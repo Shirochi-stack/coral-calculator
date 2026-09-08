@@ -22,7 +22,7 @@ A simple, offline calculator for Android with circular keys, coral accents, and 
 2. Open the downloaded file on your Android device.
 3. If Android asks, allow your browser or file manager to install apps from this source, then tap **Install**.
 
-The current APK is a debug-signed preview build. Choose the APK for installation; the `.aab` file is intended for app distribution tooling.
+The current APK is a debug-signed preview build. The APK is the only download needed to install the app; `SHA256SUMS.txt` is available for optional download verification.
 
 ## Using the calculator
 
