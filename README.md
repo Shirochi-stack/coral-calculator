@@ -4,7 +4,7 @@ A simple, offline calculator for Android with circular keys, coral accents, and 
 
 [Download the latest release](https://github.com/Shirochi-stack/coral-calculator/releases/latest) · Android 8.0 or later
 
-<img width="300" alt="Discord_U8B7XwVVNy" src="https://github.com/user-attachments/assets/8e817e2f-632a-4c0c-92b4-abaedad6d420" />
+<img width="300" src="https://github.com/user-attachments/assets/8e817e2f-632a-4c0c-92b4-abaedad6d420" />
 
 
 ## Features
