@@ -76,3 +76,7 @@ The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. The project
 Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification.md) for build and emulator checks.
 
 </details>
+
+## License
+
+Coral Calculator is available under the [MIT License](LICENSE).
