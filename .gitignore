@@ -1,0 +1,18 @@
+# Local IDE and machine configuration
+.idea/
+*.iml
+local.properties
+.DS_Store
+Thumbs.db
+
+# Build caches and generated outputs
+.gradle/
+.kotlin/
+**/build/
+captures/
+dist/
+
+# Keep private signing material out of source control
+*.jks
+*.keystore
+keystore.properties
