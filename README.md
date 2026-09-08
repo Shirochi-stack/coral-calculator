@@ -1,54 +1,77 @@
 # Coral Calculator
 
-A native Android calculator recreating the supplied circular-key layout: off-white canvas, gray memory row, coral operators, blush operator circles, red equals key, and a right-aligned expression with a live answer below.
+A simple, offline calculator for Android with circular keys, coral accents, and answers that update as you type.
 
-The reference has no visible title, so **Coral Calculator** names the layout by its accent color. The app and private repository share that name. The screenshot below is from the running Android app. Android supplies the status and navigation bars, so their icons depend on the phone.
+[Download the latest release](https://github.com/Shirochi-stack/coral-calculator/releases/latest) · Android 8.0 or later
 
 <img src="docs/screenshot.png" width="320" alt="Coral Calculator showing 52+96 with a live result of 148">
 
 ## Features
 
-- Decimal arithmetic with precedence, contextual percentages (`200 + 10% = 220`), sign toggle, backspace, and repeated equals.
-- Memory clear/add/subtract/recall; stored memory appears in coral.
-- Last 100 completed calculations, with tap-to-reuse results.
-- Offline length, mass, and temperature conversion.
-- Currency conversion using an explicitly entered exchange rate. No live rates are claimed or fetched.
-- Fullscreen control, optional dark appearance, key vibration, and long-press result copying.
-- State and memory survive rotation and relaunch. A two-pane landscape arrangement keeps the controls accessible.
-- Native buttons with accessibility labels, hardware keyboard support, and Android system-bar insets.
-- No advertisements, analytics, network permission, or runtime dependencies.
-
-The calculator opens at zero. Enter `52+96` to reproduce the example in the reference. Arithmetic uses 16 significant decimal digits; results outside decimal exponents −100 to 100 show a recoverable error.
+- **Everyday calculations:** addition, subtraction, multiplication, division, percentages, and decimal numbers.
+- **Live answers:** see the result while entering a calculation, with multiplication and division handled before addition and subtraction.
+- **Memory and history:** store a value in memory or reuse any of your last 100 completed calculations.
+- **Unit conversion:** convert length, mass, and temperature without an internet connection.
+- **Currency conversion:** calculate amounts using an exchange rate you enter yourself.
+- **Your preferred view:** switch to dark appearance or fullscreen, rotate to landscape, and turn key vibration on or off.
+- **Convenient input:** labeled buttons, hardware keyboard support, and long-press result copying.
 
 ## Install
 
-Download the APK from the repository's **Releases**, or download and unzip the `coral-calculator-debug-apk` artifact from a successful **Actions → Android build** run. Open the APK on an Android 8.0+ device and allow installation from that file source when Android prompts.
+1. Open the [latest release](https://github.com/Shirochi-stack/coral-calculator/releases/latest) and download the `.apk` file under **Assets**.
+2. Open the downloaded file on your Android device.
+3. If Android asks, allow your browser or file manager to install apps from this source, then tap **Install**.
 
-The installable APK is signed with an Android debug key and intended for direct installation and evaluation. The unsigned release AAB is a build output for subsequent production signing; it is not directly installable. Signing keys are never committed.
+The current APK is a debug-signed preview build. Choose the APK for installation; the `.aab` file is intended for app distribution tooling.
 
-## Build on Windows
+## Using the calculator
 
-Install JDK 17 and Android SDK platform 35/build-tools 35.0.0. Point `ANDROID_HOME` at the SDK or create a gitignored `local.properties` containing `sdk.dir=C:/path/to/Android/Sdk`.
+- Enter a calculation to see a live answer. Tap **=** to finish and add it to history. Tap **=** again to repeat the last operation.
+- Use **AC** to clear the calculation, **⌫** to delete the last character, and **+/−** to change the current number's sign. **AC** keeps your memory and history.
+- For percentages, `200 + 10%` gives `220`, while `200 × 10%` gives `20`.
+- Tap the **history icon** above the memory row to view completed calculations. Tap an entry to use its result.
+- Long-press the expression or result to copy the current answer.
+
+### Memory
+
+| Key | Action |
+| --- | --- |
+| **mc** | Clear the stored value. |
+| **m+** | Add the current value to memory. |
+| **m−** | Subtract the current value from memory. |
+| **mr** | Replace the current number with the stored value. |
+
+The **mr** key turns coral when memory contains a nonzero value. Your current calculation and memory are saved when you close the app.
+
+### Converters and settings
+
+The **unit converter** and **currency converter** sit beside history. Choose the units or currencies, enter an amount, and tap **Use result** to bring the converted value into the calculator. Currency conversion requires a positive exchange rate; the app does not fetch live rates.
+
+Use the **top-right settings icon** to change appearance or key vibration. The icon beside it toggles fullscreen.
+
+## Privacy
+
+Coral Calculator works entirely offline. It has no ads, analytics, accounts, or network permission. Calculation history and settings are stored on your device. Clear saved calculations from the **History** dialog.
+
+<details>
+<summary>Build from source</summary>
+
+Use JDK 17 and Android SDK platform 35 with build-tools 35.0.0. Set `ANDROID_HOME` to the SDK directory, or configure `sdk.dir` in a local `local.properties` file.
+
+On Windows:
 
 ```powershell
-.\gradlew.bat testDebugUnitTest lintDebug assembleDebug bundleRelease
+.\gradlew.bat testDebugUnitTest lintDebug assembleDebug
 ```
 
-On macOS/Linux use `./gradlew` with the same tasks. Gradle 8.11.1 is provided through the verified wrapper; Android Gradle Plugin is pinned to 8.9.2.
+On macOS or Linux:
 
-Outputs:
+```sh
+./gradlew testDebugUnitTest lintDebug assembleDebug
+```
 
-- Installable APK: `app/build/outputs/apk/debug/app-debug.apk`
-- Unsigned bundle: `app/build/outputs/bundle/release/app-release.aab`
-- Unit test report: `app/build/reports/tests/testDebugUnitTest/index.html`
-- Android lint report: `app/build/reports/lint-results-debug.html`
+The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. The project includes the Gradle wrapper, and GitHub Actions builds and checks each push and pull request.
 
-GitHub Actions runs the same checks on pushes and pull requests, and supports manual runs. Artifacts are retained for 30 days; release downloads persist.
+Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification.md) for build and emulator checks.
 
-For the UI smoke test, install the APK on a dedicated emulator, then run `python tools/smoke_test.py --serial emulator-5580` using its actual adb serial. This exercises native controls and saves portrait, dark, and landscape screenshots. It changes the test app's history/settings and emulator rotation. See [verification results](docs/verification.md).
-
-## Implementation
-
-`CalculatorLayout` places native controls using reference-derived proportions in portrait, with a separate arrangement in landscape. Toolbar graphics are vector paths. `CalculatorEngine` is pure Java and independently tested. `ConverterDialogs` provides native conversion forms. `MainActivity` handles interaction, history, settings, and local persistence.
-
-The system-bar implementation follows Android's [edge-to-edge guidance](https://developer.android.com/develop/ui/views/layout/edge-to-edge). Build versions follow the official [Android Gradle Plugin compatibility table](https://developer.android.com/build/releases/about-agp).
+</details>
