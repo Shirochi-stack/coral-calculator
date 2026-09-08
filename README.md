@@ -45,6 +45,8 @@ Outputs:
 
 GitHub Actions runs the same checks on pushes and pull requests, and supports manual runs. Artifacts are retained for 30 days; release downloads persist.
 
+For the UI smoke test, install the APK on a dedicated emulator, then run `python tools/smoke_test.py --serial emulator-5580` using its actual adb serial. This exercises native controls and saves portrait, dark, and landscape screenshots. It changes the test app's history/settings and emulator rotation. See [verification results](docs/verification.md).
+
 ## Implementation
 
 `CalculatorLayout` places native controls using reference-derived proportions in portrait, with a separate arrangement in landscape. Toolbar graphics are vector paths. `CalculatorEngine` is pure Java and independently tested. `ConverterDialogs` provides native conversion forms. `MainActivity` handles interaction, history, settings, and local persistence.

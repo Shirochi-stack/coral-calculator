@@ -42,8 +42,12 @@ def rect(node):
 
 
 def tap(label, tree=None):
-    x1, y1, x2, y2 = rect(find(label, tree))
+    tree = nodes() if tree is None else tree
+    targets = [node for node in tree if node.get("clickable") == "true"]
+    x1, y1, x2, y2 = rect(find(label, targets))
     shell("input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+    # Input injection can return before the next UI frame dispatches onClick.
+    time.sleep(.08)
 
 
 def expect_expression(value):
@@ -103,12 +107,15 @@ tap("Done")
 
 # Equals state and repeat operands survive an actual process restart.
 keys("All clear", "5", "Add", "3", "Equals")
+expect_expression("8")
 shell("am", "force-stop", package)
 shell("am", "start", "-W", "-n", package + "/.MainActivity")
+expect_expression("8")
 keys("Equals")
 expect_expression("11")
 shell("am", "force-stop", package)
 shell("am", "start", "-W", "-n", package + "/.MainActivity")
+expect_expression("11")
 keys("9")
 expect_expression("9")
 
