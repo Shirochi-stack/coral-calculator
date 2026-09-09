@@ -176,7 +176,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         theme.setOnCheckedChangeListener((button, checked) -> { dark = checked; applyTheme(); refresh(); save(); });
         content.addView(theme);
         TextView about = new TextView(this);
-        about.setText("Coral Calculator 1.0\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
+        about.setText("Coral Calculator " + BuildConfig.VERSION_NAME + "\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
         about.setTextSize(14); about.setTextColor(0xFF777777); about.setPadding(0, dp(20), 0, dp(8));
         content.addView(about);
         new AlertDialog.Builder(this).setTitle("Settings").setView(content).setPositiveButton("Done", null).show();

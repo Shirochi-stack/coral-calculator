@@ -72,15 +72,20 @@ public final class CalculatorEngine {
             return (expression + repeatOperator + format(repeatOperand))
                     .replace('-', '−').replace('*', '×').replace('/', '÷');
         }
-        return getExpression();
+        String source = completedExpression(expression);
+        return source.isEmpty() ? getExpression()
+                : source.replace('-', '−').replace('*', '×').replace('/', '÷');
     }
 
-    /** A live answer for a complete calculation, or empty while entering a value. */
+    /** Live answer, retaining the subtotal while the next operator awaits a number. */
     public String getPreview() {
         if (errorMessage != null || evaluated || expression.isEmpty()) return "";
+        String source = completedExpression(expression);
+        if (source.isEmpty()) return "";
         try {
-            Evaluation result = evaluate(expression);
-            if (result.repeatOperator == null && !expression.endsWith("%")) return "";
+            Evaluation result = evaluate(source);
+            if (source.equals(expression) && result.repeatOperator == null
+                    && !source.endsWith("%")) return "";
             return format(result.value).replace('-', '−');
         } catch (ArithmeticException | IllegalArgumentException exception) {
             return "";
@@ -96,7 +101,7 @@ public final class CalculatorEngine {
         if (errorMessage != null) return "";
         if (expression.isEmpty()) return "0";
         try {
-            return format(evaluate(expression).value);
+            return format(evaluate(completedExpression(expression)).value);
         } catch (ArithmeticException | IllegalArgumentException exception) {
             return "";
         }
@@ -176,7 +181,7 @@ public final class CalculatorEngine {
             }
             String savedError = fields[6].isEmpty() ? null : fields[6];
             if (savedError != null) {
-                if (savedEvaluated || !isComplete(savedExpression)
+                if (savedEvaluated || !isComplete(completedExpression(savedExpression))
                         || !("Cannot divide by zero".equals(savedError)
                         || "Result is outside the supported range".equals(savedError)
                         || "Cannot calculate".equals(savedError))) return;
@@ -302,13 +307,14 @@ public final class CalculatorEngine {
     private void equalsPressed() {
         if (errorMessage != null) return;
         errorMessage = null;
-        if (expression.isEmpty() || !isComplete(expression)) return;
+        String source = completedExpression(expression);
+        if (source.isEmpty()) return;
         try {
             if (evaluated && repeatOperator != null && repeatOperand != null) {
                 expression = format(apply(new BigDecimal(expression, MATH),
                         repeatOperator, repeatOperand));
             } else {
-                Evaluation result = evaluate(expression);
+                Evaluation result = evaluate(source);
                 expression = format(result.value);
                 repeatOperator = result.repeatOperator;
                 repeatOperand = result.repeatOperand;
@@ -328,11 +334,7 @@ public final class CalculatorEngine {
     private void updateMemory(boolean subtract) {
         if (errorMessage != null) return;
         try {
-            String source = expression;
-            if (!source.isEmpty() && !isComplete(source)) {
-                int end = currentNumberStart();
-                source = end > 0 ? source.substring(0, end - 1) : "";
-            }
+            String source = completedExpression(expression);
             BigDecimal value = source.isEmpty() ? BigDecimal.ZERO : evaluate(source).value;
             memory = apply(memory, subtract ? '-' : '+', value);
         } catch (ArithmeticException | IllegalArgumentException ignored) {
@@ -373,6 +375,18 @@ public final class CalculatorEngine {
 
     private static boolean isOperator(char character) {
         return character == '+' || character == '-' || character == '*' || character == '/';
+    }
+
+    /**
+     * An operator at the end is a pending entry, not an extra operand. Use the
+     * completed prefix for the subtotal and equals, while leaving editable input
+     * untouched. This also handles a pending negative operand, such as "5+3*-".
+     * Invalid arithmetic within that prefix must still be reported as an error.
+     */
+    private static String completedExpression(String source) {
+        int end = source.length();
+        while (end > 0 && isOperator(source.charAt(end - 1))) end--;
+        return source.substring(0, end);
     }
 
     private static boolean isComplete(String source) {

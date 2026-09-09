@@ -120,7 +120,7 @@ public class CalculatorEngineTest {
         enter("×", "0", "0", ".", ".", "5", "+", "×", "2", "=", "garbage");
         assertEquals("1", calculator.getExpression());
         enter("AC", "5", "+", "=");
-        assertEquals("5+", calculator.getExpression());
+        assertEquals("5", calculator.getExpression());
         assertFalse(calculator.isError());
         assertEquals("", calculator.getPreview());
     }
@@ -184,9 +184,101 @@ public class CalculatorEngineTest {
         enter("=");
         assertEquals("-3", calculator.getValue());
         enter("+");
-        assertEquals("", calculator.getValue());
+        assertEquals("-3", calculator.getValue());
         enter("⌫", "÷", "0", "=");
         assertEquals("", calculator.getValue());
+    }
+
+    @Test public void reportedLongSumShowsSubtotalAndEqualsCompletesIt() {
+        String sum = "2265+500+1700+1000+15800+12200+2500+19300+3500";
+        type(sum + "+");
+        assertEquals("58765", calculator.getPreview());
+        assertEquals("58765", calculator.getValue());
+        assertEquals(sum, calculator.getEquationForEquals());
+        assertEquals(sum + "+", calculator.getExpression());
+        enter("=");
+        assertFalse(calculator.isError());
+        assertEquals("58765", calculator.getExpression());
+        assertEquals("", calculator.getPreview());
+        assertEquals("58765+3500", calculator.getEquationForEquals());
+        enter("=");
+        assertEquals("62265", calculator.getExpression());
+    }
+
+    @Test public void equalsIgnoresEachPendingOperatorAndKeepsCompletedPrecedence() {
+        for (String operator : new String[] {"+", "−", "×", "÷"}) {
+            enter("AC");
+            type("2+3×4" + operator);
+            assertEquals(operator, "14", calculator.getPreview());
+            assertEquals(operator, "2+3×4", calculator.getEquationForEquals());
+            enter("=", "=");
+            assertFalse(calculator.isError());
+            assertEquals(operator, "26", calculator.getExpression());
+        }
+    }
+
+    @Test public void subtotalDoesNotCommitEntryBeforeTheNextOperandIsTyped() {
+        type("52+96+");
+        assertEquals("148", calculator.getPreview());
+        assertEquals("148", calculator.getValue());
+        assertEquals("52+96", calculator.getEquationForEquals());
+        assertEquals("52+96+", calculator.getExpression());
+        type("2");
+        assertEquals("52+96+2", calculator.getExpression());
+        assertEquals("150", calculator.getPreview());
+        enter("=");
+        assertEquals("150", calculator.getExpression());
+    }
+
+    @Test public void pendingOperationAfterPercentKeepsItsArithmeticContext() {
+        type("200+10%+");
+        assertEquals("220", calculator.getPreview());
+        assertEquals("200+10%", calculator.getEquationForEquals());
+        enter("=", "=");
+        assertEquals("240", calculator.getExpression());
+    }
+
+    @Test public void restoredPendingUnarySignCanFinishOrAcceptItsOperand() {
+        calculator.restore("5+3×−", "0");
+        assertEquals("8", calculator.getPreview());
+        assertEquals("8", calculator.getValue());
+        assertEquals("5+3", calculator.getEquationForEquals());
+        enter("=");
+        assertEquals("8", calculator.getExpression());
+        calculator.restore("5+3×−", "0");
+        enter("2", "=");
+        assertEquals("−1", calculator.getExpression());
+    }
+
+    @Test public void pendingOperatorNeverHidesDivisionByZeroInCompletedPrefix() {
+        type("8÷0+");
+        assertEquals("", calculator.getPreview());
+        assertEquals("", calculator.getValue());
+        assertEquals("8÷0", calculator.getEquationForEquals());
+        enter("=");
+        assertTrue(calculator.isError());
+        assertEquals("Cannot divide by zero", calculator.getErrorMessage());
+        CalculatorEngine recreated = new CalculatorEngine();
+        recreated.restoreState(calculator.saveState());
+        assertTrue(recreated.isError());
+        assertEquals("Cannot divide by zero", recreated.getErrorMessage());
+        assertEquals("", recreated.getValue());
+    }
+
+    @Test public void pendingSubtotalSurvivesRecreationAndUsesCurrentMemoryValue() {
+        type("52+96+");
+        calculator.memoryAdd();
+        assertEquals("148", calculator.getMemory());
+        CalculatorEngine recreated = new CalculatorEngine();
+        recreated.restoreState(calculator.saveState());
+        assertEquals("52+96+", recreated.getExpression());
+        assertEquals("148", recreated.getPreview());
+        recreated.input("=");
+        calculator.restoreState(recreated.saveState());
+        assertEquals("148", calculator.getExpression());
+        assertEquals("148", calculator.getMemory());
+        enter("=");
+        assertEquals("244", calculator.getExpression());
     }
 
     @Test public void resultRangeLimitIsReportedWithoutAnUnboundedString() {

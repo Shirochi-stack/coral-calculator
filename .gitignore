@@ -8,6 +8,7 @@ Thumbs.db
 # Build caches and generated outputs
 .gradle/
 .kotlin/
+__pycache__/
 **/build/
 captures/
 dist/

@@ -28,6 +28,7 @@ The current APK is a debug-signed preview build. The APK is the only download ne
 ## Using the calculator
 
 - Enter a calculation to see a live answer. Tap **=** to finish and add it to history. Tap **=** again to repeat the last operation.
+- If you leave an operator at the end, the subtotal stays visible and **=** totals the numbers already entered.
 - Use **AC** to clear the calculation, **⌫** to delete the last character, and **+/−** to change the current number's sign. **AC** keeps your memory and history.
 - For percentages, `200 + 10%` gives `220`, while `200 × 10%` gives `20`.
 - Tap the **history icon** above the memory row to view completed calculations. Tap an entry to use its result.
@@ -73,7 +74,7 @@ On macOS or Linux:
 
 The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. The project includes the Gradle wrapper, and GitHub Actions builds and checks each push and pull request.
 
-Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification.md) for build and emulator checks.
+Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification-1.0.1.md) for build and emulator checks.
 
 </details>
 
