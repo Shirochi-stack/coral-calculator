@@ -294,9 +294,8 @@ public final class CalculatorEngine {
     }
 
     private void appendOperator(char operator) {
-        if (operator == '+' && evaluated && expressionBeforeEquals != null) {
-            // Continue the visible calculation when adding another term. Other operators
-            // still apply to the finished answer, preserving their arithmetic precedence.
+        if (evaluated && expressionBeforeEquals != null) {
+            // Continue the visible equation, applying normal precedence to the full input.
             String continued = completedExpression(expressionBeforeEquals);
             if (continued.length() >= MAX_EXPRESSION_LENGTH) return;
             expression = continued;
@@ -322,17 +321,18 @@ public final class CalculatorEngine {
     }
 
     private void toggleSign() {
+        String source = evaluated && expressionBeforeEquals != null
+                ? completedExpression(expressionBeforeEquals) : expression;
+        int start = currentNumberStart(source);
+        String prefix = source.substring(0, start);
+        String number = source.substring(start);
+        String candidate = number.startsWith("-") ? prefix + number.substring(1)
+                : prefix + "-" + (number.isEmpty() ? "0" : number);
+        if (candidate.length() > MAX_EXPRESSION_LENGTH) return;
+        expression = candidate;
         expressionBeforeEquals = null;
         evaluated = false;
         resetRepeat();
-        int start = currentNumberStart();
-        String prefix = expression.substring(0, start);
-        String number = expression.substring(start);
-        if (number.startsWith("-")) {
-            expression = prefix + number.substring(1);
-        } else if (expression.length() < MAX_EXPRESSION_LENGTH - 1) {
-            expression = prefix + "-" + (number.isEmpty() ? "0" : number);
-        }
     }
 
     private void appendPercent() {
@@ -402,15 +402,19 @@ public final class CalculatorEngine {
     }
 
     private int currentNumberStart() {
-        int index = expression.length() - 1;
-        if (index >= 0 && expression.charAt(index) == '%') index--;
+        return currentNumberStart(expression);
+    }
+
+    private static int currentNumberStart(String source) {
+        int index = source.length() - 1;
+        if (index >= 0 && source.charAt(index) == '%') index--;
         while (index >= 0) {
-            char character = expression.charAt(index);
+            char character = source.charAt(index);
             if ((character >= '0' && character <= '9') || character == '.') index--;
             else break;
         }
-        if (index >= 0 && expression.charAt(index) == '-'
-                && (index == 0 || isOperator(expression.charAt(index - 1)))) index--;
+        if (index >= 0 && source.charAt(index) == '-'
+                && (index == 0 || isOperator(source.charAt(index - 1)))) index--;
         return index + 1;
     }
 

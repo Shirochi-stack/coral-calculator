@@ -31,7 +31,8 @@ The current APK is a debug-signed preview build. The APK is the only download ne
 ## Using the calculator
 
 - Enter a calculation to see a live answer. Tap **=** to finish and add it to history. Your calculation stays visible in gray above the larger answer. Tap **=** again to repeat the last operation.
-- To keep adding, tap **+** after **=**. The original equation returns for editing with `+` appended, so the numbers you entered stay visible.
+- To continue a calculation, tap **+**, **−**, **×**, or **÷** after **=**. The original equation returns for editing with that operator appended, so the numbers you entered stay visible. Normal order of operations applies: `2+3`, then **=**, then `×4`, then **=**, gives `14` from `2+3×4`.
+- Tap **+/−** after **=** to restore the equation and change the sign of its last number. For example, `5+3` becomes `5+−3`, with a live answer of `2`.
 - After **=**, tap **⌫** once to restore the calculation that produced the answer. Tap it again to delete the last character, or continue editing the restored expression.
 - If you leave an operator at the end, the subtotal stays visible and **=** totals the numbers already entered.
 - Use **AC** to clear the calculation, **⌫** to delete the last character, and **+/−** to change the current number's sign. **AC** keeps your memory and history.
@@ -79,7 +80,7 @@ On macOS or Linux:
 
 The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. The project includes the Gradle wrapper, and GitHub Actions builds and checks each push and pull request.
 
-Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification-1.0.4.md) for build and emulator checks.
+Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification-1.0.5.md) for build and emulator checks.
 
 </details>
 
