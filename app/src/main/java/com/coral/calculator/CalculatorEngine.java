@@ -294,6 +294,13 @@ public final class CalculatorEngine {
     }
 
     private void appendOperator(char operator) {
+        if (operator == '+' && evaluated && expressionBeforeEquals != null) {
+            // Continue the visible calculation when adding another term. Other operators
+            // still apply to the finished answer, preserving their arithmetic precedence.
+            String continued = completedExpression(expressionBeforeEquals);
+            if (continued.length() >= MAX_EXPRESSION_LENGTH) return;
+            expression = continued;
+        }
         expressionBeforeEquals = null;
         evaluated = false;
         resetRepeat();

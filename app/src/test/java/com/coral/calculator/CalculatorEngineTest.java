@@ -102,6 +102,151 @@ public class CalculatorEngineTest {
         assertEquals("9", calculator.getExpression());
     }
 
+    @Test public void plusAfterEqualsContinuesTheOriginalCalculationAndKeepsNewUndo() {
+        type("5645+44646");
+        enter("=", "+");
+        assertEquals("5645+44646+", calculator.getExpression());
+        assertEquals("50291", calculator.getPreview());
+        assertFalse(calculator.isEvaluated());
+        assertFalse(calculator.canUndoEquals());
+        assertEquals("", calculator.getCompletedEquation());
+        enter("9");
+        assertEquals("5645+44646+9", calculator.getExpression());
+        assertEquals("50300", calculator.getPreview());
+        enter("=");
+        assertEquals("50300", calculator.getExpression());
+        assertEquals("5645+44646+9", calculator.getCompletedEquation());
+        enter("⌫");
+        assertEquals("5645+44646+9", calculator.getExpression());
+        enter("⌫");
+        assertEquals("5645+44646+", calculator.getExpression());
+    }
+
+    @Test public void plusAfterRepeatedEqualsContinuesTheMostRecentEquation() {
+        type("5+3");
+        enter("=", "=", "+");
+        assertEquals("8+3+", calculator.getExpression());
+        assertEquals("11", calculator.getPreview());
+        enter("4", "=");
+        assertEquals("15", calculator.getExpression());
+        assertEquals("8+3+4", calculator.getCompletedEquation());
+    }
+
+    @Test public void plusContinuationNormalizesPendingOperatorsAndRetainsLaterUndoExactly() {
+        for (String suffix : new String[] {"+", "−", "×", "÷", "×−"}) {
+            calculator.restore("5+3" + suffix, "0");
+            enter("=", "+");
+            assertEquals(suffix, "5+3+", calculator.getExpression());
+            assertEquals(suffix, "8", calculator.getPreview());
+            enter("=", "⌫");
+            assertEquals(suffix, "5+3+", calculator.getExpression());
+        }
+    }
+
+    @Test public void plusContinuationSurvivesRecreationBeforeAndAfterEditing() {
+        type("52+96");
+        calculator.memoryAdd();
+        enter("=");
+        CalculatorEngine recreated = new CalculatorEngine();
+        recreated.restoreState(calculator.saveState());
+        recreated.input("+");
+        assertEquals("52+96+", recreated.getExpression());
+        calculator.restoreState(recreated.saveState());
+        assertEquals("148", calculator.getMemory());
+        enter("2", "=");
+        assertEquals("150", calculator.getExpression());
+        recreated.restoreState(calculator.saveState());
+        assertEquals("52+96+2", recreated.getCompletedEquation());
+        recreated.input("⌫");
+        assertEquals("52+96+2", recreated.getExpression());
+    }
+
+    @Test public void plusContinuationPreservesPercentContextAndRoundedSubtotals() {
+        type("200+10%");
+        enter("=", "+");
+        assertEquals("200+10%+", calculator.getExpression());
+        assertEquals("220", calculator.getPreview());
+        type("10%");
+        enter("=");
+        assertEquals("242", calculator.getExpression());
+        enter("AC");
+        type("50%");
+        enter("=", "+", "1", "=");
+        assertEquals("1.5", calculator.getExpression());
+        assertEquals("50%+1", calculator.getCompletedEquation());
+
+        enter("AC");
+        type("9999999999999999+2");
+        enter("=");
+        String subtotal = calculator.getExpression();
+        assertEquals("10000000000000000", subtotal);
+        enter("+");
+        assertEquals(subtotal, calculator.getPreview());
+        enter("9");
+        assertEquals("10000000000000010", calculator.getPreview());
+        assertEquals("9999999999999999+2+9", calculator.getExpression());
+    }
+
+    @Test public void otherOperatorsAfterEqualsStillApplyToTheFinishedAnswer() {
+        String[] operators = {"×", "÷", "−"};
+        String[] expected = {"16", "4", "6"};
+        for (int index = 0; index < operators.length; index++) {
+            enter("AC");
+            type("5+3");
+            enter("=", operators[index]);
+            assertEquals("8" + operators[index], calculator.getExpression());
+            enter("2", "=");
+            assertEquals(operators[index], expected[index], calculator.getExpression());
+        }
+    }
+
+    @Test public void plusContinuationFallsBackForLoneLegacyNewInputAndErrors() {
+        type("5");
+        enter("=", "+");
+        assertEquals("5+", calculator.getExpression());
+        calculator.restoreState("coral:1|148|25|1|+|96|");
+        enter("+");
+        assertEquals("148+", calculator.getExpression());
+        enter("AC");
+        type("5+3");
+        enter("=", "9", "+");
+        assertEquals("9+", calculator.getExpression());
+        enter("AC");
+        type("5+3");
+        enter("=", "÷", "0", "=", "+");
+        assertEquals("8÷0+", calculator.getExpression());
+        assertFalse(calculator.isEvaluated());
+        assertFalse(calculator.canUndoEquals());
+        assertEquals("", calculator.getPreview());
+        enter("=");
+        assertTrue(calculator.isError());
+    }
+
+    @Test public void plusContinuationHonorsTheExpressionLimitWithoutDiscardingTheResult() {
+        String expressionAtLimit = "1+".repeat(127) + "10";
+        assertEquals(256, expressionAtLimit.length());
+        calculator.restore(expressionAtLimit, "25");
+        enter("=");
+        String savedResult = calculator.saveState();
+        enter("+");
+        assertEquals(savedResult, calculator.saveState());
+        assertTrue(calculator.isEvaluated());
+        assertTrue(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals(expressionAtLimit, calculator.getExpression());
+
+        String nearlyFull = "1+".repeat(126) + "10";
+        assertEquals(254, nearlyFull.length());
+        calculator.restore(nearlyFull, "25");
+        enter("=", "+", "9");
+        assertEquals(nearlyFull + "+9", calculator.getExpression());
+        assertEquals(256, calculator.getExpression().length());
+        enter("=");
+        assertEquals("145", calculator.getExpression());
+        enter("⌫");
+        assertEquals(nearlyFull + "+9", calculator.getExpression());
+    }
+
     @Test public void deleteAfterEqualsRestoresEditableEquationThenDeletesNormally() {
         type("5645+44646");
         enter("=");
@@ -194,8 +339,8 @@ public class CalculatorEngineTest {
 
     @Test public void editingAfterResultClearsStaleUndoWithoutChangingDeleteBehavior() {
         String[] edits = {"9", ".", "+", "±", "%", "AC"};
-        String[] beforeDelete = {"9", "0.", "8+", "−8", "8%", "0"};
-        String[] afterDelete = {"0", "0", "8", "−", "8", "0"};
+        String[] beforeDelete = {"9", "0.", "5+3+", "−8", "8%", "0"};
+        String[] afterDelete = {"0", "0", "5+3", "−", "8", "0"};
         for (int index = 0; index < edits.length; index++) {
             enter("AC");
             type("5+3");
