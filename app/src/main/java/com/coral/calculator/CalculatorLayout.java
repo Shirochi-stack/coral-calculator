@@ -1,5 +1,7 @@
 package com.coral.calculator;
 
+import android.animation.ArgbEvaluator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
@@ -17,6 +19,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -36,6 +39,15 @@ public final class CalculatorLayout extends ViewGroup {
     private boolean dark;
     private float contentWidth;
     private boolean landscape;
+    private boolean completed;
+    private boolean displayError;
+    private boolean hasDisplay;
+    private String equationText = "";
+    private String answerText = "";
+    private DisplayTransition pendingTransition;
+    private ValueAnimator displayAnimator;
+    private static final long TRANSITION_DURATION_MS = 260;
+    private static final ArgbEvaluator COLORS = new ArgbEvaluator();
 
     public CalculatorLayout(Context context, Listener listener) {
         super(context);
@@ -101,26 +113,126 @@ public final class CalculatorLayout extends ViewGroup {
         return view;
     }
 
-    public void update(String equation, String preview, boolean error, boolean memorySet) {
+    public void update(String equation, String preview, boolean error, boolean memorySet,
+                       boolean completed, boolean animate) {
+        boolean modeChanged = this.completed != completed;
+        boolean answerChanged = completed && (!equationText.equals(equation) || !answerText.equals(preview));
+        DisplayTransition transition = animate && hasDisplay && isLaidOut()
+                && ValueAnimator.areAnimatorsEnabled() && (modeChanged || answerChanged)
+                ? new DisplayTransition(expression, result, !modeChanged) : null;
+        stopDisplayAnimation();
+        this.completed = completed;
+        displayError = error;
+        equationText = equation;
+        answerText = preview;
+        hasDisplay = true;
         SpannableString styled = new SpannableString(equation);
         for (int i = 0; i < equation.length(); i++) {
-            if ("+−×÷%".indexOf(equation.charAt(i)) >= 0)
+            if (!completed && "+−×÷%".indexOf(equation.charAt(i)) >= 0)
                 styled.setSpan(new ForegroundColorSpan(CORAL), i, i + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         expression.setText(styled);
         expression.setContentDescription("Expression: " + equation);
         result.setText(preview);
-        result.setTextColor(error ? CORAL : (dark ? 0xFF9CA2A6 : MUTED));
+        applyDisplayColors();
         result.setContentDescription(error ? preview : "Result: " + preview);
         keys[3].setContentDescription(memorySet ? "Memory recall, value stored" : "Memory recall, memory empty");
         ((TextView) keys[3]).setTextColor(memorySet ? CORAL : (dark ? 0xFFACB0B2 : 0xFF878A88));
+        pendingTransition = transition;
+        requestLayout();
+    }
+
+    private int inkColor() { return dark ? 0xFFF3F3F3 : INK; }
+    private int mutedColor() { return dark ? 0xFF9CA2A6 : MUTED; }
+
+    private void applyDisplayColors() {
+        expression.setTextColor(completed ? mutedColor() : inkColor());
+        result.setTextColor(displayError ? CORAL : completed ? inkColor() : mutedColor());
+    }
+
+    /** Captures rendered positions so a quick second key can reverse an in-flight transition. */
+    private static final class DisplayPose {
+        final float right, centerY, textSize, alpha;
+        final int color;
+
+        DisplayPose(TextView view) {
+            right = view.getRight() + view.getTranslationX();
+            centerY = (view.getTop() + view.getBottom()) / 2f + view.getTranslationY();
+            textSize = view.getTextSize() * view.getScaleX();
+            alpha = view.getAlpha();
+            color = view.getCurrentTextColor();
+        }
+    }
+
+    private static final class DisplayTransition {
+        final DisplayPose equation, answer;
+        final boolean repeated;
+
+        DisplayTransition(TextView equation, TextView answer, boolean repeated) {
+            this.equation = new DisplayPose(equation);
+            this.answer = new DisplayPose(answer);
+            this.repeated = repeated;
+        }
+    }
+
+    private void stopDisplayAnimation() {
+        pendingTransition = null;
+        if (displayAnimator != null) {
+            displayAnimator.cancel();
+            displayAnimator = null;
+        }
+        resetTransform(expression);
+        resetTransform(result);
+    }
+
+    private static void resetTransform(View view) {
+        view.setTranslationX(0);
+        view.setTranslationY(0);
+        view.setScaleX(1);
+        view.setScaleY(1);
+        view.setAlpha(1);
+    }
+
+    private void animateDisplay(DisplayTransition transition) {
+        if (!ValueAnimator.areAnimatorsEnabled()) return;
+        int equationColor = completed ? mutedColor() : inkColor();
+        int answerColor = displayError ? CORAL : completed ? inkColor() : mutedColor();
+        displayAnimator = ValueAnimator.ofFloat(0, 1);
+        displayAnimator.setDuration(TRANSITION_DURATION_MS);
+        displayAnimator.setInterpolator(new DecelerateInterpolator());
+        displayAnimator.addUpdateListener(animation -> {
+            float progress = (float) animation.getAnimatedValue();
+            animatePose(expression, transition.equation, equationColor, progress, transition.repeated);
+            animatePose(result, transition.answer, answerColor, progress, transition.repeated);
+        });
+        // Apply the starting pose before the first frame to avoid flashing the final layout.
+        animatePose(expression, transition.equation, equationColor, 0, transition.repeated);
+        animatePose(result, transition.answer, answerColor, 0, transition.repeated);
+        displayAnimator.start();
+    }
+
+    private void animatePose(TextView view, DisplayPose from, int color, float progress, boolean repeated) {
+        float remaining = 1 - progress;
+        float scale = from.textSize / view.getTextSize();
+        float offset = repeated ? contentWidth * .012f : 0;
+        view.setTranslationX((from.right - view.getRight()) * remaining);
+        view.setTranslationY((from.centerY - (view.getTop() + view.getBottom()) / 2f + offset) * remaining);
+        view.setScaleX(1 + (scale - 1) * remaining);
+        view.setScaleY(1 + (scale - 1) * remaining);
+        view.setAlpha(1 + ((repeated ? .45f : from.alpha) - 1) * remaining);
+        view.setTextColor((int) COLORS.evaluate(progress, from.color, color));
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        stopDisplayAnimation();
+        super.onDetachedFromWindow();
     }
 
     public void setDark(boolean enabled) {
+        stopDisplayAnimation();
         dark = enabled;
         setBackgroundColor(enabled ? 0xFF17191B : BACKGROUND);
-        expression.setTextColor(enabled ? 0xFFF3F3F3 : INK);
-        result.setTextColor(enabled ? 0xFF9CA2A6 : MUTED);
+        applyDisplayColors();
         for (int i = 0; i < keys.length; i++) {
             boolean operator = i >= 7 && i % 4 == 3;
             int background = i == 23 ? CORAL : operator ? (enabled ? 0xFF44292E : 0xFFFCE9EB) : (enabled ? 0xFF24272A : 0xFFF3F3F3);
@@ -161,10 +273,10 @@ public final class CalculatorLayout extends ViewGroup {
         }
         int touchSize = Math.round(Math.max(48 * getResources().getDisplayMetrics().density, w * .092f));
         for (View tool : tools) tool.measure(exact(touchSize), exact(touchSize));
-        expression.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * .132f)), 1, TypedValue.COMPLEX_UNIT_PX);
-        result.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * .08f)), 1, TypedValue.COMPLEX_UNIT_PX);
-        expression.measure(exact(Math.round(w * .88f)), exact(Math.round(w * .166f)));
-        result.measure(exact(Math.round(w * .88f)), exact(Math.round(w * .105f)));
+        expression.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .072f : .132f))), 1, TypedValue.COMPLEX_UNIT_PX);
+        result.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .132f : .08f))), 1, TypedValue.COMPLEX_UNIT_PX);
+        expression.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .10f : .166f))));
+        result.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .166f : .105f))));
     }
 
     private static int exact(int size) { return MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY); }
@@ -186,11 +298,12 @@ public final class CalculatorLayout extends ViewGroup {
             for (int i = 0; i < keys.length; i++) center(keys[i], gridStart + w * (.12f + (i % 4) * .25f), top + h * (.08f + (i / 4) * .165f));
             center(tools[0], start + w * .69f, top + h * .12f);
             center(tools[1], start + w * .89f, top + h * .12f);
-            place(expression, start + w * .06f, top + h * .36f);
-            place(result, start + w * .06f, top + h * .60f);
+            place(expression, start + w * .06f, top + h * (completed ? .39f : .36f));
+            place(result, start + w * .06f, top + h * (completed ? .54f : .60f));
             center(tools[2], start + w * .14f, top + h * .86f);
             center(tools[3], start + w * .36f, top + h * .86f);
             center(tools[4], start + w * .58f, top + h * .86f);
+            finishDisplayLayout(changed);
             return;
         }
         float lastCenter = top + h - w * .182f;
@@ -201,10 +314,26 @@ public final class CalculatorLayout extends ViewGroup {
         center(tools[4], x + w * .388f, utilityY);
         float expressionY = utilityY - w * .385f;
         place(expression, x + w * .072f, expressionY);
-        place(result, x + w * .072f, utilityY - w * .202f);
+        place(result, x + w * .072f, utilityY - w * (completed ? .265f : .202f));
         float headerY = top + Math.max(w * .077f, (expressionY - top) * .46f) + w * .024f;
         center(tools[0], x + w * .793f, headerY);
         center(tools[1], x + w * .925f, headerY);
+        finishDisplayLayout(changed);
+    }
+
+    private void finishDisplayLayout(boolean changed) {
+        expression.setPivotX(expression.getWidth());
+        expression.setPivotY(expression.getHeight() / 2f);
+        result.setPivotX(result.getWidth());
+        result.setPivotY(result.getHeight() / 2f);
+        if (pendingTransition != null) {
+            DisplayTransition transition = pendingTransition;
+            pendingTransition = null;
+            animateDisplay(transition);
+        } else if (changed) {
+            stopDisplayAnimation();
+            applyDisplayColors();
+        }
     }
 
     /** Icons remain actual focusable Views, so TalkBack and keyboard navigation work. */

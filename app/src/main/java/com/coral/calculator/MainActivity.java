@@ -111,14 +111,21 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
             history.add(0, new String[]{before, engine.getValue()});
             if (history.size() > 100) history.remove(history.size() - 1);
         }
-        refresh();
+        refresh(true);
         save();
     }
 
     private void refresh() {
-        layout.update(NumberFormatter.format(engine.getExpression()),
-                engine.isError() ? engine.getErrorMessage() : NumberFormatter.format(engine.getPreview()),
-                engine.isError(), !"0".equals(engine.getMemory()));
+        refresh(false);
+    }
+
+    private void refresh(boolean animate) {
+        boolean completed = engine.isEvaluated();
+        String equation = completed ? engine.getCompletedEquation() : engine.getExpression();
+        String answer = completed ? engine.getExpression() : engine.getPreview();
+        layout.update(NumberFormatter.format(equation),
+                engine.isError() ? engine.getErrorMessage() : NumberFormatter.format(answer),
+                engine.isError(), !"0".equals(engine.getMemory()), completed, animate);
     }
 
     private void save() {
@@ -213,12 +220,26 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     }
     private int dp(float value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
-    @Override public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) { onKey("="); return true; }
-        if (keyCode == KeyEvent.KEYCODE_DEL) { onKey("⌫"); return true; }
-        if (keyCode == KeyEvent.KEYCODE_ESCAPE) { onKey("AC"); return true; }
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        // Handle both halves before a focused button consumes Enter. Dialog windows
+        // retain their own input, while Tab, Space and D-pad navigation work normally.
+        if (!event.isCtrlPressed() && !event.isAltPressed() && !event.isMetaPressed()
+                && (event.getAction() == KeyEvent.ACTION_DOWN || event.getAction() == KeyEvent.ACTION_UP)) {
+            String key = calculatorKey(event);
+            if (key != null) {
+                if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) onKey(key);
+                return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    private String calculatorKey(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) return "=";
+        if (keyCode == KeyEvent.KEYCODE_DEL) return "⌫";
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE) return "AC";
         char typed = (char) event.getUnicodeChar();
-        if ("0123456789.+-*/%=".indexOf(typed) >= 0) { onKey(String.valueOf(typed)); return true; }
-        return super.onKeyUp(keyCode, event);
+        return "0123456789.+-*/%=".indexOf(typed) >= 0 ? String.valueOf(typed) : null;
     }
 }

@@ -563,6 +563,119 @@ public class CalculatorEngineTest {
         assertEquals("−6×−3", calculator.getEquationForEquals());
     }
 
+    @Test public void completedEquationDescribesTheCurrentAnswerRatherThanTheNextRepeat() {
+        assertFalse(calculator.isEvaluated());
+        assertEquals("", calculator.getCompletedEquation());
+        type("5645+44646");
+        assertFalse(calculator.isEvaluated());
+        assertEquals("", calculator.getCompletedEquation());
+        enter("=");
+        assertTrue(calculator.isEvaluated());
+        assertEquals("50291", calculator.getExpression());
+        assertEquals("5645+44646", calculator.getCompletedEquation());
+        assertEquals("50291+44646", calculator.getEquationForEquals());
+        enter("=");
+        assertEquals("94937", calculator.getExpression());
+        assertEquals("50291+44646", calculator.getCompletedEquation());
+        assertEquals("94937+44646", calculator.getEquationForEquals());
+    }
+
+    @Test public void completedEquationKeepsPercentContextThenShowsTheResolvedRepeatedOperand() {
+        type("200.00+10%");
+        enter("=");
+        assertEquals("200.00+10%", calculator.getCompletedEquation());
+        assertEquals("220", calculator.getExpression());
+        enter("=");
+        assertEquals("220+20", calculator.getCompletedEquation());
+        assertEquals("240", calculator.getExpression());
+        enter("AC");
+        type("50%");
+        enter("=", "=");
+        assertTrue(calculator.isEvaluated());
+        assertEquals("50%", calculator.getCompletedEquation());
+        assertEquals("0.5", calculator.getExpression());
+    }
+
+    @Test public void completedEquationOmitsPendingInputWithoutLosingExactUndoText() {
+        calculator.restore("−5+3×−2÷", "0");
+        enter("=");
+        assertEquals("−5+3×−2", calculator.getCompletedEquation());
+        assertEquals("−11", calculator.getExpression());
+        enter("⌫");
+        assertFalse(calculator.isEvaluated());
+        assertEquals("", calculator.getCompletedEquation());
+        assertEquals("−5+3×−2÷", calculator.getExpression());
+        calculator.restore("5+3×−", "0");
+        enter("=");
+        assertEquals("5+3", calculator.getCompletedEquation());
+        enter("⌫");
+        assertEquals("5+3×−", calculator.getExpression());
+    }
+
+    @Test public void completedEquationSurvivesResultRecreationWithoutChangingItsSnapshot() {
+        type("200+10%+");
+        enter("=");
+        String snapshot = calculator.saveState();
+        CalculatorEngine recreated = new CalculatorEngine();
+        recreated.restoreState(snapshot);
+        assertTrue(recreated.isEvaluated());
+        assertEquals("200+10%", recreated.getCompletedEquation());
+        assertEquals(snapshot, recreated.saveState());
+        recreated.input("=");
+        calculator.restoreState(recreated.saveState());
+        assertTrue(calculator.isEvaluated());
+        assertEquals("220+20", calculator.getCompletedEquation());
+        enter("⌫");
+        recreated.restoreState(calculator.saveState());
+        assertFalse(recreated.isEvaluated());
+        assertEquals("", recreated.getCompletedEquation());
+        assertEquals("220+20", recreated.getExpression());
+    }
+
+    @Test public void completedEquationIsClearedOnEditingRecallAndErrors() {
+        for (String edit : new String[] {"9", ".", "+", "±", "%", "AC", "⌫"}) {
+            enter("AC");
+            type("5+3");
+            enter("=", edit);
+            assertFalse(edit, calculator.isEvaluated());
+            assertEquals(edit, "", calculator.getCompletedEquation());
+        }
+        enter("AC");
+        type("5+3");
+        enter("=");
+        calculator.memoryAdd();
+        assertEquals("5+3", calculator.getCompletedEquation());
+        calculator.memoryRecall();
+        assertFalse(calculator.isEvaluated());
+        assertEquals("", calculator.getCompletedEquation());
+        enter("÷", "0", "=");
+        assertTrue(calculator.isError());
+        assertFalse(calculator.isEvaluated());
+        assertEquals("", calculator.getCompletedEquation());
+        calculator.restoreState(calculator.saveState());
+        assertTrue(calculator.isError());
+        assertEquals("", calculator.getCompletedEquation());
+    }
+
+    @Test public void completedEquationUsesTheCurrentValueForLoneAndLegacyResults() {
+        type("500");
+        enter("=", "=");
+        assertTrue(calculator.isEvaluated());
+        assertEquals("500", calculator.getCompletedEquation());
+        assertFalse(calculator.canUndoEquals());
+        calculator.restoreState("coral:1|148|25|1|+|96|");
+        assertTrue(calculator.isEvaluated());
+        assertEquals("148", calculator.getCompletedEquation());
+        assertEquals("148+96", calculator.getEquationForEquals());
+        assertFalse(calculator.canUndoEquals());
+        enter("=");
+        assertEquals("148+96", calculator.getCompletedEquation());
+        assertEquals("244", calculator.getExpression());
+        calculator.restoreState("coral:2|-8|0|1||||");
+        assertTrue(calculator.isEvaluated());
+        assertEquals("−8", calculator.getCompletedEquation());
+    }
+
     @Test public void recreatedEntryKeepsEditingAndPreservesMemory() {
         calculator.restore("2×−", "−5.25");
         CalculatorEngine recreated = new CalculatorEngine();

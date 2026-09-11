@@ -79,6 +79,14 @@ public final class CalculatorEngine {
                 : source.replace('-', '−').replace('*', '×').replace('/', '÷');
     }
 
+    /** The last equation actually evaluated, for display above its completed answer. */
+    public String getCompletedEquation() {
+        if (!isEvaluated()) return "";
+        String source = completedExpression(expressionBeforeEquals == null
+                ? expression : expressionBeforeEquals);
+        return source.replace('-', '−').replace('*', '×').replace('/', '÷');
+    }
+
     /** Live answer, retaining the subtotal while the next operator awaits a number. */
     public String getPreview() {
         if (errorMessage != null || evaluated || expression.isEmpty()) return "";
@@ -111,6 +119,11 @@ public final class CalculatorEngine {
 
     public boolean isError() {
         return errorMessage != null;
+    }
+
+    /** Whether the display currently contains a successfully completed answer. */
+    public boolean isEvaluated() {
+        return evaluated && errorMessage == null;
     }
 
     /** Whether the next delete press restores the most recently completed equation. */
