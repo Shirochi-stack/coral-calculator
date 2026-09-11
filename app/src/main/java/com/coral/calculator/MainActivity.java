@@ -116,7 +116,9 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     }
 
     private void refresh() {
-        layout.update(engine.getExpression(), engine.isError() ? engine.getErrorMessage() : engine.getPreview(), engine.isError(), !"0".equals(engine.getMemory()));
+        layout.update(NumberFormatter.format(engine.getExpression()),
+                engine.isError() ? engine.getErrorMessage() : NumberFormatter.format(engine.getPreview()),
+                engine.isError(), !"0".equals(engine.getMemory()));
     }
 
     private void save() {
@@ -193,8 +195,10 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         AlertDialog dialog = builder.setView(scroll).setNeutralButton("Clear history", (d, which) -> { history.clear(); save(); }).create();
         for (String[] entry : history) {
             TextView row = new TextView(this);
-            row.setText(entry[0] + "\n= " + entry[1]); row.setTextSize(20); row.setTextColor(0xFF363936);
-            row.setPadding(0, dp(12), 0, dp(16)); row.setContentDescription(entry[0] + " equals " + entry[1] + ". Tap to use result");
+            String equation = NumberFormatter.format(entry[0]);
+            String answer = NumberFormatter.format(entry[1]);
+            row.setText(equation + "\n= " + answer); row.setTextSize(20); row.setTextColor(0xFF363936);
+            row.setPadding(0, dp(12), 0, dp(16)); row.setContentDescription(equation + " equals " + answer + ". Tap to use result");
             row.setBackgroundResource(android.R.drawable.list_selector_background);
             row.setOnClickListener(v -> { useValue(entry[1]); dialog.dismiss(); });
             content.addView(row);

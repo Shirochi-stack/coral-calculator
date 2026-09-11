@@ -136,8 +136,9 @@ public final class ConverterDialogs {
                 return;
             }
             resultValue = converted;
-            result.setText(resultValue + (suffix.isEmpty() ? "" : " " + suffix));
-            result.setContentDescription("Result: " + resultValue + " " + suffix);
+            String displayValue = NumberFormatter.format(resultValue);
+            result.setText(displayValue + (suffix.isEmpty() ? "" : " " + suffix));
+            result.setContentDescription("Result: " + displayValue + " " + suffix);
             status.setText(explanation);
             status.setTextColor(MUTED);
             if (dialog != null && dialog.isShowing()) {

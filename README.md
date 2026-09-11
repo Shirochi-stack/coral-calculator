@@ -11,6 +11,8 @@ A simple, offline calculator for Android with circular keys, coral accents, and 
 
 - **Everyday calculations:** addition, subtraction, multiplication, division, percentages, and decimal numbers.
 - **Live answers:** see the result while entering a calculation, with multiplication and division handled before addition and subtraction.
+- **Easy corrections:** press backspace after equals to return to the calculation and edit it.
+- **Readable numbers:** thousands separators make large values easier to read, such as `1,000`, `10,000`, and `100,000`.
 - **Memory and history:** store a value in memory or reuse any of your last 100 completed calculations.
 - **Unit conversion:** convert length, mass, and temperature without an internet connection.
 - **Currency conversion:** calculate amounts using an exchange rate you enter yourself.
@@ -28,6 +30,7 @@ The current APK is a debug-signed preview build. The APK is the only download ne
 ## Using the calculator
 
 - Enter a calculation to see a live answer. Tap **=** to finish and add it to history. Tap **=** again to repeat the last operation.
+- After **=**, tap **⌫** once to restore the calculation that produced the answer. Tap it again to delete the last character, or continue editing the restored expression.
 - If you leave an operator at the end, the subtotal stays visible and **=** totals the numbers already entered.
 - Use **AC** to clear the calculation, **⌫** to delete the last character, and **+/−** to change the current number's sign. **AC** keeps your memory and history.
 - For percentages, `200 + 10%` gives `220`, while `200 × 10%` gives `20`.
@@ -74,7 +77,7 @@ On macOS or Linux:
 
 The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. The project includes the Gradle wrapper, and GitHub Actions builds and checks each push and pull request.
 
-Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification-1.0.1.md) for build and emulator checks.
+Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification-1.0.2.md) for build and emulator checks.
 
 </details>
 

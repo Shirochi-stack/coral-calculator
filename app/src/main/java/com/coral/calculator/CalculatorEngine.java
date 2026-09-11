@@ -10,7 +10,8 @@ public final class CalculatorEngine {
     private static final int MAX_INPUT_DIGITS = 16;
     private static final int MAX_EXPRESSION_LENGTH = 256;
     private static final int MAX_EXPONENT = 100;
-    private static final String STATE_VERSION = "coral:1";
+    private static final String STATE_VERSION = "coral:2";
+    private static final String LEGACY_STATE_VERSION = "coral:1";
 
     private String expression = "";
     private BigDecimal memory = BigDecimal.ZERO;
@@ -18,6 +19,7 @@ public final class CalculatorEngine {
     private String errorMessage;
     private Character repeatOperator;
     private BigDecimal repeatOperand;
+    private String expressionBeforeEquals;
 
     public CalculatorEngine() {}
 
@@ -111,6 +113,11 @@ public final class CalculatorEngine {
         return errorMessage != null;
     }
 
+    /** Whether the next delete press restores the most recently completed equation. */
+    public boolean canUndoEquals() {
+        return evaluated && expressionBeforeEquals != null;
+    }
+
     public String getErrorMessage() {
         return errorMessage == null ? "" : errorMessage;
     }
@@ -128,6 +135,7 @@ public final class CalculatorEngine {
     }
 
     public void memoryRecall() {
+        expressionBeforeEquals = null;
         String recalled = format(memory);
         String candidate;
         if (evaluated || expression.isEmpty()) {
@@ -153,17 +161,19 @@ public final class CalculatorEngine {
                 + (evaluated ? "1" : "0") + "|"
                 + (repeatOperator == null ? "" : repeatOperator.toString()) + "|"
                 + (repeatOperand == null ? "" : format(repeatOperand)) + "|"
-                + (errorMessage == null ? "" : errorMessage);
+                + (errorMessage == null ? "" : errorMessage) + "|"
+                + (expressionBeforeEquals == null ? "" : expressionBeforeEquals);
     }
 
     /** Restores a full snapshot, or resets display and memory if it is malformed. */
     public void restoreState(String serializedState) {
         clear();
         memory = BigDecimal.ZERO;
-        if (serializedState == null || serializedState.length() > MAX_EXPRESSION_LENGTH * 3) return;
+        if (serializedState == null || serializedState.length() > MAX_EXPRESSION_LENGTH * 4) return;
         try {
             String[] fields = serializedState.split("\\|", -1);
-            if (fields.length != 7 || !STATE_VERSION.equals(fields[0])) return;
+            boolean legacy = fields.length == 7 && LEGACY_STATE_VERSION.equals(fields[0]);
+            if (!legacy && (fields.length != 8 || !STATE_VERSION.equals(fields[0]))) return;
             String savedExpression = fields[1];
             if (savedExpression.length() > MAX_EXPRESSION_LENGTH
                     || !structurallyValid(savedExpression)) return;
@@ -189,12 +199,26 @@ public final class CalculatorEngine {
             // A completed calculation always stores one canonical numeric result.
             if (savedEvaluated) savedDecimal(savedExpression);
 
+            String savedUndo = legacy || fields[7].isEmpty() ? null : fields[7];
+            if (savedUndo != null) {
+                if (!savedEvaluated || savedError != null
+                        || savedUndo.length() > MAX_EXPRESSION_LENGTH
+                        || savedUndo.equals(savedExpression) || !structurallyValid(savedUndo)) return;
+                // Reject stale equations and impossible repeat state, including out-of-range
+                // operands/results, before allowing a snapshot to change the next delete key.
+                Evaluation undone = evaluate(completedExpression(savedUndo));
+                if (!format(undone.value).equals(savedExpression)
+                        || !sameOperator(undone.repeatOperator, savedOperator)
+                        || !sameNumber(undone.repeatOperand, savedOperand)) return;
+            }
+
             expression = savedExpression;
             memory = savedMemory;
             evaluated = savedEvaluated;
             repeatOperator = savedOperator;
             repeatOperand = savedOperand;
             errorMessage = savedError;
+            expressionBeforeEquals = savedUndo;
         } catch (ArithmeticException | IllegalArgumentException ignored) {
             // All fields are checked before any restored state is committed.
         }
@@ -224,10 +248,12 @@ public final class CalculatorEngine {
         expression = "";
         evaluated = false;
         errorMessage = null;
+        expressionBeforeEquals = null;
         resetRepeat();
     }
 
     private void prepareNumericInput() {
+        expressionBeforeEquals = null;
         if (evaluated || errorMessage != null) expression = "";
         evaluated = false;
         errorMessage = null;
@@ -255,6 +281,7 @@ public final class CalculatorEngine {
     }
 
     private void appendOperator(char operator) {
+        expressionBeforeEquals = null;
         evaluated = false;
         resetRepeat();
         if (expression.isEmpty() || "-".equals(expression)) {
@@ -275,6 +302,7 @@ public final class CalculatorEngine {
     }
 
     private void toggleSign() {
+        expressionBeforeEquals = null;
         evaluated = false;
         resetRepeat();
         int start = currentNumberStart();
@@ -288,6 +316,7 @@ public final class CalculatorEngine {
     }
 
     private void appendPercent() {
+        expressionBeforeEquals = null;
         if (expression.isEmpty() || expression.endsWith("%")
                 || expression.length() >= MAX_EXPRESSION_LENGTH) return;
         char last = expression.charAt(expression.length() - 1);
@@ -298,19 +327,26 @@ public final class CalculatorEngine {
     }
 
     private void backspace() {
+        String undo = canUndoEquals() ? expressionBeforeEquals : null;
+        expressionBeforeEquals = null;
         errorMessage = null;
         evaluated = false;
         resetRepeat();
-        if (!expression.isEmpty()) expression = expression.substring(0, expression.length() - 1);
+        if (undo != null) expression = undo;
+        else if (!expression.isEmpty()) expression = expression.substring(0, expression.length() - 1);
     }
 
     private void equalsPressed() {
         if (errorMessage != null) return;
+        // Re-evaluating an already finished lone value does not replace its undo target.
+        if (evaluated && repeatOperator == null) return;
         errorMessage = null;
         String source = completedExpression(expression);
         if (source.isEmpty()) return;
         try {
+            String undo = expression;
             if (evaluated && repeatOperator != null && repeatOperand != null) {
+                undo = expression + repeatOperator + format(repeatOperand);
                 expression = format(apply(new BigDecimal(expression, MATH),
                         repeatOperator, repeatOperand));
             } else {
@@ -319,12 +355,15 @@ public final class CalculatorEngine {
                 repeatOperator = result.repeatOperator;
                 repeatOperand = result.repeatOperand;
             }
+            expressionBeforeEquals = undo.equals(expression) ? null : undo;
             evaluated = true;
         } catch (ArithmeticException exception) {
+            expressionBeforeEquals = null;
             errorMessage = exception.getMessage() == null ? "Cannot calculate" : exception.getMessage();
             evaluated = false;
             resetRepeat();
         } catch (IllegalArgumentException exception) {
+            expressionBeforeEquals = null;
             errorMessage = "Cannot calculate";
             evaluated = false;
             resetRepeat();
@@ -358,6 +397,14 @@ public final class CalculatorEngine {
     private void resetRepeat() {
         repeatOperator = null;
         repeatOperand = null;
+    }
+
+    private static boolean sameOperator(Character first, Character second) {
+        return first == null ? second == null : first.equals(second);
+    }
+
+    private static boolean sameNumber(BigDecimal first, BigDecimal second) {
+        return first == null ? second == null : second != null && first.compareTo(second) == 0;
     }
 
     private static String normalize(String value) {

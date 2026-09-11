@@ -102,6 +102,152 @@ public class CalculatorEngineTest {
         assertEquals("9", calculator.getExpression());
     }
 
+    @Test public void deleteAfterEqualsRestoresEditableEquationThenDeletesNormally() {
+        type("5645+44646");
+        enter("=");
+        assertEquals("50291", calculator.getExpression());
+        assertTrue(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("5645+44646", calculator.getExpression());
+        assertEquals("50291", calculator.getPreview());
+        assertFalse(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("5645+4464", calculator.getExpression());
+        assertEquals("10109", calculator.getPreview());
+        enter("7", "=");
+        assertEquals("50292", calculator.getExpression());
+        enter("DEL");
+        assertEquals("5645+44647", calculator.getExpression());
+    }
+
+    @Test public void repeatedEqualsUndoRestoresTheMostRecentResolvedOperation() {
+        type("5+3");
+        enter("=", "=");
+        assertEquals("11", calculator.getExpression());
+        enter("⌫");
+        assertEquals("8+3", calculator.getExpression());
+        assertEquals("11", calculator.getPreview());
+        enter("=", "=", "⌫");
+        assertEquals("11+3", calculator.getExpression());
+
+        enter("AC");
+        type("2+3×4");
+        enter("=", "=", "⌫");
+        assertEquals("14+12", calculator.getExpression());
+        assertEquals("26", calculator.getPreview());
+    }
+
+    @Test public void undoPreservesTypedDecimalsNegativeOperandsAndPercentContext() {
+        type("200.00+10%");
+        enter("=", "⌫");
+        assertEquals("200.00+10%", calculator.getExpression());
+        assertEquals("220", calculator.getPreview());
+        enter("=", "=", "⌫");
+        assertEquals("220+20", calculator.getExpression());
+        assertEquals("240", calculator.getPreview());
+        enter("AC");
+        type("2×3");
+        enter("±", "=", "⌫");
+        assertEquals("2×−3", calculator.getExpression());
+        assertEquals("−6", calculator.getPreview());
+        enter("=", "=", "⌫");
+        assertEquals("−6×−3", calculator.getExpression());
+        assertEquals("18", calculator.getPreview());
+    }
+
+    @Test public void undoPreservesAllPendingOperatorsAndPendingUnarySign() {
+        for (String operator : new String[] {"+", "−", "×", "÷"}) {
+            enter("AC");
+            type("5+3" + operator);
+            enter("=", "⌫");
+            assertEquals("5+3" + operator, calculator.getExpression());
+            assertEquals("8", calculator.getPreview());
+            enter("2", "=");
+            assertFalse(calculator.isError());
+        }
+        calculator.restore("5+3×−", "0");
+        enter("=", "⌫");
+        assertEquals("5+3×−", calculator.getExpression());
+        assertEquals("8", calculator.getPreview());
+        enter("2", "=");
+        assertEquals("−1", calculator.getExpression());
+    }
+
+    @Test public void repeatedNoOpEqualsRetainsPercentAndPendingOperatorUndo() {
+        type("50%");
+        enter("=", "=", "=", "⌫");
+        assertEquals("50%", calculator.getExpression());
+        assertEquals("0.5", calculator.getPreview());
+        enter("AC");
+        type("5+");
+        enter("=", "=", "⌫");
+        assertEquals("5+", calculator.getExpression());
+        enter("AC");
+        type("5.");
+        enter("=", "=", "⌫");
+        assertEquals("5.", calculator.getExpression());
+        enter("AC", "5", "=");
+        assertFalse(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("0", calculator.getExpression());
+    }
+
+    @Test public void editingAfterResultClearsStaleUndoWithoutChangingDeleteBehavior() {
+        String[] edits = {"9", ".", "+", "±", "%", "AC"};
+        String[] beforeDelete = {"9", "0.", "8+", "−8", "8%", "0"};
+        String[] afterDelete = {"0", "0", "8", "−", "8", "0"};
+        for (int index = 0; index < edits.length; index++) {
+            enter("AC");
+            type("5+3");
+            enter("=", edits[index]);
+            assertFalse(edits[index], calculator.canUndoEquals());
+            assertEquals(edits[index], beforeDelete[index], calculator.getExpression());
+            enter("⌫");
+            assertEquals(edits[index], afterDelete[index], calculator.getExpression());
+        }
+    }
+
+    @Test public void memoryChangesPreserveUndoButRecallStartsEditingTheRecalledValue() {
+        type("5+3");
+        enter("=");
+        calculator.memoryAdd();
+        calculator.memorySubtract();
+        calculator.memoryClear();
+        assertTrue(calculator.canUndoEquals());
+        calculator.memoryAdd();
+        enter("⌫");
+        assertEquals("5+3", calculator.getExpression());
+        assertEquals("8", calculator.getMemory());
+        enter("=");
+        calculator.memoryRecall();
+        assertFalse(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("0", calculator.getExpression());
+    }
+
+    @Test public void errorsNeverUndoAnEarlierSuccessfulCalculation() {
+        type("5+3");
+        enter("=", "÷", "0", "=");
+        assertTrue(calculator.isError());
+        assertFalse(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("8÷", calculator.getExpression());
+        assertFalse(calculator.isError());
+        enter("2", "=", "⌫");
+        assertEquals("8÷2", calculator.getExpression());
+        assertEquals("4", calculator.getPreview());
+
+        enter("AC");
+        type("9999999999999999×9999999999999999");
+        for (int index = 0; index < 10 && !calculator.isError(); index++) enter("=");
+        assertTrue(calculator.isError());
+        assertFalse(calculator.canUndoEquals());
+        String failedExpression = calculator.getExpression();
+        enter("⌫");
+        assertEquals(failedExpression.substring(0, failedExpression.length() - 1),
+                calculator.getExpression());
+    }
+
     @Test public void zeroDivisionIsRecoverableByEditingOrNewInput() {
         type("8÷0");
         assertEquals("", calculator.getPreview());
@@ -317,6 +463,90 @@ public class CalculatorEngineTest {
         recreated.restoreState(calculator.saveState());
         recreated.input("=");
         assertEquals("26", recreated.getExpression());
+    }
+
+    @Test public void snapshotPreservesUndoThenOrdinaryEditingAcrossRecreation() {
+        type("200.00+10%+");
+        calculator.memoryAdd();
+        enter("=");
+        String resultSnapshot = calculator.saveState();
+        assertTrue(resultSnapshot.startsWith("coral:2|"));
+        CalculatorEngine recreated = new CalculatorEngine();
+        recreated.restoreState(resultSnapshot);
+        assertEquals(resultSnapshot, recreated.saveState());
+        assertTrue(recreated.canUndoEquals());
+        recreated.input("⌫");
+        assertEquals("200.00+10%+", recreated.getExpression());
+        assertEquals("220", recreated.getPreview());
+        assertEquals("220", recreated.getMemory());
+        calculator.restoreState(recreated.saveState());
+        assertFalse(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("200.00+10%", calculator.getExpression());
+        enter("=", "=");
+        recreated.restoreState(calculator.saveState());
+        recreated.input("⌫");
+        assertEquals("220+20", recreated.getExpression());
+        assertEquals("240", recreated.getPreview());
+    }
+
+    @Test public void legacySnapshotsMigrateWithoutInventingAnUndoEquation() {
+        calculator.restoreState("coral:1|148|25|1|+|96|");
+        assertEquals("148", calculator.getExpression());
+        assertEquals("25", calculator.getMemory());
+        assertFalse(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("14", calculator.getExpression());
+        calculator.restoreState("coral:1|148|25|1|+|96|");
+        enter("=");
+        assertEquals("244", calculator.getExpression());
+        enter("⌫");
+        assertEquals("148+96", calculator.getExpression());
+
+        calculator.restoreState("coral:1|52+96+|25|0|||");
+        assertEquals("148", calculator.getPreview());
+        enter("=", "⌫");
+        assertEquals("52+96+", calculator.getExpression());
+        calculator.restoreState("coral:1|8/0|25|0|||Cannot divide by zero");
+        assertTrue(calculator.isError());
+        assertEquals("25", calculator.getMemory());
+        assertFalse(calculator.canUndoEquals());
+        enter("⌫");
+        assertEquals("8÷", calculator.getExpression());
+    }
+
+    @Test public void malformedOrStaleUndoSnapshotsResetAllState() {
+        String[] malformed = {
+                "coral:2|8|17|1|+|3|",
+                "coral:2|8|17|1|+|3||5+3|extra",
+                "coral:2|8|17|0|||5+3|5+3",
+                "coral:2|8|17|0||||5+3",
+                "coral:2|8|17|1|+|3||5+4",
+                "coral:2|8|17|1|+|4||5+3",
+                "coral:2|8|17|1|-|3||5+3",
+                "coral:2|8|17|1|||5+3|5+3",
+                "coral:2|8|17|1|||Cannot divide by zero|5+3",
+                "coral:2|8|17|1|+|3||5+3<script>",
+                "coral:2|8|17|1|+|3||5++3",
+                "coral:2|8|17|1|+|3||5,000+3",
+                "coral:2|8|17|1|+|3||5+3||",
+                "coral:2|8|17|1|+|3||8/0",
+                "coral:2|8|17|1|+|3||-",
+                "coral:2|8|17|1||||8",
+                "coral:2|8|17|1|+|3||" + "1".repeat(257),
+                "coral:2|8|17|1|+|3||" + "1" + "0".repeat(101),
+                "coral:2|8|17|1|+|3||0." + "0".repeat(100) + "1"
+        };
+        for (String snapshot : malformed) {
+            enter("AC");
+            type("5+3");
+            enter("=");
+            calculator.restoreState(snapshot);
+            assertEquals(snapshot, "0", calculator.getExpression());
+            assertEquals(snapshot, "0", calculator.getMemory());
+            assertFalse(snapshot, calculator.canUndoEquals());
+            assertFalse(snapshot, calculator.isError());
+        }
     }
 
     @Test public void equalsEquationExplainsRepeatedOperationInHistory() {
