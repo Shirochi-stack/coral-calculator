@@ -17,10 +17,15 @@ import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
+import android.widget.OverScroller;
 import android.widget.TextView;
 
 /** Native, accessible controls placed to preserve the supplied reference's proportions. */
@@ -30,8 +35,8 @@ public final class CalculatorLayout extends ViewGroup {
     private static final int INK = Color.rgb(41, 43, 42);
     private static final int MUTED = Color.rgb(162, 164, 163);
     public interface Listener { void onKey(String key); void onTool(String tool); }
-    private final DisplayView expression;
-    private final TextView result;
+    private final DisplayLine expression;
+    private final DisplayLine result;
     private final View[] tools = new View[5];
     private final View[] keys = new View[24];
     private final String[] labels = {"mc", "m+", "m−", "mr", "AC", "⌫", "+/−", "÷",
@@ -101,15 +106,9 @@ public final class CalculatorLayout extends ViewGroup {
         setDark(false);
     }
 
-    private DisplayView display(Context context, int color, String font) {
-        DisplayView view = new DisplayView(context);
+    private DisplayLine display(Context context, int color, String font) {
+        DisplayLine view = new DisplayLine(context, font);
         view.setTextColor(color);
-        view.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        view.setIncludeFontPadding(false);
-        view.setSingleLine(true);
-        view.setHorizontallyScrolling(false);
-        view.setTypeface(Typeface.create(font, Typeface.NORMAL));
-        view.setPadding(0, 0, 0, 0);
         return view;
     }
 
@@ -156,8 +155,8 @@ public final class CalculatorLayout extends ViewGroup {
         final float right, centerY, textSize, alpha;
         final int color;
 
-        DisplayPose(TextView view) {
-            right = view.getRight() - view.getPaddingRight() + view.getTranslationX();
+        DisplayPose(DisplayLine view) {
+            right = view.getRight() - view.getCaretRoom() + view.getTranslationX();
             centerY = (view.getTop() + view.getBottom()) / 2f + view.getTranslationY();
             textSize = view.getTextSize() * view.getScaleX();
             alpha = view.getAlpha();
@@ -169,7 +168,7 @@ public final class CalculatorLayout extends ViewGroup {
         final DisplayPose equation, answer;
         final boolean repeated;
 
-        DisplayTransition(TextView equation, TextView answer, boolean repeated) {
+        DisplayTransition(DisplayLine equation, DisplayLine answer, boolean repeated) {
             this.equation = new DisplayPose(equation);
             this.answer = new DisplayPose(answer);
             this.repeated = repeated;
@@ -212,11 +211,11 @@ public final class CalculatorLayout extends ViewGroup {
         displayAnimator.start();
     }
 
-    private void animatePose(TextView view, DisplayPose from, int color, float progress, boolean repeated) {
+    private void animatePose(DisplayLine view, DisplayPose from, int color, float progress, boolean repeated) {
         float remaining = 1 - progress;
         float scale = from.textSize / view.getTextSize();
         float offset = repeated ? contentWidth * .012f : 0;
-        view.setTranslationX((from.right - (view.getRight() - view.getPaddingRight())) * remaining);
+        view.setTranslationX((from.right - (view.getRight() - view.getCaretRoom())) * remaining);
         view.setTranslationY((from.centerY - (view.getTop() + view.getBottom()) / 2f + offset) * remaining);
         view.setScaleX(1 + (scale - 1) * remaining);
         view.setScaleY(1 + (scale - 1) * remaining);
@@ -274,10 +273,12 @@ public final class CalculatorLayout extends ViewGroup {
         }
         int touchSize = Math.round(Math.max(48 * getResources().getDisplayMetrics().density, w * .092f));
         for (View tool : tools) tool.measure(exact(touchSize), exact(touchSize));
-        // Room for the blinking caret that follows the number being entered.
-        expression.setPadding(0, 0, completed ? 0 : Math.round(w * .03f), 0);
-        expression.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .095f : .16f))), 1, TypedValue.COMPLEX_UNIT_PX);
-        result.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .16f : .11f))), 1, TypedValue.COMPLEX_UNIT_PX);
+        // Text keeps its full size; lines longer than the display are swiped sideways instead.
+        expression.setCaretRoom(completed ? 0 : Math.round(w * .03f));
+        expression.setTextSizePx(Math.max(13, Math.round(w * (completed ? .095f : .16f))));
+        float resultSize = Math.max(13, Math.round(w * (completed ? .16f : .11f)));
+        // Error messages are sentences, not numbers: fit them rather than hiding their start.
+        result.setTextSizePx(displayError ? result.fittedSize(resultSize, w * .88f) : resultSize);
         expression.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .125f : .20f))));
         result.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .20f : .135f))));
     }
@@ -325,7 +326,7 @@ public final class CalculatorLayout extends ViewGroup {
     }
 
     private void finishDisplayLayout(boolean changed) {
-        expression.setPivotX(expression.getWidth() - expression.getPaddingRight());
+        expression.setPivotX(expression.getWidth() - expression.getCaretRoom());
         expression.setPivotY(expression.getHeight() / 2f);
         result.setPivotX(result.getWidth());
         result.setPivotY(result.getHeight() / 2f);
@@ -339,10 +340,18 @@ public final class CalculatorLayout extends ViewGroup {
         }
     }
 
-    /** Display line that can show a blinking text caret after its right-aligned content. */
-    private static final class DisplayView extends TextView {
+    /**
+     * One display line at a fixed text size. Content wider than the line keeps its end in view
+     * and can be swiped sideways; a blinking caret can follow the end of the text.
+     */
+    private static final class DisplayLine extends ViewGroup {
         private static final long BLINK_MS = 500;
+        private final TextView text;
         private final Paint caretPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final OverScroller scroller;
+        private final int touchSlop;
+        private final int minimumFling;
+        private final int maximumFling;
         private final Runnable blink = new Runnable() {
             @Override public void run() {
                 caretOn = !caretOn;
@@ -350,12 +359,63 @@ public final class CalculatorLayout extends ViewGroup {
                 postDelayed(this, BLINK_MS);
             }
         };
+        private VelocityTracker velocity;
+        private float downX;
+        private float lastX;
+        private boolean dragging;
+        private float scroll;
+        private int caretRoom;
         private boolean caret;
         private boolean caretOn;
 
-        DisplayView(Context context) {
+        DisplayLine(Context context, String font) {
             super(context);
+            text = new TextView(context);
+            text.setIncludeFontPadding(false);
+            text.setSingleLine(true);
+            text.setTypeface(Typeface.create(font, Typeface.NORMAL));
+            text.setPadding(0, 0, 0, 0);
+            text.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+            addView(text);
+            setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
             caretPaint.setColor(CORAL);
+            scroller = new OverScroller(context);
+            ViewConfiguration configuration = ViewConfiguration.get(context);
+            touchSlop = configuration.getScaledTouchSlop();
+            minimumFling = configuration.getScaledMinimumFlingVelocity();
+            maximumFling = configuration.getScaledMaximumFlingVelocity();
+        }
+
+        /** New content always snaps back to its end, where the next key press lands. */
+        void setText(CharSequence value) {
+            text.setText(value);
+            scroller.abortAnimation();
+            setScroll(0);
+        }
+
+        void setTextColor(int color) { text.setTextColor(color); }
+        int getCurrentTextColor() { return text.getCurrentTextColor(); }
+        float getTextSize() { return text.getTextSize(); }
+        int getCaretRoom() { return caretRoom; }
+
+        void setTextSizePx(float size) {
+            if (text.getTextSize() != size) text.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
+        }
+
+        /** Largest size up to {@code size} at which the whole text fits in {@code available} pixels. */
+        float fittedSize(float size, float available) {
+            Paint paint = text.getPaint();
+            float current = paint.getTextSize();
+            paint.setTextSize(size);
+            float width = paint.measureText(text.getText().toString());
+            paint.setTextSize(current);
+            return width > available ? (float) Math.floor(size * available / width * .98f) : size;
+        }
+
+        void setCaretRoom(int room) {
+            if (caretRoom == room) return;
+            caretRoom = room;
+            requestLayout();
         }
 
         /** Also restarts the blink, so the caret stays solid while keys are being pressed. */
@@ -371,6 +431,97 @@ public final class CalculatorLayout extends ViewGroup {
             if (caret && isAttachedToWindow() && getWindowVisibility() == VISIBLE) postDelayed(blink, BLINK_MS);
         }
 
+        private float maxScroll() { return Math.max(0, text.getWidth() - (getWidth() - caretRoom)); }
+
+        private void setScroll(float value) {
+            scroll = Math.max(0, Math.min(maxScroll(), value));
+            text.setTranslationX(scroll);
+            invalidate();
+        }
+
+        @Override public CharSequence getAccessibilityClassName() { return TextView.class.getName(); }
+
+        @Override public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+            super.onInitializeAccessibilityNodeInfo(info);
+            info.setText(text.getText());
+        }
+
+        @Override protected void onMeasure(int widthSpec, int heightSpec) {
+            setMeasuredDimension(MeasureSpec.getSize(widthSpec), MeasureSpec.getSize(heightSpec));
+            int unspecified = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+            text.measure(unspecified, unspecified);
+        }
+
+        @Override protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            // Right-aligned: the end of the text sits at the caret, earlier digits run off the left edge.
+            int right = getWidth() - caretRoom;
+            int top = (getHeight() - text.getMeasuredHeight()) / 2;
+            text.layout(right - text.getMeasuredWidth(), top, right, top + text.getMeasuredHeight());
+            setScroll(scroll);
+        }
+
+        @Override protected void dispatchDraw(Canvas canvas) {
+            super.dispatchDraw(canvas);
+            if (!caret || !caretOn) return;
+            float size = text.getTextSize();
+            float thickness = Math.max(2 * getResources().getDisplayMetrics().density, size * .05f);
+            float left = text.getRight() + scroll + Math.min(size * .06f, Math.max(0, caretRoom - thickness));
+            float baseline = text.getTop() + text.getBaseline();
+            canvas.drawRoundRect(left, baseline + text.getPaint().ascent() * .92f, left + thickness,
+                    baseline + text.getPaint().descent() * .6f, thickness / 2, thickness / 2, caretPaint);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            if (velocity == null) velocity = VelocityTracker.obtain();
+            velocity.addMovement(event);
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    scroller.abortAnimation();
+                    downX = lastX = event.getX();
+                    dragging = false;
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (!dragging && maxScroll() > 0 && Math.abs(event.getX() - downX) > touchSlop) {
+                        dragging = true;
+                        cancelLongPress();
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                    if (dragging) setScroll(scroll + event.getX() - lastX);
+                    lastX = event.getX();
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    boolean wasDragging = dragging;
+                    dragging = false;
+                    if (wasDragging && event.getActionMasked() == MotionEvent.ACTION_UP) {
+                        velocity.computeCurrentVelocity(1000, maximumFling);
+                        float speed = velocity.getXVelocity();
+                        if (Math.abs(speed) > minimumFling) {
+                            scroller.fling(Math.round(scroll), 0, Math.round(speed), 0, 0, Math.round(maxScroll()), 0, 0);
+                            postInvalidateOnAnimation();
+                        }
+                    }
+                    velocity.recycle();
+                    velocity = null;
+                    if (wasDragging) {
+                        // Finish the gesture without letting the swipe count as a tap or long press.
+                        setPressed(false);
+                        return true;
+                    }
+                    break;
+                default: break;
+            }
+            super.onTouchEvent(event);
+            return true;
+        }
+
+        @Override public void computeScroll() {
+            if (scroller.computeScrollOffset()) {
+                setScroll(scroller.getCurrX());
+                postInvalidateOnAnimation();
+            }
+        }
+
         @Override protected void onAttachedToWindow() {
             super.onAttachedToWindow();
             restartBlink();
@@ -384,17 +535,6 @@ public final class CalculatorLayout extends ViewGroup {
         @Override protected void onWindowVisibilityChanged(int visibility) {
             super.onWindowVisibilityChanged(visibility);
             restartBlink();
-        }
-
-        @Override protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            if (!caret || !caretOn) return;
-            float size = getTextSize();
-            float thickness = Math.max(2 * getResources().getDisplayMetrics().density, size * .05f);
-            float left = Math.min(getWidth() - getPaddingRight() + size * .06f, getWidth() - thickness);
-            float baseline = getBaseline();
-            canvas.drawRoundRect(left, baseline + getPaint().ascent() * .92f, left + thickness, baseline + getPaint().descent() * .6f,
-                    thickness / 2, thickness / 2, caretPaint);
         }
     }
 
