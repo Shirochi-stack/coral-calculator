@@ -70,6 +70,9 @@ public final class CalculatorLayout extends ViewGroup {
     private float keyStretch;
     private boolean landscape;
     private boolean completed;
+    /** After equals, whether a tap has left the caret in the equation or in the answer. */
+    private boolean equationMarked;
+    private boolean answerMarked;
     private boolean displayError;
     private boolean hasDisplay;
     private String equationText = "";
@@ -140,9 +143,15 @@ public final class CalculatorLayout extends ViewGroup {
         return view;
     }
 
-    /** @param caret position of the caret in {@code equation} while it is being entered */
+    /** For {@link #update}: the line shows no caret. */
+    public static final int NO_CARET = -1;
+
+    /**
+     * @param caret position of the caret in {@code equation}, or {@link #NO_CARET}
+     * @param answerCaret position of the caret in {@code preview}, or {@link #NO_CARET}
+     */
     public void update(String equation, String preview, boolean error, boolean memorySet,
-                       boolean completed, boolean animate, int caret) {
+                       boolean completed, boolean animate, int caret, int answerCaret) {
         boolean modeChanged = this.completed != completed;
         boolean answerChanged = completed && (!equationText.equals(equation) || !answerText.equals(preview));
         DisplayTransition transition = animate && hasDisplay && isLaidOut()
@@ -150,6 +159,8 @@ public final class CalculatorLayout extends ViewGroup {
                 ? new DisplayTransition(expression, result, !modeChanged) : null;
         stopDisplayAnimation();
         this.completed = completed;
+        equationMarked = completed && caret != NO_CARET;
+        answerMarked = answerCaret != NO_CARET;
         displayError = error;
         equationText = equation;
         answerText = preview;
@@ -159,10 +170,11 @@ public final class CalculatorLayout extends ViewGroup {
             if (!completed && "+−×÷%".indexOf(equation.charAt(i)) >= 0)
                 styled.setSpan(new ForegroundColorSpan(CORAL), i, i + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
-        expression.setText(styled, completed ? -1 : caret);
-        expression.showCaret(!completed);
+        expression.showCaret(caret != NO_CARET);
+        expression.setText(styled, caret);
         expression.setContentDescription("Expression: " + equation);
-        result.setText(preview);
+        result.showCaret(answerMarked);
+        result.setText(preview, answerCaret);
         applyDisplayColors();
         result.setContentDescription(error ? preview : "Result: " + preview);
         keys[3].setContentDescription(memorySet ? "Memory recall, value stored" : "Memory recall, memory empty");
@@ -320,7 +332,13 @@ public final class CalculatorLayout extends ViewGroup {
         for (View tool : tools) tool.measure(exact(touchSize), exact(touchSize));
         // Text keeps its full size; lines longer than the display are swiped sideways instead.
         int lineWidth = Math.round(spanWidth - w * .12f);
-        expression.setCaretRoom(completed ? 0 : Math.round(w * .03f));
+        // While a calculation is entered, the caret's room comes out of the line. A caret placed
+        // after equals gets its room past the end of the line, so placing it moves no text.
+        int caretRoom = Math.round(w * .03f);
+        int equationWidth = lineWidth + (equationMarked ? caretRoom : 0);
+        int answerWidth = lineWidth + (answerMarked ? caretRoom : 0);
+        expression.setCaretRoom(completed && !equationMarked ? 0 : caretRoom);
+        result.setCaretRoom(answerMarked ? caretRoom : 0);
         expression.setTextSizePx(Math.max(13, Math.round(w * (completed ? .095f : .16f))));
         float resultSize = Math.max(13, Math.round(w * (completed ? .16f : .11f)));
         // Error messages are sentences, not numbers: fit them rather than hiding their start.
@@ -337,15 +355,15 @@ public final class CalculatorLayout extends ViewGroup {
         if (wrap) {
             // A long answer continues on a second or third line, which is enough for sixteen
             // digits; the calculation gets the rest of the room.
-            result.measure(exact(lineWidth),
+            result.measure(exact(answerWidth),
                     MeasureSpec.makeMeasureSpec(oneResult * (completed ? 3 : 2), MeasureSpec.AT_MOST));
             float room = availableHeight * .96f - toolRowY(availableHeight, touchSize) - touchSize * .6f
                     - lineGap() - result.getMeasuredHeight();
-            expression.measure(exact(lineWidth),
+            expression.measure(exact(equationWidth),
                     MeasureSpec.makeMeasureSpec(Math.max(oneLine, Math.round(room)), MeasureSpec.AT_MOST));
         } else {
-            result.measure(exact(lineWidth), exact(oneResult));
-            expression.measure(exact(lineWidth), exact(oneLine));
+            result.measure(exact(answerWidth), exact(oneResult));
+            expression.measure(exact(equationWidth), exact(oneLine));
         }
     }
 
@@ -407,7 +425,7 @@ public final class CalculatorLayout extends ViewGroup {
     private void finishDisplayLayout(boolean changed) {
         expression.setPivotX(expression.getWidth() - expression.getCaretRoom());
         expression.setPivotY(expression.getHeight() / 2f);
-        result.setPivotX(result.getWidth());
+        result.setPivotX(result.getWidth() - result.getCaretRoom());
         result.setPivotY(result.getHeight() / 2f);
         if (pendingTransition != null) {
             DisplayTransition transition = pendingTransition;
@@ -516,7 +534,7 @@ public final class CalculatorLayout extends ViewGroup {
             scroller.abortAnimation();
             caretIndex = caretAt >= 0 && caretAt < value.length() ? caretAt : -1;
             caretLeading = tapLeading && caretIndex >= 0;
-            showStart = caretIndex < 0 && wrap && startFirst;
+            showStart = caretIndex < 0 && wrap && startFirst && !caret;
             if (caretIndex < 0) setScroll(0);
             else revealCaret = true;
         }
@@ -838,8 +856,8 @@ public final class CalculatorLayout extends ViewGroup {
                         setPressed(false);
                         return true;
                     }
-                    // A short tap moves the caret to the nearest gap between characters. On the
-                    // equation above an answer, which shows no caret, it reopens the equation there.
+                    // A short tap moves the caret to the nearest gap between characters. After
+                    // equals, when neither line shows a caret, it places one in the line tapped.
                     Layout layout = text.getLayout();
                     if (caretListener != null && layout != null
                             && event.getActionMasked() == MotionEvent.ACTION_UP

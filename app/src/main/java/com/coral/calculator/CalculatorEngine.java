@@ -22,22 +22,43 @@ public final class CalculatorEngine {
     private String expressionBeforeEquals;
     /** Index in {@link #expression} where the next key lands; its end unless the user moved it. */
     private int caret;
+    /**
+     * After equals, a tap only marks a spot in the equation or the answer. The completed
+     * calculation stays as it is until a key is pressed there, so a stray tap changes nothing.
+     */
+    private Mark mark = Mark.NONE;
+
+    private enum Mark { NONE, EQUATION, ANSWER }
 
     public CalculatorEngine() {}
 
     /** Accepts the labels printed on the calculator, plus ASCII operator aliases. */
     public void input(String token) {
         if (token == null || token.isEmpty()) return;
-        if (editingInside() && !"AC".equals(token) && !"=".equals(token)) {
-            inputInside(token);
-            return;
+        if ("AC".equals(token) || "=".equals(token)) {
+            mark = Mark.NONE;
+            inputAtEnd(token);
+            caret = expression.length();
+        } else if (!editMarked(() -> edit(token))) {
+            edit(token);
         }
-        inputAtEnd(token);
-        caret = expression.length();
     }
 
-    /** Caret position within {@link #getExpression()}; an empty display holds it after the 0. */
+    private void edit(String token) {
+        if (editingInside()) {
+            inputInside(token);
+        } else {
+            inputAtEnd(token);
+            caret = expression.length();
+        }
+    }
+
+    /**
+     * Caret position within {@link #getExpression()}, or within the completed equation while
+     * that is marked; an empty display holds it after the 0.
+     */
     public int getCaret() {
+        if (isCaretInEquation()) return Math.min(caret, markedEquation().length());
         return expression.isEmpty() ? 1 : Math.min(caret, expression.length());
     }
 
@@ -48,27 +69,81 @@ public final class CalculatorEngine {
     }
 
     /**
-     * Places the caret where the calculation was tapped. Tapping a completed equation brings
-     * it back for editing at that spot, as the delete key brings it back at its end.
+     * Places the caret where the calculation was tapped. On a completed equation this only
+     * marks the spot: the next key brings the equation back and applies there.
      */
     public void placeCaret(int index) {
-        if (evaluated) {
-            expression = completedExpression(expressionBeforeEquals == null
-                    ? expression : expressionBeforeEquals);
-            expressionBeforeEquals = null;
-            evaluated = false;
-            resetRepeat();
+        if (!isEvaluated()) {
+            setCaret(index);
+            return;
         }
-        setCaret(index);
+        mark = Mark.EQUATION;
+        caret = Math.max(0, Math.min(markedEquation().length(), index));
     }
 
-    /** Turns a completed answer into a number being entered, with the caret where it was tapped. */
-    public void editAnswer(int index) {
+    /** Marks a spot in a completed answer: the next key edits the answer there as a number. */
+    public void placeAnswerCaret(int index) {
         if (!isEvaluated()) return;
+        mark = Mark.ANSWER;
+        caret = Math.max(0, Math.min(expression.length(), index));
+    }
+
+    /** Forgets a spot marked after equals, so the next key behaves as it does after equals. */
+    public void releaseCaret() {
+        if (mark == Mark.NONE) return;
+        mark = Mark.NONE;
+        caret = expression.length();
+    }
+
+    /** Whether a tap after equals left the caret in the equation above the answer. */
+    public boolean isCaretInEquation() {
+        return isEvaluated() && mark == Mark.EQUATION;
+    }
+
+    /** Whether a tap after equals left the caret in the answer. */
+    public boolean isCaretInAnswer() {
+        return isEvaluated() && mark == Mark.ANSWER;
+    }
+
+    private String markedEquation() {
+        return completedExpression(expressionBeforeEquals == null ? expression : expressionBeforeEquals);
+    }
+
+    /**
+     * Runs a key at the spot marked after equals. The completed calculation gives way only
+     * to a key that changes it; one with no effect there leaves it, and the mark, in place.
+     *
+     * @return false if nothing was marked and the key still has to be handled
+     */
+    private boolean editMarked(Runnable key) {
+        if (!isEvaluated() || mark == Mark.NONE) {
+            mark = Mark.NONE;
+            return false;
+        }
+        String answer = expression;
+        String undo = expressionBeforeEquals;
+        Character operator = repeatOperator;
+        BigDecimal operand = repeatOperand;
+        Mark marked = mark;
+        int position = caret;
+        if (marked == Mark.EQUATION) expression = markedEquation();
         expressionBeforeEquals = null;
         evaluated = false;
         resetRepeat();
-        setCaret(index);
+        mark = Mark.NONE;
+        caret = Math.min(position, expression.length());
+        String opened = expression;
+        key.run();
+        if (expression.equals(opened)) {
+            expression = answer;
+            expressionBeforeEquals = undo;
+            repeatOperator = operator;
+            repeatOperand = operand;
+            evaluated = true;
+            mark = marked;
+            caret = position;
+        }
+        return true;
     }
 
     private boolean editingInside() {
@@ -198,6 +273,10 @@ public final class CalculatorEngine {
     }
 
     public void memoryRecall() {
+        if (!editMarked(this::recall)) recall();
+    }
+
+    private void recall() {
         if (editingInside()) {
             recallInside();
             return;
@@ -321,6 +400,7 @@ public final class CalculatorEngine {
     private void clear() {
         expression = "";
         caret = 0;
+        mark = Mark.NONE;
         evaluated = false;
         errorMessage = null;
         expressionBeforeEquals = null;

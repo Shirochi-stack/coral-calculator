@@ -1208,34 +1208,41 @@ public class CalculatorEngineTest {
         assertEquals("3", calculator.getPreview());
     }
 
-    @Test public void tappingACompletedEquationReopensItAtThatSpot() {
+    @Test public void tappingACompletedEquationOnlyPlacesTheCaret() {
         type("12+34");
         enter("=");
-        assertTrue(calculator.isEvaluated());
+        String saved = calculator.saveState();
         calculator.placeCaret(1);
-        assertFalse(calculator.isEvaluated());
-        assertEditing("12+34", 1);
-        assertEquals("46", calculator.getPreview());
+        assertTrue(calculator.isEvaluated());
+        assertTrue(calculator.isCaretInEquation());
+        assertFalse(calculator.isCaretInAnswer());
+        assertEquals(1, calculator.getCaret());
+        assertEquals("46", calculator.getExpression());
+        assertEquals("12+34", calculator.getCompletedEquation());
+        assertEquals(saved, calculator.saveState());
         type("0");
+        assertFalse(calculator.isEvaluated());
         assertEditing("102+34", 2);
+        assertEquals("136", calculator.getPreview());
         enter("=");
         assertEquals("136", calculator.getExpression());
         assertEquals("102+34", calculator.getCompletedEquation());
     }
 
-    @Test public void reopeningUsesTheEquationShownAboveTheAnswer() {
+    @Test public void markedEquationIsTheOneShownAboveTheAnswer() {
         type("5+3+");
         enter("=");
         assertEquals("5+3", calculator.getCompletedEquation());
         calculator.placeCaret(99);
-        assertEditing("5+3", 3);
+        assertEquals(3, calculator.getCaret());
+        type("1");
+        assertEditing("5+31", 4);
         enter("AC");
         type("5+3");
         enter("=", "=");
         assertEquals("11", calculator.getExpression());
         assertEquals("8+3", calculator.getCompletedEquation());
         calculator.placeCaret(0);
-        assertEditing("8+3", 0);
         type("1");
         assertEditing("18+3", 1);
         enter("=", "=");
@@ -1244,20 +1251,26 @@ public class CalculatorEngineTest {
         type("5");
         enter("=");
         calculator.placeCaret(0);
-        assertEditing("5", 0);
         type("1");
         assertEditing("15", 1);
     }
 
-    @Test public void tappingACompletedAnswerEditsItAsANumber() {
+    @Test public void tappingACompletedAnswerOnlyPlacesTheCaret() {
         type("12+34");
-        calculator.editAnswer(1);
+        calculator.placeAnswerCaret(1);
+        assertFalse(calculator.isCaretInAnswer());
         assertEditing("12+34", 5);
         enter("=");
-        calculator.editAnswer(1);
-        assertFalse(calculator.isEvaluated());
-        assertEditing("46", 1);
+        String saved = calculator.saveState();
+        calculator.placeAnswerCaret(1);
+        assertTrue(calculator.isEvaluated());
+        assertTrue(calculator.isCaretInAnswer());
+        assertEquals(1, calculator.getCaret());
+        assertEquals("12+34", calculator.getCompletedEquation());
+        assertTrue(calculator.canUndoEquals());
+        assertEquals(saved, calculator.saveState());
         type("0");
+        assertFalse(calculator.isEvaluated());
         assertEditing("406", 2);
         enter("⌫");
         assertEditing("46", 1);
@@ -1270,7 +1283,7 @@ public class CalculatorEngineTest {
         type("3−8");
         enter("=");
         assertEquals("−5", calculator.getExpression());
-        calculator.editAnswer(2);
+        calculator.placeAnswerCaret(2);
         type("0");
         assertEditing("−50", 3);
         CalculatorEngine copy = new CalculatorEngine();
@@ -1278,7 +1291,92 @@ public class CalculatorEngineTest {
         assertEquals("−50", copy.getExpression());
     }
 
-    @Test public void reopenedEquationSavesAndRestores() {
+    @Test public void aKeyWithNoEffectAtTheMarkLeavesTheAnswerStanding() {
+        type("1.5+2");
+        enter("=");
+        String saved = calculator.saveState();
+        calculator.placeCaret(1);
+        enter(".");
+        assertTrue(calculator.isEvaluated());
+        assertTrue(calculator.isCaretInEquation());
+        assertEquals(1, calculator.getCaret());
+        assertEquals("3.5", calculator.getExpression());
+        assertEquals("1.5+2", calculator.getCompletedEquation());
+        assertEquals(saved, calculator.saveState());
+        calculator.placeAnswerCaret(0);
+        type("0");
+        assertTrue(calculator.isCaretInAnswer());
+        assertEquals(saved, calculator.saveState());
+        enter("=");
+        assertFalse(calculator.isCaretInAnswer());
+        assertEquals("5.5", calculator.getExpression());
+        assertEquals("3.5+2", calculator.getCompletedEquation());
+    }
+
+    @Test public void theMarkLastsOnlyUntilTheNextKey() {
+        type("12+34");
+        enter("=");
+        calculator.placeAnswerCaret(1);
+        calculator.releaseCaret();
+        assertFalse(calculator.isCaretInAnswer());
+        type("7");
+        assertEditing("7", 1);
+        enter("AC");
+        type("12+34");
+        enter("=");
+        calculator.placeAnswerCaret(1);
+        calculator.placeCaret(2);
+        assertTrue(calculator.isCaretInEquation());
+        assertFalse(calculator.isCaretInAnswer());
+        enter("AC");
+        assertFalse(calculator.isCaretInEquation());
+        assertEditing("0", 1);
+        type("12+34");
+        enter("=");
+        calculator.placeAnswerCaret(0);
+        enter("=");
+        assertEquals("80", calculator.getExpression());
+        type("9");
+        assertEditing("9", 1);
+    }
+
+    @Test public void keysAtTheEndOfAMarkedLineContinueIt() {
+        type("12+34");
+        enter("=");
+        calculator.placeCaret(5);
+        enter("⌫");
+        assertEditing("12+3", 4);
+        enter("AC");
+        type("12+34");
+        enter("=");
+        calculator.placeAnswerCaret(2);
+        type("5");
+        assertEditing("465", 3);
+        enter("AC");
+        type("12+34");
+        enter("=");
+        calculator.placeAnswerCaret(2);
+        enter("×");
+        type("2");
+        assertEditing("46×2", 4);
+    }
+
+    @Test public void memoryRecallUsesTheMark() {
+        type("7");
+        calculator.memoryAdd();
+        enter("AC");
+        type("12+34");
+        enter("=");
+        calculator.placeCaret(4);
+        calculator.memoryRecall();
+        assertEditing("12+7", 4);
+        enter("=");
+        calculator.placeAnswerCaret(1);
+        calculator.memoryRecall();
+        assertEditing("7", 1);
+    }
+
+    @Test public void theMarkIsNotPartOfTheSavedState() {
         type("12+34");
         enter("=");
         calculator.placeCaret(2);
@@ -1286,8 +1384,11 @@ public class CalculatorEngineTest {
         CalculatorEngine copy = new CalculatorEngine();
         copy.restoreState(saved);
         assertEquals(saved, copy.saveState());
-        assertEquals("12+34", copy.getExpression());
-        assertFalse(copy.isEvaluated());
+        assertEquals("46", copy.getExpression());
+        assertTrue(copy.isEvaluated());
+        assertFalse(copy.isCaretInEquation());
+        calculator.restoreState(saved);
+        assertFalse(calculator.isCaretInEquation());
     }
 
     @Test public void everyInsideEditLeavesASnapshotThatRestores() {

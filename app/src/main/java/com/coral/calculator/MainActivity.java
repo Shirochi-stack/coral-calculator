@@ -125,28 +125,30 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         String equation = completed ? engine.getCompletedEquation() : engine.getExpression();
         String answer = completed ? engine.getExpression() : engine.getPreview();
         String shown = NumberFormatter.format(equation);
-        layout.update(shown,
-                engine.isError() ? engine.getErrorMessage() : NumberFormatter.format(answer),
-                engine.isError(), !"0".equals(engine.getMemory()), completed, animate,
-                completed ? -1 : NumberFormatter.formattedOffset(shown, engine.getCaret()));
+        String shownAnswer = engine.isError() ? engine.getErrorMessage() : NumberFormatter.format(answer);
+        // After equals neither line has a caret until one of them is tapped.
+        layout.update(shown, shownAnswer, engine.isError(), !"0".equals(engine.getMemory()), completed, animate,
+                completed && !engine.isCaretInEquation() ? CalculatorLayout.NO_CARET
+                        : NumberFormatter.formattedOffset(shown, engine.getCaret()),
+                engine.isCaretInAnswer() ? NumberFormatter.formattedOffset(shownAnswer, engine.getCaret())
+                        : CalculatorLayout.NO_CARET);
     }
 
-    /** The display counts thousands separators in its positions; the engine's text has none. */
+    /**
+     * The display counts thousands separators in its positions; the engine's text has none.
+     * After equals a tap only places the caret: the calculation stays until a key is pressed.
+     */
     @Override public void onCaret(int offset) {
-        // Tapping the equation above an answer brings it back for editing at that spot.
-        boolean reopened = engine.isEvaluated();
-        String shown = NumberFormatter.format(reopened ? engine.getCompletedEquation() : engine.getExpression());
+        String shown = NumberFormatter.format(engine.isEvaluated() ? engine.getCompletedEquation() : engine.getExpression());
         engine.placeCaret(NumberFormatter.rawOffset(shown, offset));
-        refresh(reopened);
-        if (reopened) save();
+        refresh();
     }
 
-    /** Tapping a completed answer makes it the number being entered, ready to edit at that digit. */
+    /** Tapping a completed answer places the caret in it; the next key edits it as a number. */
     @Override public void onAnswerCaret(int offset) {
         if (!engine.isEvaluated()) return;
-        engine.editAnswer(NumberFormatter.rawOffset(NumberFormatter.format(engine.getExpression()), offset));
+        engine.placeAnswerCaret(NumberFormatter.rawOffset(NumberFormatter.format(engine.getExpression()), offset));
         refresh();
-        save();
     }
 
     @Override protected void onSaveInstanceState(Bundle state) {
@@ -180,7 +182,13 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
                 }
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                 clipboard.setPrimaryClip(ClipData.newPlainText("Calculation result", currentValue()));
-                Toast.makeText(this, "Result copied", Toast.LENGTH_SHORT).show(); break;
+                Toast.makeText(this, "Result copied", Toast.LENGTH_SHORT).show();
+                // Copying is not editing: a caret left by a tap on the way to the long press goes.
+                if (engine.isCaretInEquation() || engine.isCaretInAnswer()) {
+                    engine.releaseCaret();
+                    refresh();
+                }
+                break;
             default: break;
         }
     }
