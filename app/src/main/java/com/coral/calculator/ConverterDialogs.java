@@ -164,7 +164,7 @@ public final class ConverterDialogs {
         final TextView text(String value, int size, int color) {
             TextView view = new TextView(context);
             view.setText(value);
-            view.setTextSize(size);
+            view.setTextSize(size * 1.3f);
             view.setTextColor(color);
             view.setLineSpacing(dp(2), 1f);
             return view;
@@ -183,7 +183,7 @@ public final class ConverterDialogs {
             input.setId(View.generateViewId());
             labelView.setLabelFor(input.getId());
             input.setTextColor(INK);
-            input.setTextSize(22);
+            input.setTextSize(28);
             input.setSingleLine(true);
             input.setSelectAllOnFocus(true);
             input.setMinHeight(dp(52));
@@ -239,7 +239,7 @@ public final class ConverterDialogs {
         final Button addSwap(String description) {
             Button swap = new Button(context);
             swap.setText("⇄  Swap");
-            swap.setTextSize(14);
+            swap.setTextSize(18);
             swap.setAllCaps(false);
             swap.setTextColor(CORAL);
             swap.setContentDescription(description);

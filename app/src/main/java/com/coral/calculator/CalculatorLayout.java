@@ -30,7 +30,7 @@ public final class CalculatorLayout extends ViewGroup {
     private static final int INK = Color.rgb(41, 43, 42);
     private static final int MUTED = Color.rgb(162, 164, 163);
     public interface Listener { void onKey(String key); void onTool(String tool); }
-    private final TextView expression;
+    private final DisplayView expression;
     private final TextView result;
     private final View[] tools = new View[5];
     private final View[] keys = new View[24];
@@ -101,8 +101,8 @@ public final class CalculatorLayout extends ViewGroup {
         setDark(false);
     }
 
-    private TextView display(Context context, int color, String font) {
-        TextView view = new TextView(context);
+    private DisplayView display(Context context, int color, String font) {
+        DisplayView view = new DisplayView(context);
         view.setTextColor(color);
         view.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         view.setIncludeFontPadding(false);
@@ -132,6 +132,7 @@ public final class CalculatorLayout extends ViewGroup {
                 styled.setSpan(new ForegroundColorSpan(CORAL), i, i + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         expression.setText(styled);
+        expression.showCaret(!completed);
         expression.setContentDescription("Expression: " + equation);
         result.setText(preview);
         applyDisplayColors();
@@ -156,7 +157,7 @@ public final class CalculatorLayout extends ViewGroup {
         final int color;
 
         DisplayPose(TextView view) {
-            right = view.getRight() + view.getTranslationX();
+            right = view.getRight() - view.getPaddingRight() + view.getTranslationX();
             centerY = (view.getTop() + view.getBottom()) / 2f + view.getTranslationY();
             textSize = view.getTextSize() * view.getScaleX();
             alpha = view.getAlpha();
@@ -215,7 +216,7 @@ public final class CalculatorLayout extends ViewGroup {
         float remaining = 1 - progress;
         float scale = from.textSize / view.getTextSize();
         float offset = repeated ? contentWidth * .012f : 0;
-        view.setTranslationX((from.right - view.getRight()) * remaining);
+        view.setTranslationX((from.right - (view.getRight() - view.getPaddingRight())) * remaining);
         view.setTranslationY((from.centerY - (view.getTop() + view.getBottom()) / 2f + offset) * remaining);
         view.setScaleX(1 + (scale - 1) * remaining);
         view.setScaleY(1 + (scale - 1) * remaining);
@@ -267,16 +268,18 @@ public final class CalculatorLayout extends ViewGroup {
         for (int i = 0; i < keys.length; i++) {
             keys[i].measure(exact(diameter), exact(diameter));
             if (keys[i] instanceof TextView) {
-                float size = i < 4 ? .073f : i == 4 ? .063f : i == 6 ? .065f : i % 4 == 3 ? .098f : .082f;
+                float size = i < 4 ? .084f : i == 4 ? .078f : i == 6 ? .074f : i % 4 == 3 ? .116f : .102f;
                 ((TextView) keys[i]).setTextSize(TypedValue.COMPLEX_UNIT_PX, (landscape ? diameter / .169f : w) * size);
             }
         }
         int touchSize = Math.round(Math.max(48 * getResources().getDisplayMetrics().density, w * .092f));
         for (View tool : tools) tool.measure(exact(touchSize), exact(touchSize));
-        expression.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .072f : .132f))), 1, TypedValue.COMPLEX_UNIT_PX);
-        result.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .132f : .08f))), 1, TypedValue.COMPLEX_UNIT_PX);
-        expression.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .10f : .166f))));
-        result.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .166f : .105f))));
+        // Room for the blinking caret that follows the number being entered.
+        expression.setPadding(0, 0, completed ? 0 : Math.round(w * .03f), 0);
+        expression.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .095f : .16f))), 1, TypedValue.COMPLEX_UNIT_PX);
+        result.setAutoSizeTextTypeUniformWithConfiguration(12, Math.max(13, Math.round(w * (completed ? .16f : .11f))), 1, TypedValue.COMPLEX_UNIT_PX);
+        expression.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .125f : .20f))));
+        result.measure(exact(Math.round(w * .88f)), exact(Math.round(w * (completed ? .20f : .135f))));
     }
 
     private static int exact(int size) { return MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY); }
@@ -312,9 +315,9 @@ public final class CalculatorLayout extends ViewGroup {
         center(tools[2], x + w * .117f, utilityY);
         center(tools[3], x + w * .252f, utilityY);
         center(tools[4], x + w * .388f, utilityY);
-        float expressionY = utilityY - w * .385f;
+        float expressionY = utilityY - w * .42f;
         place(expression, x + w * .072f, expressionY);
-        place(result, x + w * .072f, utilityY - w * (completed ? .265f : .202f));
+        place(result, x + w * .072f, utilityY - w * (completed ? .285f : .215f));
         float headerY = top + Math.max(w * .077f, (expressionY - top) * .46f) + w * .024f;
         center(tools[0], x + w * .793f, headerY);
         center(tools[1], x + w * .925f, headerY);
@@ -322,7 +325,7 @@ public final class CalculatorLayout extends ViewGroup {
     }
 
     private void finishDisplayLayout(boolean changed) {
-        expression.setPivotX(expression.getWidth());
+        expression.setPivotX(expression.getWidth() - expression.getPaddingRight());
         expression.setPivotY(expression.getHeight() / 2f);
         result.setPivotX(result.getWidth());
         result.setPivotY(result.getHeight() / 2f);
@@ -333,6 +336,65 @@ public final class CalculatorLayout extends ViewGroup {
         } else if (changed) {
             stopDisplayAnimation();
             applyDisplayColors();
+        }
+    }
+
+    /** Display line that can show a blinking text caret after its right-aligned content. */
+    private static final class DisplayView extends TextView {
+        private static final long BLINK_MS = 500;
+        private final Paint caretPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Runnable blink = new Runnable() {
+            @Override public void run() {
+                caretOn = !caretOn;
+                invalidate();
+                postDelayed(this, BLINK_MS);
+            }
+        };
+        private boolean caret;
+        private boolean caretOn;
+
+        DisplayView(Context context) {
+            super(context);
+            caretPaint.setColor(CORAL);
+        }
+
+        /** Also restarts the blink, so the caret stays solid while keys are being pressed. */
+        void showCaret(boolean show) {
+            caret = show;
+            restartBlink();
+        }
+
+        private void restartBlink() {
+            removeCallbacks(blink);
+            caretOn = caret;
+            invalidate();
+            if (caret && isAttachedToWindow() && getWindowVisibility() == VISIBLE) postDelayed(blink, BLINK_MS);
+        }
+
+        @Override protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            restartBlink();
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            removeCallbacks(blink);
+            super.onDetachedFromWindow();
+        }
+
+        @Override protected void onWindowVisibilityChanged(int visibility) {
+            super.onWindowVisibilityChanged(visibility);
+            restartBlink();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (!caret || !caretOn) return;
+            float size = getTextSize();
+            float thickness = Math.max(2 * getResources().getDisplayMetrics().density, size * .05f);
+            float left = Math.min(getWidth() - getPaddingRight() + size * .06f, getWidth() - thickness);
+            float baseline = getBaseline();
+            canvas.drawRoundRect(left, baseline + getPaint().ascent() * .92f, left + thickness, baseline + getPaint().descent() * .6f,
+                    thickness / 2, thickness / 2, caretPaint);
         }
     }
 

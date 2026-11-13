@@ -177,16 +177,16 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     private void showSettings() {
         LinearLayout content = dialogColumn();
         Switch vibration = new Switch(this);
-        vibration.setText("Key vibration"); vibration.setChecked(haptics); vibration.setPadding(0, dp(12), 0, dp(12));
+        vibration.setText("Key vibration"); vibration.setTextSize(20); vibration.setChecked(haptics); vibration.setPadding(0, dp(12), 0, dp(12));
         vibration.setOnCheckedChangeListener((button, checked) -> { haptics = checked; save(); });
         content.addView(vibration);
         Switch theme = new Switch(this);
-        theme.setText("Dark appearance"); theme.setChecked(dark); theme.setPadding(0, dp(12), 0, dp(12));
+        theme.setText("Dark appearance"); theme.setTextSize(20); theme.setChecked(dark); theme.setPadding(0, dp(12), 0, dp(12));
         theme.setOnCheckedChangeListener((button, checked) -> { dark = checked; applyTheme(); refresh(); save(); });
         content.addView(theme);
         TextView about = new TextView(this);
         about.setText("Coral Calculator " + BuildConfig.VERSION_NAME + "\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
-        about.setTextSize(14); about.setTextColor(0xFF777777); about.setPadding(0, dp(20), 0, dp(8));
+        about.setTextSize(18); about.setTextColor(0xFF777777); about.setPadding(0, dp(20), 0, dp(8));
         content.addView(about);
         new AlertDialog.Builder(this).setTitle("Settings").setView(content).setPositiveButton("Done", null).show();
     }
@@ -194,8 +194,10 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     private void showHistory() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle("History").setPositiveButton("Done", null);
         if (history.isEmpty()) {
-            builder.setMessage("Your completed calculations will appear here. Tap = to save a calculation.");
-            builder.show(); return;
+            TextView empty = new TextView(this);
+            empty.setText("Your completed calculations will appear here. Tap = to save a calculation.");
+            empty.setTextSize(20); empty.setTextColor(0xFF363936); empty.setPadding(dp(24), dp(16), dp(24), dp(8));
+            builder.setView(empty).show(); return;
         }
         LinearLayout content = dialogColumn();
         ScrollView scroll = new ScrollView(this); scroll.addView(content);
@@ -204,7 +206,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
             TextView row = new TextView(this);
             String equation = NumberFormatter.format(entry[0]);
             String answer = NumberFormatter.format(entry[1]);
-            row.setText(equation + "\n= " + answer); row.setTextSize(20); row.setTextColor(0xFF363936);
+            row.setText(equation + "\n= " + answer); row.setTextSize(24); row.setTextColor(0xFF363936);
             row.setPadding(0, dp(12), 0, dp(16)); row.setContentDescription(equation + " equals " + answer + ". Tap to use result");
             row.setBackgroundResource(android.R.drawable.list_selector_background);
             row.setOnClickListener(v -> { useValue(entry[1]); dialog.dismiss(); });

@@ -13,6 +13,7 @@ A simple, offline calculator for Android with circular keys, coral accents, and 
 - **Live answers:** see the result while entering a calculation, with multiplication and division handled before addition and subtraction.
 - **Clear results:** after equals, the calculation stays visible above the larger answer, with a smooth transition between editing and results.
 - **Easy corrections:** press backspace after equals to return to the calculation and edit it.
+- **Large, easy-to-read text:** oversized digits on the display, keys, and dialogs, with a blinking cursor marking the number you are entering.
 - **Readable numbers:** thousands separators make large values easier to read, such as `1,000`, `10,000`, and `100,000`.
 - **Memory and history:** store a value in memory or reuse any of your last 100 completed calculations.
 - **Unit conversion:** convert length, mass, and temperature without an internet connection.
