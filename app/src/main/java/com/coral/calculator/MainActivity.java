@@ -48,6 +48,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
                 history.add(new String[]{entry.getString(0), entry.getString(1)});
             }
         } catch (JSONException ignored) { history.clear(); }
+        if (state != null) engine.setCaret(state.getInt("caret", Integer.MAX_VALUE));
         layout = new CalculatorLayout(this, this);
         setContentView(layout);
         configureInsets();
@@ -123,9 +124,23 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         boolean completed = engine.isEvaluated();
         String equation = completed ? engine.getCompletedEquation() : engine.getExpression();
         String answer = completed ? engine.getExpression() : engine.getPreview();
-        layout.update(NumberFormatter.format(equation),
+        String shown = NumberFormatter.format(equation);
+        layout.update(shown,
                 engine.isError() ? engine.getErrorMessage() : NumberFormatter.format(answer),
-                engine.isError(), !"0".equals(engine.getMemory()), completed, animate);
+                engine.isError(), !"0".equals(engine.getMemory()), completed, animate,
+                completed ? -1 : NumberFormatter.formattedOffset(shown, engine.getCaret()));
+    }
+
+    /** The display counts thousands separators in its positions; the engine's text has none. */
+    @Override public void onCaret(int offset) {
+        if (engine.isEvaluated()) return;
+        engine.setCaret(NumberFormatter.rawOffset(NumberFormatter.format(engine.getExpression()), offset));
+        refresh();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putInt("caret", engine.getCaret());
     }
 
     private void save() {

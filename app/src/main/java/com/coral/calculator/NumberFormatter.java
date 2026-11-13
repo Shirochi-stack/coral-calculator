@@ -68,6 +68,29 @@ public final class NumberFormatter {
         return result.toString();
     }
 
+    /**
+     * Where a position in unformatted text falls in its formatted form. A position that
+     * precedes a separator stays before it, next to the digit a backspace would remove.
+     */
+    public static int formattedOffset(String formatted, int rawOffset) {
+        int seen = 0;
+        for (int index = 0; index < formatted.length(); index++) {
+            if (seen >= rawOffset) return index;
+            if (formatted.charAt(index) != ',') seen++;
+        }
+        return formatted.length();
+    }
+
+    /** The reverse of {@link #formattedOffset}: separators before the position are not counted. */
+    public static int rawOffset(String formatted, int formattedOffset) {
+        int count = 0;
+        int end = Math.min(formattedOffset, formatted.length());
+        for (int index = 0; index < end; index++) {
+            if (formatted.charAt(index) != ',') count++;
+        }
+        return count;
+    }
+
     private static boolean isDigit(char character) {
         return character >= '0' && character <= '9';
     }

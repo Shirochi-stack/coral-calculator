@@ -67,4 +67,18 @@ public class NumberFormatterTest {
         assertEquals("1E-1000", NumberFormatter.format("1E-1000"));
         assertEquals("Cannot divide by zero", NumberFormatter.format("Cannot divide by zero"));
     }
+
+    @Test public void mapsCaretPositionsAroundSeparators() {
+        String formatted = NumberFormatter.format("1234567+89");
+        assertEquals("1,234,567+89", formatted);
+        int[] expected = {0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 12};
+        for (int raw = 0; raw < expected.length; raw++) {
+            assertEquals(expected[raw], NumberFormatter.formattedOffset(formatted, raw));
+            assertEquals(raw, NumberFormatter.rawOffset(formatted, expected[raw]));
+        }
+        assertEquals(1, NumberFormatter.rawOffset(formatted, 2));
+        assertEquals(12, NumberFormatter.formattedOffset(formatted, 99));
+        assertEquals(10, NumberFormatter.rawOffset(formatted, 99));
+        assertEquals(0, NumberFormatter.formattedOffset("", 0));
+    }
 }

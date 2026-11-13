@@ -20,12 +20,38 @@ public final class CalculatorEngine {
     private Character repeatOperator;
     private BigDecimal repeatOperand;
     private String expressionBeforeEquals;
+    /** Index in {@link #expression} where the next key lands; its end unless the user moved it. */
+    private int caret;
 
     public CalculatorEngine() {}
 
     /** Accepts the labels printed on the calculator, plus ASCII operator aliases. */
     public void input(String token) {
         if (token == null || token.isEmpty()) return;
+        if (editingInside() && !"AC".equals(token) && !"=".equals(token)) {
+            inputInside(token);
+            return;
+        }
+        inputAtEnd(token);
+        caret = expression.length();
+    }
+
+    /** Caret position within {@link #getExpression()}; an empty display holds it after the 0. */
+    public int getCaret() {
+        return expression.isEmpty() ? 1 : Math.min(caret, expression.length());
+    }
+
+    /** Moves the caret within the expression being entered. A completed answer has no caret. */
+    public void setCaret(int index) {
+        if (evaluated) return;
+        caret = Math.max(0, Math.min(expression.length(), index));
+    }
+
+    private boolean editingInside() {
+        return !evaluated && caret < expression.length();
+    }
+
+    private void inputAtEnd(String token) {
         if ("AC".equals(token)) {
             clear();
             return;
@@ -148,6 +174,15 @@ public final class CalculatorEngine {
     }
 
     public void memoryRecall() {
+        if (editingInside()) {
+            recallInside();
+            return;
+        }
+        recallAtEnd();
+        caret = expression.length();
+    }
+
+    private void recallAtEnd() {
         expressionBeforeEquals = null;
         String recalled = format(memory);
         String candidate;
@@ -232,6 +267,7 @@ public final class CalculatorEngine {
             repeatOperand = savedOperand;
             errorMessage = savedError;
             expressionBeforeEquals = savedUndo;
+            caret = expression.length();
         } catch (ArithmeticException | IllegalArgumentException ignored) {
             // All fields are checked before any restored state is committed.
         }
@@ -244,6 +280,7 @@ public final class CalculatorEngine {
         if (candidate.length() <= MAX_EXPRESSION_LENGTH && structurallyValid(candidate)) {
             expression = candidate;
         }
+        caret = expression.length();
         memory = BigDecimal.ZERO;
         if (savedMemory != null && savedMemory.length() <= MAX_EXPRESSION_LENGTH) {
             try {
@@ -259,6 +296,7 @@ public final class CalculatorEngine {
 
     private void clear() {
         expression = "";
+        caret = 0;
         evaluated = false;
         errorMessage = null;
         expressionBeforeEquals = null;
@@ -388,6 +426,193 @@ public final class CalculatorEngine {
             evaluated = false;
             resetRepeat();
         }
+    }
+
+    /**
+     * Keys pressed while the caret is inside the expression. Every edit is built as a
+     * candidate and kept only if the whole expression is still well formed, so the
+     * expression can always be evaluated, saved, and continued from its end.
+     */
+    private void inputInside(String token) {
+        errorMessage = null;
+        if ("⌫".equals(token) || "DEL".equals(token)) {
+            deleteInside();
+            return;
+        }
+        if ("±".equals(token) || "+/-".equals(token)) {
+            toggleSignInside();
+            return;
+        }
+        String normalized = normalize(token);
+        if (normalized.length() != 1) return;
+        char character = normalized.charAt(0);
+        String candidate = expression.substring(0, caret) + character + expression.substring(caret);
+        if (Character.isDigit(character) && character <= '9') {
+            if (digitsAround(candidate, caret) <= MAX_INPUT_DIGITS) commit(candidate, caret + 1);
+        } else if (character == '.' || character == '%') {
+            commit(candidate, caret + 1);
+        } else if (isOperator(character)) {
+            insertOperatorInside(character);
+        }
+    }
+
+    /** An operator typed next to another replaces it, as it does at the end of the expression. */
+    private void insertOperatorInside(char operator) {
+        String after = expression.substring(caret);
+        if (caret > 0 && isOperator(expression.charAt(caret - 1))) {
+            if (!isSign(expression, caret - 1)) {
+                commit(expression.substring(0, caret - 1) + operator + after, caret);
+            } else if (caret > 1) {
+                commit(expression.substring(0, caret - 2) + operator + after, caret - 1);
+            }
+        } else if (caret > 0 && isOperator(after.charAt(0))) {
+            commit(expression.substring(0, caret) + operator + after.substring(1), caret + 1);
+        } else {
+            commit(expression.substring(0, caret) + operator + after, caret + 1);
+        }
+    }
+
+    private void deleteInside() {
+        if (caret == 0) return;
+        int at = caret - 1;
+        char removed = expression.charAt(at);
+        if (isNumberCharacter(removed) && operandStart(expression, at) == at
+                && operandEnd(expression, caret) == caret) {
+            // An operand's only digit becomes 0 so the expression stays complete; the next
+            // digit typed replaces that 0, and deleting again removes the operand.
+            if (removed != '0') {
+                commit(expression.substring(0, at) + '0' + expression.substring(caret), caret);
+            } else {
+                deleteEmptyOperand(at);
+            }
+            return;
+        }
+        String candidate = expression.substring(0, at) + expression.substring(caret);
+        boolean joinsNumbers = isOperator(removed) && !isSign(expression, at);
+        if (joinsNumbers && digitsAround(candidate, at) > MAX_INPUT_DIGITS) return;
+        commit(candidate, at);
+    }
+
+    /** Removes a lone 0 operand: its sign first, otherwise the operator that introduced it. */
+    private void deleteEmptyOperand(int at) {
+        if (at > 0 && isSign(expression, at - 1)) {
+            commit(expression.substring(0, at - 1) + expression.substring(at), at);
+        } else if (at > 0) {
+            commit(expression.substring(0, at - 1) + expression.substring(at + 1), at - 1);
+        } else {
+            int end = 1;
+            if (end < expression.length() && expression.charAt(end) == '%') end++;
+            if (end < expression.length() && isOperator(expression.charAt(end))) end++;
+            commit(expression.substring(end), 0);
+        }
+    }
+
+    private void toggleSignInside() {
+        int start = operandAt(caret);
+        if (start < 0) return;
+        if (start > 0 && isSign(expression, start - 1)) {
+            commit(expression.substring(0, start - 1) + expression.substring(start),
+                    caret >= start ? caret - 1 : caret);
+        } else {
+            commit(expression.substring(0, start) + '-' + expression.substring(start),
+                    caret >= start ? caret + 1 : caret);
+        }
+    }
+
+    /** Replaces the number under the caret, as recall replaces the number being typed. */
+    private void recallInside() {
+        int start = operandAt(caret);
+        if (start < 0) return;
+        int end = operandEnd(expression, start);
+        if (start > 0 && isSign(expression, start - 1)) start--;
+        String recalled = format(memory);
+        if (commit(expression.substring(0, start) + recalled + expression.substring(end),
+                start + recalled.length())) errorMessage = null;
+    }
+
+    /** Start of the digits of the number the caret touches, or -1 between two operators. */
+    private int operandAt(int position) {
+        int start = operandStart(expression, position);
+        if (start < operandEnd(expression, position)) return start;
+        if (position > 0 && expression.charAt(position - 1) == '%') {
+            return operandStart(expression, position - 1);
+        }
+        return isSign(expression, position) ? position + 1 : -1;
+    }
+
+    private static int operandStart(String source, int position) {
+        while (position > 0 && isNumberCharacter(source.charAt(position - 1))) position--;
+        return position;
+    }
+
+    private static int operandEnd(String source, int position) {
+        while (position < source.length() && isNumberCharacter(source.charAt(position))) position++;
+        return position;
+    }
+
+    private static int digitsAround(String source, int position) {
+        int digits = 0;
+        int end = operandEnd(source, position);
+        for (int index = operandStart(source, position); index < end; index++) {
+            if (source.charAt(index) != '.') digits++;
+        }
+        return digits;
+    }
+
+    private static boolean isNumberCharacter(char character) {
+        return (character >= '0' && character <= '9') || character == '.';
+    }
+
+    /** Whether the minus at this index negates the number after it rather than subtracting. */
+    private static boolean isSign(String source, int index) {
+        return index < source.length() && source.charAt(index) == '-'
+                && (index == 0 || isOperator(source.charAt(index - 1)));
+    }
+
+    /**
+     * Tidies the numbers in an edited expression (07 becomes 7, .5 becomes 0.5), moving the
+     * caret with them, and adopts the result only if it is a well-formed expression.
+     */
+    private boolean commit(String candidate, int position) {
+        StringBuilder text = new StringBuilder(candidate.length() + 1);
+        int moved = position;
+        int index = 0;
+        while (index < candidate.length()) {
+            char character = candidate.charAt(index);
+            if (!isNumberCharacter(character)) {
+                text.append(character);
+                index++;
+                continue;
+            }
+            int end = index;
+            while (end < candidate.length() && candidate.charAt(end) >= '0'
+                    && candidate.charAt(end) <= '9') end++;
+            if (end == index) {
+                // A leading decimal point gains its 0, and a caret at that spot follows it.
+                text.append('0');
+                if (index <= position) moved++;
+            }
+            while (index < end - 1 && candidate.charAt(index) == '0') {
+                if (index < position) moved--;
+                index++;
+            }
+            text.append(candidate, index, end);
+            index = end;
+            if (index < candidate.length() && candidate.charAt(index) == '.') {
+                text.append('.');
+                index++;
+                while (index < candidate.length() && candidate.charAt(index) >= '0'
+                        && candidate.charAt(index) <= '9') text.append(candidate.charAt(index++));
+            }
+        }
+        String edited = text.toString();
+        if (edited.length() > MAX_EXPRESSION_LENGTH || !structurallyValid(edited)) return false;
+        expression = edited;
+        caret = Math.max(0, Math.min(edited.length(), moved));
+        expressionBeforeEquals = null;
+        evaluated = false;
+        resetRepeat();
+        return true;
     }
 
     private void updateMemory(boolean subtract) {

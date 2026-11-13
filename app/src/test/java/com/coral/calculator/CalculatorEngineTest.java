@@ -975,4 +975,258 @@ public class CalculatorEngineTest {
         enter("7");
         assertEquals("7", calculator.getExpression());
     }
+
+    private void typeAt(int position, String text) {
+        calculator.setCaret(position);
+        type(text);
+    }
+
+    private void assertEditing(String expression, int caret) {
+        assertEquals(expression, calculator.getExpression());
+        assertEquals(caret, calculator.getCaret());
+    }
+
+    @Test public void caretStaysAtTheEndUntilItIsMoved() {
+        assertEquals(1, calculator.getCaret());
+        type("12+34");
+        assertEditing("12+34", 5);
+        enter("⌫");
+        assertEditing("12+3", 4);
+        calculator.setCaret(99);
+        assertEquals(4, calculator.getCaret());
+        calculator.setCaret(-3);
+        assertEquals(0, calculator.getCaret());
+    }
+
+    @Test public void digitsAndDecimalPointsAreInsertedAtTheCaret() {
+        type("52444");
+        typeAt(2, "9");
+        assertEditing("529444", 3);
+        type("0");
+        assertEditing("5290444", 4);
+        typeAt(0, "7");
+        assertEditing("75290444", 1);
+        typeAt(3, ".");
+        assertEditing("752.90444", 4);
+        type(".");
+        assertEditing("752.90444", 4);
+        assertEquals("", calculator.getPreview());
+    }
+
+    @Test public void insertingInsideAnEarlierNumberUpdatesTheAnswer() {
+        type("12+34×5");
+        typeAt(1, "0");
+        assertEditing("102+34×5", 2);
+        assertEquals("272", calculator.getPreview());
+        enter("=");
+        assertEquals("272", calculator.getExpression());
+        assertEquals("102+34×5", calculator.getCompletedEquation());
+    }
+
+    @Test public void backspaceRemovesTheCharacterBeforeTheCaret() {
+        type("1234+56");
+        calculator.setCaret(2);
+        enter("⌫");
+        assertEditing("134+56", 1);
+        enter("⌫");
+        assertEditing("34+56", 0);
+        enter("⌫");
+        assertEditing("34+56", 0);
+        assertEquals("90", calculator.getPreview());
+    }
+
+    @Test public void deletingAnOperatorJoinsItsNumbers() {
+        type("12+34");
+        calculator.setCaret(3);
+        enter("⌫");
+        assertEditing("1234", 2);
+        enter("AC");
+        type("1.5+2.5");
+        calculator.setCaret(4);
+        enter("⌫");
+        assertEditing("1.5+2.5", 4);
+        enter("AC");
+        type("50%+3");
+        calculator.setCaret(4);
+        enter("⌫");
+        assertEditing("50%+3", 4);
+    }
+
+    @Test public void deletingAnOperandsOnlyDigitLeavesAZeroToReplace() {
+        type("2+5×3");
+        calculator.setCaret(3);
+        enter("⌫");
+        assertEditing("2+0×3", 3);
+        assertEquals("2", calculator.getPreview());
+        type("7");
+        assertEditing("2+7×3", 3);
+        assertEquals("23", calculator.getPreview());
+        enter("⌫", "⌫");
+        assertEditing("2×3", 1);
+    }
+
+    @Test public void deletingTheFirstOperandRemovesItsOperatorToo() {
+        type("5+3");
+        calculator.setCaret(1);
+        enter("⌫");
+        assertEditing("0+3", 1);
+        enter("⌫");
+        assertEditing("3", 0);
+        enter("AC");
+        type("9");
+        enter("±");
+        type("+3");
+        assertEquals("−9+3", calculator.getExpression());
+        calculator.setCaret(2);
+        enter("⌫");
+        assertEditing("−0+3", 2);
+        enter("⌫");
+        assertEditing("0+3", 1);
+    }
+
+    @Test public void editingKeepsNumbersTidy() {
+        type("105+2");
+        calculator.setCaret(1);
+        enter("⌫");
+        assertEditing("5+2", 0);
+        enter("AC");
+        type("1.5+2");
+        calculator.setCaret(1);
+        enter("⌫");
+        assertEditing("0.5+2", 1);
+        type("7");
+        assertEditing("7.5+2", 1);
+        enter("AC");
+        type("2+5");
+        typeAt(2, ".");
+        assertEditing("2+0.5", 4);
+        typeAt(0, "0");
+        assertEditing("2+0.5", 0);
+    }
+
+    @Test public void operatorsSplitReplaceAndRespectTheirNeighbours() {
+        type("1234");
+        typeAt(2, "+");
+        assertEditing("12+34", 3);
+        enter("×");
+        assertEditing("12×34", 3);
+        calculator.setCaret(2);
+        enter("÷");
+        assertEditing("12÷34", 3);
+        typeAt(0, "×");
+        assertEditing("12÷34", 0);
+        enter("−");
+        assertEditing("−12÷34", 1);
+        enter("AC");
+        type("50%+3");
+        typeAt(2, "+");
+        assertEditing("50%+3", 2);
+        typeAt(3, "7");
+        assertEditing("50%+3", 3);
+    }
+
+    @Test public void operatorTypedAfterASignReplacesTheSignedOperator() {
+        type("2+5");
+        enter("±");
+        assertEquals("2+−5", calculator.getExpression());
+        typeAt(3, "×");
+        assertEditing("2×5", 2);
+    }
+
+    @Test public void percentAndSignApplyToTheNumberAtTheCaret() {
+        type("200+10×3");
+        typeAt(6, "%");
+        assertEditing("200+10%×3", 7);
+        calculator.setCaret(5);
+        enter("±");
+        assertEditing("200+−10%×3", 6);
+        enter("±");
+        assertEditing("200+10%×3", 5);
+        calculator.setCaret(1);
+        enter("±");
+        assertEditing("−200+10%×3", 2);
+        calculator.setCaret(8);
+        enter("±");
+        assertEditing("−200+−10%×3", 9);
+        enter("⌫");
+        assertEditing("−200+−10×3", 8);
+    }
+
+    @Test public void insertedDigitsRespectTheSixteenDigitLimit() {
+        type("1234567890123456+1");
+        typeAt(3, "9");
+        assertEditing("1234567890123456+1", 3);
+        calculator.setCaret(17);
+        enter("⌫");
+        assertEditing("1234567890123456+1", 17);
+        typeAt(18, "2");
+        assertEditing("1234567890123456+12", 19);
+    }
+
+    @Test public void memoryRecallReplacesTheNumberAtTheCaret() {
+        type("7");
+        calculator.memoryAdd();
+        enter("AC");
+        type("12+34×5");
+        calculator.setCaret(4);
+        calculator.memoryRecall();
+        assertEditing("12+7×5", 4);
+        assertEquals("47", calculator.getPreview());
+    }
+
+    @Test public void equalsClearAndCompletedAnswersResetTheCaret() {
+        type("12+34");
+        calculator.setCaret(1);
+        enter("=");
+        assertEquals("46", calculator.getExpression());
+        calculator.setCaret(0);
+        assertEquals(2, calculator.getCaret());
+        enter("+");
+        assertEditing("12+34+", 6);
+        calculator.setCaret(1);
+        enter("AC");
+        assertEquals(1, calculator.getCaret());
+        type("5");
+        assertEditing("5", 1);
+    }
+
+    @Test public void editingInsideAfterAnErrorKeepsTheExpression() {
+        type("8÷0");
+        enter("=");
+        assertTrue(calculator.isError());
+        calculator.setCaret(2);
+        enter("⌫");
+        assertFalse(calculator.isError());
+        assertEditing("80", 1);
+        enter("AC");
+        type("8÷0+1");
+        enter("=");
+        assertTrue(calculator.isError());
+        typeAt(3, "4");
+        assertFalse(calculator.isError());
+        assertEditing("8÷4+1", 3);
+        assertEquals("3", calculator.getPreview());
+    }
+
+    @Test public void everyInsideEditLeavesASnapshotThatRestores() {
+        String[] keys = {"1", "0", ".", "+", "−", "×", "÷", "%", "±", "⌫", "7"};
+        java.util.Random random = new java.util.Random(7);
+        for (int round = 0; round < 400; round++) {
+            enter("AC");
+            type("12.5+30×4%−7÷2");
+            for (int step = 0; step < 25; step++) {
+                String before = calculator.getExpression();
+                calculator.setCaret(random.nextInt(before.length() + 1));
+                enter(keys[random.nextInt(keys.length)]);
+                String expression = calculator.getExpression();
+                int caret = calculator.getCaret();
+                assertTrue(expression + " @" + caret, caret >= 0 && caret <= expression.length());
+                String saved = calculator.saveState();
+                CalculatorEngine copy = new CalculatorEngine();
+                copy.restoreState(saved);
+                assertEquals(before + " -> " + expression, saved, copy.saveState());
+                assertEquals(expression, copy.getExpression());
+            }
+        }
+    }
 }
