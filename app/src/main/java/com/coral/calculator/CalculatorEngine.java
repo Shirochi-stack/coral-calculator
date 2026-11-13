@@ -47,6 +47,30 @@ public final class CalculatorEngine {
         caret = Math.max(0, Math.min(expression.length(), index));
     }
 
+    /**
+     * Places the caret where the calculation was tapped. Tapping a completed equation brings
+     * it back for editing at that spot, as the delete key brings it back at its end.
+     */
+    public void placeCaret(int index) {
+        if (evaluated) {
+            expression = completedExpression(expressionBeforeEquals == null
+                    ? expression : expressionBeforeEquals);
+            expressionBeforeEquals = null;
+            evaluated = false;
+            resetRepeat();
+        }
+        setCaret(index);
+    }
+
+    /** Turns a completed answer into a number being entered, with the caret where it was tapped. */
+    public void editAnswer(int index) {
+        if (!isEvaluated()) return;
+        expressionBeforeEquals = null;
+        evaluated = false;
+        resetRepeat();
+        setCaret(index);
+    }
+
     private boolean editingInside() {
         return !evaluated && caret < expression.length();
     }

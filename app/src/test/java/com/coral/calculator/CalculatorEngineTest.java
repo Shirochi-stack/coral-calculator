@@ -1208,6 +1208,88 @@ public class CalculatorEngineTest {
         assertEquals("3", calculator.getPreview());
     }
 
+    @Test public void tappingACompletedEquationReopensItAtThatSpot() {
+        type("12+34");
+        enter("=");
+        assertTrue(calculator.isEvaluated());
+        calculator.placeCaret(1);
+        assertFalse(calculator.isEvaluated());
+        assertEditing("12+34", 1);
+        assertEquals("46", calculator.getPreview());
+        type("0");
+        assertEditing("102+34", 2);
+        enter("=");
+        assertEquals("136", calculator.getExpression());
+        assertEquals("102+34", calculator.getCompletedEquation());
+    }
+
+    @Test public void reopeningUsesTheEquationShownAboveTheAnswer() {
+        type("5+3+");
+        enter("=");
+        assertEquals("5+3", calculator.getCompletedEquation());
+        calculator.placeCaret(99);
+        assertEditing("5+3", 3);
+        enter("AC");
+        type("5+3");
+        enter("=", "=");
+        assertEquals("11", calculator.getExpression());
+        assertEquals("8+3", calculator.getCompletedEquation());
+        calculator.placeCaret(0);
+        assertEditing("8+3", 0);
+        type("1");
+        assertEditing("18+3", 1);
+        enter("=", "=");
+        assertEquals("24", calculator.getExpression());
+        enter("AC");
+        type("5");
+        enter("=");
+        calculator.placeCaret(0);
+        assertEditing("5", 0);
+        type("1");
+        assertEditing("15", 1);
+    }
+
+    @Test public void tappingACompletedAnswerEditsItAsANumber() {
+        type("12+34");
+        calculator.editAnswer(1);
+        assertEditing("12+34", 5);
+        enter("=");
+        calculator.editAnswer(1);
+        assertFalse(calculator.isEvaluated());
+        assertEditing("46", 1);
+        type("0");
+        assertEditing("406", 2);
+        enter("⌫");
+        assertEditing("46", 1);
+        calculator.setCaret(2);
+        type("+4");
+        enter("=");
+        assertEquals("50", calculator.getExpression());
+        assertEquals("46+4", calculator.getCompletedEquation());
+        enter("AC");
+        type("3−8");
+        enter("=");
+        assertEquals("−5", calculator.getExpression());
+        calculator.editAnswer(2);
+        type("0");
+        assertEditing("−50", 3);
+        CalculatorEngine copy = new CalculatorEngine();
+        copy.restoreState(calculator.saveState());
+        assertEquals("−50", copy.getExpression());
+    }
+
+    @Test public void reopenedEquationSavesAndRestores() {
+        type("12+34");
+        enter("=");
+        calculator.placeCaret(2);
+        String saved = calculator.saveState();
+        CalculatorEngine copy = new CalculatorEngine();
+        copy.restoreState(saved);
+        assertEquals(saved, copy.saveState());
+        assertEquals("12+34", copy.getExpression());
+        assertFalse(copy.isEvaluated());
+    }
+
     @Test public void everyInsideEditLeavesASnapshotThatRestores() {
         String[] keys = {"1", "0", ".", "+", "−", "×", "÷", "%", "±", "⌫", "7"};
         java.util.Random random = new java.util.Random(7);

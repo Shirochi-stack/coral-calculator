@@ -20,6 +20,7 @@ import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.Layout;
 import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
@@ -35,6 +36,7 @@ import android.widget.Button;
 import android.widget.OverScroller;
 import android.widget.TextView;
 
+import java.util.Arrays;
 import java.util.function.IntConsumer;
 
 /** Native, accessible controls placed to preserve the supplied reference's proportions. */
@@ -50,6 +52,8 @@ public final class CalculatorLayout extends ViewGroup {
         void onTool(String tool);
         /** The caret was placed at this position in the displayed expression. */
         void onCaret(int offset);
+        /** The line under the expression was tapped at this position in its text. */
+        void onAnswerCaret(int offset);
     }
     private final DisplayLine expression;
     private final DisplayLine result;
@@ -83,8 +87,10 @@ public final class CalculatorLayout extends ViewGroup {
         expression.setContentDescription("Expression: 0");
         result = display(context, MUTED, "sans-serif-medium");
         result.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);
+        result.setStartFirst(true);
         expression.setOnLongClickListener(v -> { listener.onTool("copy"); return true; });
         expression.setCaretListener(listener::onCaret);
+        result.setCaretListener(listener::onAnswerCaret);
         result.setOnLongClickListener(v -> { listener.onTool("copy"); return true; });
         addView(expression);
         addView(result);
@@ -319,9 +325,35 @@ public final class CalculatorLayout extends ViewGroup {
         float resultSize = Math.max(13, Math.round(w * (completed ? .16f : .11f)));
         // Error messages are sentences, not numbers: fit them rather than hiding their start.
         result.setTextSizePx(displayError ? result.fittedSize(resultSize, lineWidth) : resultSize);
-        expression.measure(exact(lineWidth), exact(Math.round(w * (completed ? .125f : .20f))));
-        result.measure(exact(lineWidth), exact(Math.round(w * (completed ? .20f : .135f))));
+        int oneLine = Math.round(w * (completed ? .125f : .20f));
+        int oneResult = Math.round(w * (completed ? .20f : .135f));
+        // An unfolded screen held sideways has room under the tools for a long calculation to
+        // continue on further lines. A phone held sideways does not, and keeps its single line.
+        boolean wrap = landscape && availableHeight >= 480 * getResources().getDisplayMetrics().density;
+        expression.setWrap(wrap);
+        expression.setLineHeight(oneLine);
+        result.setWrap(wrap && !displayError);
+        result.setLineHeight(oneResult);
+        if (wrap) {
+            // A long answer continues on a second or third line, which is enough for sixteen
+            // digits; the calculation gets the rest of the room.
+            result.measure(exact(lineWidth),
+                    MeasureSpec.makeMeasureSpec(oneResult * (completed ? 3 : 2), MeasureSpec.AT_MOST));
+            float room = availableHeight * .96f - toolRowY(availableHeight, touchSize) - touchSize * .6f
+                    - lineGap() - result.getMeasuredHeight();
+            expression.measure(exact(lineWidth),
+                    MeasureSpec.makeMeasureSpec(Math.max(oneLine, Math.round(room)), MeasureSpec.AT_MOST));
+        } else {
+            result.measure(exact(lineWidth), exact(oneResult));
+            expression.measure(exact(lineWidth), exact(oneLine));
+        }
     }
+
+    /** Sideways: centre of the row of tools above the display, below the top of the content. */
+    private static float toolRowY(float height, float touch) { return Math.max(height * .12f, touch * .55f); }
+
+    /** Sideways: space between the calculation and the line under it. */
+    private float lineGap() { return contentWidth * (completed ? .01f : .005f); }
 
     private static int exact(int size) { return MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY); }
     private void place(View view, float x, float y) {
@@ -342,11 +374,11 @@ public final class CalculatorLayout extends ViewGroup {
             // One row of tools above the display, which sits level with the middle of the keys.
             float touch = tools[0].getMeasuredWidth();
             float toolStep = Math.max(touch * 1.05f, w * .135f);
-            float toolY = top + Math.max(h * .12f, touch * .55f);
+            float toolY = top + toolRowY(h, touch);
             for (int i = 2; i < tools.length; i++) center(tools[i], start + w * .11f + (i - 2) * toolStep, toolY);
             center(tools[0], start + w * .89f - toolStep, toolY);
             center(tools[1], start + w * .89f, toolY);
-            float lineStep = w * (completed ? .135f : .205f);
+            float lineStep = expression.getMeasuredHeight() + lineGap();
             float displayY = Math.max(toolY + touch * .6f, top + (h - lineStep - result.getMeasuredHeight()) / 2f);
             place(expression, start + w * .06f, displayY);
             place(result, start + w * .06f, displayY + lineStep);
@@ -388,12 +420,16 @@ public final class CalculatorLayout extends ViewGroup {
     }
 
     /**
-     * One display line at a fixed text size. Content wider than the line fades out at the
-     * clipped edge and can be swiped sideways. A blinking caret marks where the next key
-     * lands: the end of the text, or wherever the line was last tapped.
+     * One line of the display at a fixed text size, with a blinking caret marking where the
+     * next key lands: the end of the text, or wherever it was last tapped.
+     *
+     * Content wider than the line normally stays on one line, fades out at the clipped edge
+     * and is swiped sideways. In wrapping mode it continues on further lines instead, and is
+     * swiped up and down once it has more lines than there is room for.
      */
     private static final class DisplayLine extends ViewGroup {
         private static final long BLINK_MS = 500;
+        private static final int[] NO_BREAKS = {};
         private final TextView text;
         private final Paint caretPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint fadePaint = new Paint();
@@ -413,17 +449,38 @@ public final class CalculatorLayout extends ViewGroup {
         };
         private VelocityTracker velocity;
         private float downX;
-        private float lastX;
+        private float downY;
+        private float last;
         private boolean dragging;
+        /** How far the content is moved from showing its end: sideways, or down when wrapping. */
         private float scroll;
         private int caretRoom;
         private boolean caret;
         private boolean caretOn;
+        /** The text as given, without the line breaks wrapping adds to what is shown. */
+        private CharSequence source = "";
         /** Character the caret precedes, or -1 when it follows the last one. */
         private int caretIndex = -1;
+        /** At a line break, whether the caret starts the next line rather than ending this one. */
+        private boolean caretLeading;
+        private boolean tapLeading;
+        private boolean showStart;
         private boolean revealCaret;
         private boolean pinStart;
+        /** Wrapped lines that do not all fit open on the first ones rather than the last. */
+        private boolean startFirst;
         private IntConsumer caretListener;
+        private boolean wrap;
+        /** Positions in {@link #source} that start a new line when wrapping. */
+        private int[] breaks = NO_BREAKS;
+        private int wrapWidth = -1;
+        private float wrapSize;
+        /** Height of this view when it holds a single line. */
+        private int lineHeight;
+        /** Space shared above and below the lines when wrapping. */
+        private int verticalPad;
+        /** When wrapped lines scroll, the strip in which the next hidden line shows, fading out. */
+        private int peek;
 
         DisplayLine(Context context, String font) {
             super(context);
@@ -454,26 +511,124 @@ public final class CalculatorLayout extends ViewGroup {
         void setText(CharSequence value, int caretAt) {
             // Swiped back to the start, the start stays put while digits are edited near it.
             pinStart = caretAt >= 0 && maxScroll() > 0 && scroll >= maxScroll() - 1;
-            text.setText(value);
+            source = value;
+            showText();
             scroller.abortAnimation();
             caretIndex = caretAt >= 0 && caretAt < value.length() ? caretAt : -1;
+            caretLeading = tapLeading && caretIndex >= 0;
+            showStart = caretIndex < 0 && wrap && startFirst;
             if (caretIndex < 0) setScroll(0);
             else revealCaret = true;
+        }
+
+        /** For a number, whose leading digits matter most when it is too long to show whole. */
+        void setStartFirst(boolean enabled) { startFirst = enabled; }
+
+        /** Wrapping continues long content on further lines, breaking before operators. */
+        void setWrap(boolean enabled) {
+            if (wrap == enabled) return;
+            wrap = enabled;
+            wrapWidth = -1;
+            scroller.abortAnimation();
+            scroll = 0;
+            text.setTranslationX(0);
+            text.setTranslationY(0);
+            text.setSingleLine(!enabled);
+            text.setGravity(enabled ? Gravity.END : Gravity.START);
+            showText();
+        }
+
+        /** The height of this view while its content fits on one line. */
+        void setLineHeight(int height) { lineHeight = height; }
+
+        private void showText() {
+            breaks = wrap && wrapWidth > 0 ? lineBreaks(source, text.getPaint(), wrapWidth) : NO_BREAKS;
+            if (breaks.length == 0) {
+                text.setText(source);
+                return;
+            }
+            SpannableStringBuilder shown = new SpannableStringBuilder(source);
+            for (int index = breaks.length - 1; index >= 0; index--) shown.insert(breaks[index], "\n");
+            text.setText(shown);
+        }
+
+        /**
+         * Where each further line starts. A line ends before an operator where it can, so a
+         * number stays whole; a number too long for one line is split after a separator.
+         */
+        private static int[] lineBreaks(CharSequence value, Paint paint, float width) {
+            int length = value.length();
+            if (length == 0 || paint.measureText(value, 0, length) <= width) return NO_BREAKS;
+            int[] found = new int[length];
+            int count = 0;
+            int start = 0;
+            while (start < length) {
+                int end = start + Math.max(1, paint.breakText(value, start, length, true, width, null));
+                if (end >= length) break;
+                int at = -1;
+                for (int index = end; index > start && at < 0; index--) {
+                    if (isOperator(value.charAt(index)) && !isOperator(value.charAt(index - 1))) at = index;
+                }
+                for (int index = end; index > start + 1 && at < 0; index--) {
+                    if (value.charAt(index - 1) == ',') at = index;
+                }
+                start = at < 0 ? end : at;
+                found[count++] = start;
+            }
+            return Arrays.copyOf(found, count);
+        }
+
+        private static boolean isOperator(char character) { return "+−×÷".indexOf(character) >= 0; }
+
+        /** Position in the shown text, which has one extra character for every earlier break. */
+        private int shownIndex(int position, boolean leading) {
+            int shown = position;
+            for (int start : breaks) if (start < position || (leading && start == position)) shown++;
+            return shown;
+        }
+
+        private int sourceIndex(int shown) {
+            CharSequence value = text.getText();
+            int position = shown;
+            for (int index = Math.min(shown, value.length()) - 1; index >= 0; index--) {
+                if (value.charAt(index) == '\n') position--;
+            }
+            return position;
         }
 
         /** Taps and accessibility actions report the position they ask the caret to take. */
         void setCaretListener(IntConsumer listener) { caretListener = listener; }
 
-        private int caretPosition() { return caretIndex < 0 ? text.length() : caretIndex; }
+        private int caretPosition() { return caretIndex < 0 ? source.length() : caretIndex; }
+
+        private int caretShown() {
+            return caretIndex < 0 ? text.length() : Math.min(text.length(), shownIndex(caretIndex, caretLeading));
+        }
 
         /** Caret position in the unscrolled text, measured from this view's left edge. */
         private float caretOffset() {
             Layout layout = text.getLayout();
             if (caretIndex < 0 || layout == null) return text.getRight();
-            return text.getLeft() + layout.getPrimaryHorizontal(Math.min(caretIndex, text.length()));
+            return text.getLeft() + layout.getPrimaryHorizontal(caretShown());
+        }
+
+        private int caretLine() {
+            Layout layout = text.getLayout();
+            return layout == null ? 0 : layout.getLineForOffset(caretShown());
         }
 
         private void bringCaretIntoView() {
+            Layout layout = text.getLayout();
+            if (wrap) {
+                if (layout == null) return;
+                // The caret's line stays clear of the strips where neighbouring lines fade out.
+                int line = caretLine();
+                float lowest = verticalPad / 2f + (line > 0 ? peek : 0) - text.getTop() - layout.getLineTop(line);
+                float highest = getHeight() - verticalPad / 2f - (line < layout.getLineCount() - 1 ? peek : 0)
+                        - text.getTop() - layout.getLineBottom(line);
+                setScroll(Math.max(lowest, Math.min(highest, scroll)));
+                return;
+            }
             // Wider than the faded edge, so the caret and the digit before it stay legible.
             float margin = text.getTextSize() * .7f;
             float offset = caretOffset();
@@ -495,7 +650,7 @@ public final class CalculatorLayout extends ViewGroup {
             Paint paint = text.getPaint();
             float current = paint.getTextSize();
             paint.setTextSize(size);
-            float width = paint.measureText(text.getText().toString());
+            float width = paint.measureText(source.toString());
             paint.setTextSize(current);
             return width > available ? (float) Math.floor(size * available / width * .98f) : size;
         }
@@ -519,11 +674,15 @@ public final class CalculatorLayout extends ViewGroup {
             if (caret && isAttachedToWindow() && getWindowVisibility() == VISIBLE) postDelayed(blink, BLINK_MS);
         }
 
-        private float maxScroll() { return Math.max(0, text.getWidth() - (getWidth() - caretRoom)); }
+        private float maxScroll() {
+            return Math.max(0, wrap ? text.getHeight() - (getHeight() - verticalPad)
+                    : text.getWidth() - (getWidth() - caretRoom));
+        }
 
         private void setScroll(float value) {
             scroll = Math.max(0, Math.min(maxScroll(), value));
-            text.setTranslationX(scroll);
+            text.setTranslationX(wrap ? 0 : scroll);
+            text.setTranslationY(wrap ? scroll : 0);
             invalidate();
         }
 
@@ -531,11 +690,11 @@ public final class CalculatorLayout extends ViewGroup {
 
         @Override public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
             super.onInitializeAccessibilityNodeInfo(info);
-            info.setText(text.getText());
+            info.setText(source);
             if (!caret || caretListener == null) return;
             if (caretPosition() > 0) info.addAction(new AccessibilityNodeInfo.AccessibilityAction(
                     R.id.action_caret_left, "Move cursor left"));
-            if (caretPosition() < text.length()) info.addAction(new AccessibilityNodeInfo.AccessibilityAction(
+            if (caretPosition() < source.length()) info.addAction(new AccessibilityNodeInfo.AccessibilityAction(
                     R.id.action_caret_right, "Move cursor right"));
         }
 
@@ -546,26 +705,47 @@ public final class CalculatorLayout extends ViewGroup {
             }
             int target = caretPosition() + (left ? -1 : 1);
             // A thousands separator is not a stop of its own: step past it to the next digit.
-            if (!left && target < text.length() && text.getText().charAt(target - 1) == ',') target++;
-            caretListener.accept(Math.max(0, Math.min(text.length(), target)));
+            if (!left && target < source.length() && source.charAt(target - 1) == ',') target++;
+            caretListener.accept(Math.max(0, Math.min(source.length(), target)));
             int position = caretPosition();
             announceForAccessibility(position == 0 ? "Cursor at start"
-                    : "Cursor after " + text.getText().charAt(position - 1));
+                    : "Cursor after " + source.charAt(position - 1));
             return true;
         }
 
         @Override protected void onMeasure(int widthSpec, int heightSpec) {
-            setMeasuredDimension(MeasureSpec.getSize(widthSpec), MeasureSpec.getSize(heightSpec));
+            int width = MeasureSpec.getSize(widthSpec);
+            if (wrap && (wrapWidth != width - caretRoom || wrapSize != text.getTextSize())) {
+                wrapWidth = width - caretRoom;
+                wrapSize = text.getTextSize();
+                showText();
+            }
             int unspecified = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
             text.measure(unspecified, unspecified);
+            int height = MeasureSpec.getSize(heightSpec);
+            if (wrap) {
+                // Grow by whole lines up to the room on offer. Past that the lines scroll, with
+                // part of the next hidden line left showing as a sign that there is more.
+                int lines = Math.max(1, text.getLineCount());
+                int each = Math.max(1, text.getMeasuredHeight() / lines);
+                verticalPad = Math.max(0, lineHeight - each);
+                int room = height - verticalPad;
+                peek = lines * each > room ? Math.round(each * .45f) : 0;
+                height = verticalPad + (peek == 0 ? text.getMeasuredHeight()
+                        : Math.max(1, (room - peek) / each) * each + peek);
+            }
+            setMeasuredDimension(width, height);
         }
 
         @Override protected void onLayout(boolean changed, int l, int t, int r, int b) {
             // Right-aligned: the end of the text sits at the caret, earlier digits run off the left edge.
+            // When wrapping, the last line sits at the bottom and earlier lines run off the top.
             int right = getWidth() - caretRoom;
-            int top = (getHeight() - text.getMeasuredHeight()) / 2;
+            int top = wrap ? getHeight() - verticalPad / 2 - text.getMeasuredHeight()
+                    : (getHeight() - text.getMeasuredHeight()) / 2;
             text.layout(right - text.getMeasuredWidth(), top, right, top + text.getMeasuredHeight());
-            setScroll(revealCaret && pinStart ? maxScroll() : scroll);
+            setScroll(showStart || (revealCaret && pinStart) ? maxScroll() : scroll);
+            showStart = false;
             if (revealCaret) {
                 revealCaret = false;
                 bringCaretIntoView();
@@ -574,40 +754,45 @@ public final class CalculatorLayout extends ViewGroup {
 
         @Override protected void dispatchDraw(Canvas canvas) {
             // Text that runs past an edge fades out there instead of being cut mid-digit.
-            float hiddenLeft = maxScroll() - scroll, hiddenRight = scroll;
-            boolean fade = hiddenLeft > 1 || hiddenRight > 1;
+            float hiddenBefore = maxScroll() - scroll, hiddenAfter = scroll;
+            boolean fade = hiddenBefore > 1 || hiddenAfter > 1;
             int layer = fade ? canvas.saveLayer(0, 0, getWidth(), getHeight(), null) : 0;
             super.dispatchDraw(canvas);
             drawCaret(canvas);
             if (!fade) return;
             // About half a digit wide, so a digit that is fully in view stays readable.
-            float edge = text.getTextSize() * .35f;
-            if (hiddenLeft > 1) {
-                float width = Math.min(edge, hiddenLeft);
-                fadeMatrix.setScale(width, 1);
-                fadeShader.setLocalMatrix(fadeMatrix);
-                canvas.drawRect(0, 0, width, getHeight(), fadePaint);
-            }
-            if (hiddenRight > 1) {
-                float width = Math.min(edge, hiddenRight);
-                fadeMatrix.setScale(-width, 1);
-                fadeMatrix.postTranslate(getWidth(), 0);
-                fadeShader.setLocalMatrix(fadeMatrix);
-                canvas.drawRect(getWidth() - width, 0, getWidth(), getHeight(), fadePaint);
-            }
+            float edge = wrap ? peek : text.getTextSize() * .35f;
+            if (hiddenBefore > 1) fadeEdge(canvas, Math.min(edge, hiddenBefore), false);
+            if (hiddenAfter > 1) fadeEdge(canvas, Math.min(edge, hiddenAfter), true);
             canvas.restoreToCount(layer);
         }
 
+        /** Erases towards the left or top edge, or towards the right or bottom one. */
+        private void fadeEdge(Canvas canvas, float size, boolean far) {
+            if (wrap) {
+                fadeMatrix.setRotate(90);
+                fadeMatrix.postScale(1, far ? -size : size);
+                fadeMatrix.postTranslate(0, far ? getHeight() : 0);
+            } else {
+                fadeMatrix.setScale(far ? -size : size, 1);
+                fadeMatrix.postTranslate(far ? getWidth() : 0, 0);
+            }
+            fadeShader.setLocalMatrix(fadeMatrix);
+            if (wrap) canvas.drawRect(0, far ? getHeight() - size : 0, getWidth(), far ? getHeight() : size, fadePaint);
+            else canvas.drawRect(far ? getWidth() - size : 0, 0, far ? getWidth() : size, getHeight(), fadePaint);
+        }
+
         private void drawCaret(Canvas canvas) {
-            if (!caret || !caretOn) return;
+            Layout layout = text.getLayout();
+            if (!caret || !caretOn || layout == null) return;
             float size = text.getTextSize();
             // Slimmer between two characters, where it has to fit in the gap between them.
             float thickness = Math.max(2 * getResources().getDisplayMetrics().density,
                     size * (caretIndex < 0 ? .05f : .035f));
-            float left = caretIndex < 0
-                    ? text.getRight() + scroll + Math.min(size * .06f, Math.max(0, caretRoom - thickness))
-                    : caretOffset() + scroll - thickness / 2;
-            float baseline = text.getTop() + text.getBaseline();
+            float left = (wrap ? 0 : scroll) + (caretIndex < 0
+                    ? text.getRight() + Math.min(size * .06f, Math.max(0, caretRoom - thickness))
+                    : caretOffset() - thickness / 2);
+            float baseline = text.getTop() + layout.getLineBaseline(caretLine()) + (wrap ? scroll : 0);
             canvas.drawRoundRect(left, baseline + text.getPaint().ascent() * .92f, left + thickness,
                     baseline + text.getPaint().descent() * .6f, thickness / 2, thickness / 2, caretPaint);
         }
@@ -615,20 +800,24 @@ public final class CalculatorLayout extends ViewGroup {
         @Override public boolean onTouchEvent(MotionEvent event) {
             if (velocity == null) velocity = VelocityTracker.obtain();
             velocity.addMovement(event);
+            // Content moves along one axis: sideways on a single line, up and down when wrapping.
+            float along = wrap ? event.getY() : event.getX();
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     scroller.abortAnimation();
-                    downX = lastX = event.getX();
+                    downX = event.getX();
+                    downY = event.getY();
+                    last = along;
                     dragging = false;
                     break;
                 case MotionEvent.ACTION_MOVE:
-                    if (!dragging && maxScroll() > 0 && Math.abs(event.getX() - downX) > touchSlop) {
+                    if (!dragging && maxScroll() > 0 && Math.abs(along - (wrap ? downY : downX)) > touchSlop) {
                         dragging = true;
                         cancelLongPress();
                         getParent().requestDisallowInterceptTouchEvent(true);
                     }
-                    if (dragging) setScroll(scroll + event.getX() - lastX);
-                    lastX = event.getX();
+                    if (dragging) setScroll(scroll + along - last);
+                    last = along;
                     break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
@@ -636,7 +825,7 @@ public final class CalculatorLayout extends ViewGroup {
                     dragging = false;
                     if (wasDragging && event.getActionMasked() == MotionEvent.ACTION_UP) {
                         velocity.computeCurrentVelocity(1000, maximumFling);
-                        float speed = velocity.getXVelocity();
+                        float speed = wrap ? velocity.getYVelocity() : velocity.getXVelocity();
                         if (Math.abs(speed) > minimumFling) {
                             scroller.fling(Math.round(scroll), 0, Math.round(speed), 0, 0, Math.round(maxScroll()), 0, 0);
                             postInvalidateOnAnimation();
@@ -649,13 +838,21 @@ public final class CalculatorLayout extends ViewGroup {
                         setPressed(false);
                         return true;
                     }
-                    // A short tap moves the caret to the nearest gap between characters.
+                    // A short tap moves the caret to the nearest gap between characters. On the
+                    // equation above an answer, which shows no caret, it reopens the equation there.
                     Layout layout = text.getLayout();
-                    if (caret && caretListener != null && layout != null
+                    if (caretListener != null && layout != null
                             && event.getActionMasked() == MotionEvent.ACTION_UP
                             && Math.abs(event.getX() - downX) <= touchSlop
+                            && Math.abs(event.getY() - downY) <= touchSlop
                             && event.getEventTime() - event.getDownTime() < ViewConfiguration.getLongPressTimeout()) {
-                        caretListener.accept(layout.getOffsetForHorizontal(0, event.getX() - text.getLeft() - scroll));
+                        float x = event.getX() - text.getLeft() - (wrap ? 0 : scroll);
+                        float y = event.getY() - text.getTop() - (wrap ? scroll : 0);
+                        int shown = layout.getOffsetForHorizontal(layout.getLineForVertical(Math.round(y)), x);
+                        // Tapping the start of a wrapped line keeps the caret on that line.
+                        tapLeading = shown > 0 && text.getText().charAt(shown - 1) == '\n';
+                        caretListener.accept(sourceIndex(shown));
+                        tapLeading = false;
                     }
                     break;
                 default: break;

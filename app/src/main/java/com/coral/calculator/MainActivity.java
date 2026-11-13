@@ -133,9 +133,20 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
 
     /** The display counts thousands separators in its positions; the engine's text has none. */
     @Override public void onCaret(int offset) {
-        if (engine.isEvaluated()) return;
-        engine.setCaret(NumberFormatter.rawOffset(NumberFormatter.format(engine.getExpression()), offset));
+        // Tapping the equation above an answer brings it back for editing at that spot.
+        boolean reopened = engine.isEvaluated();
+        String shown = NumberFormatter.format(reopened ? engine.getCompletedEquation() : engine.getExpression());
+        engine.placeCaret(NumberFormatter.rawOffset(shown, offset));
+        refresh(reopened);
+        if (reopened) save();
+    }
+
+    /** Tapping a completed answer makes it the number being entered, ready to edit at that digit. */
+    @Override public void onAnswerCaret(int offset) {
+        if (!engine.isEvaluated()) return;
+        engine.editAnswer(NumberFormatter.rawOffset(NumberFormatter.format(engine.getExpression()), offset));
         refresh();
+        save();
     }
 
     @Override protected void onSaveInstanceState(Bundle state) {
