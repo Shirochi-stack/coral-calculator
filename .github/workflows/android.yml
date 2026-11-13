@@ -97,6 +97,12 @@ jobs:
           cp apk/app-debug.apk "dist/Coral-Calculator-$version.apk"
           cp LICENSE dist/LICENSE
           (cd dist && sha256sum "Coral-Calculator-$version.apk" > SHA256SUMS.txt)
-          gh release create "$TAG" dist/* --verify-tag \
-            --title "Coral Calculator $version" \
-            --notes-file "docs/release-notes/$version.md"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # The release was drafted on GitHub first: attach the files and fill in the notes.
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --title "Coral Calculator $version" --notes-file "docs/release-notes/$version.md"
+          else
+            gh release create "$TAG" dist/* --verify-tag \
+              --title "Coral Calculator $version" \
+              --notes-file "docs/release-notes/$version.md"
+          fi
