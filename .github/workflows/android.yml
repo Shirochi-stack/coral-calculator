@@ -27,6 +27,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's default list includes the retired 'tools' package, which fails to install.
+          packages: ''
 
       - name: Install Android 35 platform and build tools
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
@@ -65,3 +68,35 @@ jobs:
             app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
           retention-days: 14
+
+  release:
+    # Pushing a v* tag publishes the tested debug APK as a GitHub release.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download tested debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: coral-calculator-debug-apk
+          path: apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          grep -q "versionName '$version'" app/build.gradle || { echo "Tag $TAG does not match versionName"; exit 1; }
+          mkdir dist
+          cp apk/app-debug.apk "dist/Coral-Calculator-$version.apk"
+          cp LICENSE dist/LICENSE
+          (cd dist && sha256sum "Coral-Calculator-$version.apk" > SHA256SUMS.txt)
+          gh release create "$TAG" dist/* --verify-tag \
+            --title "Coral Calculator $version" \
+            --notes-file "docs/release-notes/$version.md"
