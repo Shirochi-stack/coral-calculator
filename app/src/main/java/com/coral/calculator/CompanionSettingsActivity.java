@@ -84,27 +84,32 @@ public final class CompanionSettingsActivity extends Activity {
         masterNote.setPadding(0, 0, dp(56), dp(8));
         content.addView(masterNote);
 
-        toggle(content, "Animated Halgakos", "Her pink-haired form breathes and blinks, runs when you drag her, and "
-                        + "works alongside the mini calculator. The still Halgakos uses less battery.",
-                prefs.animated(), checked -> { prefs.set(CompanionPrefs.ANIMATED, checked); apply(); });
-        toggle(content, "Tap for the mini calculator", "Holding her opens her menu. Switch this off to have a tap "
-                        + "open the menu and a hold the mini calculator.",
+        section(content, "Mini calculator");
+        toggle(content, "Close it when you tap away", "Touching anywhere outside the mini calculator closes it. "
+                        + "Switch this off to keep it open while you use the app underneath.",
+                prefs.closeOutside(), checked -> { prefs.set(CompanionPrefs.CLOSE_OUTSIDE, checked); apply(); });
+        toggle(content, "Open it with a tap", "A tap on Halgakos opens the mini calculator and a hold opens her "
+                        + "menu. Switch this off to swap the two.",
                 prefs.tapCalculator(), checked -> {
                     prefs.set(CompanionPrefs.TAP_CALCULATOR, checked);
                     describeGestures();
                     apply();
                 });
-        toggle(content, "Hide the mini calculator when you tap away", "A touch anywhere outside it closes it. Switch "
-                        + "this off to keep it open while you use the app underneath.",
-                prefs.closeOutside(), checked -> { prefs.set(CompanionPrefs.CLOSE_OUTSIDE, checked); apply(); });
+
+        section(content, "Halgakos");
+        toggle(content, "Animated Halgakos", "Her pink-haired form breathes and blinks, runs when you drag her, and "
+                        + "works alongside the mini calculator. The still Halgakos uses less battery.",
+                prefs.animated(), checked -> { prefs.set(CompanionPrefs.ANIMATED, checked); apply(); });
+        toggle(content, "Keep her out of the calculator app", "She steps aside while the full calculator app is on "
+                        + "screen and returns when you leave it. This is about Halgakos herself, not the mini "
+                        + "calculator.",
+                prefs.hideInApp(), checked -> { prefs.set(CompanionPrefs.HIDE_IN_APP, checked); apply(); });
         boolean foldable = FoldState.isFoldable(this);
         Switch unfolded = toggle(content, "Only while unfolded",
                 foldable ? "She stays away while the device is folded shut, and returns when you open it."
                         : "For foldables. This device has no hinge to go by.",
                 prefs.unfoldedOnly(), checked -> { prefs.set(CompanionPrefs.UNFOLDED_ONLY, checked); apply(); });
         unfolded.setEnabled(foldable);
-        toggle(content, "Hide while the calculator is open", "She steps aside when you are already in the app.",
-                prefs.hideInApp(), checked -> { prefs.set(CompanionPrefs.HIDE_IN_APP, checked); apply(); });
         toggle(content, "Snap to the edge", "She slides to the nearer side of the screen when you let go, rather "
                         + "than staying where you drop her.",
                 prefs.snap(), checked -> { prefs.set(CompanionPrefs.SNAP, checked); apply(); });
@@ -138,7 +143,7 @@ public final class CompanionSettingsActivity extends Activity {
         content.addView(fadeAfter, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
         describeFade();
 
-        TextView sizeLabel = text("Size", 19, ink());
+        TextView sizeLabel = text("Her size", 19, ink());
         sizeLabel.setPadding(0, dp(14), 0, dp(4));
         content.addView(sizeLabel);
         RadioGroup sizes = new RadioGroup(this);
@@ -169,9 +174,7 @@ public final class CompanionSettingsActivity extends Activity {
         tips.setPadding(0, dp(20), 0, 0);
         content.addView(tips);
 
-        TextView noticeLabel = text("Android's notification", 19, ink());
-        noticeLabel.setPadding(0, dp(22), 0, dp(4));
-        content.addView(noticeLabel);
+        section(content, "Android's notification");
         content.addView(text("While she is on screen, Android posts its own notification that Halgakos Calculator "
                 + "is displaying over other apps. It belongs to Android, so its icon and wording are not the "
                 + "calculator's to change, but you can switch it off.", 15, muted()));
@@ -183,6 +186,20 @@ public final class CompanionSettingsActivity extends Activity {
         notice.setBackgroundResource(android.R.drawable.list_selector_background);
         notice.setOnClickListener(v -> openSystemNotice());
         content.addView(notice);
+
+        // Which release this is, since one from before 1.2.0 can sit beside it looking the same.
+        TextView version = text("Halgakos Calculator " + BuildConfig.VERSION_NAME, 14, muted());
+        version.setPadding(0, dp(16), 0, 0);
+        content.addView(version);
+        if (OldCopy.installed(this)) {
+            TextView old = text("An older copy is installed beside this one, with settings of its own. "
+                    + "Remove it  ›", 16, CalculatorLayout.CORAL);
+            old.setPadding(0, dp(10), 0, dp(10));
+            old.setFocusable(true);
+            old.setBackgroundResource(android.R.drawable.list_selector_background);
+            old.setOnClickListener(v -> OldCopy.open(this));
+            content.addView(old);
+        }
 
         // The page is a long one: it can be closed from its foot as well as its head.
         LinearLayout.LayoutParams footParams = new LinearLayout.LayoutParams(
@@ -253,6 +270,16 @@ public final class CompanionSettingsActivity extends Activity {
                 "She needs Android's permission to appear on top of other apps.",
                 () -> awaitingPermission = true,
                 () -> masterNote.setText("This device has no setting for displaying over other apps."));
+    }
+
+    /** A heading over a group of settings. */
+    private void section(LinearLayout parent, String name) {
+        TextView heading = text(name, 15, CalculatorLayout.CORAL);
+        heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        heading.setAllCaps(true);
+        heading.setLetterSpacing(.06f);
+        heading.setPadding(0, dp(24), 0, dp(2));
+        parent.addView(heading);
     }
 
     private TextView closeButton() {

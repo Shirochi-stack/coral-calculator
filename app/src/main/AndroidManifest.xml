@@ -5,6 +5,12 @@
     <!-- So a companion that is switched on returns after the device restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Releases before 1.2.0 had this ID and stay installed beside this one. Being able to
+         see that one is there is what lets the app point the duplicate out. -->
+    <queries>
+        <package android:name="com.coral.calculator" />
+    </queries>
+
     <application
         android:name=".CalculatorApp"
         android:allowBackup="false"

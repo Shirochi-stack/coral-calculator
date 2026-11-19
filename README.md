@@ -80,11 +80,11 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 
 | Setting | What it does |
 | --- | --- |
+| **Close it when you tap away** (mini calculator) | Touching anywhere outside the mini calculator closes it. On by default; turn off to keep it open while you use the app underneath. |
+| **Open it with a tap** (mini calculator) | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
 | **Animated Halgakos** | Her pink-haired form breathes and blinks, runs the way you drag her, and works alongside the mini calculator. Off by default: the still Halgakos uses less battery. |
-| **Tap for the mini calculator** | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
-| **Hide the mini calculator when you tap away** | A touch anywhere outside the mini calculator closes it. On by default; turn off to keep it open while you use the app underneath. |
+| **Keep her out of the calculator app** | Halgakos herself steps aside while the full calculator app is on screen. On by default. It has nothing to do with the mini calculator. |
 | **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
-| **Hide while the calculator is open** | She steps aside while you are in the app. On by default. |
 | **Snap to the edge** | She slides to the nearer side of the screen when you let go. Off by default. |
 | **Fade when resting** | She turns translucent once she has been left alone. The slider under it sets how soon, from half a second to ten seconds; it starts at a second and a half. |
 | **Size** | Small, medium, or large. |
