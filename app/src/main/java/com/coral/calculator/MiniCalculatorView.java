@@ -82,8 +82,8 @@ final class MiniCalculatorView extends LinearLayout {
         title.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         title.setPadding(px(4), 0, 0, 0);
         header.addView(title, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
-        // Wider than they are tall, and shaped like the keys: easier to see and to hit than a
-        // bare icon in a square the height of the header.
+        // Wider than they are tall: easier to hit than a square the height of the header.
+        // They show no background until they are pressed.
         header.addView(headerButton(CompanionIcon.OPEN, "Open in Halgakos Calculator", host::onOpenApp),
                 new LayoutParams(px(HEADER_BUTTON), px(HEADER)));
         LayoutParams closeParams = new LayoutParams(px(HEADER_BUTTON), px(HEADER));
@@ -126,7 +126,7 @@ final class MiniCalculatorView extends LinearLayout {
         button.setContentDescription(description);
         button.setFocusable(true);
         button.setClickable(true);
-        button.setBackground(CalculatorLayout.pill(dark ? 0xFF2A2E31 : 0xFFF3F3F3));
+        button.setBackground(CalculatorLayout.pill(Color.TRANSPARENT));
         button.setOnClickListener(v -> action.run());
         return button;
     }
