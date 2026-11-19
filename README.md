@@ -1,6 +1,8 @@
-# Coral Calculator
+# Halgakos Calculator
 
-A simple, offline calculator for Android with circular keys, coral accents, and answers that update as you type.
+A simple, offline calculator for Android with circular keys, coral accents, and answers that update as you type. Halgakos, its mascot, can float over your other apps with a mini calculator in hand.
+
+Formerly Coral Calculator.
 
 [Download the latest release](https://github.com/Shirochi-stack/coral-calculator/releases/latest) · Android 8.0 or later
 
@@ -18,6 +20,7 @@ A simple, offline calculator for Android with circular keys, coral accents, and 
 - **Memory and history:** store a value in memory or reuse any of your last 100 completed calculations.
 - **Unit conversion:** convert length, mass, and temperature without an internet connection.
 - **Currency conversion:** calculate amounts using an exchange rate you enter yourself.
+- **Halgakos companion:** a mini Halgakos who floats over other apps. Drag her anywhere, hold her for a compact calculator, or tap her to jump back to the app.
 - **Your preferred view:** switch to dark appearance or fullscreen, rotate to landscape, and turn key vibration on or off.
 - **Convenient input:** labeled buttons, hardware keyboard support, and long-press result copying.
 
@@ -61,14 +64,40 @@ The **unit converter** and **currency converter** sit beside history. Choose the
 
 Use the **top-right settings icon** to change appearance or key vibration. The icon beside it toggles fullscreen.
 
+### Halgakos companion
+
+<img width="260" src="docs/companion.png" />
+
+Open **Settings › Halgakos companion** and switch on **Show Halgakos**. Android asks once for permission to display over other apps; choose Halgakos Calculator in the list it shows, allow it, and come back.
+
+- **Drag** her anywhere on the screen. She slides to the nearer edge when you let go.
+- **Hold** her to open the mini calculator over the app you are in. Hold or tap her again, or use the **✕** in its corner, to close it.
+- **Tap** her for a menu with the mini calculator, the full calculator, and her settings.
+- The mini calculator works on the same calculation as the app. The arrow in its corner opens the app with the same numbers, and long-pressing its display copies the result.
+- **Drag her onto the ✕** that appears at the bottom of the screen to hide her. The switch in her settings brings her back.
+
+Her settings:
+
+| Setting | What it does |
+| --- | --- |
+| **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
+| **Hide while the calculator is open** | She steps aside while you are in the app. On by default. |
+| **Snap to the edge** | Turn off to leave her exactly where you drop her. |
+| **Fade when resting** | She turns translucent after a few seconds. |
+| **Size** | Small, medium, or large. |
+
+She keeps her place when the device is folded, unfolded, or turned, and comes back after a restart. Android hides her on the lock screen and over its own Settings and permission screens.
+
 ## Privacy
 
-Coral Calculator works entirely offline. It has no ads, analytics, accounts, or network permission. Calculation history and settings are stored on your device. Clear saved calculations from the **History** dialog.
+Halgakos Calculator works entirely offline. It has no ads, analytics, accounts, or network permission. Calculation history and settings are stored on your device. Clear saved calculations from the **History** dialog.
+
+The companion needs Android's permission to display over other apps, which is used only to draw her and her mini calculator. See the [privacy policy](PRIVACY.md).
 
 <details>
 <summary>Build from source</summary>
 
-Use JDK 17 and Android SDK platform 35 with build-tools 35.0.0. Set `ANDROID_HOME` to the SDK directory, or configure `sdk.dir` in a local `local.properties` file.
+Use JDK 17 and Android SDK platform 36 with build-tools 35.0.0. Set `ANDROID_HOME` to the SDK directory, or configure `sdk.dir` in a local `local.properties` file.
 
 On Windows:
 
@@ -86,8 +115,12 @@ The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. The project
 
 Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification-1.0.5.md) for build and emulator checks.
 
+The launcher icon and the companion's figure are generated from `assets/HalgakosWhite.png` by `python tools/make_art.py`, which needs Pillow.
+
+For a signed Google Play bundle, put the upload key's `storeFile`, `storePassword`, `keyAlias` and `keyPassword` in a `keystore.properties` file beside `settings.gradle` and run `gradlew bundleRelease`. Without that file the bundle is built unsigned.
+
 </details>
 
 ## License
 
-Coral Calculator is available under the [MIT License](LICENSE).
+Halgakos Calculator is available under the [MIT License](LICENSE).

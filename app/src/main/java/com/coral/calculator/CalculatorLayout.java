@@ -287,7 +287,7 @@ public final class CalculatorLayout extends ViewGroup {
     }
 
     /** Fully rounded ends: a circle when square, a pill when a key is wider than it is tall. */
-    private static RippleDrawable pill(int color) {
+    static RippleDrawable pill(int color) {
         GradientDrawable shape = new GradientDrawable();
         shape.setCornerRadius(100000f);
         shape.setColor(color);

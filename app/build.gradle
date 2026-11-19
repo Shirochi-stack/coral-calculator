@@ -2,25 +2,47 @@ plugins {
     id 'com.android.application'
 }
 
+// Google Play upload key. keystore.properties is kept out of source control; without it the
+// release bundle is built unsigned, as it is in CI.
+def keystoreProperties = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) {
+    keystoreFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace 'com.coral.calculator'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId 'com.coral.calculator'
         minSdk 26
-        targetSdk 35
-        versionCode 10
-        versionName '1.0.9'
+        targetSdk 36
+        versionCode 11
+        versionName '1.1.0'
     }
 
     buildFeatures {
         buildConfig true
     }
 
+    signingConfigs {
+        if (keystoreFile.exists()) {
+            upload {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.upload
+            }
         }
     }
 

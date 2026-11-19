@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
@@ -19,15 +20,13 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-
-import java.util.ArrayList;
 import java.util.List;
 
-public final class MainActivity extends Activity implements CalculatorLayout.Listener {
-    private final CalculatorEngine engine = new CalculatorEngine();
-    private final List<String[]> history = new ArrayList<>();
+public final class MainActivity extends Activity implements CalculatorLayout.Listener, CalculatorSession.Listener {
+    /** Shared with the companion's mini calculator, which may change them while this is open. */
+    private CalculatorSession session;
+    private CalculatorEngine engine;
+    private List<String[]> history;
     private CalculatorLayout layout;
     private SharedPreferences preferences;
     private boolean haptics;
@@ -36,18 +35,12 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        preferences = getSharedPreferences("calculator", MODE_PRIVATE);
+        preferences = getSharedPreferences(CalculatorSession.PREFERENCES, MODE_PRIVATE);
         haptics = preferences.getBoolean("haptics", true);
         dark = preferences.getBoolean("dark", false);
-        if (preferences.contains("state")) engine.restoreState(preferences.getString("state", ""));
-        else engine.restore(preferences.getString("expression", "0"), preferences.getString("memory", "0"));
-        try {
-            JSONArray saved = new JSONArray(preferences.getString("history", "[]"));
-            for (int i = 0; i < Math.min(saved.length(), 100); i++) {
-                JSONArray entry = saved.getJSONArray(i);
-                history.add(new String[]{entry.getString(0), entry.getString(1)});
-            }
-        } catch (JSONException ignored) { history.clear(); }
+        session = CalculatorSession.get(this);
+        engine = session.engine();
+        history = session.history();
         if (state != null) engine.setCaret(state.getInt("caret", Integer.MAX_VALUE));
         layout = new CalculatorLayout(this, this);
         setContentView(layout);
@@ -55,6 +48,21 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         applyTheme();
         refresh();
     }
+
+    @Override protected void onStart() {
+        super.onStart();
+        session.addListener(this);
+        Companion.get(this).setCalculatorOpen(true);
+        refresh();
+    }
+
+    @Override protected void onStop() {
+        session.removeListener(this);
+        Companion.get(this).setCalculatorOpen(false);
+        super.onStop();
+    }
+
+    @Override public void onCalculationChanged() { refresh(); }
 
     @SuppressWarnings("deprecation")
     private void configureInsets() {
@@ -99,21 +107,8 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
 
     @Override public void onKey(String key) {
         if (haptics) layout.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-        String before = engine.getEquationForEquals();
-        boolean complete = !engine.getValue().isEmpty();
-        switch (key) {
-            case "mc": engine.memoryClear(); break;
-            case "m+": engine.memoryAdd(); break;
-            case "m−": engine.memorySubtract(); break;
-            case "mr": engine.memoryRecall(); break;
-            default: engine.input(key); break;
-        }
-        if ("=".equals(key) && complete && !engine.isError() && !engine.getValue().isEmpty()) {
-            history.add(0, new String[]{before, engine.getValue()});
-            if (history.size() > 100) history.remove(history.size() - 1);
-        }
+        session.press(key, this);
         refresh(true);
-        save();
     }
 
     private void refresh() {
@@ -157,13 +152,8 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     }
 
     private void save() {
-        JSONArray saved = new JSONArray();
-        for (String[] entry : history) {
-            JSONArray item = new JSONArray(); item.put(entry[0]); item.put(entry[1]); saved.put(item);
-        }
-        preferences.edit().putString("expression", engine.getExpression()).putString("memory", engine.getMemory())
-                .putString("state", engine.saveState())
-                .putString("history", saved.toString()).putBoolean("haptics", haptics).putBoolean("dark", dark).apply();
+        session.save();
+        preferences.edit().putBoolean("haptics", haptics).putBoolean("dark", dark).apply();
     }
 
     @Override protected void onPause() { super.onPause(); save(); }
@@ -194,7 +184,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     }
 
     private String currentValue() { return engine.getValue().isEmpty() ? "0" : engine.getValue(); }
-    private void useValue(String value) { engine.restore(value, engine.getMemory()); refresh(); save(); }
+    private void useValue(String value) { engine.restore(value, engine.getMemory()); refresh(); session.changed(this); }
 
     @SuppressWarnings("deprecation")
     private void toggleFullScreen() {
@@ -216,13 +206,28 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         content.addView(vibration);
         Switch theme = new Switch(this);
         theme.setText("Dark appearance"); theme.setTextSize(20); theme.setChecked(dark); theme.setPadding(0, dp(12), 0, dp(12));
-        theme.setOnCheckedChangeListener((button, checked) -> { dark = checked; applyTheme(); refresh(); save(); });
+        theme.setOnCheckedChangeListener((button, checked) -> {
+            dark = checked; applyTheme(); refresh(); save();
+            Companion.get(this).settingsChanged();
+        });
         content.addView(theme);
+        TextView companion = new TextView(this);
+        companion.setText("Halgakos companion  ›");
+        companion.setTextSize(20); companion.setTextColor(CalculatorLayout.CORAL);
+        companion.setPadding(0, dp(14), 0, dp(14));
+        companion.setContentDescription("Halgakos companion settings");
+        companion.setBackgroundResource(android.R.drawable.list_selector_background);
+        content.addView(companion);
         TextView about = new TextView(this);
-        about.setText("Coral Calculator " + BuildConfig.VERSION_NAME + "\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
+        about.setText("Halgakos Calculator " + BuildConfig.VERSION_NAME + "\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
         about.setTextSize(18); about.setTextColor(0xFF777777); about.setPadding(0, dp(20), 0, dp(8));
         content.addView(about);
-        new AlertDialog.Builder(this).setTitle("Settings").setView(content).setPositiveButton("Done", null).show();
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Settings").setView(content).setPositiveButton("Done", null).create();
+        companion.setOnClickListener(v -> {
+            dialog.dismiss();
+            startActivity(new Intent(this, CompanionSettingsActivity.class));
+        });
+        dialog.show();
     }
 
     private void showHistory() {

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep in step with BACKGROUND_TOP and BACKGROUND_BOTTOM in tools/make_art.py. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient android:angle="270" android:startColor="#FF7A74" android:endColor="#F02E42" />
+</shape>

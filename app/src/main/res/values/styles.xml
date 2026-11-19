@@ -9,4 +9,14 @@
         <item name="android:windowBackground">#FAFAFA</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+
+    <!-- The companion's settings when the calculator is set to its dark appearance. -->
+    <style name="Theme.CoralCalculator.Dark" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#FF393F</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#17191B</item>
+        <item name="android:navigationBarColor">#17191B</item>
+        <item name="android:windowBackground">#17191B</item>
+    </style>
 </resources>
