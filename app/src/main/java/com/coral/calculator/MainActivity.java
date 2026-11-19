@@ -47,6 +47,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         configureInsets();
         applyTheme();
         refresh();
+        if (state == null) CompanionPermission.offerOnce(this);
     }
 
     @Override protected void onStart() {

@@ -75,6 +75,8 @@ def assert_no_overlaps():
 shell("settings", "put", "system", "accelerometer_rotation", "0")
 shell("settings", "put", "system", "user_rotation", "0")
 shell("am", "force-stop", package)
+# Allowed up front, so the first launch does not stop to offer the companion's permission.
+shell("appops", "set", package, "SYSTEM_ALERT_WINDOW", "allow")
 shell("am", "start", "-W", "-n", package + "/.MainActivity")
 time.sleep(.5)
 home = nodes()

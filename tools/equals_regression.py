@@ -88,6 +88,8 @@ class Regression:
             self.keys(KEY_NAMES.get(character, character))
 
     def launch(self):
+        # Allowed up front, so the first launch does not stop to offer the companion's permission.
+        self.shell("appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
         self.shell("am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
         time.sleep(.5)
         self.home = self.nodes()

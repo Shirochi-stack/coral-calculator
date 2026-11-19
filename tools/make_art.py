@@ -1,9 +1,11 @@
 """Derive the launcher icon, the companion sprite and the store icon from the Halgakos art.
 
-Usage: python tools/make_art.py [--preview DIR]
+Usage: python tools/make_art.py [--preview DIR] [--pet SHEET]
 
 Reads assets/HalgakosWhite.png and rewrites the generated images under app/src/main/res
-and store/. With --preview it also writes the icon under the masks launchers apply.
+and store/. With --preview it also writes the icon under the masks launchers apply. With
+--pet it also rebuilds the animated companion's frames from the Codex pet atlas, which is
+kept in the Halgakos-Codex-Pet repository rather than here.
 """
 import argparse
 import pathlib
@@ -23,6 +25,11 @@ BUST_VISIBLE = 1010
 BACKGROUND_TOP = (255, 122, 116)
 BACKGROUND_BOTTOM = (240, 46, 66)
 SPRITE_HEIGHT = 512
+# The Codex pet atlas: cell size, cells per row, and the rows the app plays, in the order
+# they take in its own atlas: idle, running right, running left, waving, jumping, failed, working.
+PET_CELL = (192, 208)
+PET_COLUMNS = 8
+PET_ROWS = (0, 1, 2, 3, 4, 5, 7)
 
 
 def clean(image):
@@ -74,10 +81,48 @@ def masked(layers, shape):
     return visible
 
 
+def pet_atlas(sheet_path):
+    """
+    The animated companion's frames, cut from the Halgakos Codex pet atlas (8 by 11 cells of
+    192 by 208). Only the rows the app plays are kept, each cell trimmed to the box that
+    holds the figure in every frame, so the frames stay registered with one another.
+    """
+    sheet = Image.open(sheet_path).convert("RGBA")
+    if sheet.size != (PET_CELL[0] * PET_COLUMNS, PET_CELL[1] * 11):
+        raise SystemExit(f"{sheet_path}: not a Codex v2 pet atlas, size {sheet.size}")
+    cells = {}
+    box = None
+    for row, source_row in enumerate(PET_ROWS):
+        for column in range(PET_COLUMNS):
+            left, top = column * PET_CELL[0], source_row * PET_CELL[1]
+            cell = sheet.crop((left, top, left + PET_CELL[0], top + PET_CELL[1]))
+            bounds = cell.getchannel("A").getbbox()
+            if bounds is None:
+                continue
+            cells[(row, column)] = cell
+            box = bounds if box is None else (min(box[0], bounds[0]), min(box[1], bounds[1]),
+                                              max(box[2], bounds[2]), max(box[3], bounds[3]))
+    # A clear margin round every frame keeps a scaled frame from picking up its neighbour.
+    box = (max(0, box[0] - 2), max(0, box[1] - 2), min(PET_CELL[0], box[2] + 2), min(PET_CELL[1], box[3] + 2))
+    width, height = box[2] - box[0], box[3] - box[1]
+    atlas = Image.new("RGBA", (width * PET_COLUMNS, height * len(PET_ROWS)), (0, 0, 0, 0))
+    for (row, column), cell in cells.items():
+        atlas.paste(cell.crop(box), (column * width, row * height))
+    counts = [sum(1 for (row, _) in cells if row == index) for index in range(len(PET_ROWS))]
+    return atlas, (width, height), counts
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview")
+    parser.add_argument("--pet", help="spritesheet-v2-smooth.webp from the Halgakos Codex pet repository")
     arguments = parser.parse_args()
+    if arguments.pet:
+        atlas, frame, counts = pet_atlas(arguments.pet)
+        (RES / "drawable-nodpi").mkdir(parents=True, exist_ok=True)
+        atlas.save(RES / "drawable-nodpi" / "halgakos_pet.webp", lossless=True, quality=100, method=6)
+        # Keep Companion.java's PET_FRAMES in step with these.
+        print("pet atlas", atlas.size, "frame", frame, "frames per row", counts)
     source = clean(Image.open(SOURCE).convert("RGBA"))
 
     icon = foreground(source, 432)

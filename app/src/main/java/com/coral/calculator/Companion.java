@@ -13,7 +13,10 @@ import android.graphics.Insets;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
@@ -52,7 +55,6 @@ import android.widget.Toast;
 final class Companion implements FoldState.Listener, CalculatorSession.Listener {
     /** Height of the figure for each size setting, in dp. */
     private static final int[] HEIGHT_DP = {64, 88, 116};
-    private static final long REST_MS = 3500;
     private static final long MENU_MS = 6000;
     private static final float REST_ALPHA = .5f;
     /** The mini calculator shrinks to fit a small screen, but no further than this. */
@@ -60,6 +62,17 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** It gives up this much of its size to stay on one side of a fold, and no more. */
     private static final float FOLD_SCALE = .85f;
     private static final int NO_HINGE = 0, UPRIGHT_HINGE = 1, LEVEL_HINGE = 2;
+    /** Rows of the animated figure's frames. Keep in step with PET_ROWS in tools/make_art.py. */
+    private static final int POSE_IDLE = 0, POSE_RUN_RIGHT = 1, POSE_RUN_LEFT = 2, POSE_WAVE = 3,
+            POSE_JUMP = 4, POSE_SAD = 5, POSE_WORK = 6;
+    private static final int PET_COLUMNS = 8;
+    private static final int[] PET_FRAMES = {7, 8, 8, 4, 5, 8, 6};
+    private static final int[] PET_FRAME_MS = {170, 85, 85, 150, 100, 140, 180};
+    /** She breathes and blinks once, then holds still this long: fewer frames, less battery. */
+    private static final long IDLE_PAUSE_MS = 2600;
+    private static final long NO_TOUCH = -1;
+    /** One touch reaches her window and the menu's this far apart at most. */
+    private static final long SAME_TOUCH_MS = 150;
 
     private static Companion instance;
 
@@ -84,6 +97,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private Context ui;
     private WindowManager windows;
     private Bitmap art;
+    /** The animated figure's frames, one pose to a row; loaded only while she is animated. */
+    private Bitmap pet;
     /** Room around the figure in its window, for her shadow. */
     private int pad;
 
@@ -100,7 +115,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private boolean calculatorOpen;
     private boolean serviceStarted;
     private boolean watchingDisplay;
-    private long menuClosedAt;
+    /** When the touch now on her was felt, and when one outside the menu last closed it. */
+    private long touchStarted = NO_TOUCH;
+    private long menuClosedBy = NO_TOUCH;
 
     static Companion get(Context context) {
         if (instance == null) instance = new Companion(context.getApplicationContext());
@@ -134,6 +151,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     void settingsChanged() {
         sync();
         relayout();
+        wake();
     }
 
     private void refit() {
@@ -154,6 +172,26 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     void screenChanged() {
         handler.removeCallbacks(refit);
         handler.postDelayed(refit, 150);
+        // The screen coming back on is one of these changes: she starts moving again.
+        if (sprite != null) sprite.resume();
+    }
+
+    /** Loads the animated frames while they are wanted, and lets them go when they are not. */
+    private boolean animated() {
+        if (!prefs.animated()) {
+            pet = null;
+            return false;
+        }
+        if (pet == null) pet = BitmapFactory.decodeResource(app.getResources(), R.drawable.halgakos_pet);
+        return pet != null;
+    }
+
+    /** The pose she holds when nothing briefer is playing. */
+    private void pose() {
+        if (sprite == null) return;
+        sprite.setPose(dismiss != null && overDismiss() ? POSE_SAD
+                : sprite.dragging ? (sprite.leftward ? POSE_RUN_LEFT : POSE_RUN_RIGHT)
+                : panel != null ? POSE_WORK : POSE_IDLE);
     }
 
     private boolean prepare() {
@@ -251,6 +289,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         sprite.setScaleX(.6f);
         sprite.setScaleY(.6f);
         sprite.animate().scaleX(1).scaleY(1).setDuration(260).setInterpolator(new OvershootInterpolator(2f));
+        sprite.play(POSE_WAVE);
         wake();
     }
 
@@ -273,12 +312,19 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         closeMenu();
         fit();
         update(sprite, spriteParams);
+        // Whichever figure is not in use is redrawn from scratch if it is chosen again.
+        sprite.figure = null;
+        sprite.describe();
+        sprite.resume();
         if (panel != null) openPanel();
     }
 
     private void fit() {
         int height = dp(HEIGHT_DP[prefs.size()]);
-        spriteParams.width = Math.round(height * (float) art.getWidth() / art.getHeight()) + pad * 2;
+        // The two figures differ in shape: the animated one has room in its frames to run.
+        float shape = animated() ? (float) (pet.getWidth() / PET_COLUMNS) / (pet.getHeight() / PET_FRAMES.length)
+                : (float) art.getWidth() / art.getHeight();
+        spriteParams.width = Math.round(height * shape) + pad * 2;
         spriteParams.height = height + pad * 2;
         placedBounds.set(bounds());
         placedDensity = app.getResources().getDisplayMetrics().density;
@@ -362,24 +408,44 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         handler.removeCallbacks(rest);
         if (sprite == null) return;
         sprite.animate().alpha(1).setDuration(120);
-        handler.postDelayed(rest, REST_MS);
+        handler.postDelayed(rest, prefs.fadeAfterMs());
     }
 
     private void rest() {
         if (sprite == null || !prefs.fade() || menu != null || panel != null) return;
-        sprite.animate().alpha(REST_ALPHA).setDuration(500);
+        sprite.animate().alpha(REST_ALPHA).setDuration(300);
     }
 
+    /** A tap and a hold each open one of her two popups; which is which is a setting. */
     private void tapped() {
         wake();
-        if (panel != null) closePanel();
-        else if (menu != null) closeMenu();
-        // The touch that lands on her also closes the menu from outside; leave it closed.
-        else if (SystemClock.uptimeMillis() - menuClosedAt > 400) openMenu();
+        toggle(prefs.tapCalculator());
     }
 
     private void held() {
         wake();
+        toggle(!prefs.tapCalculator());
+    }
+
+    private void toggle(boolean calculator) {
+        if (calculator) {
+            if (panel != null) {
+                closePanel();
+            } else {
+                openPanel();
+                if (sprite != null) sprite.play(POSE_JUMP);
+            }
+        } else if (menu != null) {
+            closeMenu();
+        } else if (menuClosedBy == NO_TOUCH || menuClosedBy < touchStarted - SAME_TOUCH_MS) {
+            // The touch that lands on her also closes the menu from outside; it stays closed.
+            openMenu();
+        }
+        menuClosedBy = NO_TOUCH;
+    }
+
+    private void toggleFromMenu() {
+        closeMenu();
         if (panel != null) closePanel(); else openPanel();
     }
 
@@ -399,12 +465,14 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         card.setPadding(0, dp(6), 0, dp(6));
         card.setBackground(cardBackground(dark, dp(18)));
         card.setClipToOutline(true);
-        card.addView(menuRow(CompanionIcon.CALCULATOR, "Mini calculator", dark, this::openPanel));
+        card.addView(menuRow(CompanionIcon.CALCULATOR, panel == null ? "Mini calculator" : "Close mini calculator",
+                dark, this::toggleFromMenu));
         card.addView(menuRow(CompanionIcon.OPEN, "Open calculator", dark, this::openApp));
         card.addView(menuRow(CompanionIcon.SETTINGS, "Companion settings", dark, this::openSettings));
+        card.addView(menuRow(CompanionIcon.CLOSE, "Hide Halgakos", dark, this::sendAway));
         Holder holder = new Holder(ui, card, dp(12));
         holder.outside = () -> {
-            menuClosedAt = SystemClock.uptimeMillis();
+            menuClosedBy = SystemClock.uptimeMillis();
             closeMenu();
         };
         int free = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
@@ -478,6 +546,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             return;
         }
         panel = holder;
+        pose();
         appear(calculator);
         // Keys pressed here go on the end, wherever the app last left its cursor.
         CalculatorSession session = CalculatorSession.get(app);
@@ -493,6 +562,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         remove(panel);
         panel = null;
         calculator = null;
+        pose();
         wake();
     }
 
@@ -665,6 +735,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** A popup's window: the card, with room around it for the shadow it casts. */
     private static final class Holder extends FrameLayout {
         final int inset;
+        /** Run when a touch lands outside the popup. */
         Runnable outside;
 
         Holder(Context context, View card, int inset) {
@@ -690,15 +761,26 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private final class Sprite extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        /** Draws a frame of the animated figure as its own shadow. */
+        private final Paint silhouette = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Rect frameSource = new Rect();
+        private final RectF frameTarget = new RectF();
         private final int[] shadowOffset = new int[2];
         private final int slop;
         private final Runnable hold = this::onHold;
+        private final Runnable step = this::step;
         private Bitmap figure;
         private Bitmap shadow;
-        private float downX, downY;
+        private float downX, downY, lastX;
         private int startX, startY;
         private boolean dragging;
+        /** Which way she was last dragged, and so which way she runs. */
+        private boolean leftward;
         private boolean held;
+        /** The pose she keeps, one played through once over it (or -1), and the frame shown. */
+        private int pose = POSE_IDLE;
+        private int playing = -1;
+        private int frame;
         /** Kept on screen but unseen, waiting for a folded device to be opened. */
         boolean away;
 
@@ -706,18 +788,25 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             super(context);
             slop = ViewConfiguration.get(context).getScaledTouchSlop();
             shadowPaint.setColor(0x52000000);
-            setContentDescription("Halgakos companion. Tap for a menu, hold for the mini calculator, drag to move");
+            silhouette.setColorFilter(new PorterDuffColorFilter(0x3D000000, PorterDuff.Mode.SRC_IN));
+            describe();
             setClickable(true);
             setLongClickable(true);
             setOnClickListener(v -> tapped());
             setOnLongClickListener(v -> { held(); return true; });
         }
 
+        void describe() {
+            setContentDescription(prefs.tapCalculator()
+                    ? "Halgakos companion. Tap for the mini calculator, hold for the menu, drag to move"
+                    : "Halgakos companion. Tap for the menu, hold for the mini calculator, drag to move");
+        }
+
         @Override public CharSequence getAccessibilityClassName() { return Button.class.getName(); }
 
         @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
             int figureWidth = width - pad * 2, figureHeight = height - pad * 2;
-            if (figureWidth <= 0 || figureHeight <= 0) return;
+            if (figureWidth <= 0 || figureHeight <= 0 || pet != null) return;
             figure = Bitmap.createScaledBitmap(art, figureWidth, figureHeight, true);
             Paint blur = new Paint();
             blur.setMaskFilter(new BlurMaskFilter(pad * .5f, BlurMaskFilter.Blur.NORMAL));
@@ -725,9 +814,73 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         }
 
         @Override protected void onDraw(Canvas canvas) {
-            if (figure == null || away) return;
-            canvas.drawBitmap(shadow, pad + shadowOffset[0], pad + shadowOffset[1] + pad * .3f, shadowPaint);
-            canvas.drawBitmap(figure, pad, pad, paint);
+            if (away) return;
+            if (pet != null) {
+                int row = playing >= 0 ? playing : pose;
+                int width = pet.getWidth() / PET_COLUMNS, height = pet.getHeight() / PET_FRAMES.length;
+                frameSource.set(frame * width, row * height, (frame + 1) * width, (row + 1) * height);
+                frameTarget.set(pad, pad + pad * .3f, getWidth() - pad, getHeight() - pad + pad * .3f);
+                canvas.drawBitmap(pet, frameSource, frameTarget, silhouette);
+                frameTarget.offset(0, -pad * .3f);
+                canvas.drawBitmap(pet, frameSource, frameTarget, paint);
+            } else if (figure != null) {
+                canvas.drawBitmap(shadow, pad + shadowOffset[0], pad + shadowOffset[1] + pad * .3f, shadowPaint);
+                canvas.drawBitmap(figure, pad, pad, paint);
+            }
+        }
+
+        /** Changes the pose she keeps. One that is playing through once finishes first. */
+        void setPose(int value) {
+            if (pose == value) return;
+            pose = value;
+            if (playing >= 0) return;
+            frame = 0;
+            resume();
+        }
+
+        /** Plays a pose through once, then goes back to the one she keeps. */
+        void play(int value) {
+            if (pet == null) return;
+            playing = value;
+            frame = 0;
+            resume();
+        }
+
+        /** Starts the frames moving again: after a change of pose, of figure, or of screen. */
+        void resume() {
+            handler.removeCallbacks(step);
+            if (pet == null && figure == null && getWidth() > 0) onSizeChanged(getWidth(), getHeight(), 0, 0);
+            invalidate();
+            schedule();
+        }
+
+        private void schedule() {
+            // Nothing is drawn while she is unseen or the screen is off, so nothing is scheduled.
+            Display display = displays.getDisplay(Display.DEFAULT_DISPLAY);
+            if (pet == null || away || !isAttachedToWindow() || display == null
+                    || display.getState() != Display.STATE_ON) return;
+            int row = playing >= 0 ? playing : pose;
+            handler.postDelayed(step, row == POSE_IDLE && frame == 0 ? IDLE_PAUSE_MS : PET_FRAME_MS[row]);
+        }
+
+        private void step() {
+            int row = playing >= 0 ? playing : pose;
+            if (++frame >= PET_FRAMES[row]) {
+                frame = 0;
+                playing = -1;
+            }
+            invalidate();
+            schedule();
+        }
+
+        @Override protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            resume();
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            handler.removeCallbacks(step);
+            super.onDetachedFromWindow();
         }
 
         @Override protected void onConfigurationChanged(Configuration configuration) {
@@ -753,10 +906,12 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                     if (settling != null) settling.cancel();
                     downX = event.getRawX();
                     downY = event.getRawY();
+                    lastX = downX;
                     startX = spriteParams.x;
                     startY = spriteParams.y;
                     dragging = false;
                     held = false;
+                    touchStarted = SystemClock.uptimeMillis();
                     wake();
                     animate().scaleX(.93f).scaleY(.93f).setDuration(90);
                     handler.postDelayed(hold, ViewConfiguration.getLongPressTimeout());
@@ -771,8 +926,14 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                         showDismiss();
                     }
                     if (dragging) {
+                        // She runs the way she is being taken, once that is clear of a wobble.
+                        if (Math.abs(event.getRawX() - lastX) > slop * .5f) {
+                            leftward = event.getRawX() < lastX;
+                            lastX = event.getRawX();
+                        }
                         moveTo(startX + Math.round(x), startY + Math.round(y));
                         if (dismiss != null) dismiss.setHot(overDismiss());
+                        pose();
                     }
                     return true;
                 }
@@ -785,6 +946,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                     boolean wasDragging = dragging;
                     dragging = false;
                     hideDismiss();
+                    pose();
                     if (dropped) sendAway();
                     else if (wasDragging) settle();
                     else if (tap) performClick();

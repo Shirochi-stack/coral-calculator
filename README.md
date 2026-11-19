@@ -20,7 +20,7 @@ Formerly Coral Calculator.
 - **Memory and history:** store a value in memory or reuse any of your last 100 completed calculations.
 - **Unit conversion:** convert length, mass, and temperature without an internet connection.
 - **Currency conversion:** calculate amounts using an exchange rate you enter yourself.
-- **Halgakos companion:** a mini Halgakos who floats over other apps. Drag her anywhere, hold her for a compact calculator, or tap her to jump back to the app.
+- **Halgakos companion:** a mini Halgakos who floats over other apps. Tap her for a compact calculator, hold her for her menu, and drag her anywhere. An animated, pink-haired Halgakos is there if you want her to move.
 - **Your preferred view:** switch to dark appearance or fullscreen, rotate to landscape, and turn key vibration on or off.
 - **Convenient input:** labeled buttons, hardware keyboard support, and long-press result copying.
 
@@ -68,25 +68,29 @@ Use the **top-right settings icon** to change appearance or key vibration. The i
 
 <img width="260" src="docs/companion.png" />
 
-Open **Settings › Halgakos companion** and switch on **Show Halgakos**. Android asks once for permission to display over other apps; choose Halgakos Calculator in the list it shows, allow it, and come back.
+The companion is switched on from the start. The first time you open the calculator it offers Android's permission to display over other apps: choose Halgakos Calculator in the list Android shows, allow it, and come back. She appears once you leave the calculator. If you chose **Not now**, switch on **Show Halgakos** in **Settings › Halgakos companion** to be asked again.
 
-- **Drag** her anywhere on the screen. She slides to the nearer edge when you let go.
-- **Hold** her to open the mini calculator over the app you are in. Hold or tap her again, or use the **✕** in its corner, to close it.
-- **Tap** her for a menu with the mini calculator, the full calculator, and her settings.
+- **Tap** her to open the mini calculator over the app you are in. Tap her again, or use the **✕** in its corner, to close it.
+- **Hold** her for her menu: the mini calculator, the full calculator, her settings, and **Hide Halgakos**.
+- **Drag** her anywhere on the screen. She stays where you drop her.
 - The mini calculator works on the same calculation as the app. The arrow in its corner opens the app with the same numbers, and long-pressing its display copies the result.
-- **Drag her onto the ✕** that appears at the bottom of the screen to hide her. The switch in her settings brings her back.
+- To hide her, **drag her onto the ✕** that appears at the bottom of the screen, or use her menu. The switch in her settings brings her back.
 
-Her settings:
+Her settings, opened from her menu or from the calculator's own settings:
 
 | Setting | What it does |
 | --- | --- |
+| **Animated Halgakos** | Her pink-haired form breathes and blinks, runs the way you drag her, and works alongside the mini calculator. Off by default: the still Halgakos uses less battery. |
+| **Tap for the mini calculator** | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
 | **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
 | **Hide while the calculator is open** | She steps aside while you are in the app. On by default. |
-| **Snap to the edge** | Turn off to leave her exactly where you drop her. |
-| **Fade when resting** | She turns translucent after a few seconds. |
+| **Snap to the edge** | She slides to the nearer side of the screen when you let go. Off by default. |
+| **Fade when resting** | She turns translucent once she has been left alone. The slider under it sets how soon, from half a second to ten seconds; it starts at a second and a half. |
 | **Size** | Small, medium, or large. |
 
 She keeps her place when the device is folded, unfolded, or turned, and comes back after a restart. Android hides her on the lock screen and over its own Settings and permission screens.
+
+While she is on screen, Android posts a notification of its own saying that Halgakos Calculator is displaying over other apps. It belongs to Android, so its icon and wording cannot be changed by the app, but **Turn off that notification** at the bottom of her settings opens the place to switch it off.
 
 ## Privacy
 
@@ -115,7 +119,7 @@ The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. The project
 
 Arithmetic uses 16 significant decimal digits and supports decimal exponents from −100 to 100. See [verification results](docs/verification-1.0.5.md) for build and emulator checks.
 
-The launcher icon and the companion's figure are generated from `assets/HalgakosWhite.png` by `python tools/make_art.py`, which needs Pillow.
+The launcher icon and the companion's figure are generated from `assets/HalgakosWhite.png` by `python tools/make_art.py`, which needs Pillow. The animated companion's frames come from the Halgakos Codex pet atlas, which is kept in its own repository; `python tools/make_art.py --pet path/to/spritesheet-v2-smooth.webp` rebuilds them.
 
 For a signed Google Play bundle, put the upload key's `storeFile`, `storePassword`, `keyAlias` and `keyPassword` in a `keystore.properties` file beside `settings.gradle` and run `gradlew bundleRelease`. Without that file the bundle is built unsigned.
 
@@ -123,4 +127,6 @@ For a signed Google Play bundle, put the upload key's `storeFile`, `storePasswor
 
 ## License
 
-Halgakos Calculator is available under the [MIT License](LICENSE).
+The code of Halgakos Calculator is available under the [MIT License](LICENSE).
+
+Halgakos, the Glossarion mascot, is © 2026 Shirochi-stack, all rights reserved. Her artwork in this repository and in the app (`assets/`, the launcher icon, the companion's figure and animation frames, and `store/`) is not covered by the MIT License and may not be reused without permission.

@@ -43,6 +43,8 @@ def main():
     directory = Path(sys.argv[1])
     directory.mkdir(parents=True, exist_ok=True)
     adb("shell", "pm", "clear", PACKAGE)
+    # Allowed up front, so the first launch does not stop to offer the companion's permission.
+    adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
     adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
     time.sleep(4)
 

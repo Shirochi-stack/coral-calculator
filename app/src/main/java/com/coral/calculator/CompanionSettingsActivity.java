@@ -1,10 +1,7 @@
 package com.coral.calculator;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -18,18 +15,23 @@ import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /** Settings for the floating Halgakos companion. She stays on screen here to show changes. */
 public final class CompanionSettingsActivity extends Activity {
     private static final String AWAITING_PERMISSION = "awaiting_permission";
     private static final String[] SIZES = {"Small", "Medium", "Large"};
+    private static final int FADE_STEP_MS = 500;
 
     private CompanionPrefs prefs;
     private boolean dark;
     private Switch master;
     private TextView masterNote;
+    private TextView intro;
+    private TextView fadeLabel;
     /** Set while a switch is moved from code, so that it is not taken for the user's choice. */
     private boolean updating;
     /** The system's permission screen was opened to turn her on. */
@@ -48,7 +50,20 @@ public final class CompanionSettingsActivity extends Activity {
 
         TextView title = text("Halgakos companion", 26, ink());
         title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
-        content.addView(title);
+        CompanionIcon close = new CompanionIcon(this, CompanionIcon.CLOSE, ink(), .42f);
+        close.setContentDescription("Close settings");
+        close.setFocusable(true);
+        close.setClickable(true);
+        close.setBackground(CalculatorLayout.pill(android.graphics.Color.TRANSPARENT));
+        close.setOnClickListener(v -> finish());
+        LinearLayout heading = new LinearLayout(this);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        // Its cross lines up with the switches below, not its touch area.
+        closeParams.rightMargin = -dp(10);
+        heading.addView(close, closeParams);
+        content.addView(heading);
         ImageView figure = new ImageView(this);
         figure.setImageResource(R.drawable.halgakos);
         figure.setContentDescription("Halgakos holding a calculator");
@@ -57,10 +72,10 @@ public final class CompanionSettingsActivity extends Activity {
         figureParams.topMargin = dp(16);
         figureParams.bottomMargin = dp(8);
         content.addView(figure, figureParams);
-        TextView intro = text("A mini Halgakos who floats over your other apps. Tap her for a menu, hold her "
-                + "for the mini calculator, and drag her wherever she is out of the way.", 16, muted());
+        intro = text("", 16, muted());
         intro.setPadding(0, 0, 0, dp(12));
         content.addView(intro);
+        describeGestures();
 
         master = toggle(content, "Show Halgakos", null, false, checked -> {
             if (checked && !Settings.canDrawOverlays(this)) {
@@ -75,6 +90,16 @@ public final class CompanionSettingsActivity extends Activity {
         masterNote.setPadding(0, 0, dp(56), dp(8));
         content.addView(masterNote);
 
+        toggle(content, "Animated Halgakos", "Her pink-haired form breathes and blinks, runs when you drag her, and "
+                        + "works alongside the mini calculator. The still Halgakos uses less battery.",
+                prefs.animated(), checked -> { prefs.set(CompanionPrefs.ANIMATED, checked); apply(); });
+        toggle(content, "Tap for the mini calculator", "Holding her opens her menu. Switch this off to have a tap "
+                        + "open the menu and a hold the mini calculator.",
+                prefs.tapCalculator(), checked -> {
+                    prefs.set(CompanionPrefs.TAP_CALCULATOR, checked);
+                    describeGestures();
+                    apply();
+                });
         boolean foldable = FoldState.isFoldable(this);
         Switch unfolded = toggle(content, "Only while unfolded",
                 foldable ? "She stays away while the device is folded shut, and returns when you open it."
@@ -83,10 +108,41 @@ public final class CompanionSettingsActivity extends Activity {
         unfolded.setEnabled(foldable);
         toggle(content, "Hide while the calculator is open", "She steps aside when you are already in the app.",
                 prefs.hideInApp(), checked -> { prefs.set(CompanionPrefs.HIDE_IN_APP, checked); apply(); });
-        toggle(content, "Snap to the edge", "She slides to the nearer side of the screen when you let go.",
+        toggle(content, "Snap to the edge", "She slides to the nearer side of the screen when you let go, rather "
+                        + "than staying where you drop her.",
                 prefs.snap(), checked -> { prefs.set(CompanionPrefs.SNAP, checked); apply(); });
-        toggle(content, "Fade when resting", "She turns translucent after a few seconds, so she covers less.",
-                prefs.fade(), checked -> { prefs.set(CompanionPrefs.FADE, checked); apply(); });
+        SeekBar fadeAfter = new SeekBar(this);
+        toggle(content, "Fade when resting", "She turns translucent once she has been left alone, so she covers less.",
+                prefs.fade(), checked -> {
+                    prefs.set(CompanionPrefs.FADE, checked);
+                    fadeAfter.setEnabled(checked);
+                    apply();
+                });
+        fadeLabel = text("", 16, ink());
+        fadeLabel.setPadding(0, dp(4), 0, 0);
+        content.addView(fadeLabel);
+        fadeAfter.setMax((CompanionPrefs.FADE_LONGEST_MS - CompanionPrefs.FADE_SHORTEST_MS) / FADE_STEP_MS);
+        fadeAfter.setProgress((prefs.fadeAfterMs() - CompanionPrefs.FADE_SHORTEST_MS) / FADE_STEP_MS);
+        fadeAfter.setEnabled(prefs.fade());
+        fadeAfter.setContentDescription("How long before she fades");
+        fadeAfter.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                prefs.setFadeAfterMs(CompanionPrefs.FADE_SHORTEST_MS + progress * FADE_STEP_MS);
+                describeFade();
+                // She wakes and fades again, to show the new timing.
+                Companion.get(CompanionSettingsActivity.this).settingsChanged();
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        LinearLayout.LayoutParams fadeParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48));
+        // A seek bar insets its track by its thumb; this lines the track up with the text.
+        fadeParams.leftMargin = -dp(14);
+        fadeParams.rightMargin = -dp(14);
+        content.addView(fadeAfter, fadeParams);
+        describeFade();
 
         TextView sizeLabel = text("Size", 19, ink());
         sizeLabel.setPadding(0, dp(14), 0, dp(4));
@@ -112,11 +168,27 @@ public final class CompanionSettingsActivity extends Activity {
         }
         content.addView(sizes);
 
-        TextView tips = text("Drag her onto the ✕ that appears at the bottom of the screen to hide her; this "
-                + "switch brings her back.\n\nThe mini calculator and the app share one calculation, so either "
+        TextView tips = text("To hide her, drag her onto the ✕ that appears at the bottom of the screen, or choose "
+                + "Hide Halgakos in her menu. The switch at the top brings her back.\n\nThe mini calculator "
+                + "and the app share one calculation, so either "
                 + "carries on where the other left off.", 15, muted());
         tips.setPadding(0, dp(20), 0, 0);
         content.addView(tips);
+
+        TextView noticeLabel = text("Android's notification", 19, ink());
+        noticeLabel.setPadding(0, dp(22), 0, dp(4));
+        content.addView(noticeLabel);
+        content.addView(text("While she is on screen, Android posts its own notification that Halgakos Calculator "
+                + "is displaying over other apps. It belongs to Android, so its icon and wording are not the "
+                + "calculator's to change, but you can switch it off.", 15, muted()));
+        TextView notice = text("Turn off that notification  ›", 18, CalculatorLayout.CORAL);
+        notice.setPadding(0, dp(12), 0, dp(12));
+        notice.setMinHeight(dp(48));
+        notice.setGravity(Gravity.CENTER_VERTICAL);
+        notice.setFocusable(true);
+        notice.setBackgroundResource(android.R.drawable.list_selector_background);
+        notice.setOnClickListener(v -> openSystemNotice());
+        content.addView(notice);
 
         // On unfolded and tablet screens the settings keep a readable width in the middle.
         FrameLayout column = new FrameLayout(this);
@@ -177,23 +249,40 @@ public final class CompanionSettingsActivity extends Activity {
     }
 
     private void askForPermission() {
-        new AlertDialog.Builder(this)
-                .setTitle("Let Halgakos float over other apps")
-                .setMessage("Android will show its “Display over other apps” list. Choose Halgakos Calculator "
-                        + "there, allow it, and come back.\n\nThe calculator uses this only to draw the companion "
-                        + "and her mini calculator.")
-                .setNegativeButton("Not now", null)
-                .setPositiveButton("Continue", (dialog, which) -> {
-                    awaitingPermission = true;
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
-                    try {
-                        startActivity(intent);
-                    } catch (ActivityNotFoundException missing) {
-                        awaitingPermission = false;
-                        masterNote.setText("This device has no setting for displaying over other apps.");
-                    }
-                })
-                .show();
+        CompanionPermission.request(this, "Let Halgakos float over other apps",
+                "She needs Android's permission to appear on top of other apps.",
+                () -> awaitingPermission = true,
+                () -> masterNote.setText("This device has no setting for displaying over other apps."));
+    }
+
+    private void describeFade() {
+        int milliseconds = prefs.fadeAfterMs();
+        String seconds = milliseconds % 1000 == 0 ? String.valueOf(milliseconds / 1000)
+                : String.valueOf(milliseconds / 1000f);
+        fadeLabel.setText("Fades after " + seconds + (milliseconds == 1000 ? " second" : " seconds"));
+    }
+
+    /**
+     * Opens Android's setting for the notice it posts about this app's windows over other
+     * apps. The notice is the system's, filed under a channel of its own for each app.
+     */
+    private void openSystemNotice() {
+        Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, "android")
+                .putExtra(Settings.EXTRA_CHANNEL_ID, "com.android.server.wm.AlertWindowNotification - " + getPackageName());
+        try {
+            startActivity(intent);
+        } catch (RuntimeException unavailable) {
+            Toast.makeText(this, "Press and hold Android's notification, then switch it off there.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void describeGestures() {
+        intro.setText("A mini Halgakos who floats over your other apps. " + (prefs.tapCalculator()
+                ? "Tap her for the mini calculator, hold her for her menu,"
+                : "Tap her for her menu, hold her for the mini calculator,")
+                + " and drag her wherever she is out of the way.");
     }
 
     private interface Choice {
