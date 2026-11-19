@@ -33,7 +33,7 @@ final class MiniCalculatorView extends LinearLayout {
     static final int WIDTH_DP = 264;
     static final int HEIGHT_DP = 360;
     /** Five rows of keys take the rest of the height: 42 each at full scale. */
-    private static final int SIDE = 12, TOP = 8, HEADER = 32, DISPLAY = 68, GAP = 6;
+    private static final int SIDE = 12, TOP = 8, HEADER = 32, HEADER_BUTTON = 46, DISPLAY = 68, GAP = 6;
     private static final int MAJOR_LINE = 41, MINOR_LINE = DISPLAY - MAJOR_LINE;
 
     private static final String[] KEYS = {"AC", "⌫", "%", "÷", "7", "8", "9", "×",
@@ -82,8 +82,13 @@ final class MiniCalculatorView extends LinearLayout {
         title.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
         title.setPadding(px(4), 0, 0, 0);
         header.addView(title, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
-        header.addView(headerButton(CompanionIcon.OPEN, "Open in Halgakos Calculator", host::onOpenApp), square(HEADER));
-        header.addView(headerButton(CompanionIcon.CLOSE, "Close mini calculator", host::onClose), square(HEADER));
+        // Wider than they are tall, and shaped like the keys: easier to see and to hit than a
+        // bare icon in a square the height of the header.
+        header.addView(headerButton(CompanionIcon.OPEN, "Open in Halgakos Calculator", host::onOpenApp),
+                new LayoutParams(px(HEADER_BUTTON), px(HEADER)));
+        LayoutParams closeParams = new LayoutParams(px(HEADER_BUTTON), px(HEADER));
+        closeParams.leftMargin = px(GAP);
+        header.addView(headerButton(CompanionIcon.CLOSE, "Close mini calculator", host::onClose), closeParams);
         addView(header, new LayoutParams(LayoutParams.MATCH_PARENT, px(HEADER)));
 
         equation = line(context);
@@ -116,14 +121,12 @@ final class MiniCalculatorView extends LinearLayout {
 
     private int px(float dp) { return Math.round(dp * unit); }
 
-    private LayoutParams square(int dp) { return new LayoutParams(px(dp), px(dp)); }
-
     private View headerButton(String kind, String description, Runnable action) {
         CompanionIcon button = new CompanionIcon(getContext(), kind, dark ? 0xFFC9CDCF : 0xFF5F6360, .44f);
         button.setContentDescription(description);
         button.setFocusable(true);
         button.setClickable(true);
-        button.setBackground(CalculatorLayout.pill(Color.TRANSPARENT));
+        button.setBackground(CalculatorLayout.pill(dark ? 0xFF2A2E31 : 0xFFF3F3F3));
         button.setOnClickListener(v -> action.run());
         return button;
     }
