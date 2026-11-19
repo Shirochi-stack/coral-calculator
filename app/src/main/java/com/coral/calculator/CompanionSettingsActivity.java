@@ -94,6 +94,9 @@ public final class CompanionSettingsActivity extends Activity {
                     describeGestures();
                     apply();
                 });
+        toggle(content, "Hide the mini calculator when you tap away", "A touch anywhere outside it closes it. Switch "
+                        + "this off to keep it open while you use the app underneath.",
+                prefs.closeOutside(), checked -> { prefs.set(CompanionPrefs.CLOSE_OUTSIDE, checked); apply(); });
         boolean foldable = FoldState.isFoldable(this);
         Switch unfolded = toggle(content, "Only while unfolded",
                 foldable ? "She stays away while the device is folded shut, and returns when you open it."

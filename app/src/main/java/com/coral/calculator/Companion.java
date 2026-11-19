@@ -471,7 +471,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         card.addView(menuRow(CompanionIcon.SETTINGS, "Companion settings", dark, this::openSettings));
         card.addView(menuRow(CompanionIcon.CLOSE, "Hide Halgakos", dark, this::sendAway));
         Holder holder = new Holder(ui, card, dp(12));
-        holder.outside = () -> {
+        holder.outside = (x, y) -> {
             menuClosedBy = SystemClock.uptimeMillis();
             closeMenu();
         };
@@ -537,8 +537,13 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             @Override public void onClose() { closePanel(); }
         });
         Holder holder = new Holder(ui, calculator, dp(14));
+        boolean closesOutside = prefs.closeOutside();
+        // A touch on Halgakos or her menu is not one that leaves the calculator: she closes
+        // it herself when tapped, and it follows her when dragged.
+        if (closesOutside) holder.outside = (x, y) -> { if (!onOwnWindow(x, y)) closePanel(); };
         panelParams = overlay(Math.round(MiniCalculatorView.WIDTH_DP * unit) + holder.inset * 2,
-                Math.round(MiniCalculatorView.HEIGHT_DP * unit) + holder.inset * 2, 0);
+                Math.round(MiniCalculatorView.HEIGHT_DP * unit) + holder.inset * 2,
+                closesOutside ? WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH : 0);
         panelParams.setTitle("Halgakos mini calculator");
         place(panelParams, holder.inset);
         if (!add(holder, panelParams)) {
@@ -554,6 +559,21 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         session.engine().setCaret(Integer.MAX_VALUE);
         session.addListener(this);
         session.changed(this);
+    }
+
+    /**
+     * Whether a touch outside a popup, at this place on the screen, landed on her or her menu.
+     * Android gives the place only for touches on this app's own windows; one on another
+     * app comes with none.
+     */
+    private boolean onOwnWindow(float x, float y) {
+        if (x == 0 && y == 0) return false;
+        return within(spriteParams, x, y) || (menu != null && within(menuParams, x, y));
+    }
+
+    private static boolean within(WindowManager.LayoutParams window, float x, float y) {
+        return window != null && x >= window.x && x < window.x + window.width
+                && y >= window.y && y < window.y + window.height;
     }
 
     private void closePanel() {
@@ -732,11 +752,15 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         return Math.round(value * app.getResources().getDisplayMetrics().density);
     }
 
+    private interface Outside {
+        void touched(float x, float y);
+    }
+
     /** A popup's window: the card, with room around it for the shadow it casts. */
     private static final class Holder extends FrameLayout {
         final int inset;
-        /** Run when a touch lands outside the popup. */
-        Runnable outside;
+        /** Told when a touch lands outside the popup, and where on the screen if that is known. */
+        Outside outside;
 
         Holder(Context context, View card, int inset) {
             super(context);
@@ -750,7 +774,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
         @Override public boolean dispatchTouchEvent(MotionEvent event) {
             if (event.getActionMasked() == MotionEvent.ACTION_OUTSIDE) {
-                if (outside != null) outside.run();
+                if (outside != null) outside.touched(event.getRawX(), event.getRawY());
                 return true;
             }
             return super.dispatchTouchEvent(event);

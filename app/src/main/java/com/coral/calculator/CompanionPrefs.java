@@ -23,6 +23,8 @@ final class CompanionPrefs {
     static final String ANIMATED = "animated";
     /** A tap opens the mini calculator and a hold the menu, rather than the other way round. */
     static final String TAP_CALCULATOR = "tap_calculator";
+    /** A touch anywhere else closes the mini calculator. */
+    static final String CLOSE_OUTSIDE = "close_outside";
     static final String SIZE = "size";
     /** Position as a share of the room she has to move in, so it survives a change of screen. */
     static final String X = "x";
@@ -46,6 +48,7 @@ final class CompanionPrefs {
     }
     boolean animated() { return preferences.getBoolean(ANIMATED, false); }
     boolean tapCalculator() { return preferences.getBoolean(TAP_CALCULATOR, true); }
+    boolean closeOutside() { return preferences.getBoolean(CLOSE_OUTSIDE, true); }
     int size() { return Math.max(SMALL, Math.min(LARGE, preferences.getInt(SIZE, MEDIUM))); }
     float x() { return clamp(preferences.getFloat(X, 1f)); }
     float y() { return clamp(preferences.getFloat(Y, .58f)); }

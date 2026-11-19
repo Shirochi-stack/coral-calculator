@@ -70,7 +70,7 @@ Use the **top-right settings icon** to change appearance or key vibration. The i
 
 The companion is switched on from the start. The first time you open the calculator it offers Android's permission to display over other apps: choose Halgakos Calculator in the list Android shows, allow it, and come back. She appears once you leave the calculator. If you chose **Not now**, switch on **Show Halgakos** in **Settings › Halgakos companion** to be asked again.
 
-- **Tap** her to open the mini calculator over the app you are in. Tap her again, or use the **✕** in its corner, to close it.
+- **Tap** her to open the mini calculator over the app you are in. Tap her again, tap anywhere outside it, or use the **✕** in its corner, to close it.
 - **Hold** her for her menu: the mini calculator, the full calculator, her settings, and **Hide Halgakos**.
 - **Drag** her anywhere on the screen. She stays where you drop her.
 - The mini calculator works on the same calculation as the app. The arrow in its corner opens the app with the same numbers, and long-pressing its display copies the result.
@@ -82,6 +82,7 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 | --- | --- |
 | **Animated Halgakos** | Her pink-haired form breathes and blinks, runs the way you drag her, and works alongside the mini calculator. Off by default: the still Halgakos uses less battery. |
 | **Tap for the mini calculator** | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
+| **Hide the mini calculator when you tap away** | A touch anywhere outside the mini calculator closes it. On by default; turn off to keep it open while you use the app underneath. |
 | **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
 | **Hide while the calculator is open** | She steps aside while you are in the app. On by default. |
 | **Snap to the edge** | She slides to the nearer side of the screen when you let go. Off by default. |
