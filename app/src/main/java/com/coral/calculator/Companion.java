@@ -112,7 +112,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private DismissTarget dismiss;
     private WindowManager.LayoutParams dismissParams;
     private ValueAnimator settling;
-    private boolean calculatorOpen;
+    /** How many of the app's own screens are showing. */
+    private int appScreens;
     private boolean serviceStarted;
     private boolean watchingDisplay;
     /** When the touch now on her was felt, and when one outside the menu last closed it. */
@@ -131,9 +132,13 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         displays = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
     }
 
-    /** The calculator itself is on screen, where she can be told to keep out of the way. */
-    void setCalculatorOpen(boolean open) {
-        calculatorOpen = open;
+    /**
+     * One of the app's own screens, the calculator or these settings, has come on or gone
+     * off the screen. She can be told to keep out of the way while any of them is showing.
+     * Going from one to the other, the new one arrives before the old one leaves.
+     */
+    void setAppScreenShown(boolean shown) {
+        appScreens = Math.max(0, appScreens + (shown ? 1 : -1));
         sync();
     }
 
@@ -143,7 +148,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (on && fold.isFoldable()) fold.start(); else fold.stop();
         boolean folded = on && prefs.unfoldedOnly() && !fold.isUnfolded(smallestWidthDp());
         watchDisplay(on);
-        if (on && !(prefs.hideInApp() && calculatorOpen)) show(folded); else hide();
+        if (on && !(prefs.hideInApp() && appScreens > 0)) show(folded); else hide();
         keepService(on);
     }
 

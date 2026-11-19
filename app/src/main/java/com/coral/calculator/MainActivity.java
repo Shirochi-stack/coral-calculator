@@ -53,13 +53,13 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     @Override protected void onStart() {
         super.onStart();
         session.addListener(this);
-        Companion.get(this).setCalculatorOpen(true);
+        Companion.get(this).setAppScreenShown(true);
         refresh();
     }
 
     @Override protected void onStop() {
         session.removeListener(this);
-        Companion.get(this).setCalculatorOpen(false);
+        Companion.get(this).setAppScreenShown(false);
         super.onStop();
     }
 

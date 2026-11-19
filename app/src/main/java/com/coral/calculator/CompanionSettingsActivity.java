@@ -20,7 +20,10 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-/** Settings for the floating Halgakos companion. She stays on screen here to show changes. */
+/**
+ * Settings for the floating Halgakos companion. This counts as one of the app's own screens,
+ * so she is on it, showing changes as they are made, only if she is not kept out of the app.
+ */
 public final class CompanionSettingsActivity extends Activity {
     private static final String AWAITING_PERMISSION = "awaiting_permission";
     private static final String[] SIZES = {"Small", "Medium", "Large"};
@@ -100,9 +103,9 @@ public final class CompanionSettingsActivity extends Activity {
         toggle(content, "Animated Halgakos", "Her pink-haired form breathes and blinks, runs when you drag her, and "
                         + "works alongside the mini calculator. The still Halgakos uses less battery.",
                 prefs.animated(), checked -> { prefs.set(CompanionPrefs.ANIMATED, checked); apply(); });
-        toggle(content, "Keep her out of the calculator app", "She steps aside while the full calculator app is on "
-                        + "screen and returns when you leave it. This is about Halgakos herself, not the mini "
-                        + "calculator.",
+        toggle(content, "Keep her out of the calculator app", "She steps aside while the calculator app is on "
+                        + "screen, these settings included, and returns when you leave it. This is about "
+                        + "Halgakos herself, not the mini calculator.",
                 prefs.hideInApp(), checked -> { prefs.set(CompanionPrefs.HIDE_IN_APP, checked); apply(); });
         boolean foldable = FoldState.isFoldable(this);
         Switch unfolded = toggle(content, "Only while unfolded",
@@ -241,6 +244,16 @@ public final class CompanionSettingsActivity extends Activity {
         root.requestApplyInsets();
     }
 
+    @Override protected void onStart() {
+        super.onStart();
+        Companion.get(this).setAppScreenShown(true);
+    }
+
+    @Override protected void onStop() {
+        Companion.get(this).setAppScreenShown(false);
+        super.onStop();
+    }
+
     @Override protected void onResume() {
         super.onResume();
         if (awaitingPermission) {
@@ -261,7 +274,8 @@ public final class CompanionSettingsActivity extends Activity {
         setChecked(master, prefs.enabled() && permitted);
         masterNote.setText(prefs.enabled() && !permitted
                 ? "Android no longer lets the calculator display over other apps. Switch this on to allow it again."
-                : "Halgakos appears over other apps once you leave the calculator.");
+                : prefs.hideInApp() ? "Halgakos appears over other apps once you leave the calculator."
+                : "Halgakos is on screen, over this app and your others.");
         Companion.get(this).settingsChanged();
     }
 
