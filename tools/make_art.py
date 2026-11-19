@@ -10,7 +10,7 @@ kept in the Halgakos-Codex-Pet repository rather than here.
 import argparse
 import pathlib
 
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "HalgakosWhite.png"
@@ -112,6 +112,36 @@ def pet_atlas(sheet_path):
     return atlas, (width, height), counts
 
 
+def feature_graphic(source):
+    """Google Play's 1024 by 500 banner: the name beside the figure, on the icon's colours."""
+    width, height = 1024, 500
+    banner = Image.new("RGBA", (width, height))
+    draw = ImageDraw.Draw(banner)
+    for x in range(width):
+        t = x / (width - 1)
+        draw.line([(x, 0), (x, height)], fill=tuple(
+            round(a + (b - a) * t) for a, b in zip(BACKGROUND_BOTTOM, BACKGROUND_TOP)) + (255,))
+    figure = trimmed(source)
+    tall = 452
+    figure = figure.resize((round(figure.size[0] * tall / figure.size[1]), tall), Image.LANCZOS)
+    banner.alpha_composite(figure, (width - figure.size[0] - 58, (height - tall) // 2 + 6))
+
+    def font(names, size):
+        for name in names:
+            try:
+                return ImageFont.truetype(name, size)
+            except OSError:
+                continue
+        return ImageFont.load_default()
+
+    bold = ("segoeuib.ttf", "DejaVuSans-Bold.ttf", "Arial Bold.ttf")
+    regular = ("segoeui.ttf", "DejaVuSans.ttf", "Arial.ttf")
+    draw.text((64, 150), "Halgakos", font=font(bold, 92), fill=(255, 255, 255, 255))
+    draw.text((66, 250), "Calculator", font=font(regular, 76), fill=(255, 255, 255, 255))
+    draw.text((70, 362), "A calculator with a companion", font=font(regular, 30), fill=(255, 240, 238, 255))
+    return banner.convert("RGB")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview")
@@ -139,6 +169,7 @@ def main():
     large = Image.alpha_composite(gradient(768), foreground(source, 768))
     STORE.mkdir(exist_ok=True)
     large.crop((128, 128, 640, 640)).convert("RGB").save(STORE / "icon-512.png", optimize=True)
+    feature_graphic(source).save(STORE / "feature-graphic.png", optimize=True)
 
     if arguments.preview:
         out = pathlib.Path(arguments.preview)

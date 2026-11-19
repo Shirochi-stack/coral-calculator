@@ -14,7 +14,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--serial", required=True)
 args = parser.parse_args()
 root = pathlib.Path(__file__).resolve().parent.parent
-package = "com.coral.calculator"
+package = "com.halgakos.calculator"
+# The classes kept the package they were written in when the app's ID changed in 1.2.0.
+activity = package + "/com.coral.calculator.MainActivity"
 
 
 def adb(*arguments):
@@ -77,7 +79,7 @@ shell("settings", "put", "system", "user_rotation", "0")
 shell("am", "force-stop", package)
 # Allowed up front, so the first launch does not stop to offer the companion's permission.
 shell("appops", "set", package, "SYSTEM_ALERT_WINDOW", "allow")
-shell("am", "start", "-W", "-n", package + "/.MainActivity")
+shell("am", "start", "-W", "-n", activity)
 time.sleep(.5)
 home = nodes()
 
@@ -111,12 +113,12 @@ tap("Done")
 keys("All clear", "5", "Add", "3", "Equals")
 expect_expression("8")
 shell("am", "force-stop", package)
-shell("am", "start", "-W", "-n", package + "/.MainActivity")
+shell("am", "start", "-W", "-n", activity)
 expect_expression("8")
 keys("Equals")
 expect_expression("11")
 shell("am", "force-stop", package)
-shell("am", "start", "-W", "-n", package + "/.MainActivity")
+shell("am", "start", "-W", "-n", activity)
 expect_expression("11")
 keys("9")
 expect_expression("9")

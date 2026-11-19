@@ -5,6 +5,11 @@ Usage: python tools/equals_regression.py --serial emulator-5580 \
 
 Requires adb on PATH and the dedicated coral_calculator_api35 emulator. Changes
 its calculator state and history, but never clears app data or uninstalls it.
+
+This and the other *_regression.py scripts check upgrades between builds that share
+the package ID com.coral.calculator, which is every release up to 1.1.4. From 1.2.0
+the app is com.halgakos.calculator, which Android installs beside the old one rather
+than over it, so these scripts do not apply to it.
 Screenshots and failure diagnostics are written under dist, not docs.
 """
 

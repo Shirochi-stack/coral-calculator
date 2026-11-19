@@ -11,7 +11,9 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-PACKAGE = "com.coral.calculator"
+PACKAGE = "com.halgakos.calculator"
+# The classes kept the package they were written in when the app's ID changed in 1.2.0.
+ACTIVITY = PACKAGE + "/com.coral.calculator.MainActivity"
 KEYS = {str(d): 7 + d for d in range(10)}
 KEYS.update({"+": 157, "*": 155, "=": 66, "C": 111})
 
@@ -45,7 +47,7 @@ def main():
     adb("shell", "pm", "clear", PACKAGE)
     # Allowed up front, so the first launch does not stop to offer the companion's permission.
     adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
-    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
+    adb("shell", "am", "start", "-W", "-n", ACTIVITY)
     time.sleep(4)
 
     press("C12+7")
