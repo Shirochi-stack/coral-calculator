@@ -162,6 +162,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
     @Override public void onTool(String tool) {
         switch (tool) {
             case "settings": showSettings(); break;
+            case "companion": startActivity(new Intent(this, CompanionSettingsActivity.class)); break;
             case "history": showHistory(); break;
             case "units": ConverterDialogs.showUnits(this, currentValue(), this::useValue); break;
             case "currency": ConverterDialogs.showCurrency(this, currentValue(), this::useValue); break;

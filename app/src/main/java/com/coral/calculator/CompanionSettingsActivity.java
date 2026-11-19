@@ -50,19 +50,13 @@ public final class CompanionSettingsActivity extends Activity {
 
         TextView title = text("Halgakos companion", 26, ink());
         title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
-        CompanionIcon close = new CompanionIcon(this, CompanionIcon.CLOSE, ink(), .42f);
-        close.setContentDescription("Close settings");
-        close.setFocusable(true);
-        close.setClickable(true);
-        close.setBackground(CalculatorLayout.pill(android.graphics.Color.TRANSPARENT));
-        close.setOnClickListener(v -> finish());
         LinearLayout heading = new LinearLayout(this);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         heading.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(48), dp(48));
-        // Its cross lines up with the switches below, not its touch area.
-        closeParams.rightMargin = -dp(10);
-        heading.addView(close, closeParams);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(48));
+        closeParams.leftMargin = dp(12);
+        heading.addView(closeButton(), closeParams);
         content.addView(heading);
         ImageView figure = new ImageView(this);
         figure.setImageResource(R.drawable.halgakos);
@@ -136,12 +130,9 @@ public final class CompanionSettingsActivity extends Activity {
             @Override public void onStartTrackingTouch(SeekBar bar) {}
             @Override public void onStopTrackingTouch(SeekBar bar) {}
         });
-        LinearLayout.LayoutParams fadeParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48));
-        // A seek bar insets its track by its thumb; this lines the track up with the text.
-        fadeParams.leftMargin = -dp(14);
-        fadeParams.rightMargin = -dp(14);
-        content.addView(fadeAfter, fadeParams);
+        // Room at each end for the whole of the thumb, which is otherwise cut off at the ends.
+        fadeAfter.setPadding(dp(14), 0, dp(14), 0);
+        content.addView(fadeAfter, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
         describeFade();
 
         TextView sizeLabel = text("Size", 19, ink());
@@ -189,6 +180,12 @@ public final class CompanionSettingsActivity extends Activity {
         notice.setBackgroundResource(android.R.drawable.list_selector_background);
         notice.setOnClickListener(v -> openSystemNotice());
         content.addView(notice);
+
+        // The page is a long one: it can be closed from its foot as well as its head.
+        LinearLayout.LayoutParams footParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
+        footParams.topMargin = dp(20);
+        content.addView(closeButton(), footParams);
 
         // On unfolded and tablet screens the settings keep a readable width in the middle.
         FrameLayout column = new FrameLayout(this);
@@ -253,6 +250,21 @@ public final class CompanionSettingsActivity extends Activity {
                 "She needs Android's permission to appear on top of other apps.",
                 () -> awaitingPermission = true,
                 () -> masterNote.setText("This device has no setting for displaying over other apps."));
+    }
+
+    private TextView closeButton() {
+        TextView button = new TextView(this);
+        button.setText("Close menu  ✕");
+        button.setTextSize(17);
+        button.setTextColor(android.graphics.Color.WHITE);
+        button.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(20), 0, dp(20), 0);
+        button.setBackground(CalculatorLayout.pill(CalculatorLayout.CORAL));
+        button.setContentDescription("Close menu");
+        button.setFocusable(true);
+        button.setOnClickListener(v -> finish());
+        return button;
     }
 
     private void describeFade() {

@@ -32,7 +32,8 @@ final class MiniCalculatorView extends LinearLayout {
     /** Size at full scale, in dp. Every measurement inside is a share of these. */
     static final int WIDTH_DP = 264;
     static final int HEIGHT_DP = 360;
-    private static final int SIDE = 12, TOP = 8, HEADER = 32, DISPLAY = 68, GAP = 6, KEY = 42;
+    /** Five rows of keys take the rest of the height: 42 each at full scale. */
+    private static final int SIDE = 12, TOP = 8, HEADER = 32, DISPLAY = 68, GAP = 6;
     private static final int MAJOR_LINE = 41, MINOR_LINE = DISPLAY - MAJOR_LINE;
 
     private static final String[] KEYS = {"AC", "⌫", "%", "÷", "7", "8", "9", "×",
@@ -104,7 +105,9 @@ final class MiniCalculatorView extends LinearLayout {
                 if (column > 0) params.leftMargin = px(GAP);
                 keys.addView(key(context, row * 4 + column), params);
             }
-            LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, px(KEY));
+            // The rows share what is left of the card between them. Sized one by one, their
+            // rounded heights can add up to more than the card and cut the last row short.
+            LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1);
             params.topMargin = px(GAP);
             addView(keys, params);
         }

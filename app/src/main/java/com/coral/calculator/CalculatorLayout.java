@@ -4,6 +4,8 @@ import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
@@ -58,6 +60,9 @@ public final class CalculatorLayout extends ViewGroup {
     private final DisplayLine expression;
     private final DisplayLine result;
     private final View[] tools = new View[5];
+    /** Opens the companion's settings; it sits beside the full screen tool. */
+    private final View companion;
+    private static final String COMPANION = "companion";
     private final View[] keys = new View[24];
     private final String[] labels = {"mc", "m+", "m−", "mr", "AC", "⌫", "+/−", "÷",
             "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "%", "0", ".", "="};
@@ -107,6 +112,10 @@ public final class CalculatorLayout extends ViewGroup {
             tools[i] = tool;
             addView(tool);
         }
+        companion = new IconButton(context, COMPANION, INK);
+        companion.setContentDescription("Halgakos companion");
+        companion.setOnClickListener(v -> listener.onTool(COMPANION));
+        addView(companion);
         String[] spoken = {"Memory clear", "Memory add", "Memory subtract", "Memory recall", "All clear", "Backspace", "Change sign", "Divide",
                 "7", "8", "9", "Multiply", "4", "5", "6", "Subtract", "1", "2", "3", "Add", "Percent", "0", "Decimal point", "Equals"};
         for (int i = 0; i < labels.length; i++) {
@@ -330,6 +339,7 @@ public final class CalculatorLayout extends ViewGroup {
         }
         int touchSize = Math.round(Math.max(48 * getResources().getDisplayMetrics().density, w * .092f));
         for (View tool : tools) tool.measure(exact(touchSize), exact(touchSize));
+        companion.measure(exact(touchSize), exact(touchSize));
         // Text keeps its full size; lines longer than the display are swiped sideways instead.
         int lineWidth = Math.round(spanWidth - w * .12f);
         // While a calculation is entered, the caret's room comes out of the line. A caret placed
@@ -394,6 +404,7 @@ public final class CalculatorLayout extends ViewGroup {
             float toolStep = Math.max(touch * 1.05f, w * .135f);
             float toolY = top + toolRowY(h, touch);
             for (int i = 2; i < tools.length; i++) center(tools[i], start + w * .11f + (i - 2) * toolStep, toolY);
+            center(companion, start + w * .89f - toolStep * 2, toolY);
             center(tools[0], start + w * .89f - toolStep, toolY);
             center(tools[1], start + w * .89f, toolY);
             float lineStep = expression.getMeasuredHeight() + lineGap();
@@ -417,6 +428,7 @@ public final class CalculatorLayout extends ViewGroup {
         place(expression, x + w * .072f, expressionY);
         place(result, x + w * .072f, utilityY - w * (completed ? .285f : .215f));
         float headerY = top + Math.max(w * .077f, (expressionY - top) * .46f) + w * .024f;
+        center(companion, x + spanWidth - w * .339f, headerY);
         center(tools[0], x + spanWidth - w * .207f, headerY);
         center(tools[1], x + spanWidth - w * .075f, headerY);
         finishDisplayLayout(changed);
@@ -908,11 +920,16 @@ public final class CalculatorLayout extends ViewGroup {
         private final Path path = new Path();
         private final RectF bounds = new RectF();
         private final String kind;
+        /** For the companion's button, which shows Halgakos herself rather than a line icon. */
+        private final Bitmap figure;
         private int color;
         IconButton(Context context, String kind, int color) {
             super(context);
             this.kind = kind;
             this.color = color;
+            figure = COMPANION.equals(kind) ? BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos) : null;
+            // Drawn far smaller than it is stored: smaller copies keep its lines smooth.
+            if (figure != null) figure.setHasMipMap(true);
             setFocusable(true);
             setClickable(true);
             setBackground(pill(Color.TRANSPARENT));
@@ -922,6 +939,15 @@ public final class CalculatorLayout extends ViewGroup {
         @Override public CharSequence getAccessibilityClassName() { return Button.class.getName(); }
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
+            if (figure != null) {
+                // She stands nearly as tall as the button, a figure among the line icons.
+                float height = getHeight() * .92f, width = height * figure.getWidth() / figure.getHeight();
+                bounds.set((getWidth() - width) / 2, (getHeight() - height) / 2,
+                        (getWidth() + width) / 2, (getHeight() + height) / 2);
+                paint.setFilterBitmap(true);
+                canvas.drawBitmap(figure, null, bounds, paint);
+                return;
+            }
             float size = Math.min(getWidth(), getHeight()) * ("backspace".equals(kind) ? .39f : .47f);
             canvas.save();
             canvas.translate((getWidth() - size) / 2, (getHeight() - size) / 2);

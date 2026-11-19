@@ -68,8 +68,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private static final int PET_COLUMNS = 8;
     private static final int[] PET_FRAMES = {7, 8, 8, 4, 5, 8, 6};
     private static final int[] PET_FRAME_MS = {170, 85, 85, 150, 100, 140, 180};
-    /** She breathes and blinks once, then holds still this long: fewer frames, less battery. */
-    private static final long IDLE_PAUSE_MS = 2600;
+    /** She breathes and blinks once, then holds still this long before the next breath. */
+    private static final long IDLE_PAUSE_MS = 700;
     private static final long NO_TOUCH = -1;
     /** One touch reaches her window and the menu's this far apart at most. */
     private static final long SAME_TOUCH_MS = 150;
@@ -173,7 +173,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         handler.removeCallbacks(refit);
         handler.postDelayed(refit, 150);
         // The screen coming back on is one of these changes: she starts moving again.
-        if (sprite != null) sprite.resume();
+        if (sprite != null) sprite.keepMoving();
     }
 
     /** Loads the animated frames while they are wanted, and lets them go when they are not. */
@@ -781,6 +781,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         private int pose = POSE_IDLE;
         private int playing = -1;
         private int frame;
+        /** Whether the next frame is on its way. */
+        private boolean moving;
         /** Kept on screen but unseen, waiting for a folded device to be opened. */
         boolean away;
 
@@ -849,21 +851,34 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         /** Starts the frames moving again: after a change of pose, of figure, or of screen. */
         void resume() {
             handler.removeCallbacks(step);
+            moving = false;
             if (pet == null && figure == null && getWidth() > 0) onSizeChanged(getWidth(), getHeight(), 0, 0);
             invalidate();
             schedule();
         }
 
+        /**
+         * Starts the frames again if they had stopped, as they do while the screen is off.
+         * Unlike {@link #resume} this leaves a frame that is already due alone: the screen
+         * reports changes many times a second on some devices, and restarting the wait for
+         * each would keep her from ever taking her next breath.
+         */
+        void keepMoving() {
+            if (!moving) schedule();
+        }
+
         private void schedule() {
             // Nothing is drawn while she is unseen or the screen is off, so nothing is scheduled.
             Display display = displays.getDisplay(Display.DEFAULT_DISPLAY);
-            if (pet == null || away || !isAttachedToWindow() || display == null
-                    || display.getState() != Display.STATE_ON) return;
+            moving = pet != null && !away && isAttachedToWindow() && display != null
+                    && display.getState() == Display.STATE_ON;
+            if (!moving) return;
             int row = playing >= 0 ? playing : pose;
             handler.postDelayed(step, row == POSE_IDLE && frame == 0 ? IDLE_PAUSE_MS : PET_FRAME_MS[row]);
         }
 
         private void step() {
+            moving = false;
             int row = playing >= 0 ? playing : pose;
             if (++frame >= PET_FRAMES[row]) {
                 frame = 0;
@@ -880,6 +895,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
         @Override protected void onDetachedFromWindow() {
             handler.removeCallbacks(step);
+            moving = false;
             super.onDetachedFromWindow();
         }
 

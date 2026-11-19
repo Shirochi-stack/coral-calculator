@@ -62,7 +62,7 @@ The **mr** key turns coral when memory contains a nonzero value. Your current ca
 
 The **unit converter** and **currency converter** sit beside history. Choose the units or currencies, enter an amount, and tap **Use result** to bring the converted value into the calculator. Currency conversion requires a positive exchange rate; the app does not fetch live rates.
 
-Use the **top-right settings icon** to change appearance or key vibration. The icon beside it toggles fullscreen.
+Use the **top-right settings icon** to change appearance or key vibration. The icon beside it toggles fullscreen, and Halgakos, next to that, opens the companion's settings.
 
 ### Halgakos companion
 
@@ -76,7 +76,7 @@ The companion is switched on from the start. The first time you open the calcula
 - The mini calculator works on the same calculation as the app. The arrow in its corner opens the app with the same numbers, and long-pressing its display copies the result.
 - To hide her, **drag her onto the ✕** that appears at the bottom of the screen, or use her menu. The switch in her settings brings her back.
 
-Her settings, opened from her menu or from the calculator's own settings:
+Her settings open from her menu, or from Halgakos herself beside the full screen button at the top of the calculator:
 
 | Setting | What it does |
 | --- | --- |
