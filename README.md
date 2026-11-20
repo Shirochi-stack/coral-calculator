@@ -73,6 +73,7 @@ The companion is switched on from the start. The first time you open the calcula
 - **Tap** her to open the mini calculator over the app you are in. Tap her again, tap anywhere outside it, or use the **✕** in its corner, to close it.
 - **Hold** her for her menu: the mini calculator, the full calculator, her settings, and **Close app**.
 - **Drag** her anywhere on the screen. She stays where you drop her.
+- The mini calculator and her menu always open to her left or her right, never over her. Where neither side has room, as in the middle of a phone's screen, she steps aside for them and steps back when they close.
 - The mini calculator works on the same calculation as the app. The arrow in its corner opens the app with the same numbers, and long-pressing its display copies the result.
 - To hide her, **drag her onto the ✕** that appears at the bottom of the screen. The switch in her settings brings her back.
 - **Close app** in her menu closes Halgakos Calculator altogether: she leaves the screen and the calculator leaves your recent apps. No setting changes, so she is back the next time you open the calculator.

@@ -63,6 +63,12 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** It gives up this much of its size to stay on one side of a fold, and no more. */
     private static final float FOLD_SCALE = .85f;
     private static final int NO_HINGE = 0, UPRIGHT_HINGE = 1, LEVEL_HINGE = 2;
+    /**
+     * A popup's window has a margin for its shadow, which may run past the edge of the screen.
+     * Without this Android moves the whole window back inside, and the popup with it: toward
+     * her, when it stands between her and the edge.
+     */
+    private static final int POPUP_FLAGS = WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
     /** Rows of the animated figure's frames. Keep in step with PET_ROWS in tools/make_art.py. */
     private static final int POSE_IDLE = 0, POSE_RUN_RIGHT = 1, POSE_RUN_LEFT = 2, POSE_JUMP = 3,
             POSE_SAD = 4, POSE_WORK = 5;
@@ -93,6 +99,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private float placedDensity;
     private final Runnable rest = this::rest;
     private final Runnable closeMenu = this::closeMenu;
+    private final Runnable stepBack = this::stepBack;
 
     /** Context of the overlay windows, themed for the views in them. */
     private Context ui;
@@ -113,6 +120,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private DismissTarget dismiss;
     private WindowManager.LayoutParams dismissParams;
     private ValueAnimator settling;
+    /** Where she stood before stepping aside to give a popup room, if she has. */
+    private int steppedFrom = PopupPlacement.NOWHERE;
     /** How many of the app's own screens are showing. */
     private int appScreens;
     /** The app was closed from her menu: she stays away until one of its screens is opened. */
@@ -341,6 +350,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (prefs.snap()) x = x < .5f ? 0 : 1;
         spriteParams.x = room.left + Math.round(x * room.width());
         spriteParams.y = room.top + Math.round(prefs.y() * room.height());
+        steppedFrom = PopupPlacement.NOWHERE;
     }
 
     /** The positions her window can take: the safe area, less her own size. */
@@ -384,8 +394,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         return bounds;
     }
 
+    /** Takes her where she is dragged, which is then her place: she steps back to no other. */
     private void moveTo(int x, int y) {
         Rect room = room();
+        steppedFrom = PopupPlacement.NOWHERE;
         spriteParams.x = Math.max(room.left, Math.min(room.right, x));
         spriteParams.y = Math.max(room.top, Math.min(room.bottom, y));
         update(sprite, spriteParams);
@@ -396,10 +408,15 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private void settle() {
         Rect room = room();
         int target = spriteParams.x;
-        if (prefs.snap()) target = spriteParams.x + spriteParams.width / 2 < bounds().centerX() ? room.left : room.right;
+        if (prefs.snap()) target = onLeft() ? room.left : room.right;
         prefs.setPosition(room.width() == 0 ? 0 : (target - room.left) / (float) room.width(),
                 room.height() == 0 ? 0 : (spriteParams.y - room.top) / (float) room.height());
-        if (target == spriteParams.x) return;
+        if (target == spriteParams.x) makeRoom(); else slideTo(target);
+    }
+
+    /** Slides her along the screen, with whatever popup is open keeping beside her. */
+    private void slideTo(int target) {
+        if (settling != null) settling.cancel();
         settling = ValueAnimator.ofInt(spriteParams.x, target);
         settling.setDuration(220);
         settling.setInterpolator(new DecelerateInterpolator());
@@ -410,6 +427,53 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             placePopups();
         });
         settling.start();
+    }
+
+    /** Whether she stands in the left half of the screen. */
+    private boolean onLeft() {
+        return spriteParams.x + spriteParams.width / 2 < bounds().centerX();
+    }
+
+    /** The part of the screen a popup may take: the safe area, less a margin. */
+    private Rect span() {
+        Rect bounds = bounds();
+        int margin = dp(8);
+        return new Rect(bounds.left + margin, bounds.top + margin, bounds.right - margin, bounds.bottom - margin);
+    }
+
+    /** Where a popup this wide stands beside her within a span, if it fits on either side. */
+    private int beside(int width, Rect span) {
+        return PopupPlacement.beside(spriteParams.x + pad, spriteParams.x + spriteParams.width - pad, width,
+                dp(4), span.left, span.right, onLeft());
+    }
+
+    /**
+     * Left where a popup that is open fits on neither side of her, she steps toward the edge
+     * she is nearer, far enough to give it the other side. She steps back once it has closed.
+     */
+    private void makeRoom() {
+        if (sprite == null || sprite.dragging) return;
+        int width = 0;
+        if (menu != null) width = menuParams.width - ((Holder) menu).inset * 2;
+        if (panel != null) width = Math.max(width, panelParams.width - ((Holder) panel).inset * 2);
+        Rect span = span();
+        if (width == 0 || beside(width, span) != PopupPlacement.NOWHERE) return;
+        int left = spriteParams.x + pad, right = spriteParams.x + spriteParams.width - pad;
+        Rect room = room();
+        int target = PopupPlacement.aside(left, right, width, dp(4), span.left, span.right, onLeft()) - pad;
+        target = Math.max(room.left, Math.min(room.right, target));
+        if (target == spriteParams.x) return;
+        if (steppedFrom == PopupPlacement.NOWHERE) steppedFrom = spriteParams.x;
+        slideTo(target);
+    }
+
+    /** Back to where she stood, once nothing is open that she stepped aside for. */
+    private void stepBack() {
+        if (steppedFrom == PopupPlacement.NOWHERE || sprite == null || menu != null || panel != null) return;
+        Rect room = room();
+        int home = Math.max(room.left, Math.min(room.right, steppedFrom));
+        steppedFrom = PopupPlacement.NOWHERE;
+        if (home != spriteParams.x) slideTo(home);
     }
 
     private void wake() {
@@ -486,11 +550,12 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         int free = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         holder.measure(free, free);
         menuParams = overlay(holder.getMeasuredWidth(), holder.getMeasuredHeight(),
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH);
+                POPUP_FLAGS | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH);
         menuParams.setTitle("Halgakos companion menu");
         place(menuParams, holder.inset);
         if (!add(holder, menuParams)) return;
         menu = holder;
+        makeRoom();
         appear(card);
         handler.postDelayed(closeMenu, MENU_MS);
     }
@@ -520,6 +585,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (menu == null) return;
         remove(menu);
         menu = null;
+        // Not at once: the mini calculator may be about to open in the menu's place.
+        handler.post(stepBack);
         wake();
     }
 
@@ -551,7 +618,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (closesOutside) holder.outside = (x, y) -> { if (!onOwnWindow(x, y)) closePanel(); };
         panelParams = overlay(Math.round(MiniCalculatorView.WIDTH_DP * unit) + holder.inset * 2,
                 Math.round(MiniCalculatorView.HEIGHT_DP * unit) + holder.inset * 2,
-                closesOutside ? WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH : 0);
+                POPUP_FLAGS | (closesOutside ? WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH : 0));
         panelParams.setTitle("Halgakos mini calculator");
         place(panelParams, holder.inset);
         if (!add(holder, panelParams)) {
@@ -559,6 +626,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             return;
         }
         panel = holder;
+        makeRoom();
         pose();
         appear(calculator);
         // Keys pressed here go on the end, wherever the app last left its cursor.
@@ -590,6 +658,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         remove(panel);
         panel = null;
         calculator = null;
+        // Not at once: it may be about to open again, redrawn for a new setting or screen.
+        handler.post(stepBack);
         pose();
         wake();
     }
@@ -606,29 +676,33 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     }
 
     /**
-     * Puts a popup beside her, on the side with more room, and level with her middle.
+     * Puts a popup beside her, level with her middle: on the side with more room if it fits
+     * there, on the other side if not, and never over her.
      *
      * @param inset the transparent margin the popup's window has around what is seen
      */
     private void place(WindowManager.LayoutParams params, int inset) {
         Rect bounds = bounds();
-        int margin = dp(8), gap = dp(4);
+        int margin = dp(8);
         int width = params.width - inset * 2, height = params.height - inset * 2;
-        int left = spriteParams.x + pad, right = spriteParams.x + spriteParams.width - pad;
         int middle = spriteParams.y + spriteParams.height / 2;
-        boolean onLeft = (left + right) / 2 < bounds.centerX();
-        int x = onLeft ? right + gap : left - gap - width;
-        int y = middle - height / 2;
-        Rect span = new Rect(bounds.left + margin, bounds.top + margin, bounds.right - margin, bounds.bottom - margin);
-        // On an open foldable, stay on her side of the fold where the popup fits there.
+        Rect span = span();
+        // On an open foldable, stay on her side of the fold where the popup fits beside her there.
+        Rect near = new Rect(span);
         int hinge = hinge();
-        if (hinge == UPRIGHT_HINGE && bounds.width() / 2 - margin * 2 >= width + gap + right - left) {
-            if (onLeft) span.right = bounds.centerX() - margin; else span.left = bounds.centerX() + margin;
+        if (hinge == UPRIGHT_HINGE) {
+            if (onLeft()) near.right = bounds.centerX() - margin; else near.left = bounds.centerX() + margin;
         } else if (hinge == LEVEL_HINGE && bounds.height() / 2 - margin * 2 >= height) {
-            if (middle < bounds.centerY()) span.bottom = bounds.centerY() - margin; else span.top = bounds.centerY() + margin;
+            if (middle < bounds.centerY()) near.bottom = bounds.centerY() - margin; else near.top = bounds.centerY() + margin;
         }
-        params.x = Math.max(span.left, Math.min(span.right - width, x)) - inset;
-        params.y = Math.max(span.top, Math.min(span.bottom - height, y)) - inset;
+        int x = beside(width, near);
+        if (x == PopupPlacement.NOWHERE) x = beside(width, span);
+        // No room on either side, as when she is dragged across the middle of a narrow screen:
+        // it waits against the far edge, which is where it stands once she has stepped aside.
+        if (x == PopupPlacement.NOWHERE) x = Math.max(span.left, onLeft() ? span.right - width : span.left);
+        int y = middle - height / 2;
+        params.x = x - inset;
+        params.y = Math.max(near.top, Math.min(near.bottom - height, y)) - inset;
     }
 
     /**
