@@ -26,10 +26,11 @@ BACKGROUND_TOP = (255, 122, 116)
 BACKGROUND_BOTTOM = (240, 46, 66)
 SPRITE_HEIGHT = 512
 # The Codex pet atlas: cell size, cells per row, and the rows the app plays, in the order
-# they take in its own atlas: idle, running right, running left, waving, jumping, failed, working.
+# they take in its own atlas: idle, running right, running left, jumping, failed, working.
+# Row 3, waving, is left out: it is drawn in a different style from the rest.
 PET_CELL = (192, 208)
 PET_COLUMNS = 8
-PET_ROWS = (0, 1, 2, 3, 4, 5, 7)
+PET_ROWS = (0, 1, 2, 4, 5, 7)
 
 
 def clean(image):

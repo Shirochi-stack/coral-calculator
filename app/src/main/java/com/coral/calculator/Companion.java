@@ -64,11 +64,11 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private static final float FOLD_SCALE = .85f;
     private static final int NO_HINGE = 0, UPRIGHT_HINGE = 1, LEVEL_HINGE = 2;
     /** Rows of the animated figure's frames. Keep in step with PET_ROWS in tools/make_art.py. */
-    private static final int POSE_IDLE = 0, POSE_RUN_RIGHT = 1, POSE_RUN_LEFT = 2, POSE_WAVE = 3,
-            POSE_JUMP = 4, POSE_SAD = 5, POSE_WORK = 6;
+    private static final int POSE_IDLE = 0, POSE_RUN_RIGHT = 1, POSE_RUN_LEFT = 2, POSE_JUMP = 3,
+            POSE_SAD = 4, POSE_WORK = 5;
     private static final int PET_COLUMNS = 8;
-    private static final int[] PET_FRAMES = {7, 8, 8, 4, 5, 8, 6};
-    private static final int[] PET_FRAME_MS = {170, 85, 85, 150, 100, 140, 180};
+    private static final int[] PET_FRAMES = {7, 8, 8, 5, 8, 6};
+    private static final int[] PET_FRAME_MS = {170, 85, 85, 100, 140, 180};
     /** She breathes and blinks once, then holds still this long before the next breath. */
     private static final long IDLE_PAUSE_MS = 700;
     private static final long NO_TOUCH = -1;
@@ -298,7 +298,6 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         sprite.setScaleX(.6f);
         sprite.setScaleY(.6f);
         sprite.animate().scaleX(1).scaleY(1).setDuration(260).setInterpolator(new OvershootInterpolator(2f));
-        sprite.play(POSE_WAVE);
         wake();
     }
 
