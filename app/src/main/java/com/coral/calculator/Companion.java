@@ -1,6 +1,7 @@
 package com.coral.calculator;
 
 import android.animation.ValueAnimator;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -114,6 +115,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private ValueAnimator settling;
     /** How many of the app's own screens are showing. */
     private int appScreens;
+    /** The app was closed from her menu: she stays away until one of its screens is opened. */
+    private boolean closed;
     private boolean serviceStarted;
     private boolean watchingDisplay;
     /** When the touch now on her was felt, and when one outside the menu last closed it. */
@@ -138,13 +141,14 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
      * Going from one to the other, the new one arrives before the old one leaves.
      */
     void setAppScreenShown(boolean shown) {
+        if (shown) closed = false;
         appScreens = Math.max(0, appScreens + (shown ? 1 : -1));
         sync();
     }
 
     /** Brings what is on screen in line with the settings, the permission and the fold. */
     void sync() {
-        boolean on = prefs.enabled() && Settings.canDrawOverlays(app) && prepare();
+        boolean on = !closed && prefs.enabled() && Settings.canDrawOverlays(app) && prepare();
         if (on && fold.isFoldable()) fold.start(); else fold.stop();
         boolean folded = on && prefs.unfoldedOnly() && !fold.isUnfolded(smallestWidthDp());
         watchDisplay(on);
@@ -474,7 +478,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 dark, this::toggleFromMenu));
         card.addView(menuRow(CompanionIcon.OPEN, "Open calculator", dark, this::openApp));
         card.addView(menuRow(CompanionIcon.SETTINGS, "Companion settings", dark, this::openSettings));
-        card.addView(menuRow(CompanionIcon.CLOSE, "Hide Halgakos", dark, this::sendAway));
+        card.addView(menuRow(CompanionIcon.POWER, "Close app", dark, this::closeApp));
         Holder holder = new Holder(ui, card, dp(12));
         holder.outside = (x, y) -> {
             menuClosedBy = SystemClock.uptimeMillis();
@@ -693,6 +697,21 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         prefs.set(CompanionPrefs.ENABLED, false);
         sync();
         Toast.makeText(app, "Halgakos is hidden. Bring her back from Settings in the calculator.", Toast.LENGTH_LONG).show();
+    }
+
+    /**
+     * Closes the whole app: she goes, and so do its screens, from the recent apps too. Unlike
+     * {@link #sendAway} it changes no setting, so opening the app again brings her back.
+     */
+    private void closeApp() {
+        closed = true;
+        sync();
+        ActivityManager manager = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
+        try {
+            for (ActivityManager.AppTask task : manager.getAppTasks()) task.finishAndRemoveTask();
+        } catch (RuntimeException gone) {
+            // A task that went while the list was being read.
+        }
     }
 
     private WindowManager.LayoutParams overlay(int width, int height, int flags) {

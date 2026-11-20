@@ -13,6 +13,7 @@ final class CompanionIcon extends View {
     static final String BACKSPACE = "backspace";
     static final String OPEN = "open";
     static final String CLOSE = "close";
+    static final String POWER = "power";
     static final String CALCULATOR = "calculator";
     static final String SETTINGS = "settings";
 
@@ -65,6 +66,11 @@ final class CompanionIcon extends View {
                 break;
             case CLOSE:
                 canvas.drawLine(5, 5, 19, 19, paint); canvas.drawLine(19, 5, 5, 19, paint);
+                break;
+            case POWER:
+                // A ring open at the top, with a stroke standing in the gap.
+                bounds.set(3.5f, 4.5f, 20.5f, 21.5f); canvas.drawArc(bounds, -55, 290, false, paint);
+                canvas.drawLine(12, 2.5f, 12, 11.5f, paint);
                 break;
             case CALCULATOR:
                 bounds.set(4, 2, 20, 22); canvas.drawRoundRect(bounds, 2.5f, 2.5f, paint);

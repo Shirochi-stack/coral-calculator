@@ -170,8 +170,9 @@ public final class CompanionSettingsActivity extends Activity {
         }
         content.addView(sizes);
 
-        TextView tips = text("To hide her, drag her onto the ✕ that appears at the bottom of the screen, or choose "
-                + "Hide Halgakos in her menu. The switch at the top brings her back.\n\nThe mini calculator "
+        TextView tips = text("To hide her, drag her onto the ✕ that appears at the bottom of the screen. The switch "
+                + "at the top brings her back.\n\nClose app in her menu closes the calculator and takes her with "
+                + "it. She returns when you next open the calculator.\n\nThe mini calculator "
                 + "and the app share one calculation, so either "
                 + "carries on where the other left off.", 15, muted());
         tips.setPadding(0, dp(20), 0, 0);
