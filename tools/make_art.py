@@ -33,21 +33,25 @@ PET_COLUMNS = 8
 PET_ROWS = (0, 1, 2, 4, 5, 7)
 # The idle row breathes by narrowing her whole body below the collar, which reads as her
 # shrinking. So her body holds still: every idle frame takes it from the row's first frame.
-# Two parts keep moving as drawn. Her head, with its blink and bob, is each frame's own down
-# to PET_IDLE_SEAM, a row of the cell across her collar, crossfaded over the feather. Her
-# tail is each frame's own inside PET_IDLE_TAIL, the boxes of the cell it runs through: down
-# from the hem of her skirt beside her legs, and round under the ends of her hair, whose
-# outer strands the first box stops short of so that her outline there holds still as well.
-# The edge of the two is softened by PET_IDLE_TAIL_FEATHER pixels. In the
-# frames where she narrows her legs stand a little to the right, and her tail with them, so
-# the tail is moved back by as far as her legs moved, measured in PET_IDLE_LEGS, and comes
-# out from behind the still skirt in one piece.
+# Two parts move. Her head, with its blink and bob, is each frame's own down to
+# PET_IDLE_SEAM, a row of the cell across her collar, crossfaded over the feather.
+#
+# Her tail swings. In the row as drawn it hardly changes place from frame to frame while its
+# colour does, from dusky to bright and back, which reads as a light playing on it and not
+# as movement. So the tail too is the first frame's, one drawing in one colour: the curl of
+# it inside PET_IDLE_TAIL, the box of the cell from below the hem of her skirt to the tip,
+# is lifted out and turned about PET_IDLE_TAIL_ROOT, where it comes out from behind her
+# skirt, by PET_IDLE_TAIL_SWING degrees in each frame in turn: a flick to her left and back,
+# a little past where it hangs, and still for the frame she rests on. What is lifted begins
+# PET_IDLE_TAIL_LAP pixels above where it is cut away from her, so the two overlap there
+# and no gap opens at the join as it turns.
 PET_IDLE = 0
 PET_IDLE_SEAM = 115
 PET_IDLE_FEATHER = 8
-PET_IDLE_TAIL = ((116, 152, 143, 196), (116, 170, 158, 196))
-PET_IDLE_TAIL_FEATHER = 2
-PET_IDLE_LEGS = (0, 186, 118, 204)
+PET_IDLE_TAIL = (117, 158, 162, 200)
+PET_IDLE_TAIL_LAP = 4
+PET_IDLE_TAIL_ROOT = (121, 153)
+PET_IDLE_TAIL_SWING = (0, 6, 12, 9, 3, -4, -1)
 # The failed row, her apology, draws her larger than the other rows do: her head is up to a
 # third wider at the bottom of her bow, where the frame is filled to its edges. Each of its
 # frames is made smaller about her feet, by how much wider her horns stand apart than in the
@@ -135,30 +139,32 @@ def pet_atlas(sheet_path):
             cells[(row, column)] = cell
             box = bounds if box is None else (min(box[0], bounds[0]), min(box[1], bounds[1]),
                                               max(box[2], bounds[2]), max(box[3], bounds[3]))
-    # Her idle frames share one still body, under each frame's own head and tail: see PET_IDLE_SEAM.
+    # Her idle frames share one still body, under each frame's own head, with her tail swung: see PET_IDLE_SEAM.
     below = Image.new("L", (1, PET_CELL[1]))
     below.putdata([round(255 * max(0, min(1, (y - PET_IDLE_SEAM + PET_IDLE_FEATHER / 2) / PET_IDLE_FEATHER)))
                    for y in range(PET_CELL[1])])
     below = below.resize(PET_CELL)
-    tail = Image.new("L", PET_CELL, 0)
-    for area in PET_IDLE_TAIL:
-        ImageDraw.Draw(tail).rounded_rectangle(area, radius=8, fill=255)
-    tail = tail.filter(ImageFilter.GaussianBlur(PET_IDLE_TAIL_FEATHER))
 
-    def legs(cell):
-        """Where her legs begin, from the left of the cell."""
-        return cell.getchannel("A").point(lambda value: 255 if value > 40 else 0).crop(PET_IDLE_LEGS).getbbox()[0]
+    def area(from_row, feather):
+        """The tail's box from a row of the cell down, as a mask with a softened edge."""
+        mask = Image.new("L", PET_CELL, 0)
+        left, _, right, bottom = PET_IDLE_TAIL
+        ImageDraw.Draw(mask).rounded_rectangle((left, from_row, right, bottom), radius=6, fill=255)
+        return mask.filter(ImageFilter.GaussianBlur(feather))
 
     # Blended with the colours weighted by how solid they are, so no edge picks up a fringe.
     first = cells[(PET_IDLE, 0)]
     still = first.convert("RGBa")
+    clear = Image.new("RGBa", PET_CELL, (0, 0, 0, 0))
+    curl = Image.composite(still, clear, area(PET_IDLE_TAIL[1], 1.5))
+    rest = Image.composite(clear, still, area(PET_IDLE_TAIL[1] + PET_IDLE_TAIL_LAP, 1))
     for (row, column), cell in list(cells.items()):
         if row != PET_IDLE:
             continue
-        own = cell.convert("RGBa")
-        frame = Image.composite(still, own, below)
-        moved = ImageChops.offset(own, legs(first) - legs(cell), 0)
-        cells[(row, column)] = Image.composite(moved, frame, tail).convert("RGBA")
+        frame = Image.composite(rest, cell.convert("RGBa"), below).convert("RGBA")
+        swung = curl.rotate(PET_IDLE_TAIL_SWING[column % len(PET_IDLE_TAIL_SWING)], resample=Image.BICUBIC,
+                            center=PET_IDLE_TAIL_ROOT).convert("RGBA")
+        cells[(row, column)] = Image.alpha_composite(frame, swung)
 
     def solid(cell):
         return cell.getchannel("A").point(lambda value: 255 if value > 40 else 0)

@@ -568,8 +568,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         handler.postDelayed(rest, prefs.fadeAfterMs());
     }
 
+    /** She fades once she has been left alone, but never with something open or while she is talking. */
     private void rest() {
-        if (sprite == null || !prefs.fade() || menu != null || panel != null) return;
+        if (sprite == null || !prefs.fade() || menu != null || panel != null || bubble != null) return;
         sprite.animate().alpha(REST_ALPHA).setDuration(300);
     }
 
@@ -836,6 +837,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (bubble == null) return;
         remove(bubble);
         bubble = null;
+        // She was kept from fading while she spoke: the wait before she fades starts again now.
+        wake();
     }
 
     /** Puts the bubble where it belongs now that she, her menu or her card has moved, come or gone. */

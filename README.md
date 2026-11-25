@@ -91,7 +91,7 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 | **Keep her out of the calculator app** | Halgakos herself steps aside while the calculator app is on screen, her settings included. On by default. It has nothing to do with the mini calculator. |
 | **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
 | **Snap to the edge** | She slides to the nearer side of the screen when you let go. Off by default. |
-| **Fade when resting** | She turns translucent once she has been left alone. The slider under it sets how soon, from half a second to ten seconds; it starts at a second and a half. |
+| **Fade when resting** | She turns translucent once she has been left alone, but never while she has a speech bubble up: one brings her back to full strength until it goes. The slider under it sets how soon, from half a second to ten seconds; it starts at a second and a half. |
 | **Size** | Small, medium, or large. |
 
 She keeps her place when the device is folded, unfolded, or turned, and comes back after a restart. Android hides her on the lock screen and over its own Settings and permission screens.
