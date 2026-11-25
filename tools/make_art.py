@@ -31,6 +31,13 @@ SPRITE_HEIGHT = 512
 PET_CELL = (192, 208)
 PET_COLUMNS = 8
 PET_ROWS = (0, 1, 2, 4, 5, 7)
+# The idle row breathes by narrowing her whole lower body, which reads as her shrinking. Her
+# idle frames keep their own head, with its blink and bob, down to this row of the cell, and
+# take everything below from the working row, whose body holds its width while its tail
+# moves. The two are crossfaded over the feather, across her collar, where they differ least.
+PET_IDLE, PET_WORKING = 0, 5
+PET_IDLE_SEAM = 115
+PET_IDLE_FEATHER = 8
 
 
 def clean(image):
@@ -103,6 +110,18 @@ def pet_atlas(sheet_path):
             cells[(row, column)] = cell
             box = bounds if box is None else (min(box[0], bounds[0]), min(box[1], bounds[1]),
                                               max(box[2], bounds[2]), max(box[3], bounds[3]))
+    # Her idle frames, from the collar down, are the working row's: see PET_IDLE_SEAM.
+    working = [cells[key] for key in sorted(cells) if key[0] == PET_WORKING]
+    ramp = Image.new("L", (1, PET_CELL[1]))
+    ramp.putdata([round(255 * max(0, min(1, (y - PET_IDLE_SEAM + PET_IDLE_FEATHER / 2) / PET_IDLE_FEATHER)))
+                  for y in range(PET_CELL[1])])
+    ramp = ramp.resize(PET_CELL)
+    for (row, column), cell in list(cells.items()):
+        if row != PET_IDLE:
+            continue
+        # Blended with the colours weighted by how solid they are, so no edge picks up a fringe.
+        body = working[column % len(working)].convert("RGBa")
+        cells[(row, column)] = Image.composite(body, cell.convert("RGBa"), ramp).convert("RGBA")
     # A clear margin round every frame keeps a scaled frame from picking up its neighbour.
     box = (max(0, box[0] - 2), max(0, box[1] - 2), min(PET_CELL[0], box[2] + 2), min(PET_CELL[1], box[3] + 2))
     width, height = box[2] - box[0], box[3] - box[1]

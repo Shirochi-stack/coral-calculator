@@ -27,7 +27,7 @@ final class CompanionPrefs {
     static final String CLOSE_OUTSIDE = "close_outside";
     /** Now and then she says something, in a bubble over her head. */
     static final String CHATTER = "chatter";
-    /** Now and then she plays a prank over whatever is on screen, without being asked. */
+    /** Left idle, she plays a prank over whatever is on screen every so often, without being asked. */
     static final String PRANKS = "pranks";
     static final String SIZE = "size";
     /** Position as a share of the room she has to move in, so it survives a change of screen. */
@@ -54,7 +54,7 @@ final class CompanionPrefs {
     boolean tapCalculator() { return preferences.getBoolean(TAP_CALCULATOR, true); }
     boolean closeOutside() { return preferences.getBoolean(CLOSE_OUTSIDE, true); }
     boolean chatter() { return preferences.getBoolean(CHATTER, true); }
-    boolean pranks() { return preferences.getBoolean(PRANKS, false); }
+    boolean pranks() { return preferences.getBoolean(PRANKS, true); }
     int size() { return Math.max(SMALL, Math.min(LARGE, preferences.getInt(SIZE, MEDIUM))); }
     float x() { return clamp(preferences.getFloat(X, 1f)); }
     float y() { return clamp(preferences.getFloat(Y, .58f)); }

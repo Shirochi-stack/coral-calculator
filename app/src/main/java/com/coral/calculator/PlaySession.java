@@ -50,7 +50,7 @@ final class PlaySession {
     private final Runnable endSums = this::endSums;
 
     private int game = MENU;
-    private String line = "What shall we play?";
+    private String line = "Play with me Sloppy~♡";
 
     private TicTacToe tic;
     private boolean herTurn;
@@ -131,26 +131,27 @@ final class PlaySession {
         switch (which) {
             case TIC:
                 if (tic == null) startTic();
-                else if (tic.result() != TicTacToe.EMPTY) say("Another round?", "Shall we go again?");
-                else say(herTurn ? "It's my turn. Let me think…" : "Where were we? It's your turn.");
+                else if (tic.result() != TicTacToe.EMPTY) say("Again? You like losing Sloppy~♡", "Another round? Brave of you Sloppy~♡");
+                else say(herTurn ? "My turn. Watch and learn Sloppy~♡" : "Still your turn Sloppy~♡");
                 break;
             case RPS:
                 if (!rpsStarted) startRps();
-                else if (rpsOver()) say("Another match?", "Best of the next one?");
-                else say("Still " + myPoints + " to " + herPoints + ". Your throw!");
+                else if (rpsOver()) say("Another match? You don't learn Sloppy~♡", "Again Sloppy~♡");
+                else say("Still " + myPoints + " to " + herPoints + ". Throw Sloppy~♡");
                 break;
             case PAIRS:
                 if (pairs == null) startPairs();
-                else if (pairs.done()) say("Shall I shuffle them again?");
-                else say("Where were we? " + (Pairs.FACES.length - pairs.found()) + " pairs to go.");
+                else if (pairs.done()) say("Shall I shuffle? You'll forget them anyway Sloppy~♡");
+                else say((Pairs.FACES.length - pairs.found()) + " pairs to go. Think Sloppy~♡");
                 break;
             case SUMS:
                 if (sumsState == SUMS_READY) startSums();
-                else if (sumsState == SUMS_OVER) say("Another thirty seconds?", "Think you can beat that?");
-                else say("The clock is still running!");
+                else if (sumsState == SUMS_OVER) say("Think you can beat that? Cute Sloppy~♡", "Another thirty seconds Sloppy~♡");
+                else say("The clock is still running Sloppy~♡");
                 break;
             default:
-                say("What shall we play?", "Pick a game!", "I'm ready when you are.", "Don't worry. Games are my speciality.");
+                say("What will you lose at today Sloppy~♡", "Pick one. I'm good at all of them Sloppy~♡", "Play with me Sloppy~♡",
+                        "Don't worry. Games are my speciality Sloppy~♡", "Can't decide? So hopeless Sloppy~♡");
                 break;
         }
         changed();
@@ -168,10 +169,10 @@ final class PlaySession {
         herTurn = !playerOpens;
         playerOpens = !playerOpens;
         if (herTurn) {
-            say("I'll start this one.", "My turn to go first!");
+            say("I'll start. Try to keep up Sloppy~♡", "Me first. Obviously Sloppy~♡");
             handler.postDelayed(herMove, HER_MOVE_MS);
         } else {
-            say("You start. Crosses are yours.", "You go first!");
+            say("You start. Crosses are yours Sloppy~♡", "You first. You'll need it Sloppy~♡");
         }
     }
 
@@ -186,7 +187,7 @@ final class PlaySession {
             finishTic();
         } else {
             herTurn = true;
-            say("Hmm, let me think…", "Let me see…", "Ooh. One moment…");
+            say("Hmm~ let me think Sloppy~♡", "Ehh~? There Sloppy~♡", "Pfft~ interesting choice Sloppy~♡");
             handler.postDelayed(herMove, HER_MOVE_MS);
         }
         changed();
@@ -197,7 +198,7 @@ final class PlaySession {
         herTurn = false;
         tic.place(tic.choose(random, SLIP_PERCENT), TicTacToe.HALGAKOS);
         if (tic.result() != TicTacToe.EMPTY) finishTic();
-        else say("Your turn!", "There. Your move.", "Over to you.");
+        else say("Your move Sloppy~♡", "There. Top that Sloppy~♡", "Take your time Sloppy~♡");
         changed();
     }
 
@@ -206,19 +207,19 @@ final class PlaySession {
         switch (tic.result()) {
             case TicTacToe.PLAYER:
                 count("tic_won");
-                // Losing is when her catchphrase comes out.
-                say(Chatter.CATCHPHRASE + " You win.", "Three in a row?! " + Chatter.CATCHPHRASE,
-                        "You win! I didn't see that coming.", "Hmph. Well played. That one is yours.");
+                // Losing is when her cry about her output comes out.
+                say(Chatter.OUTPUT + " …You win Sloppy~♡", "Three in a row?! " + Chatter.OUTPUT,
+                        "Tch. Beginner's luck Sloppy~♡", "Hmph. I let you have that one Sloppy~♡");
                 mood(false);
                 break;
             case TicTacToe.HALGAKOS:
                 count("tic_lost");
-                say("Three in a row. I win!", "That's my game!", "Got you! Again?");
+                say("Three in a row. Too easy Sloppy~♡", "I win. Obviously Sloppy~♡", "Got you! Again Sloppy~♡");
                 mood(true);
                 break;
             default:
                 count("tic_drawn");
-                say("A draw. We're evenly matched.", "Nobody wins that one.", "All full. Call it a draw?");
+                say("A draw? Not bad for a Sloppy~♡", "Nobody wins. I'll allow it Sloppy~♡", "Tch. A draw Sloppy~♡");
                 break;
         }
     }
@@ -237,7 +238,7 @@ final class PlaySession {
         herHand = NO_HAND;
         myPoints = 0;
         herPoints = 0;
-        say("First to three. Ready?", "Rock, paper, scissors. First to three!");
+        say("First to three. Ready Sloppy~♡", "Don't cry when you lose Sloppy~♡");
     }
 
     void rpsAgain() {
@@ -255,18 +256,18 @@ final class PlaySession {
         else if (outcome == RockPaperScissors.LOSS) herPoints++;
         if (myPoints >= RPS_TARGET) {
             count("rps_won");
-            line = reason + ". " + Chatter.orCatchphrase(random, "The match is yours!", "Hmph. You win this one.");
+            line = reason + ". " + Chatter.orOutput(random, "Tch. The match is yours Sloppy~♡", "Hmph. You win this one Sloppy~♡");
             mood(false);
         } else if (herPoints >= RPS_TARGET) {
             count("rps_lost");
-            line = reason + ". I win the match!";
+            line = reason + ". I win Sloppy~♡";
             mood(true);
         } else if (outcome == RockPaperScissors.WIN) {
-            line = reason + ". Your point!";
+            line = reason + ". Tch. Your point Sloppy~♡";
         } else if (outcome == RockPaperScissors.LOSS) {
-            line = reason + ". My point!";
+            line = reason + ". My point Sloppy~♡";
         } else {
-            say("Snap! " + RockPaperScissors.NAMES[hand] + " for us both.", "The same! Throw again.");
+            say("Snap! " + RockPaperScissors.NAMES[hand] + " for us both Sloppy~♡", "Copying me Sloppy~♡");
         }
         changed();
     }
@@ -278,7 +279,7 @@ final class PlaySession {
     private void startPairs() {
         handler.removeCallbacks(settlePairs);
         pairs = new Pairs(random);
-        say("Find the eight pairs.", "Eight pairs are hiding. Turn two over!");
+        say("Find the eight pairs. If you can Sloppy~♡", "Eight pairs. Try to remember Sloppy~♡");
     }
 
     void pairsAgain() {
@@ -295,12 +296,12 @@ final class PlaySession {
             int best = tally("pairs_best"), moves = pairs.moves();
             boolean record = best == 0 || moves < best;
             if (record) preferences.edit().putInt("pairs_best", moves).apply();
-            line = "All eight in " + moves + " turns!" + (record && best != 0 ? " That's a new best." : "");
+            line = "All eight in " + moves + " turns. " + (record && best != 0 ? "A new best! Not bad Sloppy~♡" : "Took you long enough Sloppy~♡");
             mood(true);
         } else if (turned == Pairs.MATCH) {
-            say("A pair!", "That's one!", "Nicely remembered.", "Yes! They match.");
+            say("A pair. Lucky Sloppy~♡", "Ehh~ you remembered Sloppy~♡", "Hmph. Fine, that's one Sloppy~♡", "Not bad Sloppy~♡");
         } else if (turned == Pairs.MISS) {
-            say("Not a pair. Remember them!", "No match. Where was the other?", "Close! Try again.");
+            say("Wrong~ Try again Sloppy~♡", "Pfft~ not even close Sloppy~♡", "No match. Where was it Sloppy~♡");
             handler.postDelayed(settlePairs, MISS_MS);
         }
         changed();
@@ -328,7 +329,7 @@ final class PlaySession {
         sumsState = SUMS_READY;
         sumsScore = 0;
         question = null;
-        say("Thirty seconds. How many can you do?", "Sums against the clock! Ready?");
+        say("Thirty seconds. Scared Sloppy~♡", "Sums against the clock. Don't panic Sloppy~♡");
     }
 
     void sumsAgain() {
@@ -342,7 +343,7 @@ final class PlaySession {
         sumsScore = 0;
         sumsDeadline = SystemClock.elapsedRealtime() + SUMS_MS;
         question = Sums.next(random);
-        say("Go!", "Off you go!");
+        say("Go Sloppy~♡", "Off you go Sloppy~♡");
         handler.postDelayed(endSums, SUMS_MS);
         changed();
     }
@@ -355,10 +356,10 @@ final class PlaySession {
         }
         if (question.choices[choice] == question.answer) {
             sumsScore++;
-            say("Right!", "Yes!", "Correct!", "That's it!", "Quick!");
+            say("Hmph. Right Sloppy~♡", "Correct Sloppy~♡", "A lucky guess Sloppy~♡", "Not bad Sloppy~♡", "Keep up Sloppy~♡");
         } else {
-            // Her catchphrase, turned on the player for once.
-            line = question.text + " is " + question.answer + "." + (random.nextInt(3) == 0 ? " Where did your output go?!" : "");
+            // Her cry about her output, turned on the player for once.
+            line = question.text + " is " + question.answer + (random.nextInt(3) == 0 ? ". Where did your output go Sloppy~♡" : " Sloppy~♡");
         }
         question = Sums.next(random);
         changed();
@@ -371,8 +372,8 @@ final class PlaySession {
         int best = tally("sums_best");
         boolean record = sumsScore > best;
         if (record) preferences.edit().putInt("sums_best", sumsScore).apply();
-        line = "Time! " + sumsScore + " right." + (record && best != 0 ? " That's a new best!"
-                : sumsScore == 0 ? " Where did your output go?!" : "");
+        line = "Time! " + sumsScore + " right." + (record && best != 0 ? " A new best! Hmph Sloppy~♡"
+                : sumsScore == 0 ? " Where did your output go Sloppy~♡" : sumsScore < 5 ? " So slow Sloppy~♡" : " Not bad Sloppy~♡");
         if (sumsScore > 0) mood(true);
         changed();
     }

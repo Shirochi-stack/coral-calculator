@@ -84,9 +84,9 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 | --- | --- |
 | **Close it when you tap away** (mini calculator) | Touching anywhere outside the mini calculator closes it, and the same goes for the card of games. On by default; turn off to keep either open while you use the app underneath. |
 | **Open it with a tap** (mini calculator) | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
-| **Speech bubbles** | Now and then she says something in a bubble over her head. On by default; a tap on a bubble sends it away. |
-| **Surprise pranks** | Every so often she plays a prank without being asked. Off by default. |
-| **Animated Halgakos** | Her pink-haired form breathes and blinks, runs the way you drag her, and works alongside the mini calculator. Off by default: the still Halgakos uses less battery. |
+| **Speech bubbles** | Now and then she has something to say, in a bubble over her head. On by default; a tap on a bubble sends it away. |
+| **Surprise pranks** | Left idle, she plays a prank every several minutes without being asked. On by default. |
+| **Animated Halgakos** | Her pink-haired form blinks and bobs her head, flicks her tail, runs the way you drag her, and works alongside the mini calculator. Off by default: the still Halgakos uses less battery. |
 | **Keep her out of the calculator app** | Halgakos herself steps aside while the calculator app is on screen, her settings included. On by default. It has nothing to do with the mini calculator. |
 | **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
 | **Snap to the edge** | She slides to the nearer side of the screen when you let go. Off by default. |
@@ -116,9 +116,9 @@ All over the screen, on top of whatever app you are in:
 
 The **✕** in the corner, or Back, leaves one of these. They dim the app underneath and take its touches only while they are up.
 
-**Prank me** has her play a prank: making off with the calculator's icon and binning it, cracking the screen, or scribbling on it. It is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. With **Surprise pranks** switched on she plays one now and then without being asked.
+**Prank me** has her play a prank: making off with the calculator's icon and binning it, cracking the screen, or scribbling on it. It is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. Idle is prank time as well: left to herself she plays one every several minutes, announced with a "Watch this Sloppy~♡". Switch **Surprise pranks** off in her settings to keep them to when you ask.
 
-She talks as she plays, and while she is idle. Whenever something of hers goes wrong, a lost game or a calculation with no answer, out comes her catchphrase: "Where did my output go?!"
+She talks as she plays, and while she is idle, and what she says is teasing: smug, cheeky and fond underneath. You are her Sloppy, and her catchphrase closes her sentences: "Play with me Sloppy~♡", "Good Morning Sloppy~♡", "Counting on your fingers again Sloppy~♡". She has over a hundred such lines. When something of hers goes wrong, a lost game or a calculation with no answer, she cries "Where did my output go?!"
 
 On an open foldable, whatever has to be read or pressed keeps to her side of the fold, Number rain included, and in the app she takes one side of the fold and the card the other. Folding or turning the device in the middle of a game refits it to the new screen.
 

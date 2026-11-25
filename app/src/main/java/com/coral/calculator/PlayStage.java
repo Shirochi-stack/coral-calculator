@@ -109,6 +109,8 @@ final class PlayStage extends View {
     // Pranks
     private int step;
     private float stepClock;
+    /** How much longer she holds still at the start of a prank, saying her piece. */
+    private float opening;
     private Drawable loot;
     private String lootName = "";
     private float lootX, lootY, lootHomeX, lootHomeY, lootScale, lootAlpha, binRise;
@@ -268,6 +270,10 @@ final class PlayStage extends View {
             marks.reset();
             marks.moveTo(herX, herY - herHeight * .35f);
             marksAlpha = 1;
+        }
+        if (isPrank(game)) {
+            opening = 1.1f;
+            say(Chatter.prank(random), 1.2f);
         }
     }
 
@@ -507,9 +513,9 @@ final class PlayStage extends View {
             buzz();
             ring(x, y, true);
             perform(PetArt.JUMP);
-            // Caught is when her catchphrase comes out, every third time or so.
-            if (random.nextInt(3) == 0) say(Chatter.CATCHPHRASE, 1.4f);
-            else say(1.1f, "Eek!", "Got me!", "Again!", "Hey!", "Too quick!", "You're fast!");
+            // Caught is when her cry about her output comes out, every third time or so.
+            if (random.nextInt(3) == 0) say(Chatter.OUTPUT, 1.4f);
+            else say(1.1f, "Eek!", "Tch. Lucky Sloppy~♡", "Hey!", "Again Sloppy~♡", "You're fast?!", "Hmph!");
             dash = .5f;
             rest = 0;
             pickGoal();
@@ -556,7 +562,7 @@ final class PlayStage extends View {
                     hurt = .6f;
                     buzz();
                     ring(sign[0], sign[1], false);
-                    say(1.2f, "Ow!", "Oof! Not that one!", Chatter.CATCHPHRASE, "Ow! " + Chatter.CATCHPHRASE);
+                    say(1.2f, "Ow!", "Oof! Not that one!", Chatter.OUTPUT, "Ow! " + Chatter.OUTPUT);
                     if (hearts <= 0) {
                         int best = session.tally("rain_best");
                         boolean record = session.keepBest("rain_best", score, false);
@@ -646,7 +652,7 @@ final class PlayStage extends View {
             elapsed += PENALTY_SECONDS;
             touched[5] = .45f;
             ring(x, y, false);
-            say(1.2f, "Smaller first!", "Not yet! A smaller one.", "Find the smallest!");
+            say(1.2f, "Smaller first Sloppy~♡", "Can't you count Sloppy~♡", "Pfft~ not that one Sloppy~♡");
         }
     }
 
@@ -667,7 +673,7 @@ final class PlayStage extends View {
             rest = 0;
             dash = 0;
             pickGoal();
-            say(1.4f, "Catch me if you can!", "You'll never catch me!");
+            say(1.4f, "Catch me if you can Sloppy~♡", "You'll never catch me Sloppy~♡", "Too slow already Sloppy~♡");
         } else if (game == PlaySession.RAIN) {
             score = 0;
             hearts = HEARTS;
@@ -696,7 +702,7 @@ final class PlayStage extends View {
                 float speed = dp(18 + random.nextFloat() * 26);
                 bubbles.add(new float[]{x, y, (float) Math.cos(way) * speed, (float) Math.sin(way) * speed, number, 0});
             }
-            say(1.6f, "Smallest first!");
+            say(1.6f, "Smallest first Sloppy~♡", "Count with me. If you can Sloppy~♡");
         }
     }
 
@@ -719,6 +725,12 @@ final class PlayStage extends View {
     // Pranks: each is a short scene, and a touch at any point brings on its ending.
 
     private void prank(float seconds) {
+        // First she says what she is about to do, more or less.
+        if (opening > 0) {
+            opening -= seconds;
+            keep(PetArt.IDLE);
+            return;
+        }
         stepClock += seconds;
         if (game == SNATCH) snatch(seconds);
         else if (game == CRACK) crack(seconds);
@@ -774,7 +786,7 @@ final class PlayStage extends View {
                     binShut = true;
                     buzz();
                     perform(PetArt.JUMP);
-                    say("Oops! I deleted " + lootName + ".", 2.6f);
+                    say("Oops~ I deleted " + lootName + " Sloppy~♡", 2.6f);
                     next();
                 }
                 break;
@@ -815,7 +827,7 @@ final class PlayStage extends View {
                     buzz();
                     herX += (facingLeft ? 1 : -1) * dp(18);
                     keep(PetArt.SAD);
-                    say(Chatter.CATCHPHRASE + " …Oops. I think I cracked your screen.", 2.8f);
+                    say(Chatter.OUTPUT + " …Oops. I cracked your screen Sloppy~♡", 2.8f);
                     next();
                 }
                 break;
@@ -865,7 +877,7 @@ final class PlayStage extends View {
                 if (waypoints.isEmpty()) {
                     keep(PetArt.IDLE);
                     perform(PetArt.JUMP);
-                    say("Look! I drew on your screen.", 2.6f);
+                    say("Look! I drew on your screen Sloppy~♡", 2.6f);
                     next();
                     break;
                 }
@@ -891,15 +903,16 @@ final class PlayStage extends View {
     /** The ending of a prank: she owns up, and what she seemed to do is undone. */
     private void reveal() {
         waypoints.clear();
+        opening = 0;
         perform(PetArt.JUMP);
         keep(PetArt.IDLE);
         if (game == SNATCH) {
             step = 5;
             binRise = 1;
-            say("Just kidding! " + lootName + " is right where it was.", 2.4f);
+            say("Just kidding! " + lootName + " is right where it was Sloppy~♡", 2.4f);
         } else {
             step = 2;
-            say(game == CRACK ? "Just kidding! Not a scratch on it." : "Just kidding! It wipes right off.", 2.2f);
+            say(game == CRACK ? "Just kidding! Not a scratch on it Sloppy~♡" : "Just kidding! It wipes right off Sloppy~♡", 2.2f);
         }
         stepClock = 0;
     }

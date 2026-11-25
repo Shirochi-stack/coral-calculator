@@ -84,8 +84,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private static final int PET_COLUMNS = PetArt.COLUMNS;
     private static final int[] PET_FRAMES = PetArt.FRAMES;
     private static final int[] PET_FRAME_MS = PetArt.FRAME_MS;
-    /** A surprise prank, where she is allowed them, comes this long after the last. */
-    private static final long PRANK_SOONEST_MS = 12 * 60_000L, PRANK_LATEST_MS = 40 * 60_000L;
+    /** Idle is prank time: where she is allowed them, one comes this long after the last. */
+    private static final long PRANK_SOONEST_MS = 6 * 60_000L, PRANK_LATEST_MS = 20 * 60_000L;
     /** She breathes and blinks once, then holds still this long before the next breath. */
     private static final long IDLE_PAUSE_MS = 700;
     private static final long NO_TOUCH = -1;
@@ -138,6 +138,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private View bubble;
     private WindowManager.LayoutParams bubbleParams;
     private boolean wordsDue;
+    /** What she last said of her own accord, so as not to say it twice running. */
+    private String lastWords;
     /** A game or a prank that has the whole screen, drawn over everything else of hers. */
     private PlayStage stage;
     private WindowManager.LayoutParams stageParams;
@@ -225,7 +227,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     private void speak() {
         wordsDue = false;
-        if (idle()) say(Chatter.idle(random, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)));
+        if (idle()) {
+            lastWords = Chatter.idle(random, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY), lastWords);
+            say(lastWords);
+        }
         if (sprite != null && !sprite.away && prefs.chatter()) {
             wordsDue = true;
             handler.postDelayed(speak, NEXT_WORDS_MS + (long) (random.nextFloat() * NEXT_WORDS_SPREAD_MS));
@@ -709,9 +714,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 @Override public void onOpenApp() { openApp(); }
                 @Override public void onClose() { closePanel(); }
                 @Override public void onError() {
-                    // A sum with no answer is exactly what her catchphrase is for.
+                    // A sum with no answer is exactly what her cry about her output is for.
                     if (!prefs.chatter() || sprite == null) return;
-                    say(Chatter.CATCHPHRASE);
+                    say(Chatter.OUTPUT);
                     sprite.play(POSE_SAD);
                 }
             });

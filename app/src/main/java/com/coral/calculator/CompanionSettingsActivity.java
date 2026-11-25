@@ -112,10 +112,10 @@ public final class CompanionSettingsActivity extends Activity {
         play.setBackgroundResource(android.R.drawable.list_selector_background);
         play.setOnClickListener(v -> startActivity(new Intent(this, PlayActivity.class)));
         content.addView(play);
-        toggle(content, "Speech bubbles", "Now and then she says something, in a bubble over her head. A tap on "
-                        + "the bubble sends it away.",
+        toggle(content, "Speech bubbles", "Now and then she has something to say, in a bubble over her head, and "
+                        + "most of it is teasing. You are her Sloppy. A tap on the bubble sends it away.",
                 prefs.chatter(), checked -> { prefs.set(CompanionPrefs.CHATTER, checked); apply(); });
-        toggle(content, "Surprise pranks", "Every so often she plays a prank over whatever is on screen: making off "
+        toggle(content, "Surprise pranks", "Left idle, every several minutes she plays a prank over whatever is on screen: making off "
                         + "with the calculator's icon, cracking the screen, or drawing on it. It is only a drawing "
                         + "over the top. Nothing is deleted or changed, she owns up within seconds, and a tap ends "
                         + "it at once. Prank me, among her games, plays one when you ask.",

@@ -190,25 +190,69 @@ public class PlayGamesTest {
         }
     }
 
-    @Test public void halgakosSaysHerCatchphraseOftenWhileIdle() {
-        Random random = new Random(3);
-        int said = 0, lines = 4000;
-        for (int i = 0; i < lines; i++) {
-            String line = Chatter.idle(random, i % 24);
-            assertFalse(line.isEmpty());
-            if (line.contains(Chatter.CATCHPHRASE)) said++;
-        }
-        // About one line in five: often, without being all she says.
-        assertTrue("said " + said + " times in " + lines, said > lines * .15 && said < lines * .25);
+    @Test public void halgakosHasAHundredLinesOfHerOwn() {
+        String[] lines = Chatter.all();
+        assertTrue("only " + lines.length + " lines", lines.length >= 100);
+        java.util.Set<String> different = new java.util.HashSet<>(java.util.Arrays.asList(lines));
+        assertEquals("a line is there twice", lines.length, different.size());
+        for (String line : lines) assertFalse(line.trim().isEmpty());
     }
 
-    @Test public void catchphraseTakesTheLinesPlaceAboutHalfTheTime() {
+    /** Whether a line ends on her catchphrase, in English or in Japanese. */
+    private static boolean endsOnHerCatchphrase(String line) {
+        return line.endsWith(" " + Chatter.SLOPPY) || line.endsWith(Chatter.SLOPPY_JAPANESE);
+    }
+
+    @Test public void everyLineOfHersEndsOnHerCatchphrase() {
+        for (String line : Chatter.all()) {
+            assertTrue("does not end on Sloppy~♡: " + line, endsOnHerCatchphrase(line));
+            assertFalse("a comma before her catchphrase: " + line, line.endsWith(", " + Chatter.SLOPPY));
+            // The heart is the catchphrase's alone: one of them, at the very end.
+            assertEquals("a stray heart in: " + line, line.length() - 1, line.indexOf('♡'));
+        }
+    }
+
+    @Test public void sheHasTheLinesSheWasAskedFor() {
+        java.util.List<String> lines = java.util.Arrays.asList(Chatter.all());
+        for (String wanted : new String[]{"Watch this Sloppy~♡", "Good Morning Sloppy~♡", "C'mon little Sloppy~♡",
+                "Play with me Sloppy~♡"}) {
+            assertTrue("missing: " + wanted, lines.contains(wanted));
+        }
+    }
+
+    @Test public void whateverSheSaysWhileIdleEndsOnHerCatchphrase() {
+        Random random = new Random(3);
+        int output = 0, lines = 6000;
+        String last = null;
+        for (int i = 0; i < lines; i++) {
+            String line = Chatter.idle(random, i % 24, last);
+            assertTrue("does not end on Sloppy~♡: " + line, endsOnHerCatchphrase(line));
+            assertNotEquals("the same line twice running", last, line);
+            if (line.contains("output")) output++;
+            last = line;
+        }
+        // Her missing output turns up now and then, without being all she says.
+        assertTrue("her output in " + output + " of " + lines, output > lines * .03 && output < lines * .12);
+    }
+
+    @Test public void everyHourOfTheDayHasItsGreeting() {
+        Random random = new Random(21);
+        for (int hour = 0; hour < 24; hour++) {
+            String greeting = hour >= 5 && hour < 12 ? "Good Morning Sloppy~♡" : hour >= 12 && hour < 18 ? "Good Afternoon Sloppy~♡"
+                    : hour >= 18 && hour < 23 ? "Good Evening Sloppy~♡" : "Good Night Sloppy~♡";
+            boolean greeted = false;
+            for (int i = 0; i < 600 && !greeted; i++) greeted = Chatter.idle(random, hour, null).equals(greeting);
+            assertTrue("no " + greeting + " at " + hour + " o'clock", greeted);
+        }
+    }
+
+    @Test public void herCryAboutHerOutputTakesTheLinesPlaceAboutHalfTheTime() {
         Random random = new Random(8);
         int said = 0;
         for (int i = 0; i < 2000; i++) {
-            String line = Chatter.orCatchphrase(random, "one", "two");
-            assertTrue(line.equals(Chatter.CATCHPHRASE) || line.equals("one") || line.equals("two"));
-            if (line.equals(Chatter.CATCHPHRASE)) said++;
+            String line = Chatter.orOutput(random, "one", "two");
+            assertTrue(line.equals(Chatter.OUTPUT) || line.equals("one") || line.equals("two"));
+            if (line.equals(Chatter.OUTPUT)) said++;
         }
         assertTrue("said " + said + " times in 2000", said > 850 && said < 1150);
     }
