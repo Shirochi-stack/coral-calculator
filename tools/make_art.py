@@ -11,7 +11,7 @@ import argparse
 import colorsys
 import pathlib
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageStat
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "HalgakosWhite.png"
@@ -36,8 +36,15 @@ PET_COLUMNS = 8
 PET_ROWS = (0, 1, 2, 4, 5, 7)
 # The idle row breathes by narrowing her whole body below the collar, which reads as her
 # shrinking. So her body holds still: every idle frame takes it from the row's first frame.
-# Two parts move. Her head, with its blink and bob, is each frame's own down to
-# PET_IDLE_SEAM, a row of the cell across her collar, crossfaded over the feather.
+# Two parts move. Her head bobs: down to PET_IDLE_SEAM, a row of the cell across her collar,
+# crossfaded over the feather, it rides as high as each frame draws it.
+#
+# The row draws her head a little narrower in the frames where she blinks, by two or three
+# pixels across her hair, which over a body that holds still reads as her hair shrinking.
+# So her head too is the first frame's, one drawing, lifted by each frame's bob. Only her
+# eyes are each frame's own: what lies inside the boxes of PET_IDLE_EYES, softened at the
+# edge, is taken from the frame, moved by up to PET_IDLE_EYES_REACH pixels to where the
+# hair and cheeks within PET_IDLE_EYES_RING pixels of the boxes best match the first frame's.
 #
 # Her tail swings. In the row as drawn it hardly changes place from frame to frame while its
 # colour does, from dusky to bright and back, which reads as a light playing on it and not
@@ -51,7 +58,10 @@ PET_ROWS = (0, 1, 2, 4, 5, 7)
 PET_IDLE = 0
 PET_IDLE_SEAM = 115
 PET_IDLE_FEATHER = 8
-PET_IDLE_TAIL = (117, 158, 162, 200)
+PET_IDLE_EYES = ((61, 72, 87, 96), (95, 66, 121, 90))
+PET_IDLE_EYES_REACH = 5
+PET_IDLE_EYES_RING = 6
+PET_IDLE_TAIL =(117, 158, 162, 200)
 PET_IDLE_TAIL_LAP = 4
 PET_IDLE_TAIL_ROOT = (121, 153)
 PET_IDLE_TAIL_SWING = (0, 6, 12, 9, 3, -4, -1)
@@ -219,16 +229,41 @@ def pet_atlas(sheet_path):
     clear = Image.new("RGBa", PET_CELL, (0, 0, 0, 0))
     curl = Image.composite(still, clear, area(PET_IDLE_TAIL[1], 1.5))
     rest = Image.composite(clear, still, area(PET_IDLE_TAIL[1] + PET_IDLE_TAIL_LAP, 1))
-    for (row, column), cell in list(cells.items()):
-        if row != PET_IDLE:
-            continue
-        frame = Image.composite(rest, cell.convert("RGBa"), below).convert("RGBA")
-        swung = curl.rotate(PET_IDLE_TAIL_SWING[column % len(PET_IDLE_TAIL_SWING)], resample=Image.BICUBIC,
-                            center=PET_IDLE_TAIL_ROOT).convert("RGBA")
-        cells[(row, column)] = Image.alpha_composite(frame, swung)
 
     def solid(cell):
         return cell.getchannel("A").point(lambda value: 255 if value > 40 else 0)
+
+    def eyes(grow, feather):
+        """The boxes round her eyes, grown by some pixels, as a mask with a softened edge."""
+        mask = Image.new("L", PET_CELL, 0)
+        draw = ImageDraw.Draw(mask)
+        for left, top, right, bottom in PET_IDLE_EYES:
+            draw.rounded_rectangle((left - grow, top - grow, right + grow, bottom + grow), radius=5 + grow, fill=255)
+        return mask.filter(ImageFilter.GaussianBlur(feather)) if feather else mask
+
+    around = ImageChops.subtract(eyes(PET_IDLE_EYES_RING, 0), eyes(0, 0))
+    reach = range(-PET_IDLE_EYES_REACH, PET_IDLE_EYES_REACH + 1)
+    top = solid(first).getbbox()[1]
+
+    def placed(image, by):
+        """A frame moved by some pixels across and down."""
+        moved = Image.new(image.mode, PET_CELL, (0, 0, 0, 0))
+        moved.paste(image, by)
+        return moved
+
+    for (row, column), cell in list(cells.items()):
+        if row != PET_IDLE:
+            continue
+        own = cell.convert("RGBa")
+        # Where this frame's face sits over the first's: where what surrounds her eyes differs least.
+        fit = min(((dx, dy) for dx in reach for dy in reach), key=lambda by: ImageStat.Stat(
+            ImageChops.difference(still, placed(own, by)).convert("RGB").convert("L"), mask=around).sum[0])
+        head = Image.composite(placed(own, fit), still, eyes(0, 1.2))
+        bob = top - solid(cell).getbbox()[1]
+        frame = Image.composite(rest, placed(head, (0, -bob)), below).convert("RGBA")
+        swung = curl.rotate(PET_IDLE_TAIL_SWING[column % len(PET_IDLE_TAIL_SWING)], resample=Image.BICUBIC,
+                            center=PET_IDLE_TAIL_ROOT).convert("RGBA")
+        cells[(row, column)] = Image.alpha_composite(frame, swung)
 
     def horns(cell):
         """How far apart the outer edges of her horns are: a measure of how large she is drawn."""
