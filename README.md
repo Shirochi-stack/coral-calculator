@@ -87,7 +87,7 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 | **Speech bubbles** | Now and then she has something to say, in a bubble over her head. On by default; a tap on a bubble sends it away. |
 | **What she calls you** | The name her catchphrase is made of. Empty, she calls you Sloppy; type another and every line of hers ends with it instead. |
 | **Surprise pranks** | Left idle, she plays a prank every several minutes without being asked, and little ones where she stands in between. On by default. |
-| **Animated Halgakos** | Her pink-haired form blinks and bobs her head, flicks her tail, runs the way you drag her, and works alongside the mini calculator. On by default; switch it off for the still Halgakos, who uses less battery. |
+| **Animated Halgakos** | Her pink-haired form blinks, flicks her tail, runs the way you drag her, and works alongside the mini calculator. On by default; switch it off for the still Halgakos, who uses less battery. |
 | **Keep her out of the calculator app** | Halgakos herself steps aside while the calculator app is on screen, her settings included. On by default. It has nothing to do with the mini calculator. |
 | **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
 | **Snap to the edge** | She slides to the nearer side of the screen when you let go. Off by default. |
