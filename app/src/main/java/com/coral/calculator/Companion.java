@@ -80,7 +80,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private static final int POPUP_FLAGS = WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
     /** Rows of the animated figure's frames. */
     private static final int POSE_IDLE = PetArt.IDLE, POSE_RUN_RIGHT = PetArt.RUN_RIGHT, POSE_RUN_LEFT = PetArt.RUN_LEFT,
-            POSE_JUMP = PetArt.JUMP, POSE_SAD = PetArt.SAD, POSE_WORK = PetArt.WORK;
+            POSE_JUMP = PetArt.JUMP, POSE_SAD = PetArt.SAD, POSE_WORK = PetArt.WORK, POSE_WAVE = PetArt.WAVE;
     private static final int PET_COLUMNS = PetArt.COLUMNS;
     private static final int[] PET_FRAMES = PetArt.FRAMES;
     private static final int[] PET_FRAME_MS = PetArt.FRAME_MS;
@@ -88,7 +88,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private static final long PRANK_SOONEST_MS = 6 * 60_000L, PRANK_LATEST_MS = 20 * 60_000L;
     /** Between those she plays small ones in her own window, this long apart, each over in a few seconds. */
     private static final long ANTIC_SOONEST_MS = 90_000L, ANTIC_LATEST_MS = 240_000L;
-    private static final long ANTIC_MS = 3600, BRIEF_ANTIC_MS = 1500;
+    private static final long ANTIC_MS = 3600, BRIEF_ANTIC_MS = 1500, WAVE_ANTIC_MS = 2000, LOOK_ANTIC_MS = 3200;
     private static final int NO_ANTIC = -1;
     /** She breathes and blinks once, then holds still this long before the next breath. */
     private static final long IDLE_PAUSE_MS = 700;
@@ -155,6 +155,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private int playing = NO_ANTIC;
     private int anticX, anticY;
     private ValueAnimator hopping;
+    /** Her look round, as one of her small pranks. */
+    private ValueAnimator looking;
     private DismissTarget dismiss;
     private WindowManager.LayoutParams dismissParams;
     private ValueAnimator settling;
@@ -244,7 +246,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         anticDue = false;
         // Not while she is still sliding somewhere: where she stands now is where she goes back to.
         boolean still = settling == null || !settling.isRunning();
-        if (idle() && playing == NO_ANTIC && bubble == null && still) play(random.nextInt(Chatter.antics()));
+        // Waving and looking round are drawn only for the animated Halgakos: the still one keeps to the rest.
+        if (idle() && playing == NO_ANTIC && bubble == null && still)
+            play(random.nextInt(pet != null ? Chatter.antics() : Chatter.WAVE));
         schedule();
     }
 
@@ -280,6 +284,20 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                         : room.right + Math.round(spriteParams.width * .56f));
                 handler.postDelayed(this::pose, 260);
                 break;
+            case Chatter.WAVE:
+                // A wave from where she stands, three times over.
+                sprite.play(POSE_WAVE, 3);
+                break;
+            case Chatter.LOOK:
+                // All the way round, twice, as if something were circling her.
+                looking = ValueAnimator.ofInt(0, PetArt.LOOKS * 2);
+                looking.setInterpolator(null);
+                looking.setDuration(LOOK_ANTIC_MS - 200);
+                looking.addUpdateListener(animation -> {
+                    if (sprite != null) sprite.look((int) animation.getAnimatedValue() % PetArt.LOOKS);
+                });
+                looking.start();
+                break;
             default:
                 // Three hops on the spot. Her window is no taller than she is, so it hops with her.
                 hopping = ValueAnimator.ofFloat(0, (float) (Math.PI * 3));
@@ -293,7 +311,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 hopping.start();
                 break;
         }
-        handler.postDelayed(endAntic, which == Chatter.TWIRL || which == Chatter.HOP ? BRIEF_ANTIC_MS : ANTIC_MS);
+        handler.postDelayed(endAntic, which == Chatter.TWIRL || which == Chatter.HOP ? BRIEF_ANTIC_MS
+                : which == Chatter.WAVE ? WAVE_ANTIC_MS : which == Chatter.LOOK ? LOOK_ANTIC_MS : ANTIC_MS);
     }
 
     /** Puts her back as she was: the right way up, her own size, and where she stood. */
@@ -303,7 +322,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         playing = NO_ANTIC;
         if (hopping != null) hopping.cancel();
         hopping = null;
+        if (looking != null) looking.cancel();
+        looking = null;
         if (sprite == null || which == NO_ANTIC) return;
+        sprite.look(PetArt.NOWHERE);
         // Two turns are no turn: she is facing front again, so there is nothing to unwind.
         sprite.setRotationY(0);
         sprite.animate().rotationX(0).scaleX(1).scaleY(1).setDuration(260).setInterpolator(new OvershootInterpolator(2f));
@@ -1339,6 +1361,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         private int pose = POSE_IDLE;
         private int playing = -1;
         private int frame;
+        /** How many more times the pose that is playing is to be played through. */
+        private int again;
+        /** The way she is looking, in place of any pose, or {@link PetArt#NOWHERE}. */
+        private int gaze = PetArt.NOWHERE;
         /** Whether the next frame is on its way. */
         private boolean moving;
         /** Kept on screen but unseen, waiting for a folded device to be opened. */
@@ -1381,9 +1407,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             // While she has the whole screen she is drawn there, not here.
             if (away || onStage) return;
             if (pet != null) {
-                int row = playing >= 0 ? playing : pose;
+                int row = gaze != PetArt.NOWHERE ? PetArt.lookRow(gaze) : playing >= 0 ? playing : pose;
+                int column = gaze != PetArt.NOWHERE ? PetArt.lookColumn(gaze) : frame;
                 int width = pet.getWidth() / PET_COLUMNS, height = pet.getHeight() / PET_FRAMES.length;
-                frameSource.set(frame * width, row * height, (frame + 1) * width, (row + 1) * height);
+                frameSource.set(column * width, row * height, (column + 1) * width, (row + 1) * height);
                 frameTarget.set(pad, pad + pad * .3f, getWidth() - pad, getHeight() - pad + pad * .3f);
                 canvas.drawBitmap(pet, frameSource, frameTarget, silhouette);
                 frameTarget.offset(0, -pad * .3f);
@@ -1404,11 +1431,22 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         }
 
         /** Plays a pose through once, then goes back to the one she keeps. */
-        void play(int value) {
+        void play(int value) { play(value, 1); }
+
+        /** Plays a pose through a number of times, then goes back to the one she keeps. */
+        void play(int value, int times) {
             if (pet == null) return;
             playing = value;
+            again = times - 1;
             frame = 0;
             resume();
+        }
+
+        /** Has her look a way, in place of whatever pose she is in; {@link PetArt#NOWHERE} lets the pose show again. */
+        void look(int way) {
+            if (gaze == way) return;
+            gaze = way;
+            invalidate();
         }
 
         /** Starts the frames moving again: after a change of pose, of figure, or of screen. */
@@ -1445,7 +1483,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             int row = playing >= 0 ? playing : pose;
             if (++frame >= PET_FRAMES[row]) {
                 frame = 0;
-                playing = -1;
+                if (again > 0) again--; else playing = -1;
             }
             invalidate();
             schedule();
@@ -1481,7 +1519,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
         @Override public boolean onTouchEvent(MotionEvent event) {
             // A touch in the middle of one of her small pranks ends the prank, and does no more.
-            if (event.getActionMasked() == MotionEvent.ACTION_DOWN && playing != NO_ANTIC) {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN && Companion.this.playing != NO_ANTIC) {
                 endAntic();
                 wake();
                 ignoring = true;

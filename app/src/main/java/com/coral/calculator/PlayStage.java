@@ -39,9 +39,9 @@ final class PlayStage extends View {
 
     /** The pranks, numbered on from the games of {@link PlaySession}. */
     static final int SNATCH = 9, CRACK = 10, SCRIBBLE = 11, LIGHTS = 12, SPLAT = 13, PAWS = 14, AVALANCHE = 15, GIANT = 16,
-            NOTES = 17, CONFETTI = 18, CURTAIN = 19, BITE = 20;
+            NOTES = 17, CONFETTI = 18, CURTAIN = 19, BITE = 20, CROWD = 21, BUG = 22;
     private static final int[] PRANKS = {SNATCH, CRACK, SCRIBBLE, LIGHTS, SPLAT, PAWS, AVALANCHE, GIANT, NOTES, CONFETTI,
-            CURTAIN, BITE};
+            CURTAIN, BITE, CROWD, BUG};
     /** What she writes on the notes she sticks to the screen, the paper they are on, and her confetti. */
     private static final String[] NOTES_SAY = {"Sloppy was here", "IOU one ice cream", "7 × 8 = 56", "Feed Halgakos", "Do your sums", "Property of Halgakos", "Tap me"};
     private static final int[] PAPER = {0xFFFFF3A0, 0xFFFFC9D6, 0xFFC9F2DD, 0xFFCFE4FF};
@@ -154,6 +154,12 @@ final class PlayStage extends View {
     /** How far the curtains are drawn, and how much of the corner she has bitten off. */
     private float drawn, bitten;
     private boolean biteLeft;
+    /** Her sisters along the bottom of the screen: x, how far up each has come, when each comes up, and where in her wave each is. */
+    private final List<float[]> crowd = new ArrayList<>();
+    /** The bug she drew on the screen: where it is and which way it is heading. */
+    private float bugX, bugY, bugTurn;
+    /** The way she is looking, in place of any pose, or {@link PetArt#NOWHERE}. */
+    private int gaze = PetArt.NOWHERE;
 
     private Object backCallback;
 
@@ -390,6 +396,23 @@ final class PlayStage extends View {
             biteLeft = homeX > play.centerX();
             goalX = biteLeft ? play.left + herWidth * .5f + dp(64) : play.right - herWidth * .5f - dp(64);
             goalY = play.top + herHeight + dp(96);
+        } else if (game == CROWD) {
+            // As many of her as fit side by side along the bottom of the screen.
+            float apart = herWidth * .86f;
+            int count = Math.max(3, Math.min(9, (int) (play.width() / apart)));
+            float first = play.centerX() - apart * (count - 1) / 2;
+            for (int i = 0; i < count; i++) {
+                crowd.add(new float[]{first + apart * i, 0, .12f * i + random.nextFloat() * .1f, random.nextInt(4)});
+            }
+        } else if (game == BUG) {
+            // It comes in from the side of the screen away from her, and wanders.
+            bugX = homeX > play.centerX() ? play.left - dp(20) : play.right + dp(20);
+            bugY = play.top + play.height() * (.25f + random.nextFloat() * .3f);
+            for (int i = 0; i < 6; i++) {
+                waypoints.add(new float[]{play.left + dp(40) + random.nextFloat() * Math.max(1, play.width() - dp(80)),
+                        play.top + dp(60) + random.nextFloat() * Math.max(1, play.height() - dp(160))});
+            }
+            marksAlpha = 1;
         }
         if (isPrank(game)) {
             opening = 1.1f;
@@ -548,6 +571,10 @@ final class PlayStage extends View {
             int row = once != NONE ? once : pose;
             int width = pet.getWidth() / PetArt.COLUMNS, height = pet.getHeight() / PetArt.FRAMES.length;
             int column = Math.min(frameIndex, PetArt.FRAMES[row] - 1);
+            if (gaze != PetArt.NOWHERE && once == NONE) {
+                row = PetArt.lookRow(gaze);
+                column = PetArt.lookColumn(gaze);
+            }
             source.set(column * width, row * height, (column + 1) * width, (row + 1) * height);
             canvas.drawBitmap(pet, source, target, paint);
         } else {
@@ -882,7 +909,75 @@ final class PlayStage extends View {
             case CONFETTI: confetti(seconds); break;
             case CURTAIN: curtain(seconds); break;
             case BITE: bite(seconds); break;
+            case CROWD: crowd(seconds); break;
+            case BUG: bug(seconds); break;
             default: giant(seconds); break;
+        }
+    }
+
+    /** She brings her sisters: a row of her comes up along the bottom of the screen, every one waving. */
+    private void crowd(float seconds) {
+        switch (step) {
+            case 0:
+                keep(PetArt.WAVE);
+                boolean up = true;
+                for (float[] sister : crowd) {
+                    sister[1] = clamp((stepClock - sister[2]) / .35f, 0, 1);
+                    up &= sister[1] >= 1;
+                }
+                if (up) {
+                    buzz();
+                    say("Say hi to my sisters Sloppy~♡", 2.8f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.8f) reveal();
+                break;
+            case 2:
+                for (float[] sister : crowd) sister[1] = Math.max(0, Math.min(sister[1], 1 - stepClock / .5f));
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She draws a bug on the screen, and watches it crawl about as if it had nothing to do with her. */
+    private void bug(float seconds) {
+        switch (step) {
+            case 0:
+            case 1:
+                if (!waypoints.isEmpty()) {
+                    float[] to = waypoints.get(0);
+                    float across = to[0] - bugX, down = to[1] - bugY;
+                    float distance = (float) Math.hypot(across, down), reach = dp(210) * seconds;
+                    if (distance <= reach) {
+                        waypoints.remove(0);
+                    } else {
+                        bugX += across / distance * reach;
+                        bugY += down / distance * reach;
+                        bugTurn = (float) Math.toDegrees(Math.atan2(across, -down));
+                    }
+                }
+                // Her eyes follow it wherever it goes.
+                gaze = PetArt.lookAt(bugX - herX, bugY - (herY - herHeight * .7f));
+                if (step == 0 && stepClock > .9f) {
+                    buzz();
+                    say("Eek! There's a bug on your screen Sloppy~♡", 2.6f);
+                    next();
+                } else if (step == 1 && (stepClock > 3.6f || waypoints.isEmpty())) {
+                    reveal();
+                }
+                break;
+            case 2:
+                marksAlpha = Math.max(0, Math.min(marksAlpha, 1 - stepClock / .5f));
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
         }
     }
 
@@ -1368,6 +1463,7 @@ final class PlayStage extends View {
     private void reveal() {
         waypoints.clear();
         opening = 0;
+        gaze = PetArt.NOWHERE;
         perform(PetArt.JUMP);
         keep(PetArt.IDLE);
         if (game == SNATCH) {
@@ -1387,6 +1483,8 @@ final class PlayStage extends View {
                     : game == CONFETTI ? "Just kidding! All swept up Sloppy~♡"
                     : game == CURTAIN ? "Just kidding! Encore Sloppy~♡"
                     : game == BITE ? "Just kidding! Still in one piece Sloppy~♡"
+                    : game == CROWD ? "Just kidding! There's only one of me Sloppy~♡"
+                    : game == BUG ? "Just kidding! I drew it myself Sloppy~♡"
                     : "Just kidding! Back to pocket size Sloppy~♡", 2.2f);
         }
         stepClock = 0;
@@ -1664,8 +1762,62 @@ final class PlayStage extends View {
                 canvas.restore();
             }
         }
+        if (game == CROWD) drawCrowd(canvas);
+        if (game == BUG && marksAlpha > 0) drawBug(canvas);
         drawHer(canvas);
         drawSaying(canvas);
+    }
+
+    /** Her sisters, each as far up from below the screen as she has come, each at her own point in the wave. */
+    private void drawCrowd(Canvas canvas) {
+        paint.setAlpha(255);
+        for (float[] sister : crowd) {
+            if (sister[1] <= 0) continue;
+            float risen = 1 - (1 - sister[1]) * (1 - sister[1]);
+            float feet = play.bottom + herHeight * (1 - risen);
+            target.set(sister[0] - herWidth / 2, feet - herHeight, sister[0] + herWidth / 2, feet);
+            if (pet != null) {
+                int width = pet.getWidth() / PetArt.COLUMNS, height = pet.getHeight() / PetArt.FRAMES.length;
+                int column = ((int) (clock * 1000 / PetArt.FRAME_MS[PetArt.WAVE]) + (int) sister[3]) % PetArt.FRAMES[PetArt.WAVE];
+                source.set(column * width, PetArt.WAVE * height, (column + 1) * width, (PetArt.WAVE + 1) * height);
+                canvas.drawBitmap(pet, source, target, paint);
+            } else {
+                canvas.drawBitmap(art, null, target, paint);
+            }
+        }
+    }
+
+    /** The bug: a ladybird in her own colours, legs going, turned the way it is crawling. */
+    private void drawBug(Canvas canvas) {
+        float size = dp(13), stride = (float) Math.sin(clock * 22) * dp(2);
+        int alpha = Math.round(255 * marksAlpha), black = 0xFF2A2326;
+        canvas.save();
+        canvas.rotate(bugTurn, bugX, bugY);
+        stroke.setColor(black);
+        stroke.setAlpha(alpha);
+        stroke.setStrokeWidth(dp(1.6f));
+        for (int leg = -1; leg <= 1; leg++) {
+            float y = bugY + leg * size * .45f, lift = leg == 0 ? -stride : stride;
+            canvas.drawLine(bugX - size * .5f, y, bugX - size * 1.1f, y + lift, stroke);
+            canvas.drawLine(bugX + size * .5f, y, bugX + size * 1.1f, y - lift, stroke);
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(black);
+        paint.setAlpha(alpha);
+        canvas.drawCircle(bugX, bugY - size * .8f, size * .42f, paint);
+        paint.setColor(CalculatorLayout.CORAL);
+        paint.setAlpha(alpha);
+        canvas.drawOval(bugX - size * .72f, bugY - size * .85f, bugX + size * .72f, bugY + size * .85f, paint);
+        paint.setColor(black);
+        paint.setAlpha(alpha);
+        canvas.drawRect(bugX - dp(.7f), bugY - size * .8f, bugX + dp(.7f), bugY + size * .8f, paint);
+        canvas.drawCircle(bugX - size * .36f, bugY - size * .25f, size * .15f, paint);
+        canvas.drawCircle(bugX + size * .36f, bugY - size * .25f, size * .15f, paint);
+        canvas.drawCircle(bugX - size * .32f, bugY + size * .35f, size * .13f, paint);
+        canvas.drawCircle(bugX + size * .32f, bugY + size * .35f, size * .13f, paint);
+        canvas.restore();
+        paint.setAlpha(255);
+        stroke.setAlpha(255);
     }
 
     /**

@@ -29,11 +29,17 @@ SPRITE_HEIGHT = 512
 # The height of the full drawings kept for when she is shown as large as the screen.
 LARGE_HEIGHT = 1200
 # The Codex pet atlas: cell size, cells per row, and the rows the app plays, in the order
-# they take in its own atlas: idle, running right, running left, jumping, failed, working.
-# Row 3, waving, is left out: it is drawn in a different style from the rest.
+# they take in its own atlas: idle, running right, running left, jumping, failed, working,
+# waving, and the two rows of her looking each of sixteen ways, clockwise from straight up.
 PET_CELL = (192, 208)
 PET_COLUMNS = 8
-PET_ROWS = (0, 1, 2, 4, 5, 7)
+PET_ROWS = (0, 1, 2, 4, 5, 7, 3, 9, 10)
+# The waving row has green screen left in it: a yellow and green streak in the gap between
+# two locks of her hair, by her hip. Inside PET_SPILL_BOX, a box of the cell round that gap,
+# the yellows, greens and the orange at their edge are cut away: none of them is a colour
+# of hers there.
+PET_WAVE = 6
+PET_SPILL_BOX = (34, 126, 84, 172)
 # The idle row breathes by narrowing her whole body and her head, by two or three pixels
 # across her hair in the frames where she blinks, and by lifting her head as it does, which
 # reads as her shrinking and growing back. Told apart, each still shows: a head that keeps
@@ -83,8 +89,11 @@ PET_HORN_ROWS = 95
 # when she runs, and somewhere between in the rest, so her hair changes shade as she changes
 # what she is doing. The idle's is taken as hers. Her hair is measured in each row over the
 # top PET_HAIR_ROWS rows of its cells, her head and shoulders, and the pinks of every other
-# row are multiplied, channel by channel, by what brings its hair to the idle's.
+# row are multiplied, channel by channel, by what brings its hair to the idle's. That is done
+# PET_HAIR_PASSES times over, each pass measuring what the last one left, since a pixel at
+# the edge of pink is moved only part of the way.
 PET_HAIR_ROWS = 110
+PET_HAIR_PASSES = 3
 
 
 def clean(image):
@@ -207,14 +216,24 @@ def pet_atlas(sheet_path):
             box = bounds if box is None else (min(box[0], bounds[0]), min(box[1], bounds[1]),
                                               max(box[2], bounds[2]), max(box[3], bounds[3]))
     # Every row in the idle's shade of pink: see PET_HAIR_ROWS.
+    # The green screen left in the waving row, cut away: see PET_SPILL_BOX.
+    for key in [key for key in cells if key[0] == PET_WAVE]:
+        pixels = cells[key].load()
+        for y in range(PET_SPILL_BOX[1], PET_SPILL_BOX[3]):
+            for x in range(PET_SPILL_BOX[0], PET_SPILL_BOX[2]):
+                red, green, blue, alpha = pixels[x, y]
+                hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+                if alpha and .05 < hue < .47 and saturation > .3 and value > .3:
+                    pixels[x, y] = (0, 0, 0, 0)
     wanted = hair_colour([cell for (row, _), cell in cells.items() if row == PET_IDLE])
     for index in range(len(PET_ROWS)):
         if index == PET_IDLE:
             continue
-        has = hair_colour([cell for (row, _), cell in cells.items() if row == index])
-        gains = [wanted[channel] / has[channel] for channel in range(3)]
-        for key in [key for key in cells if key[0] == index]:
-            cells[key] = recoloured(cells[key], gains)
+        for _ in range(PET_HAIR_PASSES):
+            has = hair_colour([cell for (row, _), cell in cells.items() if row == index])
+            gains = [wanted[channel] / has[channel] for channel in range(3)]
+            for key in [key for key in cells if key[0] == index]:
+                cells[key] = recoloured(cells[key], gains)
     # Her idle frames are one still drawing, with each frame's own eyes and her tail swung: see PET_IDLE_EYES.
     def area(from_row, feather):
         """The tail's box from a row of the cell down, as a mask with a softened edge."""

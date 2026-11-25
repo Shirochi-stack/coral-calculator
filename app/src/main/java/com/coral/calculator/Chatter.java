@@ -36,7 +36,7 @@ final class Chatter {
     };
 
     /** Small pranks she plays on her own while idle, and what she says as she plays each. */
-    static final int FLIP = 0, TWIRL = 1, SHRINK = 2, DASH = 3, PEEK = 4, HOP = 5;
+    static final int FLIP = 0, TWIRL = 1, SHRINK = 2, DASH = 3, PEEK = 4, HOP = 5, WAVE = 6, LOOK = 7;
     private static final String[] ANTICS = {
             "The world looks better upside down Sloppy~♡",
             "Wheee~ Dizzy yet Sloppy~♡",
@@ -44,6 +44,8 @@ final class Chatter {
             "Too slow. Over here Sloppy~♡",
             "You can't see me Sloppy~♡",
             "Boing, boing. Bored yet Sloppy~♡",
+            "Hiii~ Did you forget about me Sloppy~♡",
+            "Hm? What's that behind you Sloppy~♡",
     };
 
     /** Teasing for its own sake. */
