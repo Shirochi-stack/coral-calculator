@@ -126,7 +126,8 @@ public final class CompanionSettingsActivity extends Activity {
         nameField(content);
         toggle(content, "Surprise pranks", "Left idle, every several minutes she plays a prank over whatever is on "
                         + "screen: binning one of your apps, shaking them all loose, cracking the screen, turning "
-                        + "it off, dropping her ice cream on it and more. It is only a drawing over the top. "
+                        + "it off, dropping her ice cream on it and more. In between she plays little ones "
+                        + "where she stands: a hop, a twirl, a dash across the screen. It is only a drawing over the top. "
                         + "Nothing is deleted or changed, she owns up within seconds, and a tap ends it at once. "
                         + "Prank me, among her games, plays one when you ask.",
                 prefs.pranks(), checked -> { prefs.set(CompanionPrefs.PRANKS, checked); apply(); });

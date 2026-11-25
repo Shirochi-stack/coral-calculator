@@ -25,6 +25,8 @@ BUST_VISIBLE = 1010
 BACKGROUND_TOP = (255, 122, 116)
 BACKGROUND_BOTTOM = (240, 46, 66)
 SPRITE_HEIGHT = 512
+# The height of the full drawings kept for when she is shown as large as the screen.
+LARGE_HEIGHT = 1200
 # The Codex pet atlas: cell size, cells per row, and the rows the app plays, in the order
 # they take in its own atlas: idle, running right, running left, jumping, failed, working.
 # Row 3, waving, is left out: it is drawn in a different style from the rest.
@@ -236,7 +238,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview")
     parser.add_argument("--pet", help="spritesheet-v2-smooth.webp from the Halgakos Codex pet repository")
+    parser.add_argument("--pet-portrait", help="Halgakos.png, the full drawing the pet was made from, from the same repository")
     arguments = parser.parse_args()
+    if arguments.pet_portrait:
+        # The pink-haired Halgakos at a size to fill a screen, for the prank in which she does.
+        portrait = trimmed(clean(Image.open(arguments.pet_portrait).convert("RGBA")))
+        portrait = portrait.resize((round(portrait.size[0] * LARGE_HEIGHT / portrait.size[1]), LARGE_HEIGHT), Image.LANCZOS)
+        (RES / "drawable-nodpi").mkdir(parents=True, exist_ok=True)
+        portrait.save(RES / "drawable-nodpi" / "halgakos_pet_large.webp", quality=88, method=6)
+        print("pet portrait", portrait.size)
     if arguments.pet:
         atlas, frame, counts = pet_atlas(arguments.pet)
         (RES / "drawable-nodpi").mkdir(parents=True, exist_ok=True)
@@ -253,6 +263,9 @@ def main():
     width = round(figure.size[0] * SPRITE_HEIGHT / figure.size[1])
     sprite = figure.resize((width, SPRITE_HEIGHT), Image.LANCZOS)
     (RES / "drawable-nodpi").mkdir(parents=True, exist_ok=True)
+    # The same figure at a size to fill a screen, for the prank in which she does.
+    large = figure.resize((round(figure.size[0] * LARGE_HEIGHT / figure.size[1]), LARGE_HEIGHT), Image.LANCZOS)
+    large.save(RES / "drawable-nodpi" / "halgakos_large.webp", quality=88, method=6)
     sprite.save(RES / "drawable-nodpi" / "halgakos.png", optimize=True)
 
     # Play asks for a 512px icon with no transparency; it applies its own rounded mask.

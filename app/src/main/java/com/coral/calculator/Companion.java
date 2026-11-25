@@ -86,6 +86,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private static final int[] PET_FRAME_MS = PetArt.FRAME_MS;
     /** Idle is prank time: where she is allowed them, one comes this long after the last. */
     private static final long PRANK_SOONEST_MS = 6 * 60_000L, PRANK_LATEST_MS = 20 * 60_000L;
+    /** Between those she plays small ones in her own window, this long apart, each over in a few seconds. */
+    private static final long ANTIC_SOONEST_MS = 90_000L, ANTIC_LATEST_MS = 240_000L;
+    private static final long ANTIC_MS = 3600, BRIEF_ANTIC_MS = 1500;
+    private static final int NO_ANTIC = -1;
     /** She breathes and blinks once, then holds still this long before the next breath. */
     private static final long IDLE_PAUSE_MS = 700;
     private static final long NO_TOUCH = -1;
@@ -114,6 +118,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private final Runnable speak = this::speak;
     private final Runnable closeBubble = this::closeBubble;
     private final Runnable surprise = this::surprise;
+    private final Runnable antic = this::antic;
+    private final Runnable endAntic = this::endAntic;
     private final Random random = new Random();
 
     /** Context of the overlay windows, themed for the views in them. */
@@ -144,6 +150,11 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private PlayStage stage;
     private WindowManager.LayoutParams stageParams;
     private boolean prankDue;
+    /** The small prank she is playing in her own window, where she stood when it began, and her hop. */
+    private boolean anticDue;
+    private int playing = NO_ANTIC;
+    private int anticX, anticY;
+    private ValueAnimator hopping;
     private DismissTarget dismiss;
     private WindowManager.LayoutParams dismissParams;
     private ValueAnimator settling;
@@ -215,6 +226,96 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         } else {
             prankDue = false;
             handler.removeCallbacks(surprise);
+        }
+        if (shown && prefs.pranks()) {
+            if (!anticDue) {
+                anticDue = true;
+                handler.postDelayed(antic, ANTIC_SOONEST_MS + (long) (random.nextFloat() * (ANTIC_LATEST_MS - ANTIC_SOONEST_MS)));
+            }
+        } else {
+            anticDue = false;
+            handler.removeCallbacks(antic);
+        }
+    }
+
+    // Small pranks of her own: a few seconds of mischief in her own window, while she is idle
+
+    private void antic() {
+        anticDue = false;
+        // Not while she is still sliding somewhere: where she stands now is where she goes back to.
+        boolean still = settling == null || !settling.isRunning();
+        if (idle() && playing == NO_ANTIC && bubble == null && still) play(random.nextInt(Chatter.antics()));
+        schedule();
+    }
+
+    private void play(int which) {
+        playing = which;
+        anticX = spriteParams.x;
+        anticY = spriteParams.y;
+        // She says what she is up to, unless she has been asked to keep quiet.
+        if (prefs.chatter()) say(Chatter.antic(which));
+        Rect room = room();
+        switch (which) {
+            case Chatter.FLIP:
+                // Head over heels, and she stays that way a while.
+                sprite.animate().rotationX(180).setDuration(420);
+                break;
+            case Chatter.TWIRL:
+                sprite.animate().rotationY(720).setDuration(1300);
+                break;
+            case Chatter.SHRINK:
+                sprite.animate().scaleX(.35f).scaleY(.35f).setDuration(260);
+                break;
+            case Chatter.DASH:
+                // Across to the far side of the screen, at a run.
+                sprite.setPose(onLeft() ? POSE_RUN_RIGHT : POSE_RUN_LEFT);
+                slideTo(onLeft() ? room.right : room.left);
+                // She runs there, and stands once she has arrived.
+                handler.postDelayed(this::pose, 260);
+                break;
+            case Chatter.PEEK:
+                // Most of the way off the nearer edge, with only a little of her left showing.
+                sprite.setPose(onLeft() ? POSE_RUN_LEFT : POSE_RUN_RIGHT);
+                slideTo(onLeft() ? room.left - Math.round(spriteParams.width * .56f)
+                        : room.right + Math.round(spriteParams.width * .56f));
+                handler.postDelayed(this::pose, 260);
+                break;
+            default:
+                // Three hops on the spot. Her window is no taller than she is, so it hops with her.
+                hopping = ValueAnimator.ofFloat(0, (float) (Math.PI * 3));
+                hopping.setDuration(BRIEF_ANTIC_MS - 200);
+                hopping.addUpdateListener(animation -> {
+                    if (sprite == null) return;
+                    spriteParams.y = anticY - Math.round(Math.abs((float) Math.sin((float) animation.getAnimatedValue())) * dp(24));
+                    update(sprite, spriteParams);
+                    moveBubble();
+                });
+                hopping.start();
+                break;
+        }
+        handler.postDelayed(endAntic, which == Chatter.TWIRL || which == Chatter.HOP ? BRIEF_ANTIC_MS : ANTIC_MS);
+    }
+
+    /** Puts her back as she was: the right way up, her own size, and where she stood. */
+    private void endAntic() {
+        handler.removeCallbacks(endAntic);
+        int which = playing;
+        playing = NO_ANTIC;
+        if (hopping != null) hopping.cancel();
+        hopping = null;
+        if (sprite == null || which == NO_ANTIC) return;
+        // Two turns are no turn: she is facing front again, so there is nothing to unwind.
+        sprite.setRotationY(0);
+        sprite.animate().rotationX(0).scaleX(1).scaleY(1).setDuration(260).setInterpolator(new OvershootInterpolator(2f));
+        if (which == Chatter.HOP && spriteParams.y != anticY) {
+            spriteParams.y = anticY;
+            update(sprite, spriteParams);
+            moveBubble();
+        }
+        if (which == Chatter.DASH || which == Chatter.PEEK) {
+            sprite.setPose(anticX < spriteParams.x ? POSE_RUN_LEFT : POSE_RUN_RIGHT);
+            slideTo(anticX);
+            handler.postDelayed(this::pose, 260);
         }
     }
 
@@ -393,6 +494,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     private void hide() {
         handler.removeCallbacks(rest);
+        endAntic();
         closeMenu();
         closePanel();
         closeBubble();
@@ -408,6 +510,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** Sizes and places her again for the current settings and screen. */
     private void relayout() {
         if (sprite == null) return;
+        endAntic();
         if (settling != null) settling.cancel();
         closeMenu();
         fit();
@@ -717,7 +820,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 @Override public void onError() {
                     // A sum with no answer is exactly what her cry about her output is for.
                     if (!prefs.chatter() || sprite == null) return;
-                    say(Chatter.OUTPUT);
+                    say(Chatter.lostOutput(random));
                     sprite.play(POSE_SAD);
                 }
             });
@@ -1234,6 +1337,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         boolean away;
         /** She has left this window for the whole screen, for a game or a prank. */
         boolean onStage;
+        /** The touch now on her ended a small prank of hers, and is to do nothing else. */
+        private boolean ignoring;
 
         Sprite(Context context) {
             super(context);
@@ -1367,6 +1472,17 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         }
 
         @Override public boolean onTouchEvent(MotionEvent event) {
+            // A touch in the middle of one of her small pranks ends the prank, and does no more.
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN && playing != NO_ANTIC) {
+                endAntic();
+                wake();
+                ignoring = true;
+                return true;
+            }
+            if (ignoring) {
+                if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) ignoring = false;
+                return true;
+            }
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     if (settling != null) settling.cancel();

@@ -19,15 +19,31 @@ final class Chatter {
     static final String SLOPPY = "Sloppy~♡";
     /** The same, when she is speaking Japanese. */
     static final String SLOPPY_JAPANESE = "ざぁこ~♡";
-    /** What she cries when something of hers goes missing or goes wrong. */
+    /**
+     * What she cries when her output goes missing: a calculation that ends with no answer.
+     * It belongs there and nowhere else; a lost game or a prank is not a lost output.
+     */
     static final String OUTPUT = "Where did my output go Sloppy~♡";
 
+    /** What she says when a calculation ends in an error and there is no answer to show. */
     private static final String[] OUTPUTS = {
             "Where did my output go?! Give it back Sloppy~♡",
             "Where did my output go?! …Oh. There it is Sloppy~♡",
             OUTPUT,
             "Hmph. Did you take my output Sloppy~♡",
             "Ehh~? Where did your output go Sloppy~♡",
+            "No answer? You broke it Sloppy~♡",
+    };
+
+    /** Small pranks she plays on her own while idle, and what she says as she plays each. */
+    static final int FLIP = 0, TWIRL = 1, SHRINK = 2, DASH = 3, PEEK = 4, HOP = 5;
+    private static final String[] ANTICS = {
+            "The world looks better upside down Sloppy~♡",
+            "Wheee~ Dizzy yet Sloppy~♡",
+            "Can you still see me Sloppy~♡",
+            "Too slow. Over here Sloppy~♡",
+            "You can't see me Sloppy~♡",
+            "Boing, boing. Bored yet Sloppy~♡",
     };
 
     /** Teasing for its own sake. */
@@ -226,14 +242,14 @@ final class Chatter {
             "Heh heh heh Sloppy~♡",
     };
 
-    private static final String[][] EVERYTHING = {OUTPUTS, TEASING, SUMS, GAMES, JAPANESE, MORNING, AFTERNOON, EVENING,
-            NIGHT, PRANK};
+    private static final String[][] EVERYTHING = {OUTPUTS, ANTICS, TEASING, SUMS, GAMES, JAPANESE, MORNING, AFTERNOON,
+            EVENING, NIGHT, PRANK};
 
     private Chatter() {}
 
     /**
-     * Something for her to say while idle: a tease more often than not, the time of day about
-     * one time in six, and her missing output now and then. Every one ends on her catchphrase.
+     * Something for her to say while idle: a tease more often than not, and the time of day
+     * about one time in six. Every one ends on her catchphrase.
      *
      * @param hour the hour of the day, 0 to 23
      * @param last what she said last, which she does not say twice running; may be null
@@ -241,9 +257,9 @@ final class Chatter {
     static String idle(Random random, int hour, String last) {
         for (int tries = 0; ; tries++) {
             int roll = random.nextInt(100);
-            String[] lines = roll < 8 ? OUTPUTS : roll < 24 ? (hour >= 5 && hour < 12 ? MORNING
+            String[] lines = roll < 16 ? (hour >= 5 && hour < 12 ? MORNING
                     : hour >= 12 && hour < 18 ? AFTERNOON : hour >= 18 && hour < 23 ? EVENING : NIGHT)
-                    : roll < 62 ? TEASING : roll < 82 ? SUMS : roll < 96 ? GAMES : JAPANESE;
+                    : roll < 60 ? TEASING : roll < 81 ? SUMS : roll < 96 ? GAMES : JAPANESE;
             String line = lines[random.nextInt(lines.length)];
             if (!line.equals(last) || tries > 8) return line;
         }
@@ -252,10 +268,13 @@ final class Chatter {
     /** What she says as she sets about a prank. */
     static String prank(Random random) { return PRANK[random.nextInt(PRANK.length)]; }
 
-    /** One of a few lines, or her cry about her output in their place about half the time. */
-    static String orOutput(Random random, String... lines) {
-        return random.nextBoolean() ? OUTPUT : lines[random.nextInt(lines.length)];
-    }
+    /** What she says when a calculation ends with no answer: her output has gone missing. */
+    static String lostOutput(Random random) { return OUTPUTS[random.nextInt(OUTPUTS.length)]; }
+
+    /** What she says as she plays one of her small pranks. */
+    static String antic(int which) { return ANTICS[which]; }
+
+    static int antics() { return ANTICS.length; }
 
     /** What she calls the user by default. */
     static final String DEFAULT_NAME = "Sloppy";

@@ -38,8 +38,15 @@ final class PlayStage extends View {
     }
 
     /** The pranks, numbered on from the games of {@link PlaySession}. */
-    static final int SNATCH = 9, CRACK = 10, SCRIBBLE = 11, LIGHTS = 12, SPLAT = 13, PAWS = 14, AVALANCHE = 15, GIANT = 16;
-    private static final int[] PRANKS = {SNATCH, CRACK, SCRIBBLE, LIGHTS, SPLAT, PAWS, AVALANCHE, GIANT};
+    static final int SNATCH = 9, CRACK = 10, SCRIBBLE = 11, LIGHTS = 12, SPLAT = 13, PAWS = 14, AVALANCHE = 15, GIANT = 16,
+            NOTES = 17, CONFETTI = 18, CURTAIN = 19, BITE = 20;
+    private static final int[] PRANKS = {SNATCH, CRACK, SCRIBBLE, LIGHTS, SPLAT, PAWS, AVALANCHE, GIANT, NOTES, CONFETTI,
+            CURTAIN, BITE};
+    /** What she writes on the notes she sticks to the screen, the paper they are on, and her confetti. */
+    private static final String[] NOTES_SAY = {"Sloppy was here", "IOU one ice cream", "7 × 8 = 56", "Feed Halgakos", "Do your sums", "Property of Halgakos", "Tap me"};
+    private static final int[] PAPER = {0xFFFFF3A0, 0xFFFFC9D6, 0xFFC9F2DD, 0xFFCFE4FF};
+    private static final int[] CONFETTI_COLOURS = {0xFFFF393F, 0xFFFF8FB1, 0xFFFFD84D, 0xFF7BE0B0, 0xFF6FB6FF, 0xFFFFFFFF};
+    private static final int PIECES = 110;
     /** How many apps she shakes loose, how many scoops she drops, and the colours they come in. */
     private static final int SHAKEN = 8, SCOOPS = 7;
     private static final int[] FLAVOURS = {0xFFF7A1B5, 0xFFFFF1C9, 0xFFB8EBD0, 0xFF9A6A54};
@@ -138,6 +145,15 @@ final class PlayStage extends View {
     /** Icons shaken loose: x, y, speed down, turn, turning speed, where it began, wait, and where it lands. */
     private final List<float[]> loose = new ArrayList<>();
     private final CompanionPrefs names;
+    /** The full drawing of her, for when she is shown as large as the screen. */
+    private Bitmap large;
+    /** Notes stuck to the screen: x, y, tilt, paper, when it went up, and which thing it says. */
+    private final List<float[]> notes = new ArrayList<>();
+    /** Confetti: x, y, speed across, speed down, turn, turning speed, colour, size, and where it settles. */
+    private final List<float[]> pieces = new ArrayList<>();
+    /** How far the curtains are drawn, and how much of the corner she has bitten off. */
+    private float drawn, bitten;
+    private boolean biteLeft;
 
     private Object backCallback;
 
@@ -172,6 +188,11 @@ final class PlayStage extends View {
         setContentDescription(isPrank(game) ? "Halgakos is playing a prank. Tap to end it"
                 : PlaySession.NAMES[game] + ", on the whole screen");
         names = new CompanionPrefs(context);
+        if (game == GIANT) {
+            // Her frames are small: blown up to the size of the screen they would be a blur.
+            large = android.graphics.BitmapFactory.decodeResource(context.getResources(),
+                    pet != null ? R.drawable.halgakos_pet_large : R.drawable.halgakos_large);
+        }
         if (game == SNATCH || game == AVALANCHE) {
             pickApps(context, game == SNATCH ? 1 : SHAKEN);
             loot = icons.get(0);
@@ -358,6 +379,17 @@ final class PlayStage extends View {
         } else if (game == GIANT) {
             goalX = sideX();
             goalY = play.bottom - dp(4);
+        } else if (game == NOTES) {
+            goalX = sideX();
+            goalY = clamp(sideY() + herHeight * .5f, play.top + herHeight, play.bottom);
+            marksAlpha = 1;
+        } else if (game == CONFETTI) {
+            marksAlpha = 1;
+        } else if (game == BITE) {
+            // The top corner on the other side of the screen from her.
+            biteLeft = homeX > play.centerX();
+            goalX = biteLeft ? play.left + herWidth * .5f + dp(64) : play.right - herWidth * .5f - dp(64);
+            goalY = play.top + herHeight + dp(96);
         }
         if (isPrank(game)) {
             opening = 1.1f;
@@ -496,6 +528,22 @@ final class PlayStage extends View {
     private void drawHer(Canvas canvas) {
         target.set(herX - herWidth * grown / 2, herY - herHeight * grown, herX + herWidth * grown / 2, herY);
         paint.setAlpha(255);
+        if (large != null && grown > 1) {
+            // As she grows, her small frame gives way to the full drawing of her, which stays sharp.
+            float shown = Math.min(1, (grown - 1) / .35f);
+            if (shown < 1) drawFrame(canvas);
+            float tall = herHeight * grown, wide = tall * large.getWidth() / large.getHeight();
+            target.set(herX - wide / 2, herY - tall, herX + wide / 2, herY);
+            paint.setAlpha(Math.round(255 * shown));
+            canvas.drawBitmap(large, null, target, paint);
+            paint.setAlpha(255);
+            return;
+        }
+        drawFrame(canvas);
+    }
+
+    /** The frame of her that is showing, or the still drawing, where {@link #target} says. */
+    private void drawFrame(Canvas canvas) {
         if (pet != null) {
             int row = once != NONE ? once : pose;
             int width = pet.getWidth() / PetArt.COLUMNS, height = pet.getHeight() / PetArt.FRAMES.length;
@@ -604,9 +652,7 @@ final class PlayStage extends View {
             buzz();
             ring(x, y, true);
             perform(PetArt.JUMP);
-            // Caught is when her cry about her output comes out, every third time or so.
-            if (random.nextInt(3) == 0) say(Chatter.OUTPUT, 1.4f);
-            else say(1.1f, "Eek! Let go Sloppy~♡", "Tch. Lucky Sloppy~♡", "Hey! No fair Sloppy~♡", "Again Sloppy~♡", "You're fast Sloppy~♡", "Hmph. Fine Sloppy~♡");
+            say(1.1f, "Eek! Let go Sloppy~♡", "Tch. Lucky Sloppy~♡", "Hey! No fair Sloppy~♡", "Again Sloppy~♡", "You're fast Sloppy~♡", "Hmph. Fine Sloppy~♡");
             dash = .5f;
             rest = 0;
             pickGoal();
@@ -653,7 +699,7 @@ final class PlayStage extends View {
                     hurt = .6f;
                     buzz();
                     ring(sign[0], sign[1], false);
-                    say(1.2f, "Ow! That hurt Sloppy~♡", "Not that one Sloppy~♡", Chatter.OUTPUT, "Ow! " + Chatter.OUTPUT);
+                    say(1.2f, "Ow! That hurt Sloppy~♡", "Not that one Sloppy~♡", "Hey! Watch where you drag me Sloppy~♡", "Tch. That was your fault Sloppy~♡");
                     if (hearts <= 0) {
                         int best = session.tally("rain_best");
                         boolean record = session.keepBest("rain_best", score, false);
@@ -832,6 +878,10 @@ final class PlayStage extends View {
             case SPLAT: splat(seconds); break;
             case PAWS: paws(seconds); break;
             case AVALANCHE: avalanche(seconds); break;
+            case NOTES: notes(seconds); break;
+            case CONFETTI: confetti(seconds); break;
+            case CURTAIN: curtain(seconds); break;
+            case BITE: bite(seconds); break;
             default: giant(seconds); break;
         }
     }
@@ -992,6 +1042,136 @@ final class PlayStage extends View {
         }
     }
 
+    /** She sticks notes all over the screen. */
+    private void notes(float seconds) {
+        switch (step) {
+            case 0:
+                if (!arrive(dp(600), seconds)) break;
+                if (notes.isEmpty() && stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                while (notes.size() < NOTES_SAY.length && stepClock > notes.size() * .2f) {
+                    float size = dp(92);
+                    notes.add(new float[]{play.left + size * .7f + random.nextFloat() * Math.max(1, play.width() - size * 1.4f),
+                            play.top + size * .9f + random.nextFloat() * Math.max(1, play.height() * .78f - size),
+                            (random.nextFloat() - .5f) * 22, random.nextInt(PAPER.length), clock, notes.size()});
+                    buzz();
+                }
+                if (notes.size() >= NOTES_SAY.length && stepClock > NOTES_SAY.length * .2f + .6f) {
+                    say("Oops~ I left you a few notes Sloppy~♡", 2.8f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.8f) reveal();
+                break;
+            case 2: // They peel off and drop.
+                marksAlpha = Math.max(0, 1 - stepClock / .8f);
+                for (float[] note : notes) {
+                    note[1] += dp(220) * seconds * (1 + note[5] * .12f);
+                    note[2] += 60 * seconds;
+                }
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She throws a party all over the screen. */
+    private void confetti(float seconds) {
+        if (step <= 2) {
+            // It falls, flutters and settles, whatever she is saying meanwhile.
+            for (float[] piece : pieces) {
+                if (piece[1] >= piece[8]) continue;
+                piece[3] += dp(520) * seconds;
+                piece[0] += (piece[2] + (float) Math.sin(clock * 5 + piece[6]) * dp(40)) * seconds;
+                piece[1] = Math.min(piece[8], piece[1] + Math.min(piece[3], dp(430)) * seconds);
+                piece[4] += piece[5] * seconds;
+            }
+        }
+        switch (step) {
+            case 0:
+                if (stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                while (pieces.size() < PIECES && stepClock > pieces.size() * .012f) {
+                    float size = dp(7 + random.nextFloat() * 6);
+                    pieces.add(new float[]{play.left + random.nextFloat() * play.width(), play.top - dp(20) - random.nextFloat() * dp(120),
+                            (random.nextFloat() - .5f) * dp(120), dp(60 + random.nextFloat() * 160), random.nextFloat() * 360,
+                            (random.nextFloat() - .5f) * 720, random.nextInt(CONFETTI_COLOURS.length), size,
+                            play.bottom - size / 2 - random.nextFloat() * dp(26)});
+                }
+                if (pieces.size() >= PIECES && stepClock > 2.2f) {
+                    buzz();
+                    say("Surprise! I threw a party on your screen Sloppy~♡", 2.8f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.8f) reveal();
+                break;
+            case 2:
+                marksAlpha = Math.max(0, 1 - stepClock / .7f);
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She draws the curtains across the screen. */
+    private void curtain(float seconds) {
+        switch (step) {
+            case 0:
+                if (stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                float along = Math.min(1, stepClock / .7f);
+                drawn = 1 - (1 - along) * (1 - along);
+                if (along >= 1) {
+                    buzz();
+                    say("Show's over Sloppy~♡", 2.6f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.6f) reveal();
+                break;
+            case 2:
+                drawn = Math.max(0, Math.min(drawn, 1 - stepClock / .6f));
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She takes a bite out of the corner of the screen. */
+    private void bite(float seconds) {
+        switch (step) {
+            case 0:
+                if (!arrive(dp(640), seconds)) break;
+                facingLeft = biteLeft;
+                if (stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                if (stepClock > .25f) {
+                    bitten = 1;
+                    flash = .08f;
+                    buzz();
+                    say("Nom. Your screen tastes like pixels Sloppy~♡", 2.8f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.8f) reveal();
+                break;
+            case 2:
+                bitten = Math.max(0, Math.min(bitten, 1 - stepClock / .6f));
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
     /** She comes to the front of the screen and turns out to be enormous. */
     private void giant(float seconds) {
         float most = Math.max(1.5f, play.height() * .82f / herHeight);
@@ -1111,7 +1291,7 @@ final class PlayStage extends View {
                     buzz();
                     herX += (facingLeft ? 1 : -1) * dp(18);
                     keep(PetArt.SAD);
-                    say("Where did my output go?! …Oops. I cracked your screen Sloppy~♡", 2.8f);
+                    say("Oops~ I cracked your screen Sloppy~♡", 2.8f);
                     next();
                 }
                 break;
@@ -1203,6 +1383,10 @@ final class PlayStage extends View {
                     : game == SPLAT ? "Just kidding! Not a drop on it Sloppy~♡"
                     : game == PAWS ? "Just kidding! Clean as ever Sloppy~♡"
                     : game == AVALANCHE ? "Just kidding! They never left Sloppy~♡"
+                    : game == NOTES ? "Just kidding! All tidied away Sloppy~♡"
+                    : game == CONFETTI ? "Just kidding! All swept up Sloppy~♡"
+                    : game == CURTAIN ? "Just kidding! Encore Sloppy~♡"
+                    : game == BITE ? "Just kidding! Still in one piece Sloppy~♡"
                     : "Just kidding! Back to pocket size Sloppy~♡", 2.2f);
         }
         stepClock = 0;
@@ -1440,6 +1624,8 @@ final class PlayStage extends View {
         }
         if (flash > 0) canvas.drawColor(Color.argb(Math.round(150 * Math.min(1, flash / .12f)), 255, 255, 255));
         if (darkness > 0) canvas.drawColor(Color.argb(Math.round(242 * darkness), 6, 7, 10));
+        if (drawn > 0) drawCurtains(canvas);
+        if (bitten > 0) drawBite(canvas);
         if (game == SNATCH) {
             if (binRise > 0) drawBin(canvas);
             if (loot != null && lootAlpha > 0 && lootScale > 0) {
@@ -1450,6 +1636,19 @@ final class PlayStage extends View {
             }
         }
         if (marksAlpha > 0) {
+            for (float[] note : notes) drawNote(canvas, note);
+            for (float[] piece : pieces) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(CONFETTI_COLOURS[(int) piece[6]]);
+                paint.setAlpha(Math.round(240 * marksAlpha));
+                canvas.save();
+                canvas.rotate(piece[4], piece[0], piece[1]);
+                // Turning end over end, a piece shows now its face and now its edge.
+                float thin = piece[7] * (.25f + .75f * Math.abs((float) Math.cos(Math.toRadians(piece[4] * 1.7f))));
+                canvas.drawRect(piece[0] - piece[7] / 2, piece[1] - thin / 2, piece[0] + piece[7] / 2, piece[1] + thin / 2, paint);
+                canvas.restore();
+            }
+            paint.setAlpha(255);
             for (float[] scoop : scoops) drawScoop(canvas, scoop);
             for (float[] print : prints) drawPrint(canvas, print);
             int half = Math.round(dp(27));
@@ -1501,6 +1700,79 @@ final class PlayStage extends View {
         paint.setColor(Color.WHITE);
         paint.setAlpha(Math.round(150 * marksAlpha));
         canvas.drawCircle(x - size * .34f * pop, y - size * .34f * pop, size * .16f * pop, paint);
+        paint.setAlpha(255);
+    }
+
+    /** A square of coloured paper stuck up at a tilt, with a few words in her hand on it. */
+    private void drawNote(Canvas canvas, float[] note) {
+        float size = dp(92), pop = Math.min(1, (clock - note[4]) / .12f), half = size / 2 * pop;
+        canvas.save();
+        canvas.translate(note[0], note[1]);
+        canvas.rotate(note[2]);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(Math.round(50 * marksAlpha));
+        canvas.drawRect(-half + dp(2), -half + dp(3), half + dp(2), half + dp(3), paint);
+        paint.setColor(PAPER[(int) note[3]]);
+        paint.setAlpha(Math.round(250 * marksAlpha));
+        canvas.drawRect(-half, -half, half, half, paint);
+        // The strip of glue along the top, a shade darker.
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(Math.round(22 * marksAlpha));
+        canvas.drawRect(-half, -half, half, -half + dp(13) * pop, paint);
+        if (pop >= 1) {
+            text.setTextSize(dp(13));
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(0xFF3A3D3B);
+            text.setAlpha(Math.round(255 * marksAlpha));
+            List<String> lines = wrap(names.named(NOTES_SAY[(int) note[5]]), size - dp(18));
+            float line = dp(17), top = dp(6) - lines.size() * line / 2;
+            for (int i = 0; i < lines.size(); i++) canvas.drawText(lines.get(i), 0, top + line * (i + .8f), text);
+            text.setAlpha(255);
+        }
+        paint.setAlpha(255);
+        canvas.restore();
+    }
+
+    /** Stage curtains drawn from both sides to meet in the middle, in folds. */
+    private void drawCurtains(Canvas canvas) {
+        float half = getWidth() / 2f, reach = half * drawn, fold = dp(26);
+        for (int side = 0; side < 2; side++) {
+            float from = side == 0 ? 0 : getWidth() - reach, to = side == 0 ? reach : getWidth();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFD92B35);
+            canvas.drawRect(from, 0, to, getHeight(), paint);
+            // Folds, running down from the rail: a darker stripe and a lighter one to each.
+            for (float x = side == 0 ? to - fold : from; side == 0 ? x > from - fold : x < to; x += side == 0 ? -fold : fold) {
+                paint.setColor(0x33000000);
+                canvas.drawRect(Math.max(from, x), 0, Math.min(to, x + fold * .38f), getHeight(), paint);
+                paint.setColor(0x1FFFFFFF);
+                canvas.drawRect(Math.max(from, x + fold * .6f), 0, Math.min(to, x + fold * .78f), getHeight(), paint);
+            }
+            // A gold edge where the two meet.
+            paint.setColor(0xFFFFD36B);
+            float edge = side == 0 ? to - dp(5) : from;
+            canvas.drawRect(edge, 0, edge + dp(5), getHeight(), paint);
+        }
+        // The pelmet they hang from.
+        paint.setColor(0xFFB8202A);
+        canvas.drawRect(0, 0, getWidth(), (play.top + dp(22)) * drawn, paint);
+    }
+
+    /** A bite out of a top corner of the screen: nothing where the screen was, with tooth marks round it. */
+    private void drawBite(Canvas canvas) {
+        float x = biteLeft ? 0 : getWidth(), reach = dp(118);
+        path.reset();
+        path.addCircle(x, 0, reach, Path.Direction.CW);
+        // Each tooth took its own little scoop out of the edge.
+        for (int tooth = 0; tooth <= 6; tooth++) {
+            double way = Math.PI / 2 * tooth / 6;
+            path.addCircle(x + (biteLeft ? 1 : -1) * (float) Math.cos(way) * reach, (float) Math.sin(way) * reach, dp(21), Path.Direction.CW);
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF050608);
+        paint.setAlpha(Math.round(255 * bitten));
+        canvas.drawPath(path, paint);
         paint.setAlpha(255);
     }
 

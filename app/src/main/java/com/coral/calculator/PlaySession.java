@@ -210,8 +210,7 @@ final class PlaySession {
         switch (tic.result()) {
             case TicTacToe.PLAYER:
                 count("tic_won");
-                // Losing is when her cry about her output comes out.
-                say("Where did my output go?! …You win Sloppy~♡", "Three in a row?! " + Chatter.OUTPUT,
+                say("Three in a row?! No way Sloppy~♡", "You win. Don't get used to it Sloppy~♡",
                         "Tch. Beginner's luck Sloppy~♡", "Hmph. I let you have that one Sloppy~♡");
                 mood(false);
                 break;
@@ -259,7 +258,7 @@ final class PlaySession {
         else if (outcome == RockPaperScissors.LOSS) herPoints++;
         if (myPoints >= RPS_TARGET) {
             count("rps_won");
-            line = reason + ". " + Chatter.orOutput(random, "Tch. The match is yours Sloppy~♡", "Hmph. You win this one Sloppy~♡");
+            line = reason + ". " + (random.nextBoolean() ? "Tch. The match is yours Sloppy~♡" : "Hmph. You win this one Sloppy~♡");
             mood(false);
         } else if (herPoints >= RPS_TARGET) {
             count("rps_lost");
@@ -361,8 +360,7 @@ final class PlaySession {
             sumsScore++;
             say("Hmph. Right Sloppy~♡", "Correct Sloppy~♡", "A lucky guess Sloppy~♡", "Not bad Sloppy~♡", "Keep up Sloppy~♡");
         } else {
-            // Her cry about her output, turned on the player for once.
-            line = question.text + " is " + question.answer + (random.nextInt(3) == 0 ? ". Where did your output go Sloppy~♡" : " Sloppy~♡");
+            line = question.text + " is " + question.answer + " Sloppy~♡";
         }
         question = Sums.next(random);
         changed();

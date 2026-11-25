@@ -243,17 +243,28 @@ public class PlayGamesTest {
 
     @Test public void whateverSheSaysWhileIdleEndsOnHerCatchphrase() {
         Random random = new Random(3);
-        int output = 0, lines = 6000;
         String last = null;
-        for (int i = 0; i < lines; i++) {
+        for (int i = 0; i < 6000; i++) {
             String line = Chatter.idle(random, i % 24, last);
             assertTrue("does not end on Sloppy~♡: " + line, endsOnHerCatchphrase(line));
             assertNotEquals("the same line twice running", last, line);
-            if (line.contains("output")) output++;
+            // Her output only goes missing when a calculation has no answer, never out of the blue.
+            assertFalse("her output, with nothing gone wrong: " + line, line.contains("output"));
             last = line;
         }
-        // Her missing output turns up now and then, without being all she says.
-        assertTrue("her output in " + output + " of " + lines, output > lines * .03 && output < lines * .12);
+    }
+
+    @Test public void herOutputGoesMissingOnlyWhenACalculationFails() {
+        Random random = new Random(8);
+        boolean cried = false;
+        for (int i = 0; i < 200; i++) {
+            String line = Chatter.lostOutput(random);
+            assertTrue(line, line.contains("output") || line.contains("answer"));
+            assertTrue("does not end on Sloppy~♡: " + line, endsOnHerCatchphrase(line));
+            cried |= line.equals(Chatter.OUTPUT);
+        }
+        assertTrue(cried);
+        for (int which = 0; which < Chatter.antics(); which++) assertTrue(endsOnHerCatchphrase(Chatter.antic(which)));
     }
 
     @Test public void everyHourOfTheDayHasItsGreeting() {
@@ -265,17 +276,6 @@ public class PlayGamesTest {
             for (int i = 0; i < 600 && !greeted; i++) greeted = Chatter.idle(random, hour, null).equals(greeting);
             assertTrue("no " + greeting + " at " + hour + " o'clock", greeted);
         }
-    }
-
-    @Test public void herCryAboutHerOutputTakesTheLinesPlaceAboutHalfTheTime() {
-        Random random = new Random(8);
-        int said = 0;
-        for (int i = 0; i < 2000; i++) {
-            String line = Chatter.orOutput(random, "one", "two");
-            assertTrue(line.equals(Chatter.OUTPUT) || line.equals("one") || line.equals("two"));
-            if (line.equals(Chatter.OUTPUT)) said++;
-        }
-        assertTrue("said " + said + " times in 2000", said > 850 && said < 1150);
     }
 
     @Test public void rockPaperScissorsEachBeatsOneAndLosesToOne() {
