@@ -673,7 +673,13 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     /** She fades once she has been left alone, but never with something open or while she is talking. */
     private void rest() {
-        if (sprite == null || !prefs.fade() || menu != null || panel != null || bubble != null) return;
+        if (sprite == null || !prefs.fade() || menu != null || panel != null) return;
+        if (bubble != null) {
+            // Still talking: look again once she has had time to finish.
+            handler.removeCallbacks(rest);
+            handler.postDelayed(rest, prefs.fadeAfterMs());
+            return;
+        }
         sprite.animate().alpha(REST_ALPHA).setDuration(300);
     }
 
@@ -932,6 +938,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         }
         appear(text);
         wake();
+        // At full strength at once, not a moment later: she and her words arrive together.
+        sprite.setAlpha(1);
         handler.postDelayed(closeBubble, BUBBLE_MS + BUBBLE_LETTER_MS * words.length());
     }
 

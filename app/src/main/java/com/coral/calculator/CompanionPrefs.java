@@ -53,7 +53,7 @@ final class CompanionPrefs {
     int fadeAfterMs() {
         return Math.max(FADE_SHORTEST_MS, Math.min(FADE_LONGEST_MS, preferences.getInt(FADE_AFTER, 1500)));
     }
-    boolean animated() { return preferences.getBoolean(ANIMATED, false); }
+    boolean animated() { return preferences.getBoolean(ANIMATED, true); }
     boolean tapCalculator() { return preferences.getBoolean(TAP_CALCULATOR, true); }
     boolean closeOutside() { return preferences.getBoolean(CLOSE_OUTSIDE, true); }
     boolean chatter() { return preferences.getBoolean(CHATTER, true); }

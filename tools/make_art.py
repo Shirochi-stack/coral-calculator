@@ -8,6 +8,7 @@ and store/. With --preview it also writes the icon under the masks launchers app
 kept in the Halgakos-Codex-Pet repository rather than here.
 """
 import argparse
+import colorsys
 import pathlib
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
@@ -63,6 +64,12 @@ PET_IDLE_TAIL_SWING = (0, 6, 12, 9, 3, -4, -1)
 PET_SORRY = 4
 PET_SORRY_EASE = 0.8
 PET_HORN_ROWS = 95
+# Each row of the atlas is drawn in a pink of its own: dusky in the idle, redder and brighter
+# when she runs, and somewhere between in the rest, so her hair changes shade as she changes
+# what she is doing. The idle's is taken as hers. Her hair is measured in each row over the
+# top PET_HAIR_ROWS rows of its cells, her head and shoulders, and the pinks of every other
+# row are multiplied, channel by channel, by what brings its hair to the idle's.
+PET_HAIR_ROWS = 110
 
 
 def clean(image):
@@ -114,6 +121,49 @@ def masked(layers, shape):
     return visible
 
 
+def pinkness(pixel):
+    """
+    How much a pixel of the pet atlas belongs to the pinks of her hair and tail, from 0 to 1.
+    Skin, the white of her shirt and wing, her skirt, her horns and her dark outlines come
+    out at 0; the hues at the edge of pink come out part way, so no hard line is drawn.
+    """
+    red, green, blue, alpha = pixel
+    if alpha == 0:
+        return 0.0
+    hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+    if hue >= .5:
+        by_hue = min(1.0, max(0.0, (hue - .86) / .04))
+    else:
+        by_hue = min(1.0, max(0.0, (.055 - hue) / .02))
+    return by_hue * min(1.0, max(0.0, (saturation - .12) / .1)) * min(1.0, max(0.0, (value - .35) / .15))
+
+
+def hair_colour(cells):
+    """The mean colour of her hair over some frames: the pinks of her head and shoulders."""
+    total, count = [0, 0, 0], 0
+    for cell in cells:
+        pixels = cell.load()
+        for y in range(PET_HAIR_ROWS):
+            for x in range(PET_CELL[0]):
+                if pixels[x, y][3] >= 220 and pinkness(pixels[x, y]) >= 1:
+                    total = [total[i] + pixels[x, y][i] for i in range(3)]
+                    count += 1
+    return [channel / count for channel in total]
+
+
+def recoloured(cell, gains):
+    """A frame with its pinks multiplied, channel by channel, toward another row's shade of pink."""
+    result = cell.copy()
+    pixels = result.load()
+    for y in range(PET_CELL[1]):
+        for x in range(PET_CELL[0]):
+            pixel = pixels[x, y]
+            weight = pinkness(pixel)
+            if weight > 0:
+                pixels[x, y] = tuple(min(255, round(pixel[i] * (1 + (gains[i] - 1) * weight))) for i in range(3)) + (pixel[3],)
+    return result
+
+
 def is_horn(pixel):
     """Whether a pixel of the pet atlas is the dark purple of her horns."""
     red, green, blue, alpha = pixel
@@ -141,6 +191,15 @@ def pet_atlas(sheet_path):
             cells[(row, column)] = cell
             box = bounds if box is None else (min(box[0], bounds[0]), min(box[1], bounds[1]),
                                               max(box[2], bounds[2]), max(box[3], bounds[3]))
+    # Every row in the idle's shade of pink: see PET_HAIR_ROWS.
+    wanted = hair_colour([cell for (row, _), cell in cells.items() if row == PET_IDLE])
+    for index in range(len(PET_ROWS)):
+        if index == PET_IDLE:
+            continue
+        has = hair_colour([cell for (row, _), cell in cells.items() if row == index])
+        gains = [wanted[channel] / has[channel] for channel in range(3)]
+        for key in [key for key in cells if key[0] == index]:
+            cells[key] = recoloured(cells[key], gains)
     # Her idle frames share one still body, under each frame's own head, with her tail swung: see PET_IDLE_SEAM.
     below = Image.new("L", (1, PET_CELL[1]))
     below.putdata([round(255 * max(0, min(1, (y - PET_IDLE_SEAM + PET_IDLE_FEATHER / 2) / PET_IDLE_FEATHER)))

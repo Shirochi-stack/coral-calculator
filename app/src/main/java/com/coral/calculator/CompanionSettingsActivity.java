@@ -134,7 +134,8 @@ public final class CompanionSettingsActivity extends Activity {
 
         section(content, "Halgakos");
         toggle(content, "Animated Halgakos", "Her pink-haired form breathes and blinks, runs when you drag her, and "
-                        + "works alongside the mini calculator. The still Halgakos uses less battery.",
+                        + "works alongside the mini calculator. Switch this off for the still Halgakos, who uses "
+                        + "less battery.",
                 prefs.animated(), checked -> { prefs.set(CompanionPrefs.ANIMATED, checked); apply(); });
         toggle(content, "Keep her out of the calculator app", "She steps aside while the calculator app is on "
                         + "screen, these settings included, and returns when you leave it. This is about "
