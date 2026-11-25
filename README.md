@@ -85,6 +85,7 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 | **Close it when you tap away** (mini calculator) | Touching anywhere outside the mini calculator closes it, and the same goes for the card of games. On by default; turn off to keep either open while you use the app underneath. |
 | **Open it with a tap** (mini calculator) | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
 | **Speech bubbles** | Now and then she has something to say, in a bubble over her head. On by default; a tap on a bubble sends it away. |
+| **What she calls you** | The name her catchphrase is made of. Empty, she calls you Sloppy; type another and every line of hers ends with it instead. |
 | **Surprise pranks** | Left idle, she plays a prank every several minutes without being asked. On by default. |
 | **Animated Halgakos** | Her pink-haired form blinks and bobs her head, flicks her tail, runs the way you drag her, and works alongside the mini calculator. Off by default: the still Halgakos uses less battery. |
 | **Keep her out of the calculator app** | Halgakos herself steps aside while the calculator app is on screen, her settings included. On by default. It has nothing to do with the mini calculator. |
@@ -116,9 +117,20 @@ All over the screen, on top of whatever app you are in:
 
 The **✕** in the corner, or Back, leaves one of these. They dim the app underneath and take its touches only while they are up.
 
-**Prank me** has her play a prank: making off with the calculator's icon and binning it, cracking the screen, or scribbling on it. It is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. Idle is prank time as well: left to herself she plays one every several minutes, announced with a "Watch this Sloppy~♡". Switch **Surprise pranks** off in her settings to keep them to when you ask.
+**Prank me** has her play a prank, a different one each time until she has been through them all:
 
-She talks as she plays, and while she is idle, and what she says is teasing: smug, cheeky and fond underneath. You are her Sloppy, and her catchphrase closes her sentences: "Play with me Sloppy~♡", "Good Morning Sloppy~♡", "Counting on your fingers again Sloppy~♡". She has over a hundred such lines. When something of hers goes wrong, a lost game or a calculation with no answer, she cries "Where did my output go?!"
+- She makes off with one of your apps and bins it.
+- She shakes the screen and your apps fall in a heap at the bottom.
+- She cracks the screen.
+- She turns the screen off.
+- She drops her ice cream on it.
+- She scribbles on it.
+- She walks all over it and leaves paw prints.
+- She grows until she fills it.
+
+Every one is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. Idle is prank time as well: left to herself she plays one every several minutes, announced with a "Watch this Sloppy~♡". Switch **Surprise pranks** off in her settings to keep them to when you ask.
+
+Her bubble points at her with a little tail, follows her when she is dragged, and stays up while you tap or hold her; it moves aside for her menu and the mini calculator, never over them or her. She talks as she plays, and while she is idle, and what she says is teasing: smug, cheeky and fond underneath. You are her Sloppy, and her catchphrase closes her sentences: "Play with me Sloppy~♡", "Good Morning Sloppy~♡", "Counting on your fingers again Sloppy~♡". She has over a hundred and seventy such lines, and **What she calls you** in her settings swaps Sloppy for a name of your choosing. When something of hers goes wrong, a lost game or a calculation with no answer, she cries "Where did my output go?!"
 
 On an open foldable, whatever has to be read or pressed keeps to her side of the fold, Number rain included, and in the app she takes one side of the fold and the card the other. Folding or turning the device in the middle of a game refits it to the new screen.
 
@@ -126,7 +138,7 @@ On an open foldable, whatever has to be read or pressed keeps to her side of the
 
 Halgakos Calculator works entirely offline. It has no ads, analytics, accounts, or network permission. Calculation history and settings are stored on your device. Clear saved calculations from the **History** dialog.
 
-The companion needs Android's permission to display over other apps, which is used only to draw her, her mini calculator, her games and her pranks. See the [privacy policy](PRIVACY.md).
+The companion needs Android's permission to display over other apps, which is used only to draw her, her mini calculator, her games and her pranks. Her pranks draw the icons and names of apps in your launcher; these are not kept or sent anywhere. See the [privacy policy](PRIVACY.md).
 
 <details>
 <summary>Build from source</summary>

@@ -48,6 +48,15 @@ PET_IDLE_FEATHER = 8
 PET_IDLE_TAIL = ((116, 152, 143, 196), (116, 170, 158, 196))
 PET_IDLE_TAIL_FEATHER = 2
 PET_IDLE_LEGS = (0, 186, 118, 204)
+# The failed row, her apology, draws her larger than the other rows do: her head is up to a
+# third wider at the bottom of her bow, where the frame is filled to its edges. Each of its
+# frames is made smaller about her feet, by how much wider her horns stand apart than in the
+# idle, raised to PET_SORRY_EASE. At 1 her head would be the idle's size exactly and the rest
+# of her, which the row draws no larger, would be left looking small; at this her head and
+# her body both come out close to their size elsewhere.
+PET_SORRY = 4
+PET_SORRY_EASE = 0.8
+PET_HORN_ROWS = 95
 
 
 def clean(image):
@@ -99,6 +108,12 @@ def masked(layers, shape):
     return visible
 
 
+def is_horn(pixel):
+    """Whether a pixel of the pet atlas is the dark purple of her horns."""
+    red, green, blue, alpha = pixel
+    return alpha > 200 and red < 125 and green < 95 and 55 < blue < 135 and blue >= green + 12 and red >= green
+
+
 def pet_atlas(sheet_path):
     """
     The animated companion's frames, cut from the Halgakos Codex pet atlas (8 by 11 cells of
@@ -144,6 +159,33 @@ def pet_atlas(sheet_path):
         frame = Image.composite(still, own, below)
         moved = ImageChops.offset(own, legs(first) - legs(cell), 0)
         cells[(row, column)] = Image.composite(moved, frame, tail).convert("RGBA")
+
+    def solid(cell):
+        return cell.getchannel("A").point(lambda value: 255 if value > 40 else 0)
+
+    def horns(cell):
+        """How far apart the outer edges of her horns are: a measure of how large she is drawn."""
+        top = solid(cell).getbbox()[1]
+        pixels = cell.load()
+        across = [x for y in range(top, min(PET_CELL[1], top + PET_HORN_ROWS)) for x in range(PET_CELL[0])
+                  if is_horn(pixels[x, y])]
+        return max(across) - min(across)
+
+    # Her apology, brought down to the size she is in the other rows: see PET_SORRY.
+    usual = horns(first)
+    for (row, column), cell in list(cells.items()):
+        if row != PET_SORRY:
+            continue
+        factor = min(1.0, (usual / horns(cell)) ** PET_SORRY_EASE)
+        bounds = solid(cell).getbbox()
+        feet = solid(cell).crop((0, bounds[3] - 10, PET_CELL[0], bounds[3])).getbbox()
+        middle, ground = (feet[0] + feet[2]) / 2, bounds[3]
+        size = (max(1, round(PET_CELL[0] * factor)), max(1, round(PET_CELL[1] * factor)))
+        smaller = cell.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        frame = Image.new("RGBA", PET_CELL, (0, 0, 0, 0))
+        # Made smaller about the middle of her feet, which stay where they stood.
+        frame.alpha_composite(smaller, (max(0, round(middle - middle * factor)), max(0, round(ground - ground * factor))))
+        cells[(row, column)] = frame
     # A clear margin round every frame keeps a scaled frame from picking up its neighbour.
     box = (max(0, box[0] - 2), max(0, box[1] - 2), min(PET_CELL[0], box[2] + 2), min(PET_CELL[1], box[3] + 2))
     width, height = box[2] - box[0], box[3] - box[1]

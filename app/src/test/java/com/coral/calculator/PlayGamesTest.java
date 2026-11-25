@@ -192,7 +192,7 @@ public class PlayGamesTest {
 
     @Test public void halgakosHasAHundredLinesOfHerOwn() {
         String[] lines = Chatter.all();
-        assertTrue("only " + lines.length + " lines", lines.length >= 100);
+        assertTrue("only " + lines.length + " lines", lines.length >= 160);
         java.util.Set<String> different = new java.util.HashSet<>(java.util.Arrays.asList(lines));
         assertEquals("a line is there twice", lines.length, different.size());
         for (String line : lines) assertFalse(line.trim().isEmpty());
@@ -218,6 +218,27 @@ public class PlayGamesTest {
                 "Play with me Sloppy~♡"}) {
             assertTrue("missing: " + wanted, lines.contains(wanted));
         }
+    }
+
+    @Test public void sheCallsTheUserWhatTheyAsk() {
+        assertEquals("Play with me Boss~♡", Chatter.named("Play with me Sloppy~♡", "Boss"));
+        assertEquals("So clueless~ My clueless Little One~♡", Chatter.named("So clueless~ My clueless Sloppy~♡", "Little One"));
+        assertEquals("the default is left as it is", "Watch this Sloppy~♡", Chatter.named("Watch this Sloppy~♡", "Sloppy"));
+        assertEquals("in Japanese too", "よわよわ~ Boss~♡", Chatter.named("よわよわ~ ざぁこ~♡", "Boss"));
+        // Every line of hers still ends on the catchphrase, whatever the name.
+        for (String line : Chatter.all()) {
+            String named = Chatter.named(line, "Boss");
+            assertTrue("does not end on Boss~♡: " + named, named.endsWith("Boss~♡"));
+            assertFalse("still says Sloppy: " + named, named.contains("Sloppy"));
+        }
+    }
+
+    @Test public void theNameSheIsGivenIsTidiedUp() {
+        assertEquals("Sloppy", Chatter.nickname(null));
+        assertEquals("Sloppy", Chatter.nickname("   "));
+        assertEquals("Boss", Chatter.nickname("  Boss  "));
+        assertEquals("Little One", Chatter.nickname("Little\n   One"));
+        assertEquals(20, Chatter.nickname("abcdefghijklmnopqrstuvwxyz").length());
     }
 
     @Test public void whateverSheSaysWhileIdleEndsOnHerCatchphrase() {

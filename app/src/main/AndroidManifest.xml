@@ -9,6 +9,12 @@
          see that one is there is what lets the app point the duplicate out. -->
     <queries>
         <package android:name="com.coral.calculator" />
+        <!-- The apps the launcher shows: Halgakos's pranks draw their icons and say their
+             names, as when she pretends to delete one. Nothing is done to the apps. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 
     <application
@@ -37,6 +43,7 @@
         <activity
             android:name=".CompanionSettingsActivity"
             android:exported="false"
+            android:windowSoftInputMode="stateHidden|adjustResize"
             android:label="@string/companion_settings" />
         <service
             android:name=".CompanionService"

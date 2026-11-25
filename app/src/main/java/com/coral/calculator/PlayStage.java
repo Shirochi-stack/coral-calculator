@@ -38,8 +38,11 @@ final class PlayStage extends View {
     }
 
     /** The pranks, numbered on from the games of {@link PlaySession}. */
-    static final int SNATCH = 9, CRACK = 10, SCRIBBLE = 11;
-    private static final int[] PRANKS = {SNATCH, CRACK, SCRIBBLE};
+    static final int SNATCH = 9, CRACK = 10, SCRIBBLE = 11, LIGHTS = 12, SPLAT = 13, PAWS = 14, AVALANCHE = 15, GIANT = 16;
+    private static final int[] PRANKS = {SNATCH, CRACK, SCRIBBLE, LIGHTS, SPLAT, PAWS, AVALANCHE, GIANT};
+    /** How many apps she shakes loose, how many scoops she drops, and the colours they come in. */
+    private static final int SHAKEN = 8, SCOOPS = 7;
+    private static final int[] FLAVOURS = {0xFFF7A1B5, 0xFFFFF1C9, 0xFFB8EBD0, 0xFF9A6A54};
 
     private static final int INTRO = 0, PLAYING = 1, OVER = 2;
     private static final int NONE = -1;
@@ -118,6 +121,23 @@ final class PlayStage extends View {
     private final Path marks = new Path();
     private float marksAlpha, flash;
     private final List<float[]> waypoints = new ArrayList<>();
+    /** Apps picked from the launcher for a prank: their icons and their names. */
+    private final List<Drawable> icons = new ArrayList<>();
+    private final List<String> labels = new ArrayList<>();
+    /** Time since the prank began, and whether she has reached the spot she does it from. */
+    private float clock;
+    private boolean there;
+    /** How dark she has made the screen, and how many times her own size she has grown. */
+    private float darkness, grown = 1;
+    /** Scoops of ice cream on the screen: x, y, size, flavour, when it landed, and what shapes it. */
+    private final List<float[]> scoops = new ArrayList<>();
+    /** Paw prints: x, y, and which way the paw was going. */
+    private final List<float[]> prints = new ArrayList<>();
+    private float sincePrint;
+    private boolean leftPaw;
+    /** Icons shaken loose: x, y, speed down, turn, turning speed, where it began, wait, and where it lands. */
+    private final List<float[]> loose = new ArrayList<>();
+    private final CompanionPrefs names;
 
     private Object backCallback;
 
@@ -151,20 +171,64 @@ final class PlayStage extends View {
         setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);
         setContentDescription(isPrank(game) ? "Halgakos is playing a prank. Tap to end it"
                 : PlaySession.NAMES[game] + ", on the whole screen");
-        if (game == SNATCH) {
-            // Her own app is the one she makes off with: it is the only one she can see.
+        names = new CompanionPrefs(context);
+        if (game == SNATCH || game == AVALANCHE) {
+            pickApps(context, game == SNATCH ? 1 : SHAKEN);
+            loot = icons.get(0);
+            lootName = labels.get(0);
+        }
+    }
+
+    /**
+     * Picks apps at random from those the launcher shows, for a prank to seem to act on.
+     * Only their icons and names are read, to be drawn here; nothing is done to the apps.
+     */
+    private void pickApps(Context context, int count) {
+        android.content.pm.PackageManager packages = context.getPackageManager();
+        List<android.content.pm.ResolveInfo> found = new ArrayList<>();
+        try {
+            found.addAll(packages.queryIntentActivities(
+                    new android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER), 0));
+        } catch (RuntimeException unavailable) {
+            // The calculator's own icon stands in below.
+        }
+        java.util.Collections.shuffle(found, random);
+        for (android.content.pm.ResolveInfo app : found) {
+            if (icons.size() >= count) break;
             try {
-                loot = context.getPackageManager().getApplicationIcon(context.getPackageName());
-            } catch (RuntimeException | android.content.pm.PackageManager.NameNotFoundException missing) {
-                loot = null;
+                Drawable icon = app.loadIcon(packages);
+                CharSequence label = app.loadLabel(packages);
+                if (icon == null || label == null || label.toString().trim().isEmpty()) continue;
+                String name = label.toString().trim();
+                icons.add(icon);
+                labels.add(name.length() > 26 ? name.substring(0, 25).trim() + "…" : name);
+            } catch (RuntimeException unreadable) {
+                // An app that went while the list was being read.
             }
-            lootName = context.getString(R.string.app_name);
+        }
+        if (!icons.isEmpty()) return;
+        try {
+            icons.add(packages.getApplicationIcon(context.getPackageName()));
+            labels.add(context.getString(R.string.app_name));
+        } catch (RuntimeException | android.content.pm.PackageManager.NameNotFoundException missing) {
+            icons.add(new android.graphics.drawable.ColorDrawable(CalculatorLayout.CORAL));
+            labels.add(context.getString(R.string.app_name));
         }
     }
 
     static boolean isPrank(int game) { return game >= SNATCH; }
 
-    static int anyPrank(Random random) { return PRANKS[random.nextInt(PRANKS.length)]; }
+    /** The pranks she has yet to play this time round, in the order she will play them. */
+    private static final List<Integer> NEXT_PRANKS = new ArrayList<>();
+
+    /** A prank she has not played since she last got through them all. */
+    static int anyPrank(Random random) {
+        if (NEXT_PRANKS.isEmpty()) {
+            for (int prank : PRANKS) NEXT_PRANKS.add(prank);
+            java.util.Collections.shuffle(NEXT_PRANKS, random);
+        }
+        return NEXT_PRANKS.remove(NEXT_PRANKS.size() - 1);
+    }
 
     /** How far in from each edge of this view the system bars and cutouts reach. */
     void setSafeInsets(int left, int top, int right, int bottom) {
@@ -270,6 +334,30 @@ final class PlayStage extends View {
             marks.reset();
             marks.moveTo(herX, herY - herHeight * .35f);
             marksAlpha = 1;
+        } else if (game == SPLAT) {
+            goalX = sideX();
+            goalY = clamp(sideY() + herHeight * .5f, play.top + herHeight, play.bottom);
+            marksAlpha = 1;
+        } else if (game == PAWS) {
+            // Back and forth across the screen, working her way down it.
+            for (int i = 0; i < 5; i++) {
+                float across = i % 2 == 0 ? .12f + random.nextFloat() * .2f : .68f + random.nextFloat() * .2f;
+                waypoints.add(new float[]{play.left + play.width() * across,
+                        play.top + herHeight + (play.height() - herHeight) * (i + .3f + random.nextFloat() * .4f) / 5});
+            }
+            marksAlpha = 1;
+        } else if (game == AVALANCHE) {
+            float size = dp(54);
+            for (int i = 0; i < icons.size(); i++) {
+                float x = play.left + size + random.nextFloat() * Math.max(1, play.width() - size * 2);
+                float y = play.top + size + random.nextFloat() * Math.max(1, play.height() * .5f);
+                loose.add(new float[]{x, y, 0, 0, (random.nextFloat() - .5f) * 260, y, i * .09f + random.nextFloat() * .12f,
+                        play.bottom - size / 2 - random.nextFloat() * dp(10)});
+            }
+            marksAlpha = 0;
+        } else if (game == GIANT) {
+            goalX = sideX();
+            goalY = play.bottom - dp(4);
         }
         if (isPrank(game)) {
             opening = 1.1f;
@@ -378,6 +466,7 @@ final class PlayStage extends View {
     }
 
     private void say(String words, float seconds) {
+        words = names.named(words);
         saying = words;
         sayingLeft = seconds;
         // Read out as it changes: the view is a live region.
@@ -405,7 +494,7 @@ final class PlayStage extends View {
     }
 
     private void drawHer(Canvas canvas) {
-        target.set(herX - herWidth / 2, herY - herHeight, herX + herWidth / 2, herY);
+        target.set(herX - herWidth * grown / 2, herY - herHeight * grown, herX + herWidth * grown / 2, herY);
         paint.setAlpha(255);
         if (pet != null) {
             int row = once != NONE ? once : pose;
@@ -431,11 +520,13 @@ final class PlayStage extends View {
         float width = 0;
         for (String one : lines) width = Math.max(width, text.measureText(one));
         float left = clamp(herX - width / 2 - pad, play.left + dp(8), play.right - dp(8) - width - pad * 2);
-        float bottom = herY - herHeight - dp(10), top = bottom - lines.size() * line - pad * 1.5f;
-        // Under her instead, where there is no room over her head.
+        float tall = lines.size() * line + pad * 1.5f;
+        float bottom = herY - herHeight * grown - dp(10), top = bottom - tall;
         if (top < play.top + dp(6)) {
-            top = Math.min(herY + dp(10), play.bottom - lines.size() * line - pad * 1.5f - dp(6));
-            bottom = top + lines.size() * line + pad * 1.5f;
+            // Under her instead, where there is no room over her head; and where she fills
+            // the screen, at the top of it, across her.
+            top = grown > 1.5f ? play.top + dp(14) : Math.min(herY + dp(10), play.bottom - tall - dp(6));
+            bottom = top + tall;
         }
         box.set(left, top, left + width + pad * 2, bottom);
         plate(canvas, box, dp(14));
@@ -515,7 +606,7 @@ final class PlayStage extends View {
             perform(PetArt.JUMP);
             // Caught is when her cry about her output comes out, every third time or so.
             if (random.nextInt(3) == 0) say(Chatter.OUTPUT, 1.4f);
-            else say(1.1f, "Eek!", "Tch. Lucky Sloppy~♡", "Hey!", "Again Sloppy~♡", "You're fast?!", "Hmph!");
+            else say(1.1f, "Eek! Let go Sloppy~♡", "Tch. Lucky Sloppy~♡", "Hey! No fair Sloppy~♡", "Again Sloppy~♡", "You're fast Sloppy~♡", "Hmph. Fine Sloppy~♡");
             dash = .5f;
             rest = 0;
             pickGoal();
@@ -562,7 +653,7 @@ final class PlayStage extends View {
                     hurt = .6f;
                     buzz();
                     ring(sign[0], sign[1], false);
-                    say(1.2f, "Ow!", "Oof! Not that one!", Chatter.OUTPUT, "Ow! " + Chatter.OUTPUT);
+                    say(1.2f, "Ow! That hurt Sloppy~♡", "Not that one Sloppy~♡", Chatter.OUTPUT, "Ow! " + Chatter.OUTPUT);
                     if (hearts <= 0) {
                         int best = session.tally("rain_best");
                         boolean record = session.keepBest("rain_best", score, false);
@@ -732,9 +823,202 @@ final class PlayStage extends View {
             return;
         }
         stepClock += seconds;
-        if (game == SNATCH) snatch(seconds);
-        else if (game == CRACK) crack(seconds);
-        else scribble(seconds);
+        clock += seconds;
+        switch (game) {
+            case SNATCH: snatch(seconds); break;
+            case CRACK: crack(seconds); break;
+            case SCRIBBLE: scribble(seconds); break;
+            case LIGHTS: lights(seconds); break;
+            case SPLAT: splat(seconds); break;
+            case PAWS: paws(seconds); break;
+            case AVALANCHE: avalanche(seconds); break;
+            default: giant(seconds); break;
+        }
+    }
+
+    /** Runs her to the spot she does the prank from; true once she is there. */
+    private boolean arrive(float speed, float seconds) {
+        if (there) return true;
+        there = runTo(goalX, goalY, speed, seconds);
+        if (there) {
+            stepClock = 0;
+            keep(PetArt.IDLE);
+        }
+        return there;
+    }
+
+    /** She turns the screen off, or so it looks: it goes dark around her. */
+    private void lights(float seconds) {
+        switch (step) {
+            case 0:
+                if (stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                darkness = Math.min(1, stepClock / .45f);
+                if (darkness >= 1) {
+                    buzz();
+                    say("Oops~ I turned off your screen Sloppy~♡", 2.6f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.6f) reveal();
+                break;
+            case 2:
+                darkness = Math.max(0, Math.min(darkness, 1 - stepClock / .6f));
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She drops her ice cream on the screen, a scoop at a time. */
+    private void splat(float seconds) {
+        switch (step) {
+            case 0:
+                if (!arrive(dp(600), seconds)) break;
+                if (scoops.isEmpty() && stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                while (scoops.size() < SCOOPS && stepClock > scoops.size() * .17f) {
+                    float size = dp(22 + random.nextFloat() * 24);
+                    scoops.add(new float[]{play.left + size * 2 + random.nextFloat() * Math.max(1, play.width() - size * 4),
+                            play.top + size * 2 + random.nextFloat() * Math.max(1, play.height() * .72f - size * 2),
+                            size, random.nextInt(FLAVOURS.length), clock, random.nextInt(1 << 20)});
+                    buzz();
+                }
+                if (scoops.size() >= SCOOPS && stepClock > SCOOPS * .17f + .6f) {
+                    say("Oops~ I dropped my ice cream on your screen Sloppy~♡", 2.8f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.8f) reveal();
+                break;
+            case 2: // It slides off as she owns up.
+                marksAlpha = Math.max(0, 1 - stepClock / .8f);
+                for (float[] scoop : scoops) scoop[1] += dp(150) * seconds;
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She walks all over the screen and leaves her paw prints on it. */
+    private void paws(float seconds) {
+        switch (step) {
+            case 0: {
+                if (waypoints.isEmpty()) {
+                    keep(PetArt.IDLE);
+                    perform(PetArt.JUMP);
+                    say("I walked all over your screen Sloppy~♡", 2.6f);
+                    next();
+                    break;
+                }
+                float[] to = waypoints.get(0);
+                float fromX = herX, fromY = herY;
+                if (runTo(to[0], to[1], dp(430), seconds)) waypoints.remove(0);
+                sincePrint += (float) Math.hypot(herX - fromX, herY - fromY);
+                if (sincePrint >= dp(30)) {
+                    sincePrint = 0;
+                    leftPaw = !leftPaw;
+                    double heading = Math.atan2(herY - fromY, herX - fromX), side = heading + (leftPaw ? -1 : 1) * Math.PI / 2;
+                    prints.add(new float[]{herX + (float) Math.cos(side) * dp(9), herY - dp(4) + (float) Math.sin(side) * dp(9),
+                            (float) Math.toDegrees(heading)});
+                }
+                break;
+            }
+            case 1:
+                if (stepClock > 2.6f) reveal();
+                break;
+            case 2:
+                marksAlpha = Math.max(0, 1 - stepClock / .7f);
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She shakes the screen, and apps come loose and fall to the bottom of it. */
+    private void avalanche(float seconds) {
+        switch (step) {
+            case 0: {
+                if (stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                marksAlpha = Math.min(1, stepClock / .2f);
+                boolean settled = true;
+                for (float[] icon : loose) {
+                    if (stepClock < icon[6]) {
+                        settled = false;
+                        continue;
+                    }
+                    if (icon[2] == 0 && icon[1] >= icon[7]) continue;
+                    icon[2] += dp(1900) * seconds;
+                    icon[1] += icon[2] * seconds;
+                    icon[3] += icon[4] * seconds;
+                    if (icon[1] >= icon[7]) {
+                        // It lands, bounces once, and lies still.
+                        icon[1] = icon[7];
+                        icon[2] = icon[2] > dp(520) ? -icon[2] * .32f : 0;
+                        icon[4] *= .4f;
+                        if (icon[2] == 0) icon[4] = 0;
+                    }
+                    if (icon[2] != 0 || icon[1] < icon[7]) settled = false;
+                }
+                if (settled || stepClock > 3.2f) {
+                    buzz();
+                    say("Oops~ I shook your apps loose Sloppy~♡", 2.8f);
+                    next();
+                }
+                break;
+            }
+            case 1:
+                if (stepClock > 2.8f) reveal();
+                break;
+            case 2: { // They float back up to where they were, and are gone into the screen.
+                float along = Math.min(1, stepClock / .7f), eased = 1 - (1 - along) * (1 - along);
+                for (float[] icon : loose) {
+                    icon[1] = icon[7] + (icon[5] - icon[7]) * eased;
+                    icon[3] *= 1 - along;
+                }
+                marksAlpha = stepClock < .7f ? 1 : Math.max(0, 1 - (stepClock - .7f) / .4f);
+                if (stepClock > 2.2f) next();
+                break;
+            }
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** She comes to the front of the screen and turns out to be enormous. */
+    private void giant(float seconds) {
+        float most = Math.max(1.5f, play.height() * .82f / herHeight);
+        switch (step) {
+            case 0:
+                if (!arrive(dp(620), seconds)) break;
+                float along = Math.min(1, stepClock / .45f);
+                grown = 1 + (most - 1) * (1 - (1 - along) * (1 - along));
+                if (along >= 1) {
+                    buzz();
+                    perform(PetArt.JUMP);
+                    say("Boo! I'm taking over your screen Sloppy~♡", 2.4f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.4f) reveal();
+                break;
+            case 2:
+                grown = Math.max(1, grown - (most - 1) * seconds / .45f);
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                grown = 1;
+                goHome(seconds);
+                break;
+        }
     }
 
     private void next() {
@@ -827,7 +1111,7 @@ final class PlayStage extends View {
                     buzz();
                     herX += (facingLeft ? 1 : -1) * dp(18);
                     keep(PetArt.SAD);
-                    say(Chatter.OUTPUT + " …Oops. I cracked your screen Sloppy~♡", 2.8f);
+                    say("Where did my output go?! …Oops. I cracked your screen Sloppy~♡", 2.8f);
                     next();
                 }
                 break;
@@ -912,7 +1196,14 @@ final class PlayStage extends View {
             say("Just kidding! " + lootName + " is right where it was Sloppy~♡", 2.4f);
         } else {
             step = 2;
-            say(game == CRACK ? "Just kidding! Not a scratch on it Sloppy~♡" : "Just kidding! It wipes right off Sloppy~♡", 2.2f);
+            there = true;
+            say(game == CRACK ? "Just kidding! Not a scratch on it Sloppy~♡"
+                    : game == SCRIBBLE ? "Just kidding! It wipes right off Sloppy~♡"
+                    : game == LIGHTS ? "Just kidding! Lights back on Sloppy~♡"
+                    : game == SPLAT ? "Just kidding! Not a drop on it Sloppy~♡"
+                    : game == PAWS ? "Just kidding! Clean as ever Sloppy~♡"
+                    : game == AVALANCHE ? "Just kidding! They never left Sloppy~♡"
+                    : "Just kidding! Back to pocket size Sloppy~♡", 2.2f);
         }
         stepClock = 0;
     }
@@ -1148,6 +1439,7 @@ final class PlayStage extends View {
             stroke.setAlpha(255);
         }
         if (flash > 0) canvas.drawColor(Color.argb(Math.round(150 * Math.min(1, flash / .12f)), 255, 255, 255));
+        if (darkness > 0) canvas.drawColor(Color.argb(Math.round(242 * darkness), 6, 7, 10));
         if (game == SNATCH) {
             if (binRise > 0) drawBin(canvas);
             if (loot != null && lootAlpha > 0 && lootScale > 0) {
@@ -1157,8 +1449,81 @@ final class PlayStage extends View {
                 loot.draw(canvas);
             }
         }
+        if (marksAlpha > 0) {
+            for (float[] scoop : scoops) drawScoop(canvas, scoop);
+            for (float[] print : prints) drawPrint(canvas, print);
+            int half = Math.round(dp(27));
+            for (int i = 0; i < loose.size(); i++) {
+                float[] icon = loose.get(i);
+                if (stepClock < icon[6] && step == 0) continue;
+                Drawable drawn = icons.get(i);
+                canvas.save();
+                canvas.rotate(icon[3], icon[0], icon[1]);
+                drawn.setBounds(Math.round(icon[0]) - half, Math.round(icon[1]) - half, Math.round(icon[0]) + half, Math.round(icon[1]) + half);
+                drawn.setAlpha(Math.round(255 * marksAlpha));
+                drawn.draw(canvas);
+                canvas.restore();
+            }
+        }
         drawHer(canvas);
         drawSaying(canvas);
+    }
+
+    /**
+     * A scoop of ice cream where it landed: a blob with smaller blobs flung out round it, and
+     * drips that run down the longer it sits. What it looks like comes from the number it was
+     * given when it landed, so it is the same shape in every frame.
+     */
+    private void drawScoop(Canvas canvas, float[] scoop) {
+        float x = scoop[0], y = scoop[1], size = scoop[2], age = clock - scoop[4];
+        float pop = Math.min(1, age / .12f);
+        int seed = (int) scoop[5];
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(FLAVOURS[(int) scoop[3]]);
+        paint.setAlpha(Math.round(245 * marksAlpha));
+        canvas.drawCircle(x, y, size * pop, paint);
+        for (int blob = 0; blob < 6; blob++) {
+            seed = seed * 1103515245 + 12345;
+            double way = ((seed >>> 16) & 0x3FF) / 1024.0 * Math.PI * 2;
+            seed = seed * 1103515245 + 12345;
+            float out = size * (.78f + ((seed >>> 16) & 0xFF) / 255f * .5f) * pop;
+            float small = size * (.2f + ((seed >>> 8) & 0xFF) / 255f * .24f) * pop;
+            canvas.drawCircle(x + (float) Math.cos(way) * out, y + (float) Math.sin(way) * out, small, paint);
+        }
+        for (int drip = 0; drip < 3; drip++) {
+            seed = seed * 1103515245 + 12345;
+            float across = (((seed >>> 16) & 0xFF) / 255f - .5f) * size * 1.2f;
+            float wide = size * (.16f + ((seed >>> 8) & 0xFF) / 255f * .12f);
+            float run = Math.min(size * (1 + ((seed >>> 4) & 0xFF) / 255f * 1.3f), age * dp(44));
+            canvas.drawRoundRect(x + across - wide / 2, y, x + across + wide / 2, y + size * .5f + run, wide / 2, wide / 2, paint);
+        }
+        // A glint, as on anything wet.
+        paint.setColor(Color.WHITE);
+        paint.setAlpha(Math.round(150 * marksAlpha));
+        canvas.drawCircle(x - size * .34f * pop, y - size * .34f * pop, size * .16f * pop, paint);
+        paint.setAlpha(255);
+    }
+
+    /** A cat's paw print: a pad and four toes, pointing the way she was going. */
+    private void drawPrint(Canvas canvas, float[] print) {
+        canvas.save();
+        canvas.translate(print[0], print[1]);
+        canvas.rotate(print[2] + 90);
+        for (int pass = 0; pass < 2; pass++) {
+            // A light edge under the pink, so the prints show on any screen.
+            float more = pass == 0 ? dp(1.2f) : 0;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(pass == 0 ? Color.WHITE : 0xFFFF6F91);
+            paint.setAlpha(Math.round((pass == 0 ? 200 : 235) * marksAlpha));
+            box.set(-dp(5.5f) - more, -dp(2) - more, dp(5.5f) + more, dp(7) + more);
+            canvas.drawOval(box, paint);
+            canvas.drawCircle(-dp(6.5f), -dp(5.5f), dp(2.4f) + more, paint);
+            canvas.drawCircle(-dp(2.3f), -dp(8.5f), dp(2.4f) + more, paint);
+            canvas.drawCircle(dp(2.3f), -dp(8.5f), dp(2.4f) + more, paint);
+            canvas.drawCircle(dp(6.5f), -dp(5.5f), dp(2.4f) + more, paint);
+        }
+        paint.setAlpha(255);
+        canvas.restore();
     }
 
     /** A bin drawn the way her menus are: a white card with coral lines, not the system's own. */

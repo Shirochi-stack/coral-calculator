@@ -5,10 +5,16 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -50,6 +56,8 @@ public final class CompanionSettingsActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(24), dp(20), dp(24), dp(32));
+        // The page takes the focus itself, so the name field does not bring up the keyboard unasked.
+        content.setFocusableInTouchMode(true);
 
         TextView title = text("Halgakos companion", 26, ink());
         title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
@@ -113,12 +121,14 @@ public final class CompanionSettingsActivity extends Activity {
         play.setOnClickListener(v -> startActivity(new Intent(this, PlayActivity.class)));
         content.addView(play);
         toggle(content, "Speech bubbles", "Now and then she has something to say, in a bubble over her head, and "
-                        + "most of it is teasing. You are her Sloppy. A tap on the bubble sends it away.",
+                        + "most of it is teasing. A tap on the bubble sends it away.",
                 prefs.chatter(), checked -> { prefs.set(CompanionPrefs.CHATTER, checked); apply(); });
-        toggle(content, "Surprise pranks", "Left idle, every several minutes she plays a prank over whatever is on screen: making off "
-                        + "with the calculator's icon, cracking the screen, or drawing on it. It is only a drawing "
-                        + "over the top. Nothing is deleted or changed, she owns up within seconds, and a tap ends "
-                        + "it at once. Prank me, among her games, plays one when you ask.",
+        nameField(content);
+        toggle(content, "Surprise pranks", "Left idle, every several minutes she plays a prank over whatever is on "
+                        + "screen: binning one of your apps, shaking them all loose, cracking the screen, turning "
+                        + "it off, dropping her ice cream on it and more. It is only a drawing over the top. "
+                        + "Nothing is deleted or changed, she owns up within seconds, and a tap ends it at once. "
+                        + "Prank me, among her games, plays one when you ask.",
                 prefs.pranks(), checked -> { prefs.set(CompanionPrefs.PRANKS, checked); apply(); });
 
         section(content, "Halgakos");
@@ -256,7 +266,9 @@ public final class CompanionSettingsActivity extends Activity {
         }
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
-                android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                // The keyboard as well, so the field being typed in can be scrolled clear of it.
+                android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                        | WindowInsets.Type.ime());
                 view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
             } else {
                 view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
@@ -307,6 +319,46 @@ public final class CompanionSettingsActivity extends Activity {
                 "She needs Android's permission to appear on top of other apps.",
                 () -> awaitingPermission = true,
                 () -> masterNote.setText("This device has no setting for displaying over other apps."));
+    }
+
+    /**
+     * What she calls the user. Her catchphrase is that name with "~♡" after it, at the end of
+     * what she says; "Sloppy" is hers, and this is where to have her use another.
+     */
+    private void nameField(LinearLayout parent) {
+        TextView label = text("What she calls you", 19, ink());
+        label.setPadding(0, dp(10), 0, 0);
+        parent.addView(label);
+        EditText name = new EditText(this);
+        name.setSingleLine(true);
+        // Left empty unless another name was chosen: the hint shows the one she uses then.
+        name.setText(prefs.nickname().equals(Chatter.DEFAULT_NAME) ? "" : prefs.nickname());
+        name.setHint(Chatter.DEFAULT_NAME);
+        name.setTextSize(19);
+        name.setTextColor(ink());
+        name.setHintTextColor(muted());
+        name.setFilters(new InputFilter[]{new InputFilter.LengthFilter(CompanionPrefs.NICKNAME_LENGTH)});
+        name.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        name.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        name.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        name.setContentDescription("What Halgakos calls you");
+        name.setMinHeight(dp(48));
+        parent.addView(name, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView example = text("", 15, muted());
+        example.setPadding(0, 0, dp(56), dp(8));
+        parent.addView(example);
+        Runnable show = () -> example.setText("She ends what she says with it: \""
+                + prefs.named("Play with me Sloppy~♡") + "\". Leave it empty and she calls you Sloppy.");
+        name.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence text, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable text) {
+                prefs.setNickname(text.toString());
+                show.run();
+            }
+        });
+        show.run();
     }
 
     /** A heading over a group of settings. */

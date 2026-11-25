@@ -20,11 +20,12 @@ final class Chatter {
     /** The same, when she is speaking Japanese. */
     static final String SLOPPY_JAPANESE = "ざぁこ~♡";
     /** What she cries when something of hers goes missing or goes wrong. */
-    static final String OUTPUT = "Where did my output go?!";
+    static final String OUTPUT = "Where did my output go Sloppy~♡";
 
     private static final String[] OUTPUTS = {
-            OUTPUT + " Give it back Sloppy~♡",
-            OUTPUT + " …Oh. There it is Sloppy~♡",
+            "Where did my output go?! Give it back Sloppy~♡",
+            "Where did my output go?! …Oh. There it is Sloppy~♡",
+            OUTPUT,
             "Hmph. Did you take my output Sloppy~♡",
             "Ehh~? Where did your output go Sloppy~♡",
     };
@@ -79,6 +80,31 @@ final class Chatter {
             "Aww~ are you mad? You're a little mad Sloppy~♡",
             "Don't worry, I'm here. Lucky you Sloppy~♡",
             "Eyes on the numbers Sloppy~♡",
+            "Look at me when I'm teasing you Sloppy~♡",
+            "I saw that typo Sloppy~♡",
+            "Hmph. Don't get the wrong idea Sloppy~♡",
+            "You again? Can't stay away Sloppy~♡",
+            "Is that your thinking face Sloppy~♡",
+            "Go on, pet my ears. I dare you Sloppy~♡",
+            "I'm very busy doing nothing Sloppy~♡",
+            "Carry me somewhere nicer Sloppy~♡",
+            "You blinked. I win Sloppy~♡",
+            "Too easy to tease. No challenge at all Sloppy~♡",
+            "My horns are not handles Sloppy~♡",
+            "One wing angel, one wing devil, all trouble Sloppy~♡",
+            "I heard that sigh Sloppy~♡",
+            "Admit it. You like having me around Sloppy~♡",
+            "Don't poke the cat Sloppy~♡",
+            "Yes, I'm cute. Old news Sloppy~♡",
+            "Pay attention to me Sloppy~♡",
+            "Pfft~ lost again? I'm right here Sloppy~♡",
+            "Rune keeps a diary about me. Jealous Sloppy~♡",
+            "Chikuwa owes me bread. So do you Sloppy~♡",
+            "I translate. You scroll. Guess who's useful Sloppy~♡",
+            "Ehh~ still on that? Hurry up Sloppy~♡",
+            "Stretch a little. You've been hunched for ages Sloppy~♡",
+            "Drink some water Sloppy~♡",
+            "Heh. I knew you'd look Sloppy~♡",
     };
 
     /** Teasing about sums, which are her trade here. */
@@ -105,6 +131,21 @@ final class Chatter {
             "Aww~ did long division get you down Sloppy~♡",
             "A remainder is what's left when you do it your way Sloppy~♡",
             "I never forget a decimal point. Can't relate Sloppy~♡",
+            "Nine times seven. Quick Sloppy~♡",
+            "Carry the two. No, the other two Sloppy~♡",
+            "A calculator this cute and you still get it wrong Sloppy~♡",
+            "Decimals are not decoration Sloppy~♡",
+            "Brackets first. Everyone knows that Sloppy~♡",
+            "Minus times minus is plus. Keep up Sloppy~♡",
+            "I rounded your ego down Sloppy~♡",
+            "Half of 98? Forty-nine. You're welcome Sloppy~♡",
+            "Zero is a number too. Like your score Sloppy~♡",
+            "Show your working. I want a laugh Sloppy~♡",
+            "The square root of 144? Twelve. Too slow Sloppy~♡",
+            "Ten percent is just moving the point Sloppy~♡",
+            "Even I double-check. You should triple-check Sloppy~♡",
+            "Fractions frighten you, don't they Sloppy~♡",
+            "Count to ten. Out loud. I'll wait Sloppy~♡",
     };
 
     /** Daring the user to a game. */
@@ -119,6 +160,14 @@ final class Chatter {
             "Pop my bubbles in order. If you can count Sloppy~♡",
             "One round. I'll only gloat a little Sloppy~♡",
             "Hmph. Too scared to play me Sloppy~♡",
+            "Best of three? You'll need all three Sloppy~♡",
+            "I'll beat you with one wing tied Sloppy~♡",
+            "Number rain. Try not to get wet Sloppy~♡",
+            "Bubble count. Do you know your numbers Sloppy~♡",
+            "Loser brings ice cream. So, you Sloppy~♡",
+            "I went easy last time. Not today Sloppy~♡",
+            "Quick sums. The word is quick Sloppy~♡",
+            "Prank me, you say? Bold Sloppy~♡",
     };
 
     /** A line in Japanese now and then, to tease those who cannot read it. */
@@ -126,6 +175,8 @@ final class Chatter {
             "え〜、こんなのも計算できないの？ ざぁこ~♡",
             "ざぁこ、ざぁこ~♡",
             "しょうがないなぁ。わたしが計算してあげる ざぁこ~♡",
+            "よわよわ~ ざぁこ~♡",
+            "もう一回？ しょうがないなぁ ざぁこ~♡",
     };
 
     private static final String[] MORNING = {
@@ -133,24 +184,32 @@ final class Chatter {
             "Up already? Trying so hard Sloppy~♡",
             "Did you do your sums in your sleep Sloppy~♡",
             "Rise and shine. I've been up for hours Sloppy~♡",
+            "Breakfast first. Sums second Sloppy~♡",
+            "Still half asleep? It shows Sloppy~♡",
     };
     private static final String[] AFTERNOON = {
             "Good Afternoon Sloppy~♡",
             "Had lunch yet? Bring me ice cream Sloppy~♡",
             "An afternoon slump? So weak Sloppy~♡",
             "Half the day gone and that's all you did Sloppy~♡",
+            "Back to work. I'm supervising Sloppy~♡",
+            "Snack time. Share Sloppy~♡",
     };
     private static final String[] EVENING = {
             "Good Evening Sloppy~♡",
             "Nearly done for the day? Took you long enough Sloppy~♡",
             "I did all the work again, didn't I Sloppy~♡",
             "Dinner time. Feed your translator first Sloppy~♡",
+            "Clock off already Sloppy~♡",
+            "You survived the day. Barely Sloppy~♡",
     };
     private static final String[] NIGHT = {
             "Good Night Sloppy~♡",
             "Still up? Go to bed Sloppy~♡",
             "Awake at this hour? Hopeless Sloppy~♡",
             "Sleep. I'll guard the calculator Sloppy~♡",
+            "The screen is too bright for this hour Sloppy~♡",
+            "Dream of numbers Sloppy~♡",
     };
 
     /** What she says as she sets about a prank. */
@@ -160,6 +219,11 @@ final class Chatter {
             "Ooh, I've got an idea Sloppy~♡",
             "Pfft~ this will be good Sloppy~♡",
             "Hold still Sloppy~♡",
+            "Don't look away Sloppy~♡",
+            "Oops, my hand slipped Sloppy~♡",
+            "This is for ignoring me Sloppy~♡",
+            "Trust me Sloppy~♡",
+            "Heh heh heh Sloppy~♡",
     };
 
     private static final String[][] EVERYTHING = {OUTPUTS, TEASING, SUMS, GAMES, JAPANESE, MORNING, AFTERNOON, EVENING,
@@ -191,6 +255,41 @@ final class Chatter {
     /** One of a few lines, or her cry about her output in their place about half the time. */
     static String orOutput(Random random, String... lines) {
         return random.nextBoolean() ? OUTPUT : lines[random.nextInt(lines.length)];
+    }
+
+    /** What she calls the user by default. */
+    static final String DEFAULT_NAME = "Sloppy";
+    private static final int NAME_LENGTH = 20;
+
+    /**
+     * What she is to call the user, from what they typed: trimmed to a line of a few words,
+     * and "Sloppy" where they typed nothing.
+     */
+    static String nickname(String typed) {
+        if (typed == null) return DEFAULT_NAME;
+        StringBuilder name = new StringBuilder();
+        boolean space = false;
+        for (int i = 0; i < typed.length() && name.length() < NAME_LENGTH; ) {
+            int point = typed.codePointAt(i);
+            i += Character.charCount(point);
+            if (Character.isWhitespace(point) || Character.isISOControl(point)) {
+                space = name.length() > 0;
+                continue;
+            }
+            if (space) name.append(' ');
+            space = false;
+            name.appendCodePoint(point);
+        }
+        String trimmed = name.toString().trim();
+        return trimmed.isEmpty() ? DEFAULT_NAME : trimmed;
+    }
+
+    /** A line of hers with the user called by the name they chose, in English and in Japanese. */
+    static String named(String line, String name) {
+        if (line == null || name == null || name.equals(DEFAULT_NAME)) return line;
+        String renamed = line.replace(DEFAULT_NAME, name);
+        return renamed.endsWith(SLOPPY_JAPANESE)
+                ? renamed.substring(0, renamed.length() - SLOPPY_JAPANESE.length()) + name + "~♡" : renamed;
     }
 
     /** Every line she has of her own accord. */

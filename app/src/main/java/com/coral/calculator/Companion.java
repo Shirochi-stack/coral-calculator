@@ -585,7 +585,6 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     }
 
     private void toggle(boolean calculator) {
-        closeBubble();
         if (calculator) {
             // Whichever of the two is open, the touch that would open the calculator closes it.
             if (panel != null) {
@@ -646,6 +645,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (!add(holder, menuParams)) return;
         menu = holder;
         makeRoom();
+        moveBubble();
         appear(card);
         handler.postDelayed(closeMenu, MENU_MS);
     }
@@ -675,6 +675,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (menu == null) return;
         remove(menu);
         menu = null;
+        moveBubble();
         // Not at once: the mini calculator may be about to open in the menu's place.
         handler.post(stepBack);
         wake();
@@ -684,7 +685,6 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private void openPanel(boolean games) {
         closeMenu();
         closePanel();
-        closeBubble();
         if (sprite == null) return;
         Rect bounds = bounds();
         float density = ui.getResources().getDisplayMetrics().density;
@@ -739,6 +739,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         panel = holder;
         panelGames = games;
         makeRoom();
+        moveBubble();
         pose();
         appear(content);
         if (games) return;
@@ -757,7 +758,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
      */
     private boolean onOwnWindow(float x, float y) {
         if (x == 0 && y == 0) return false;
-        return within(spriteParams, x, y) || (menu != null && within(menuParams, x, y));
+        return within(spriteParams, x, y) || (menu != null && within(menuParams, x, y))
+                || (bubble != null && within(bubbleParams, x, y));
     }
 
     private static boolean within(WindowManager.LayoutParams window, float x, float y) {
@@ -771,6 +773,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         remove(panel);
         panel = null;
         calculator = null;
+        moveBubble();
         // Not at once: it may be about to open again, redrawn for a new setting or screen.
         handler.post(stepBack);
         pose();
@@ -786,18 +789,20 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             place(panelParams, ((Holder) panel).inset);
             update(panel, panelParams);
         }
-        if (bubble != null) {
-            placeBubble();
-            update(bubble, bubbleParams);
-        }
+        moveBubble();
     }
 
     // What she says
 
-    /** Puts up a bubble over her head with something she has to say; a touch dismisses it. */
+    /**
+     * Puts up a bubble with something she has to say, its tail pointing at her. It stays for
+     * as long as it takes to read, through whatever is done to her meanwhile: tapped, held or
+     * dragged, she keeps talking. Only a touch on the bubble itself sends it away early.
+     */
     private void say(String words) {
         closeBubble();
         if (sprite == null) return;
+        words = prefs.named(words);
         boolean dark = dark();
         TextView text = new TextView(ui);
         text.setText(words);
@@ -809,15 +814,18 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         text.setBackground(cardBackground(dark, dp(16)));
         text.setContentDescription("Halgakos says: " + words);
         text.setOnClickListener(v -> closeBubble());
-        Holder holder = new Holder(ui, text, dp(10));
-        Rect span = span();
-        holder.measure(View.MeasureSpec.makeMeasureSpec(Math.min(dp(236), span.width()) + holder.inset * 2, View.MeasureSpec.AT_MOST),
+        Speech speech = new Speech(ui, text, dark ? 0xFF1D2023 : Color.WHITE, dark ? 0xFF34383C : 0xFFE4E4E4, dp(8));
+        speech.measure(View.MeasureSpec.makeMeasureSpec(Math.min(dp(236), span().width()), View.MeasureSpec.AT_MOST),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-        bubbleParams = overlay(holder.getMeasuredWidth(), holder.getMeasuredHeight(), POPUP_FLAGS);
+        // The window is no bigger than the bubble and its tail: it has no margin to lie over her.
+        bubbleParams = overlay(speech.getMeasuredWidth(), speech.getMeasuredHeight(), POPUP_FLAGS);
         bubbleParams.setTitle("Halgakos says");
-        placeBubble(holder.inset);
-        if (!add(holder, bubbleParams)) return;
-        bubble = holder;
+        bubble = speech;
+        placeBubble();
+        if (!add(speech, bubbleParams)) {
+            bubble = null;
+            return;
+        }
         appear(text);
         wake();
         handler.postDelayed(closeBubble, BUBBLE_MS + BUBBLE_LETTER_MS * words.length());
@@ -830,28 +838,42 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         bubble = null;
     }
 
-    private void placeBubble() { placeBubble(((Holder) bubble).inset); }
+    /** Puts the bubble where it belongs now that she, her menu or her card has moved, come or gone. */
+    private void moveBubble() {
+        if (bubble == null) return;
+        placeBubble();
+        update(bubble, bubbleParams);
+    }
 
-    /** Over her head, or under her feet where there is no room above; never off the screen. */
-    private void placeBubble(int inset) {
+    /** What is seen of a popup's window: the card, without the margin for its shadow. */
+    private static Rect seen(WindowManager.LayoutParams window, int inset) {
+        return new Rect(window.x + inset, window.y + inset, window.x + window.width - inset, window.y + window.height - inset);
+    }
+
+    /**
+     * Over her head, or under her feet where there is no room above, and never on top of
+     * her, her menu, the mini calculator or her games: where one of those stands in the
+     * bubble's column, the bubble goes over the top of it, or under it.
+     */
+    private void placeBubble() {
         Rect span = span();
-        int width = bubbleParams.width - inset * 2, height = bubbleParams.height - inset * 2, gap = dp(2);
-        int x = spriteParams.x + spriteParams.width / 2 - width / 2;
-        int y = spriteParams.y + pad - gap - height;
-        if (y < span.top) y = spriteParams.y + spriteParams.height - pad + gap;
-        x = Math.max(span.left, Math.min(span.right - width, x));
-        y = Math.max(span.top, Math.min(span.bottom - height, y));
-        if (panel != null) {
-            // Clear of the mini calculator or the games: over the top of the card, or under it.
-            int inner = ((Holder) panel).inset;
-            int left = panelParams.x + inner, top = panelParams.y + inner;
-            int right = panelParams.x + panelParams.width - inner, bottom = panelParams.y + panelParams.height - inner;
-            if (x < right && x + width > left && y < bottom && y + height > top) {
-                y = top - dp(6) - height >= span.top ? top - dp(6) - height : Math.min(span.bottom - height, bottom + dp(6));
-            }
+        int width = bubbleParams.width, height = bubbleParams.height;
+        Rect her = new Rect(spriteParams.x + pad, spriteParams.y + pad,
+                spriteParams.x + spriteParams.width - pad, spriteParams.y + spriteParams.height - pad);
+        int x = Math.max(span.left, Math.min(span.right - width, her.centerX() - width / 2));
+        int top = her.top, bottom = her.bottom;
+        Rect[] others = {menu == null ? null : seen(menuParams, ((Holder) menu).inset),
+                panel == null ? null : seen(panelParams, ((Holder) panel).inset)};
+        for (Rect other : others) {
+            if (other == null || other.left >= x + width || other.right <= x) continue;
+            top = Math.min(top, other.top);
+            bottom = Math.max(bottom, other.bottom);
         }
-        bubbleParams.x = x - inset;
-        bubbleParams.y = y - inset;
+        // Above unless only below has the room.
+        boolean above = top - height >= span.top || bottom + height > span.bottom;
+        bubbleParams.x = x;
+        bubbleParams.y = above ? Math.max(span.top, top - height) : bottom;
+        ((Speech) bubble).setTail(her.centerX() - x, !above);
     }
 
     // The whole screen: her games that are played all over it, and her pranks
@@ -1105,6 +1127,53 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     private interface Outside {
         void touched(float x, float y);
+    }
+
+    /** Something she says: a card of words, with a tail that points at her from above or below. */
+    private static final class Speech extends FrameLayout {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Path tail = new android.graphics.Path();
+        private final int fill, edge, reach;
+        private float tailX;
+        private boolean tailUp;
+
+        /** @param reach how far the tail reaches out of the card toward her */
+        Speech(Context context, View words, int fill, int edge, int reach) {
+            super(context);
+            this.fill = fill;
+            this.edge = edge;
+            this.reach = reach;
+            setWillNotDraw(false);
+            // Room for the tail on both sides, so the bubble is one size whichever way it points.
+            setPadding(0, reach, 0, reach);
+            addView(words, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        }
+
+        /** @param x where she is, across this bubble; @param up she is above it, not below */
+        void setTail(float x, boolean up) {
+            tailX = x;
+            tailUp = up;
+            invalidate();
+        }
+
+        @Override protected void dispatchDraw(Canvas canvas) {
+            super.dispatchDraw(canvas);
+            float half = reach * .85f;
+            float x = Math.max(half * 2.2f, Math.min(getWidth() - half * 2.2f, tailX));
+            // The base sits just inside the card, over its border, so the two read as one shape.
+            float base = tailUp ? reach + 1.5f : getHeight() - reach - 1.5f, tip = tailUp ? 1 : getHeight() - 1;
+            tail.reset();
+            tail.moveTo(x - half, base);
+            tail.lineTo(x, tip);
+            tail.lineTo(x + half, base);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(fill);
+            canvas.drawPath(tail, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(1);
+            paint.setColor(edge);
+            canvas.drawPath(tail, paint);
+        }
     }
 
     /** A popup's window: the card, with room around it for the shadow it casts. */

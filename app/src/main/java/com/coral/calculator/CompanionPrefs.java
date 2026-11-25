@@ -29,6 +29,9 @@ final class CompanionPrefs {
     static final String CHATTER = "chatter";
     /** Left idle, she plays a prank over whatever is on screen every so often, without being asked. */
     static final String PRANKS = "pranks";
+    /** What she calls the user, in place of "Sloppy". */
+    static final String NICKNAME = "nickname";
+    static final int NICKNAME_LENGTH = 20;
     static final String SIZE = "size";
     /** Position as a share of the room she has to move in, so it survives a change of screen. */
     static final String X = "x";
@@ -59,6 +62,14 @@ final class CompanionPrefs {
     float x() { return clamp(preferences.getFloat(X, 1f)); }
     float y() { return clamp(preferences.getFloat(Y, .58f)); }
     boolean offered() { return preferences.getBoolean(OFFERED, false); }
+
+    /** What she calls the user: "Sloppy" unless they gave her another name. */
+    String nickname() { return Chatter.nickname(preferences.getString(NICKNAME, null)); }
+
+    void setNickname(String name) { preferences.edit().putString(NICKNAME, Chatter.nickname(name)).apply(); }
+
+    /** A line of hers, with the user called what they asked to be called. */
+    String named(String line) { return Chatter.named(line, nickname()); }
 
     void set(String key, boolean value) { preferences.edit().putBoolean(key, value).apply(); }
     void setSize(int size) { preferences.edit().putInt(SIZE, size).apply(); }

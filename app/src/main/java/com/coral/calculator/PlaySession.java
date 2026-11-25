@@ -42,6 +42,7 @@ final class PlaySession {
     private static PlaySession instance;
 
     private final SharedPreferences preferences;
+    private final CompanionPrefs names;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
     private final List<Listener> listeners = new ArrayList<>();
@@ -74,6 +75,7 @@ final class PlaySession {
 
     private PlaySession(Context context) {
         preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
+        names = new CompanionPrefs(context);
     }
 
     void addListener(Listener listener) {
@@ -100,7 +102,8 @@ final class PlaySession {
 
     int game() { return game; }
 
-    String line() { return line; }
+    /** What she is saying, with the user called by the name they chose. */
+    String line() { return names.named(line); }
 
     /** A tally kept between rounds, such as {@code tic_won} or {@code sums_best}; 0 if none. */
     int tally(String key) { return preferences.getInt(key, 0); }
@@ -208,7 +211,7 @@ final class PlaySession {
             case TicTacToe.PLAYER:
                 count("tic_won");
                 // Losing is when her cry about her output comes out.
-                say(Chatter.OUTPUT + " …You win Sloppy~♡", "Three in a row?! " + Chatter.OUTPUT,
+                say("Where did my output go?! …You win Sloppy~♡", "Three in a row?! " + Chatter.OUTPUT,
                         "Tch. Beginner's luck Sloppy~♡", "Hmph. I let you have that one Sloppy~♡");
                 mood(false);
                 break;
