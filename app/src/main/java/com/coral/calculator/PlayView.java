@@ -42,9 +42,15 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
     private static final int NOT_SHOWN = -1;
     private static final long TICK_MS = 100;
     private static final String[] HANDS = {CompanionIcon.ROCK, CompanionIcon.PAPER, CompanionIcon.SCISSORS};
-    /** The menu's tiles, in the order of the games in {@link PlaySession}. */
+    /** The menu's tiles, two to a row: the games they open, and their pictures. */
+    private static final int[] TILE_GAMES = {PlaySession.TIC, PlaySession.RPS, PlaySession.PAIRS, PlaySession.SUMS,
+            PlaySession.CHESS, PlaySession.MINES, PlaySession.TAG, PlaySession.RAIN, PlaySession.ORDER, PlaySession.PRANK};
     private static final String[] TILE_ICONS = {CompanionIcon.GRID, CompanionIcon.SCISSORS, CompanionIcon.CARDS,
-            CompanionIcon.SUMS, CompanionIcon.TARGET, CompanionIcon.RAIN, CompanionIcon.BUBBLES, CompanionIcon.SPARK};
+            CompanionIcon.SUMS, CompanionIcon.PAWN, CompanionIcon.MINE, CompanionIcon.TARGET, CompanionIcon.RAIN,
+            CompanionIcon.BUBBLES, CompanionIcon.SPARK};
+    /** The chess pieces from pawn to king, as the solid figures of the chess symbols, kept from turning into emoji. */
+    private static final String[] CHESSMEN = {"", "♟︎", "♞︎", "♝︎", "♜︎", "♛︎", "♚︎"};
+    private static final String[] CHESSMEN_NAMES = {"", "pawn", "knight", "bishop", "rook", "queen", "king"};
 
     private final PlaySession session;
     private final float unit;
@@ -155,9 +161,10 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
             clock = () -> {};
             body.removeAllViews();
             View content = game == PlaySession.TIC ? ticTacToe() : game == PlaySession.RPS ? rockPaperScissors()
-                    : game == PlaySession.PAIRS ? pairs() : game == PlaySession.SUMS ? sums() : menu();
+                    : game == PlaySession.PAIRS ? pairs() : game == PlaySession.SUMS ? sums()
+                    : game == PlaySession.CHESS ? chess() : menu();
             body.addView(content, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            title.setText(PlaySession.NAMES[game]);
+            title.setText(PlaySession.name(game));
             back.setVisibility(game == PlaySession.MENU ? GONE : VISIBLE);
         }
         speech.setText(session.line());
@@ -175,7 +182,7 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
 
     // The menu of games
 
-    /** Eight tiles: four games played on this card, three all over the screen, and her pranks. */
+    /** Ten tiles: five games played on this card, four all over the screen, and her pranks. */
     private View menu() {
         LinearLayout grid = new LinearLayout(getContext());
         grid.setOrientation(VERTICAL);
@@ -183,32 +190,34 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
         for (int row = 0; row < TILE_ICONS.length / 2; row++) {
             LinearLayout line = new LinearLayout(getContext());
             for (int column = 0; column < 2; column++) {
-                int index = row * 2 + column, game = index + 1;
+                int index = row * 2 + column, game = TILE_GAMES[index];
+                // Its picture to the left, its name over a line about it to the right.
                 LinearLayout tile = new LinearLayout(getContext());
-                tile.setOrientation(VERTICAL);
-                tile.setGravity(Gravity.CENTER);
-                tile.setPadding(px(4), 0, px(4), 0);
-                tile.setBackground(tile(key, 14));
+                tile.setGravity(Gravity.CENTER_VERTICAL);
+                tile.setPadding(px(9), 0, px(6), 0);
+                tile.setBackground(tile(key, 13));
                 tile.addView(new CompanionIcon(getContext(), TILE_ICONS[index], CalculatorLayout.CORAL, 1f),
-                        new LayoutParams(px(21), px(21)));
-                TextView name = text(PlaySession.NAMES[game], 11.5f, ink, true);
-                name.setGravity(Gravity.CENTER);
+                        new LayoutParams(px(20), px(20)));
+                LinearLayout words = column();
+                TextView name = text(PlaySession.name(game), 11.5f, ink, true);
                 name.setMaxLines(1);
                 // The longest name gives up a little of its size to stay on one line.
                 name.setAutoSizeTextTypeUniformWithConfiguration(px(8), px(11.5f), Math.max(1, px(.5f)),
                         TypedValue.COMPLEX_UNIT_PX);
-                LayoutParams nameParams = new LayoutParams(LayoutParams.MATCH_PARENT, px(15));
-                nameParams.topMargin = px(3);
-                tile.addView(name, nameParams);
+                name.setGravity(Gravity.CENTER_VERTICAL);
+                words.addView(name, new LayoutParams(LayoutParams.MATCH_PARENT, px(15)));
                 notes[index] = text("", 9.5f, muted, false);
-                notes[index].setGravity(Gravity.CENTER);
                 notes[index].setMaxLines(1);
-                LayoutParams noteParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+                notes[index].setEllipsize(TextUtils.TruncateAt.END);
+                LayoutParams noteParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
                 noteParams.topMargin = px(1);
-                tile.addView(notes[index], noteParams);
+                words.addView(notes[index], noteParams);
+                LayoutParams wordsParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
+                wordsParams.leftMargin = px(7);
+                tile.addView(words, wordsParams);
                 tile.setFocusable(true);
                 tap(tile, () -> {
-                    if (game >= PlaySession.TAG) host.onStage(game); else session.open(game);
+                    if (PlaySession.onCard(game)) session.open(game); else host.onStage(game);
                 });
                 LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1);
                 if (column > 0) params.leftMargin = px(GAP);
@@ -219,25 +228,165 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
             grid.addView(line, params);
         }
         updater = () -> {
-            notes[0].setText(record(session.tally("tic_won"), session.tally("tic_lost"), session.tally("tic_drawn")));
-            notes[1].setText(record(session.tally("rps_won"), session.tally("rps_lost"), 0));
-            notes[2].setText(best("pairs_best", " turns", "On this card"));
-            notes[3].setText(best("sums_best", " right", "On this card"));
-            notes[4].setText(best("tag_best", " caught", "Whole screen"));
-            notes[5].setText(best("rain_best", " caught", "Whole screen"));
-            int tenths = session.tally("order_best");
-            notes[6].setText(tenths == 0 ? "Whole screen" : "Best: " + PlayStage.seconds(tenths) + "s");
-            notes[7].setText("Whole screen");
             for (int index = 0; index < notes.length; index++) {
-                ((View) notes[index].getParent()).setContentDescription(
-                        PlaySession.NAMES[index + 1] + ". " + notes[index].getText());
+                notes[index].setText(note(TILE_GAMES[index]));
+                ((View) notes[index].getParent().getParent()).setContentDescription(
+                        PlaySession.name(TILE_GAMES[index]) + ". " + notes[index].getText());
             }
         };
         return grid;
     }
 
+    /** The line under a game's name on its tile: how the player has done at it, or where it is played. */
+    private String note(int game) {
+        switch (game) {
+            case PlaySession.TIC: return record(session.tally("tic_won"), session.tally("tic_lost"), session.tally("tic_drawn"));
+            case PlaySession.RPS: return record(session.tally("rps_won"), session.tally("rps_lost"), 0);
+            case PlaySession.CHESS: return record(session.tally("chess_won"), session.tally("chess_lost"), session.tally("chess_drawn"));
+            case PlaySession.PAIRS: return best("pairs_best", " turns", "On this card");
+            case PlaySession.SUMS: return best("sums_best", " right", "On this card");
+            case PlaySession.TAG: return best("tag_best", " caught", "Whole screen");
+            case PlaySession.RAIN: return best("rain_best", " caught", "Whole screen");
+            case PlaySession.ORDER: {
+                int tenths = session.tally("order_best");
+                return tenths == 0 ? "Whole screen" : "Best: " + PlayStage.seconds(tenths) + "s";
+            }
+            case PlaySession.MINES: {
+                int seconds = session.tally("mines_best");
+                return seconds == 0 ? "Whole screen" : "Best: " + PlayStage.clock(seconds);
+            }
+            default: return "Whole screen";
+        }
+    }
+
     private static String record(int won, int lost, int drawn) {
         return won + lost + drawn == 0 ? "On this card" : "Won " + won + " · Lost " + lost;
+    }
+
+    // Chess
+
+    private View chess() {
+        LinearLayout root = column();
+        ChessBoard board = new ChessBoard(getContext());
+        FrameLayout stage = new FrameLayout(getContext());
+        stage.addView(board, new FrameLayout.LayoutParams(px(224), px(224), Gravity.CENTER));
+        root.addView(stage, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1));
+        // A lower row than the other games have: the board needs the height.
+        TextView note = footnote();
+        note.setMaxLines(1);
+        TextView again = button("");
+        tap(again, session::chessAgain);
+        LinearLayout footer = new LinearLayout(getContext());
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        footer.addView(note, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
+        footer.addView(again, new LayoutParams(LayoutParams.WRAP_CONTENT, px(26)));
+        LayoutParams footerParams = new LayoutParams(LayoutParams.MATCH_PARENT, px(28));
+        footerParams.topMargin = px(4);
+        root.addView(footer, footerParams);
+        updater = () -> {
+            Chess game = session.chess();
+            if (game == null) return;
+            boolean over = game.result() != Chess.ONGOING;
+            board.refresh();
+            board.setContentDescription("Chess board. You have white. " + (over ? "The game is over."
+                    : session.chessHerTurn() ? "Halgakos is thinking." : "Your move."));
+            note.setText("Won " + session.tally("chess_won") + " · Lost " + session.tally("chess_lost")
+                    + " · Drawn " + session.tally("chess_drawn"));
+            style(again, over ? "Play again" : "Restart", over);
+        };
+        return root;
+    }
+
+    /** The chess board: white at the bottom, the player's. A touch picks a piece up, and another puts it down. */
+    private final class ChessBoard extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint figure = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int light = dark ? 0xFF4B5157 : 0xFFF6ECEA, deep = dark ? 0xFF7A4149 : 0xFFEFA5AB;
+        /** The squares the piece in hand may go to. */
+        private int[] goals = {};
+
+        /** Brings the board up to date with the game. */
+        void refresh() {
+            Chess game = session.chess();
+            int picked = session.chessPicked();
+            goals = game == null || picked == PlaySession.NO_SQUARE ? new int[0] : game.goals(picked);
+            invalidate();
+        }
+
+        ChessBoard(Context context) {
+            super(context);
+            figure.setTextAlign(Paint.Align.CENTER);
+            figure.setStrokeJoin(Paint.Join.ROUND);
+            setBackground(round(light, 8));
+            setClipToOutline(true);
+            setFocusable(true);
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            Chess game = session.chess();
+            if (game == null) return;
+            float side = getWidth() / 8f;
+            int picked = session.chessPicked(), last = game.lastMove();
+            int checked = game.inCheck() ? game.king() : PlaySession.NO_SQUARE;
+            figure.setTextSize(side * .8f);
+            float baseline = side / 2 - (figure.ascent() + figure.descent()) / 2;
+            for (int square = 0; square < 64; square++) {
+                float left = (square & 7) * side, top = (square >> 3) * side;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(((square >> 3) + (square & 7)) % 2 == 0 ? light : deep);
+                canvas.drawRect(left, top, left + side, top + side, paint);
+                // The move just made, the piece in hand, and a king in check are each lit.
+                int wash = square == checked ? 0x99FF2D38 : square == picked ? 0x80FFD24A
+                        : last != Chess.NO_MOVE && (square == Chess.from(last) || square == Chess.to(last)) ? 0x55FFD24A : 0;
+                if (wash != 0) {
+                    paint.setColor(wash);
+                    canvas.drawRect(left, top, left + side, top + side, paint);
+                }
+                int piece = game.at(square);
+                if (piece != 0) {
+                    // One figure for both sides: white's filled white with a dark edge, black's dark with a light one.
+                    String man = CHESSMEN[Math.abs(piece)];
+                    figure.setStyle(Paint.Style.STROKE);
+                    figure.setStrokeWidth(side * (piece > 0 ? .09f : .05f));
+                    figure.setColor(piece > 0 ? 0xFF2B2628 : 0xFFF4F0F0);
+                    canvas.drawText(man, left + side / 2, top + baseline, figure);
+                    figure.setStyle(Paint.Style.FILL);
+                    figure.setColor(piece > 0 ? Color.WHITE : 0xFF2B2628);
+                    canvas.drawText(man, left + side / 2, top + baseline, figure);
+                }
+            }
+            // Where the piece in hand may go: a dot on an empty square, a ring round a piece it would take.
+            for (int goal : goals) {
+                float x = (goal & 7) * side + side / 2, y = (goal >> 3) * side + side / 2;
+                paint.setColor(0xCCFF393F);
+                if (game.at(goal) == 0) {
+                    paint.setStyle(Paint.Style.FILL);
+                    canvas.drawCircle(x, y, side * .15f, paint);
+                } else {
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(side * .09f);
+                    canvas.drawCircle(x, y, side * .42f, paint);
+                }
+            }
+        }
+
+        @Override public boolean onTouchEvent(android.view.MotionEvent event) {
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_UP && getWidth() > 0) {
+                int file = (int) (event.getX() * 8 / getWidth()), row = (int) (event.getY() * 8 / getHeight());
+                if (file >= 0 && file < 8 && row >= 0 && row < 8) {
+                    if (haptics) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                    performClick();
+                    Chess game = session.chess();
+                    int piece = game == null ? 0 : game.at(row * 8 + file);
+                    announceForAccessibility((char) ('a' + file) + String.valueOf(8 - row)
+                            + (piece == 0 ? "" : (piece > 0 ? ", white " : ", black ") + CHESSMEN_NAMES[Math.abs(piece)]));
+                    session.chessTap(row * 8 + file);
+                }
+            }
+            return true;
+        }
+
+        @Override public boolean performClick() { return super.performClick(); }
     }
 
     private String best(String key, String unit, String unplayed) {

@@ -116,6 +116,21 @@ final class PlayStage extends View {
     // Bubble count: each bubble is x, y, x speed, y speed, its number, and how long it flashes.
     private final List<float[]> bubbles = new ArrayList<>();
 
+    // Minesweeper: the field, the size of a square and where the field's corner is, and how the touch on it stands.
+    private static final long HOLD_MS = 320;
+    private static final int[] NUMBER_COLOURS = {0, 0xFF2F7DE1, 0xFF2E9E5B, 0xFFFF393F, 0xFF8257D8, 0xFFC0562F, 0xFF1E9AA6, 0xFF7A7F84, 0xFF7A7F84};
+    private Mines field;
+    private float square, fieldX, fieldY;
+    /** A tap plants a flag, and does not open the square. */
+    private boolean flagging;
+    private final RectF flagButton = new RectF();
+    private int pressed = Mines.NONE;
+    private float pressX, pressY;
+    private boolean planted, digging;
+    /** How much longer the field is left on show, mines and all, before the card comes up. */
+    private float showing;
+    private final Runnable plant = this::plant;
+
     // Pranks
     private int step;
     private float stepClock;
@@ -192,7 +207,7 @@ final class PlayStage extends View {
         setDefaultFocusHighlightEnabled(false);
         setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);
         setContentDescription(isPrank(game) ? "Halgakos is playing a prank. Tap to end it"
-                : PlaySession.NAMES[game] + ", on the whole screen");
+                : PlaySession.name(game) + ", on the whole screen");
         names = new CompanionPrefs(context);
         if (game == GIANT) {
             // Her frames are small: blown up to the size of the screen they would be a blur.
@@ -243,7 +258,7 @@ final class PlayStage extends View {
         }
     }
 
-    static boolean isPrank(int game) { return game >= SNATCH; }
+    static boolean isPrank(int game) { return game >= SNATCH && game <= BUG; }
 
     /** The pranks she has yet to play this time round, in the order she will play them. */
     private static final List<Integer> NEXT_PRANKS = new ArrayList<>();
@@ -305,6 +320,7 @@ final class PlayStage extends View {
             started = true;
             begin();
         } else {
+            fitField();
             herX = clamp(herX, play.left + herWidth / 2, play.right - herWidth / 2);
             herY = clamp(herY, play.top + herHeight, play.bottom);
             if (game == PlaySession.RAIN) {
@@ -492,6 +508,7 @@ final class PlayStage extends View {
             prank(seconds);
         } else if (phase == PLAYING) {
             if (game == PlaySession.TAG) tag(seconds);
+            else if (game == PlaySession.MINES) mines(seconds);
             else if (game == PlaySession.RAIN) rain(seconds);
             else bubbles(seconds);
         } else if (card.isEmpty() || runTo(clamp(card.left + herWidth * .65f, play.left + herWidth / 2, play.right - herWidth / 2),
@@ -822,6 +839,119 @@ final class PlayStage extends View {
 
     static String seconds(int tenths) { return tenths / 10 + "." + tenths % 10; }
 
+    /** A length of time in minutes and seconds, as a clock shows it. */
+    static String clock(int seconds) { return seconds / 60 + ":" + (seconds % 60 < 10 ? "0" : "") + seconds % 60; }
+
+    // Minesweeper
+
+    /** Lays out a new field: as many squares as fit the screen at a size a finger can hit, between the bar on top and her below. */
+    private void newField() {
+        float room = play.height() - dp(64) - herHeight - dp(18), across = play.width() - dp(16);
+        int columns = Math.max(6, Math.min(24, (int) (across / dp(40)))), rows = Math.max(6, Math.min(30, (int) (room / dp(40))));
+        field = new Mines(columns, rows, Mines.fair(columns, rows));
+        flagging = false;
+        digging = false;
+        showing = 0;
+        pressed = Mines.NONE;
+        removeCallbacks(plant);
+        fitField();
+    }
+
+    /** Fits the field to the room there is: at first, and again when the screen turns or folds. */
+    private void fitField() {
+        if (field == null) return;
+        float room = play.height() - dp(64) - herHeight - dp(18), across = play.width() - dp(16);
+        square = Math.max(dp(14), Math.min(across / field.columns, room / field.rows));
+        fieldX = play.centerX() - square * field.columns / 2;
+        fieldY = play.top + dp(64) + Math.max(0, room - square * field.rows) / 2;
+    }
+
+    private void mines(float seconds) {
+        // She waits under the field, on her own side of the screen.
+        float x = clamp(homeX, play.left + herWidth / 2 + dp(8), play.right - herWidth / 2 - dp(8));
+        if (runTo(x, play.bottom - dp(6), dp(760), seconds)) keep(PetArt.IDLE);
+        if (digging && field.state() == Mines.PLAYING) elapsed += seconds;
+        if (showing > 0 && (showing -= seconds) <= 0) {
+            int time = Math.max(1, Math.round(elapsed));
+            if (field.state() == Mines.WON) {
+                boolean record = session.keepBest("mines_best", time, true);
+                finish("Field cleared!", "All " + field.mines + " mines found in " + clock(time) + (record ? ". A new best!" : "."));
+            } else {
+                finish("Boom!", "That was a mine. You lasted " + clock(time) + " among " + field.mines + " of them.");
+            }
+        }
+    }
+
+    private int squareAt(float x, float y) {
+        if (field == null || x < fieldX || y < fieldY) return Mines.NONE;
+        int column = (int) ((x - fieldX) / square), row = (int) ((y - fieldY) / square);
+        return column < field.columns && row < field.rows ? row * field.columns + column : Mines.NONE;
+    }
+
+    private void minesTouch(int action, float x, float y) {
+        if (field == null || showing > 0 || field.state() != Mines.PLAYING) return;
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                if (flagButton.contains(x, y)) {
+                    buzz();
+                    flagging = !flagging;
+                    say(flagging ? "Flags now. Careful where Sloppy~♡" : "Digging again. Brave Sloppy~♡", 1.2f);
+                    return;
+                }
+                pressed = squareAt(x, y);
+                pressX = x;
+                pressY = y;
+                planted = false;
+                removeCallbacks(plant);
+                if (pressed != Mines.NONE) postDelayed(plant, HOLD_MS);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                // A finger that wanders off was not a touch on that square.
+                if (pressed != Mines.NONE && Math.hypot(x - pressX, y - pressY) > dp(14)) {
+                    removeCallbacks(plant);
+                    pressed = Mines.NONE;
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                removeCallbacks(plant);
+                if (pressed != Mines.NONE && !planted) {
+                    buzz();
+                    if (flagging && !field.isOpen(pressed)) field.flag(pressed); else dig(pressed);
+                }
+                pressed = Mines.NONE;
+                break;
+            default:
+                removeCallbacks(plant);
+                pressed = Mines.NONE;
+                break;
+        }
+    }
+
+    /** A finger held on a square plants a flag there, or takes one off. */
+    private void plant() {
+        if (field == null || pressed == Mines.NONE || phase != PLAYING) return;
+        planted = true;
+        if (field.flag(pressed) && haptics) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+    }
+
+    private void dig(int where) {
+        int opened = field.open(where, random);
+        if (opened > 0) digging = true;
+        if (field.state() == Mines.LOST) {
+            if (haptics) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            flash = .2f;
+            showing = 1.8f;
+            perform(PetArt.JUMP);
+            say(1.8f, "Boom! Pfft~ that was a mine Sloppy~♡", "Kaboom. I saw that coming Sloppy~♡", "Boom. So careless Sloppy~♡");
+        } else if (field.state() == Mines.WON) {
+            showing = 1.4f;
+            perform(PetArt.SAD);
+            say(1.4f, "Not one mine?! Hmph Sloppy~♡", "Tch. You cleared it Sloppy~♡");
+        } else if (opened >= 10) {
+            say(1.2f, "Ooh. Lucky Sloppy~♡", "Ehh~ all that at once Sloppy~♡");
+        }
+    }
+
     // Starting and ending a game
 
     private void play() {
@@ -838,6 +968,9 @@ final class PlayStage extends View {
             dash = 0;
             pickGoal();
             say(1.4f, "Catch me if you can Sloppy~♡", "You'll never catch me Sloppy~♡", "Too slow already Sloppy~♡");
+        } else if (game == PlaySession.MINES) {
+            newField();
+            say(1.6f, "Mind the mines Sloppy~♡", "One wrong tap and boom Sloppy~♡", "I know where they all are Sloppy~♡");
         } else if (game == PlaySession.RAIN) {
             score = 0;
             hearts = HEARTS;
@@ -1511,7 +1644,9 @@ final class PlayStage extends View {
             return true;
         }
         if (phase == PLAYING) {
-            if (game == PlaySession.RAIN) {
+            if (game == PlaySession.MINES) {
+                minesTouch(action, x, y);
+            } else if (game == PlaySession.RAIN) {
                 if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE)
                     wantedX = clamp(x, fieldLeft + herWidth / 2, fieldRight - herWidth / 2);
             } else if (action == MotionEvent.ACTION_DOWN) {
@@ -1562,6 +1697,8 @@ final class PlayStage extends View {
         canvas.drawColor(SCRIM);
         // The signs fall behind her; the bubbles drift in front, so she never hides one.
         if (phase == PLAYING && game == PlaySession.RAIN) drawRain(canvas);
+        if (game == PlaySession.MINES && field != null && phase != INTRO) drawField(canvas);
+        if (flash > 0) canvas.drawColor(Color.argb(Math.round(150 * Math.min(1, flash / .12f)), 255, 255, 255));
         drawHer(canvas);
         if (phase == PLAYING && game == PlaySession.ORDER) drawBubbles(canvas);
         for (float[] ring : rings) {
@@ -1575,7 +1712,9 @@ final class PlayStage extends View {
         drawSaying(canvas);
         drawHud(canvas);
         if (phase == INTRO) {
-            drawCard(canvas, PlaySession.NAMES[game], game == PlaySession.TAG
+            drawCard(canvas, PlaySession.name(game), game == PlaySession.MINES
+                    ? "Tap a square to open it: its number is how many mines touch it. Hold a square to flag a mine, or tap the flag button to flag with a tap. Open every square that has no mine."
+                    : game == PlaySession.TAG
                     ? "She runs all over your screen. Tap her as many times as you can in 30 seconds."
                     : game == PlaySession.RAIN
                     ? "Drag anywhere to move Halgakos. Catch each + and keep clear of each −. Three bumps and it's over."
@@ -1597,6 +1736,7 @@ final class PlayStage extends View {
         canvas.drawLine(exit.centerX() + arm, exit.centerY() - arm, exit.centerX() - arm, exit.centerY() + arm, stroke);
         if (phase != PLAYING) return;
         String status = game == PlaySession.TAG ? "Caught " + caught + "  ·  " + (int) Math.ceil(timeLeft) + "s"
+                : game == PlaySession.MINES ? clock(Math.round(elapsed)) + "  ·  " + (field == null ? 0 : field.left()) + " mines"
                 : game == PlaySession.RAIN ? "Caught " + score
                 : seconds(Math.round(elapsed * 10)) + "s  ·  " + bubbles.size() + " to go";
         text.setTextSize(dp(15));
@@ -1613,6 +1753,88 @@ final class PlayStage extends View {
                 paint.setColor(heart < hearts ? CalculatorLayout.CORAL : cardEdge);
                 canvas.drawCircle(box.right - dp(20) - dp(22) * (HEARTS - 1 - heart), box.centerY(), dp(7), paint);
             }
+        }
+        if (game == PlaySession.MINES) {
+            // The flag button: lit while a tap plants a flag.
+            flagButton.set(box.right + dp(8), box.top, box.right + dp(8) + size, box.bottom);
+            if (flagging) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(CalculatorLayout.CORAL);
+                canvas.drawRoundRect(flagButton, size / 2, size / 2, paint);
+            } else {
+                plate(canvas, flagButton, size / 2);
+            }
+            drawFlag(canvas, flagButton.centerX(), flagButton.centerY(), size * .8f, flagging ? Color.WHITE : ink,
+                    flagging ? Color.WHITE : CalculatorLayout.CORAL);
+        }
+    }
+
+    /** The minefield: shut squares stand proud, open ones lie flat with their numbers, and at the end every mine shows. */
+    private void drawField(Canvas canvas) {
+        boolean over = field.state() != Mines.PLAYING;
+        float gap = Math.max(1, square * .045f), round = square * .17f;
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTextSize(square * .56f);
+        float baseline = square / 2 - (text.ascent() + text.descent()) / 2;
+        for (int index = 0; index < field.columns * field.rows; index++) {
+            float left = fieldX + index % field.columns * square, top = fieldY + index / field.columns * square;
+            target.set(left + gap, top + gap, left + square - gap, top + square - gap);
+            boolean mine = over && field.isMine(index);
+            paint.setStyle(Paint.Style.FILL);
+            if (field.isOpen(index)) {
+                paint.setColor(dark ? 0xE6101214 : 0xE6DFE2E4);
+                canvas.drawRoundRect(target, round, round, paint);
+                int near = field.near(index);
+                if (near > 0) {
+                    text.setColor(near == 7 ? ink : NUMBER_COLOURS[near]);
+                    canvas.drawText(String.valueOf(near), left + square / 2, top + baseline, text);
+                }
+                continue;
+            }
+            paint.setColor(index == field.struck() ? CalculatorLayout.CORAL : index == pressed ? cardEdge : cardColor);
+            canvas.drawRoundRect(target, round, round, paint);
+            stroke.setColor(cardEdge);
+            stroke.setStrokeWidth(Math.max(1, dp(.75f)));
+            canvas.drawRoundRect(target, round, round, stroke);
+            if (mine && !(field.isFlagged(index) && field.state() == Mines.WON)) {
+                drawMine(canvas, left + square / 2, top + square / 2, square, index == field.struck() ? Color.WHITE : ink);
+            } else if (field.isFlagged(index)) {
+                drawFlag(canvas, left + square / 2, top + square / 2, square, ink, CalculatorLayout.CORAL);
+                // A flag that turned out to have no mine under it is crossed through.
+                if (over && !field.isMine(index)) {
+                    stroke.setColor(ink);
+                    stroke.setStrokeWidth(dp(1.6f));
+                    canvas.drawLine(target.left + round, target.top + round, target.right - round, target.bottom - round, stroke);
+                }
+            }
+        }
+    }
+
+    private void drawFlag(Canvas canvas, float x, float y, float size, int pole, int cloth) {
+        path.reset();
+        path.moveTo(x - size * .1f, y - size * .27f);
+        path.lineTo(x + size * .24f, y - size * .12f);
+        path.lineTo(x - size * .1f, y + size * .03f);
+        path.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(cloth);
+        canvas.drawPath(path, paint);
+        stroke.setColor(pole);
+        stroke.setStrokeWidth(Math.max(1.5f, size * .06f));
+        canvas.drawLine(x - size * .1f, y - size * .27f, x - size * .1f, y + size * .27f, stroke);
+        canvas.drawLine(x - size * .22f, y + size * .27f, x + size * .04f, y + size * .27f, stroke);
+    }
+
+    private void drawMine(Canvas canvas, float x, float y, float size, int color) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(color);
+        canvas.drawCircle(x, y, size * .19f, paint);
+        stroke.setColor(color);
+        stroke.setStrokeWidth(Math.max(1.5f, size * .06f));
+        for (int spike = 0; spike < 4; spike++) {
+            double turn = Math.PI * spike / 4;
+            float across = (float) Math.cos(turn) * size * .3f, down = (float) Math.sin(turn) * size * .3f;
+            canvas.drawLine(x - across, y - down, x + across, y + down, stroke);
         }
     }
 

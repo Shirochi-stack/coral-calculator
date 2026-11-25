@@ -108,12 +108,14 @@ On the card:
 - **Rock paper scissors.** First to three points takes the match.
 - **Pairs.** Sixteen cards hide eight pairs of a calculator's signs. Find them in as few turns as you can.
 - **Quick sums.** Thirty seconds of small calculations, each with four answers to choose from.
+- **Chess.** You have white and move first; she has black. Tap a piece, then tap where it goes: the squares it may move to are marked. Every rule is played, castling and capturing in passing included, and a pawn that reaches the last row becomes a queen. She looks three moves ahead.
 
 All over the screen, on top of whatever app you are in:
 
 - **Catch Halgakos.** She runs about the whole screen, faster each time she is caught. Tap her as often as you can in thirty seconds.
 - **Number rain.** Drag anywhere to move her along the bottom. Catch each **+** and keep clear of each **−**; three bumps end the round.
 - **Bubble count.** Ten numbered bubbles drift about. Pop them from the smallest to the largest; a wrong one costs two seconds.
+- **Minesweeper.** A minefield as large as the screen allows, with about one mine to every six or seven squares. Tap a square to open it, hold one to flag a mine, or switch the flag button on to flag with a tap. The first square you open is never a mine, and tapping an open number that has all its flags opens the rest round it. Your best time is kept.
 
 The **✕** in the corner, or Back, leaves one of these. They dim the app underneath and take its touches only while they are up.
 

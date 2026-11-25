@@ -27,6 +27,17 @@ final class PlaySession {
     static final int TAG = 5, RAIN = 6, ORDER = 7, PRANK = 8;
     static final String[] NAMES = {"Play with Halgakos", "Tic-tac-toe", "Rock paper scissors", "Pairs", "Quick sums",
             "Catch Halgakos", "Number rain", "Bubble count", "Prank me"};
+    /** Chess is played on the card and minesweeper all over the screen; they are numbered on from her pranks. */
+    static final int CHESS = 23, MINES = 24;
+    static final int NO_SQUARE = -1;
+    /** How many moves ahead she looks at chess, counting each side's. */
+    private static final int CHESS_AHEAD = 3;
+
+    /** What a game is called. */
+    static String name(int game) { return game == CHESS ? "Chess" : game == MINES ? "Minesweeper" : NAMES[game]; }
+
+    /** Whether a game is played on the card, and not all over the screen. */
+    static boolean onCard(int game) { return game == TIC || game == RPS || game == PAIRS || game == SUMS || game == CHESS; }
     /** Points that win a match of rock paper scissors. */
     static final int RPS_TARGET = 3;
     static final int SUMS_MS = 30_000;
@@ -67,6 +78,12 @@ final class PlaySession {
     private int sumsState = SUMS_READY;
     private int sumsScore;
     private long sumsDeadline;
+
+    private Chess chess;
+    private boolean chessHerTurn;
+    private int chessPicked = NO_SQUARE;
+    /** Which game of chess this is: a move she thought of for an earlier one is dropped. */
+    private int chessGame;
 
     static PlaySession get(Context context) {
         if (instance == null) instance = new PlaySession(context.getApplicationContext());
@@ -151,6 +168,11 @@ final class PlaySession {
                 if (sumsState == SUMS_READY) startSums();
                 else if (sumsState == SUMS_OVER) say("Think you can beat that? Cute Sloppy~♡", "Another thirty seconds Sloppy~♡");
                 else say("The clock is still running Sloppy~♡");
+                break;
+            case CHESS:
+                if (chess == null) startChess();
+                else if (chess.result() != Chess.ONGOING) say("Another game? You like losing Sloppy~♡", "Set them up again Sloppy~♡");
+                else say(chessHerTurn ? "Shh. I'm thinking Sloppy~♡" : "Still your move Sloppy~♡");
                 break;
             default:
                 say("What will you lose at today Sloppy~♡", "Pick one. I'm good at all of them Sloppy~♡", "Play with me Sloppy~♡",
@@ -377,5 +399,94 @@ final class PlaySession {
                 : sumsScore == 0 ? " Where did your output go Sloppy~♡" : sumsScore < 5 ? " So slow Sloppy~♡" : " Not bad Sloppy~♡");
         if (sumsScore > 0) mood(true);
         changed();
+    }
+
+    // Chess: the player has white and moves first; she has black
+
+    Chess chess() { return chess; }
+
+    boolean chessHerTurn() { return chessHerTurn; }
+
+    /** The square of the piece the player has picked up, or {@link #NO_SQUARE}. */
+    int chessPicked() { return chessPicked; }
+
+    private void startChess() {
+        chessGame++;
+        chess = new Chess();
+        chessHerTurn = false;
+        chessPicked = NO_SQUARE;
+        say("You're white. You'll need the head start Sloppy~♡", "Chess? Bold of you Sloppy~♡", "White moves first. Go on Sloppy~♡");
+    }
+
+    void chessAgain() {
+        startChess();
+        changed();
+    }
+
+    /** A touch on a square: it picks up one of the player's pieces, or moves the one picked up there. */
+    void chessTap(int square) {
+        if (chess == null || chessHerTurn || chess.result() != Chess.ONGOING) return;
+        int move = chessPicked == NO_SQUARE ? Chess.NO_MOVE : chess.move(chessPicked, square);
+        if (move == Chess.NO_MOVE) {
+            chessPicked = chess.at(square) > 0 && square != chessPicked ? square : NO_SQUARE;
+            changed();
+            return;
+        }
+        boolean took = chess.at(square) != 0;
+        chess.play(move);
+        chessPicked = NO_SQUARE;
+        if (chess.result() != Chess.ONGOING) {
+            finishChess();
+        } else {
+            chessHerTurn = true;
+            if (chess.inCheck()) say("Check? How rude Sloppy~♡", "Eek. Check Sloppy~♡");
+            else if (took) say("Hey! I was using that Sloppy~♡", "Tch. Give that back Sloppy~♡");
+            else say("Hmm~ let me think Sloppy~♡", "Ehh~? That move Sloppy~♡", "Pfft~ interesting choice Sloppy~♡");
+            think();
+        }
+        changed();
+    }
+
+    /** She thinks about her move away from the main thread, on a copy of the game, and then plays it. */
+    private void think() {
+        int game = chessGame;
+        Chess copy = chess.copy();
+        long began = SystemClock.uptimeMillis();
+        new Thread(() -> {
+            int move = copy.choose(new Random(), CHESS_AHEAD);
+            handler.postDelayed(() -> herChessMove(game, move), Math.max(0, HER_MOVE_MS - (SystemClock.uptimeMillis() - began)));
+        }, "halgakos-chess").start();
+    }
+
+    private void herChessMove(int game, int move) {
+        if (game != chessGame || chess == null || !chessHerTurn || move == Chess.NO_MOVE) return;
+        chessHerTurn = false;
+        boolean took = chess.at(Chess.to(move)) != 0;
+        chess.play(move);
+        if (chess.result() != Chess.ONGOING) finishChess();
+        else if (chess.inCheck()) say("Check Sloppy~♡", "Check. Run along Sloppy~♡");
+        else if (took) say("Yoink. Mine now Sloppy~♡", "Thanks for that one Sloppy~♡");
+        else say("Your move Sloppy~♡", "There. Top that Sloppy~♡", "Take your time Sloppy~♡");
+        changed();
+    }
+
+    private void finishChess() {
+        chessHerTurn = false;
+        switch (chess.result()) {
+            case Chess.WHITE_WINS:
+                count("chess_won");
+                say("Checkmate?! No way Sloppy~♡", "You win. Don't get used to it Sloppy~♡", "Hmph. I let you have that one Sloppy~♡");
+                mood(false);
+                break;
+            case Chess.BLACK_WINS:
+                count("chess_lost");
+                say("Checkmate. Too easy Sloppy~♡", "Checkmate. Obviously Sloppy~♡", "Got your king! Again Sloppy~♡");
+                mood(true);
+                break;
+            default:
+                count("chess_drawn");
+                say("A draw? Not bad for a Sloppy~♡", "Nobody wins. I'll allow it Sloppy~♡", "Tch. A draw Sloppy~♡");
+                break;
+        }
     }
 }

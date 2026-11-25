@@ -32,6 +32,8 @@ final class CompanionIcon extends View {
     static final String BUBBLES = "bubbles";
     static final String SPARK = "spark";
     static final String SPEECH = "speech";
+    static final String PAWN = "pawn";
+    static final String MINE = "mine";
     static final String NONE = "";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -183,6 +185,21 @@ final class CompanionIcon extends View {
             case SPEECH:
                 bounds.set(3, 4, 21, 17); canvas.drawRoundRect(bounds, 4, 4, paint);
                 path.moveTo(8, 17); path.lineTo(7, 21); path.lineTo(12, 17); canvas.drawPath(path, paint);
+                break;
+            case PAWN:
+                // A chess pawn: a head, a body that widens, and a foot.
+                canvas.drawCircle(12, 6.5f, 3.3f, paint);
+                path.moveTo(9.5f, 11); path.lineTo(14.5f, 11); path.lineTo(16.5f, 18); path.lineTo(7.5f, 18); path.close();
+                canvas.drawPath(path, paint);
+                canvas.drawLine(5.5f, 21, 18.5f, 21, paint);
+                break;
+            case MINE:
+                // A mine: a ball with spikes all round it.
+                canvas.drawCircle(12, 12, 5.5f, paint);
+                canvas.drawLine(12, 2.5f, 12, 5, paint); canvas.drawLine(12, 19, 12, 21.5f, paint);
+                canvas.drawLine(2.5f, 12, 5, 12, paint); canvas.drawLine(19, 12, 21.5f, 12, paint);
+                canvas.drawLine(5.3f, 5.3f, 7, 7, paint); canvas.drawLine(17, 17, 18.7f, 18.7f, paint);
+                canvas.drawLine(18.7f, 5.3f, 17, 7, paint); canvas.drawLine(7, 17, 5.3f, 18.7f, paint);
                 break;
             default: break;
         }
