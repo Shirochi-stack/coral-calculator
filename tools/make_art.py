@@ -10,7 +10,7 @@ kept in the Halgakos-Codex-Pet repository rather than here.
 import argparse
 import pathlib
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "HalgakosWhite.png"
@@ -31,13 +31,23 @@ SPRITE_HEIGHT = 512
 PET_CELL = (192, 208)
 PET_COLUMNS = 8
 PET_ROWS = (0, 1, 2, 4, 5, 7)
-# The idle row breathes by narrowing her whole lower body, which reads as her shrinking. Her
-# idle frames keep their own head, with its blink and bob, down to this row of the cell, and
-# take everything below from the working row, whose body holds its width while its tail
-# moves. The two are crossfaded over the feather, across her collar, where they differ least.
-PET_IDLE, PET_WORKING = 0, 5
+# The idle row breathes by narrowing her whole body below the collar, which reads as her
+# shrinking. So her body holds still: every idle frame takes it from the row's first frame.
+# Two parts keep moving as drawn. Her head, with its blink and bob, is each frame's own down
+# to PET_IDLE_SEAM, a row of the cell across her collar, crossfaded over the feather. Her
+# tail is each frame's own inside PET_IDLE_TAIL, the boxes of the cell it runs through: down
+# from the hem of her skirt beside her legs, and round under the ends of her hair, whose
+# outer strands the first box stops short of so that her outline there holds still as well.
+# The edge of the two is softened by PET_IDLE_TAIL_FEATHER pixels. In the
+# frames where she narrows her legs stand a little to the right, and her tail with them, so
+# the tail is moved back by as far as her legs moved, measured in PET_IDLE_LEGS, and comes
+# out from behind the still skirt in one piece.
+PET_IDLE = 0
 PET_IDLE_SEAM = 115
 PET_IDLE_FEATHER = 8
+PET_IDLE_TAIL = ((116, 152, 143, 196), (116, 170, 158, 196))
+PET_IDLE_TAIL_FEATHER = 2
+PET_IDLE_LEGS = (0, 186, 118, 204)
 
 
 def clean(image):
@@ -110,18 +120,30 @@ def pet_atlas(sheet_path):
             cells[(row, column)] = cell
             box = bounds if box is None else (min(box[0], bounds[0]), min(box[1], bounds[1]),
                                               max(box[2], bounds[2]), max(box[3], bounds[3]))
-    # Her idle frames, from the collar down, are the working row's: see PET_IDLE_SEAM.
-    working = [cells[key] for key in sorted(cells) if key[0] == PET_WORKING]
-    ramp = Image.new("L", (1, PET_CELL[1]))
-    ramp.putdata([round(255 * max(0, min(1, (y - PET_IDLE_SEAM + PET_IDLE_FEATHER / 2) / PET_IDLE_FEATHER)))
-                  for y in range(PET_CELL[1])])
-    ramp = ramp.resize(PET_CELL)
+    # Her idle frames share one still body, under each frame's own head and tail: see PET_IDLE_SEAM.
+    below = Image.new("L", (1, PET_CELL[1]))
+    below.putdata([round(255 * max(0, min(1, (y - PET_IDLE_SEAM + PET_IDLE_FEATHER / 2) / PET_IDLE_FEATHER)))
+                   for y in range(PET_CELL[1])])
+    below = below.resize(PET_CELL)
+    tail = Image.new("L", PET_CELL, 0)
+    for area in PET_IDLE_TAIL:
+        ImageDraw.Draw(tail).rounded_rectangle(area, radius=8, fill=255)
+    tail = tail.filter(ImageFilter.GaussianBlur(PET_IDLE_TAIL_FEATHER))
+
+    def legs(cell):
+        """Where her legs begin, from the left of the cell."""
+        return cell.getchannel("A").point(lambda value: 255 if value > 40 else 0).crop(PET_IDLE_LEGS).getbbox()[0]
+
+    # Blended with the colours weighted by how solid they are, so no edge picks up a fringe.
+    first = cells[(PET_IDLE, 0)]
+    still = first.convert("RGBa")
     for (row, column), cell in list(cells.items()):
         if row != PET_IDLE:
             continue
-        # Blended with the colours weighted by how solid they are, so no edge picks up a fringe.
-        body = working[column % len(working)].convert("RGBa")
-        cells[(row, column)] = Image.composite(body, cell.convert("RGBa"), ramp).convert("RGBA")
+        own = cell.convert("RGBa")
+        frame = Image.composite(still, own, below)
+        moved = ImageChops.offset(own, legs(first) - legs(cell), 0)
+        cells[(row, column)] = Image.composite(moved, frame, tail).convert("RGBA")
     # A clear margin round every frame keeps a scaled frame from picking up its neighbour.
     box = (max(0, box[0] - 2), max(0, box[1] - 2), min(PET_CELL[0], box[2] + 2), min(PET_CELL[1], box[3] + 2))
     width, height = box[2] - box[0], box[3] - box[1]
