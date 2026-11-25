@@ -220,6 +220,13 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         companion.setContentDescription("Halgakos companion settings");
         companion.setBackgroundResource(android.R.drawable.list_selector_background);
         content.addView(companion);
+        TextView play = new TextView(this);
+        play.setText("Play with Halgakos  ›");
+        play.setTextSize(20); play.setTextColor(CalculatorLayout.CORAL);
+        play.setPadding(0, dp(14), 0, dp(14));
+        play.setContentDescription("Play with Halgakos: small games");
+        play.setBackgroundResource(android.R.drawable.list_selector_background);
+        content.addView(play);
         TextView about = new TextView(this);
         about.setText("Halgakos Calculator " + BuildConfig.VERSION_NAME + "\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
         about.setTextSize(18); about.setTextColor(0xFF777777); about.setPadding(0, dp(20), 0, dp(8));
@@ -228,6 +235,10 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         companion.setOnClickListener(v -> {
             dialog.dismiss();
             startActivity(new Intent(this, CompanionSettingsActivity.class));
+        });
+        play.setOnClickListener(v -> {
+            dialog.dismiss();
+            startActivity(new Intent(this, PlayActivity.class));
         });
         dialog.show();
     }

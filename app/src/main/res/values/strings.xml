@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">Halgakos Calculator</string>
     <string name="companion_settings">Halgakos companion</string>
+    <string name="play_with_halgakos">Play with Halgakos</string>
 </resources>

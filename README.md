@@ -71,7 +71,7 @@ Use the **top-right settings icon** to change appearance or key vibration. The i
 The companion is switched on from the start. The first time you open the calculator it offers Android's permission to display over other apps: choose Halgakos Calculator in the list Android shows, allow it, and come back. She appears once you leave the calculator. If you chose **Not now**, switch on **Show Halgakos** in **Settings › Halgakos companion** to be asked again.
 
 - **Tap** her to open the mini calculator over the app you are in. Tap her again, tap anywhere outside it, or use the **✕** in its corner, to close it.
-- **Hold** her for her menu: the mini calculator, the full calculator, her settings, and **Close app**.
+- **Hold** her for her menu: the mini calculator, **Play with Halgakos**, the full calculator, her settings, and **Close app**.
 - **Drag** her anywhere on the screen. She stays where you drop her.
 - The mini calculator and her menu always open to her left or her right, never over her. Where neither side has room, as in the middle of a phone's screen, she steps aside for them and steps back when they close.
 - The mini calculator works on the same calculation as the app. The arrow in its corner opens the app with the same numbers, and long-pressing its display copies the result.
@@ -82,8 +82,10 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 
 | Setting | What it does |
 | --- | --- |
-| **Close it when you tap away** (mini calculator) | Touching anywhere outside the mini calculator closes it. On by default; turn off to keep it open while you use the app underneath. |
+| **Close it when you tap away** (mini calculator) | Touching anywhere outside the mini calculator closes it, and the same goes for the card of games. On by default; turn off to keep either open while you use the app underneath. |
 | **Open it with a tap** (mini calculator) | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
+| **Speech bubbles** | Now and then she says something in a bubble over her head. On by default; a tap on a bubble sends it away. |
+| **Surprise pranks** | Every so often she plays a prank without being asked. Off by default. |
 | **Animated Halgakos** | Her pink-haired form breathes and blinks, runs the way you drag her, and works alongside the mini calculator. Off by default: the still Halgakos uses less battery. |
 | **Keep her out of the calculator app** | Halgakos herself steps aside while the calculator app is on screen, her settings included. On by default. It has nothing to do with the mini calculator. |
 | **Only while unfolded** | On a foldable, she stays away while the device is folded shut and returns when you open it. |
@@ -95,11 +97,36 @@ She keeps her place when the device is folded, unfolded, or turned, and comes ba
 
 While she is on screen, Android posts a notification of its own saying that Halgakos Calculator is displaying over other apps. It belongs to Android, so its icon and wording cannot be changed by the app, but **Turn off that notification** at the bottom of her settings opens the place to switch it off.
 
+### Play with Halgakos
+
+**Play with Halgakos**, in her menu, opens a card of small games where the mini calculator opens. The arrow in its corner carries the game on to a full screen in the app, which also opens from **Settings › Play with Halgakos**. Tallies and best results are kept on the device.
+
+On the card:
+
+- **Tic-tac-toe.** You are the crosses and she is the noughts. She plays well, but not perfectly.
+- **Rock paper scissors.** First to three points takes the match.
+- **Pairs.** Sixteen cards hide eight pairs of a calculator's signs. Find them in as few turns as you can.
+- **Quick sums.** Thirty seconds of small calculations, each with four answers to choose from.
+
+All over the screen, on top of whatever app you are in:
+
+- **Catch Halgakos.** She runs about the whole screen, faster each time she is caught. Tap her as often as you can in thirty seconds.
+- **Number rain.** Drag anywhere to move her along the bottom. Catch each **+** and keep clear of each **−**; three bumps end the round.
+- **Bubble count.** Ten numbered bubbles drift about. Pop them from the smallest to the largest; a wrong one costs two seconds.
+
+The **✕** in the corner, or Back, leaves one of these. They dim the app underneath and take its touches only while they are up.
+
+**Prank me** has her play a prank: making off with the calculator's icon and binning it, cracking the screen, or scribbling on it. It is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. With **Surprise pranks** switched on she plays one now and then without being asked.
+
+She talks as she plays, and while she is idle. Whenever something of hers goes wrong, a lost game or a calculation with no answer, out comes her catchphrase: "Where did my output go?!"
+
+On an open foldable, whatever has to be read or pressed keeps to her side of the fold, Number rain included, and in the app she takes one side of the fold and the card the other. Folding or turning the device in the middle of a game refits it to the new screen.
+
 ## Privacy
 
 Halgakos Calculator works entirely offline. It has no ads, analytics, accounts, or network permission. Calculation history and settings are stored on your device. Clear saved calculations from the **History** dialog.
 
-The companion needs Android's permission to display over other apps, which is used only to draw her and her mini calculator. See the [privacy policy](PRIVACY.md).
+The companion needs Android's permission to display over other apps, which is used only to draw her, her mini calculator, her games and her pranks. See the [privacy policy](PRIVACY.md).
 
 <details>
 <summary>Build from source</summary>

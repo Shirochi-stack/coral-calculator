@@ -88,8 +88,9 @@ public final class CompanionSettingsActivity extends Activity {
         content.addView(masterNote);
 
         section(content, "Mini calculator");
-        toggle(content, "Close it when you tap away", "Touching anywhere outside the mini calculator closes it. "
-                        + "Switch this off to keep it open while you use the app underneath.",
+        toggle(content, "Close it when you tap away", "Touching anywhere outside the mini calculator closes it, "
+                        + "and the same goes for the card of games. Switch this off to keep either open while "
+                        + "you use the app underneath.",
                 prefs.closeOutside(), checked -> { prefs.set(CompanionPrefs.CLOSE_OUTSIDE, checked); apply(); });
         toggle(content, "Open it with a tap", "A tap on Halgakos opens the mini calculator and a hold opens her "
                         + "menu. Switch this off to swap the two.",
@@ -98,6 +99,27 @@ public final class CompanionSettingsActivity extends Activity {
                     describeGestures();
                     apply();
                 });
+
+        section(content, "Play with Halgakos");
+        content.addView(text("Small games to play with her: tic-tac-toe, rock paper scissors, pairs and quick sums "
+                + "on a card where the mini calculator opens, and three that have the whole screen, over whatever "
+                + "app you are in. Hold her and choose Play with Halgakos, or start here.", 15, muted()));
+        TextView play = text("Play with Halgakos  ›", 18, CalculatorLayout.CORAL);
+        play.setPadding(0, dp(12), 0, dp(12));
+        play.setMinHeight(dp(48));
+        play.setGravity(Gravity.CENTER_VERTICAL);
+        play.setFocusable(true);
+        play.setBackgroundResource(android.R.drawable.list_selector_background);
+        play.setOnClickListener(v -> startActivity(new Intent(this, PlayActivity.class)));
+        content.addView(play);
+        toggle(content, "Speech bubbles", "Now and then she says something, in a bubble over her head. A tap on "
+                        + "the bubble sends it away.",
+                prefs.chatter(), checked -> { prefs.set(CompanionPrefs.CHATTER, checked); apply(); });
+        toggle(content, "Surprise pranks", "Every so often she plays a prank over whatever is on screen: making off "
+                        + "with the calculator's icon, cracking the screen, or drawing on it. It is only a drawing "
+                        + "over the top. Nothing is deleted or changed, she owns up within seconds, and a tap ends "
+                        + "it at once. Prank me, among her games, plays one when you ask.",
+                prefs.pranks(), checked -> { prefs.set(CompanionPrefs.PRANKS, checked); apply(); });
 
         section(content, "Halgakos");
         toggle(content, "Animated Halgakos", "Her pink-haired form breathes and blinks, runs when you drag her, and "

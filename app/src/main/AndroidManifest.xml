@@ -30,6 +30,11 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".PlayActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
+            android:label="@string/play_with_halgakos" />
+        <activity
             android:name=".CompanionSettingsActivity"
             android:exported="false"
             android:label="@string/companion_settings" />

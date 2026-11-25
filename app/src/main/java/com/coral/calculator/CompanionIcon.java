@@ -16,11 +16,28 @@ final class CompanionIcon extends View {
     static final String POWER = "power";
     static final String CALCULATOR = "calculator";
     static final String SETTINGS = "settings";
+    static final String BACK = "back";
+    /** A game controller: playing with Halgakos. */
+    static final String PLAY = "play";
+    /** The games themselves, and the marks and hands played in them. */
+    static final String GRID = "grid";
+    static final String CARDS = "cards";
+    static final String SUMS = "sums";
+    static final String NOUGHT = "nought";
+    static final String ROCK = "rock";
+    static final String PAPER = "paper";
+    static final String SCISSORS = "scissors";
+    static final String TARGET = "target";
+    static final String RAIN = "rain";
+    static final String BUBBLES = "bubbles";
+    static final String SPARK = "spark";
+    static final String SPEECH = "speech";
+    static final String NONE = "";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
     private final RectF bounds = new RectF();
-    private final String kind;
+    private String kind;
     /** Share of the view's shorter side the icon takes up. */
     private final float fill;
 
@@ -38,6 +55,12 @@ final class CompanionIcon extends View {
     void setColor(int color) {
         paint.setColor(color);
         invalidate();
+    }
+
+    /** Draws another icon in this one's place, as a cell of a game does when it is marked. */
+    void set(String kind, int color) {
+        this.kind = kind;
+        setColor(color);
     }
 
     @Override public CharSequence getAccessibilityClassName() {
@@ -86,6 +109,80 @@ final class CompanionIcon extends View {
                     if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
                 }
                 path.close(); canvas.drawPath(path, paint); canvas.drawCircle(12, 12, 4.3f, paint);
+                break;
+            case BACK:
+                canvas.drawLine(19, 12, 5, 12, paint);
+                canvas.drawLine(5, 12, 11, 6, paint); canvas.drawLine(5, 12, 11, 18, paint);
+                break;
+            case PLAY:
+                // A controller: a cross of direction keys and two buttons.
+                bounds.set(2, 6.5f, 22, 17.5f); canvas.drawRoundRect(bounds, 5.5f, 5.5f, paint);
+                canvas.drawLine(6, 12, 10, 12, paint); canvas.drawLine(8, 10, 8, 14, paint);
+                canvas.drawPoint(15, 13.5f, paint); canvas.drawPoint(18, 10.5f, paint);
+                break;
+            case GRID:
+                canvas.drawLine(9, 4, 9, 20, paint); canvas.drawLine(15, 4, 15, 20, paint);
+                canvas.drawLine(4, 9, 20, 9, paint); canvas.drawLine(4, 15, 20, 15, paint);
+                break;
+            case CARDS:
+                // Two cards side by side, with the same sign on each.
+                bounds.set(2.5f, 5, 10.5f, 19); canvas.drawRoundRect(bounds, 2, 2, paint);
+                bounds.set(13.5f, 5, 21.5f, 19); canvas.drawRoundRect(bounds, 2, 2, paint);
+                canvas.drawLine(5, 12, 8, 12, paint); canvas.drawLine(6.5f, 10.5f, 6.5f, 13.5f, paint);
+                canvas.drawLine(16, 12, 19, 12, paint); canvas.drawLine(17.5f, 10.5f, 17.5f, 13.5f, paint);
+                break;
+            case SUMS:
+                // The four signs, as on a calculator's keys.
+                canvas.drawLine(4, 7.5f, 10, 7.5f, paint); canvas.drawLine(7, 4.5f, 7, 10.5f, paint);
+                canvas.drawLine(14, 7.5f, 20, 7.5f, paint);
+                canvas.drawLine(4.8f, 14.3f, 9.2f, 18.7f, paint); canvas.drawLine(9.2f, 14.3f, 4.8f, 18.7f, paint);
+                canvas.drawLine(14, 15, 20, 15, paint); canvas.drawLine(14, 18, 20, 18, paint);
+                break;
+            case NOUGHT:
+                canvas.drawCircle(12, 12, 7.5f, paint);
+                break;
+            case ROCK:
+                // A stone, with one of its faces catching the light.
+                path.moveTo(4, 14.5f); path.lineTo(6, 8.5f); path.lineTo(11, 5); path.lineTo(17, 6);
+                path.lineTo(20.5f, 11); path.lineTo(19, 17); path.lineTo(12.5f, 19.5f); path.lineTo(6.5f, 18.5f);
+                path.close(); canvas.drawPath(path, paint);
+                canvas.drawLine(8.5f, 11, 11.5f, 9, paint);
+                break;
+            case PAPER:
+                // A sheet with its corner turned down.
+                path.moveTo(6, 3); path.lineTo(14.5f, 3); path.lineTo(19, 7.5f); path.lineTo(19, 21); path.lineTo(6, 21);
+                path.close(); canvas.drawPath(path, paint);
+                path.reset(); path.moveTo(14.5f, 3); path.lineTo(14.5f, 7.5f); path.lineTo(19, 7.5f);
+                canvas.drawPath(path, paint);
+                canvas.drawLine(9, 12.5f, 16, 12.5f, paint); canvas.drawLine(9, 16.5f, 16, 16.5f, paint);
+                break;
+            case SCISSORS:
+                canvas.drawCircle(7, 18.3f, 2.7f, paint); canvas.drawCircle(17, 18.3f, 2.7f, paint);
+                canvas.drawLine(8.6f, 16.1f, 18, 3.5f, paint); canvas.drawLine(15.4f, 16.1f, 6, 3.5f, paint);
+                break;
+            case TARGET:
+                canvas.drawCircle(12, 12, 9, paint); canvas.drawCircle(12, 12, 4.5f, paint);
+                canvas.drawPoint(12, 12, paint);
+                break;
+            case RAIN:
+                // A plus and a minus on their way down.
+                canvas.drawLine(4.5f, 12, 11.5f, 12, paint); canvas.drawLine(8, 8.5f, 8, 15.5f, paint);
+                canvas.drawLine(13.5f, 18, 20, 18, paint);
+                canvas.drawLine(8, 2.5f, 8, 4.5f, paint); canvas.drawLine(16.75f, 9.5f, 16.75f, 13.5f, paint);
+                break;
+            case BUBBLES:
+                canvas.drawCircle(9, 14, 6.5f, paint); canvas.drawCircle(17.5f, 6.5f, 3.5f, paint);
+                bounds.set(5.5f, 10.5f, 12.5f, 17.5f); canvas.drawArc(bounds, 190, 60, false, paint);
+                break;
+            case SPARK:
+                // A four pointed star: something up her sleeve.
+                path.moveTo(12, 2.5f); path.lineTo(14.2f, 9.8f); path.lineTo(21.5f, 12); path.lineTo(14.2f, 14.2f);
+                path.lineTo(12, 21.5f); path.lineTo(9.8f, 14.2f); path.lineTo(2.5f, 12); path.lineTo(9.8f, 9.8f);
+                path.close(); canvas.drawPath(path, paint);
+                break;
+            case SPEECH:
+                bounds.set(3, 4, 21, 17); canvas.drawRoundRect(bounds, 4, 4, paint);
+                path.moveTo(8, 17); path.lineTo(7, 21); path.lineTo(12, 17); canvas.drawPath(path, paint);
                 break;
             default: break;
         }

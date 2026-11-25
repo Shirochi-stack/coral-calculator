@@ -27,6 +27,8 @@ final class MiniCalculatorView extends LinearLayout {
     interface Host {
         void onOpenApp();
         void onClose();
+        /** A key pressed here left the calculation with no answer to show, only an error. */
+        void onError();
     }
 
     /** Size at full scale, in dp. Every measurement inside is a share of these. */
@@ -46,6 +48,7 @@ final class MiniCalculatorView extends LinearLayout {
     private final float unit;
     private final boolean dark;
     private final boolean haptics;
+    private final Host host;
     private final TextView equation;
     private final TextView answer;
 
@@ -59,6 +62,7 @@ final class MiniCalculatorView extends LinearLayout {
         this.unit = unit;
         this.dark = dark;
         this.haptics = haptics;
+        this.host = host;
         this.owner = owner;
         session = CalculatorSession.get(context);
         setOrientation(VERTICAL);
@@ -175,8 +179,10 @@ final class MiniCalculatorView extends LinearLayout {
         key.setContentDescription(SPOKEN[index]);
         key.setOnClickListener(v -> {
             if (haptics) v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            boolean wasError = session.engine().isError();
             session.press("+/−".equals(token) ? "±" : token, owner);
             refresh();
+            if (!wasError && session.engine().isError()) host.onError();
         });
         return key;
     }

@@ -18,6 +18,9 @@ final class FoldState implements SensorEventListener {
         void onFoldChanged();
     }
 
+    /** Which way the fold runs across the screen in use, if there is one. */
+    static final int NO_HINGE = 0, UPRIGHT_HINGE = 1, LEVEL_HINGE = 2;
+
     /** A hinge opened past this is open; it has to close below {@link #SHUT_DEGREES} again. */
     private static final float OPEN_DEGREES = 30;
     private static final float SHUT_DEGREES = 20;
@@ -57,6 +60,20 @@ final class FoldState implements SensorEventListener {
     boolean isUnfolded(int smallestWidthDp) {
         if (hinge == null || smallestWidthDp >= LARGE_SCREEN_DP) return true;
         return known && open;
+    }
+
+    /**
+     * Which way the fold runs across the screen in use, going by the kind of device: a book
+     * folds down its middle when upright, a flip phone across it.
+     *
+     * @param rotation the display's, as {@link android.view.Surface} names it
+     */
+    int hinge(int smallestWidthDp, int rotation) {
+        if (hinge == null) return NO_HINGE;
+        boolean book = smallestWidthDp >= LARGE_SCREEN_DP;
+        if (!book && !isUnfolded(smallestWidthDp)) return NO_HINGE;
+        boolean natural = rotation == android.view.Surface.ROTATION_0 || rotation == android.view.Surface.ROTATION_180;
+        return book == natural ? UPRIGHT_HINGE : LEVEL_HINGE;
     }
 
     void start() {

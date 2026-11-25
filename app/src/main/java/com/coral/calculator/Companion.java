@@ -32,7 +32,6 @@ import android.view.Display;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
-import android.view.Surface;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
@@ -46,9 +45,13 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.Random;
+
 /**
  * The mini Halgakos that floats over other apps. She is dragged about, opens a menu when
  * tapped and the mini calculator when held, and can be dropped on a target to send her away.
+ * From her menu she plays games, some of them all over the screen, and now and then she has
+ * something to say.
  *
  * Her window keeps this process running while Android is showing it. She keeps it, unseen,
  * while she waits for a folded device to be opened, so that the hinge is still heard.
@@ -62,19 +65,27 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private static final float SMALLEST_SCALE = .62f;
     /** It gives up this much of its size to stay on one side of a fold, and no more. */
     private static final float FOLD_SCALE = .85f;
-    private static final int NO_HINGE = 0, UPRIGHT_HINGE = 1, LEVEL_HINGE = 2;
+    private static final int NO_HINGE = FoldState.NO_HINGE, UPRIGHT_HINGE = FoldState.UPRIGHT_HINGE,
+            LEVEL_HINGE = FoldState.LEVEL_HINGE;
+    /** How long she waits before the first thing she says, and between one and the next. */
+    private static final long FIRST_WORDS_MS = 20_000, FIRST_WORDS_SPREAD_MS = 25_000;
+    private static final long NEXT_WORDS_MS = 60_000, NEXT_WORDS_SPREAD_MS = 90_000;
+    /** How long a bubble stays up: a base, and more for each letter there is to read. */
+    private static final long BUBBLE_MS = 3200, BUBBLE_LETTER_MS = 45;
     /**
      * A popup's window has a margin for its shadow, which may run past the edge of the screen.
      * Without this Android moves the whole window back inside, and the popup with it: toward
      * her, when it stands between her and the edge.
      */
     private static final int POPUP_FLAGS = WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
-    /** Rows of the animated figure's frames. Keep in step with PET_ROWS in tools/make_art.py. */
-    private static final int POSE_IDLE = 0, POSE_RUN_RIGHT = 1, POSE_RUN_LEFT = 2, POSE_JUMP = 3,
-            POSE_SAD = 4, POSE_WORK = 5;
-    private static final int PET_COLUMNS = 8;
-    private static final int[] PET_FRAMES = {7, 8, 8, 5, 8, 6};
-    private static final int[] PET_FRAME_MS = {170, 85, 85, 100, 140, 180};
+    /** Rows of the animated figure's frames. */
+    private static final int POSE_IDLE = PetArt.IDLE, POSE_RUN_RIGHT = PetArt.RUN_RIGHT, POSE_RUN_LEFT = PetArt.RUN_LEFT,
+            POSE_JUMP = PetArt.JUMP, POSE_SAD = PetArt.SAD, POSE_WORK = PetArt.WORK;
+    private static final int PET_COLUMNS = PetArt.COLUMNS;
+    private static final int[] PET_FRAMES = PetArt.FRAMES;
+    private static final int[] PET_FRAME_MS = PetArt.FRAME_MS;
+    /** A surprise prank, where she is allowed them, comes this long after the last. */
+    private static final long PRANK_SOONEST_MS = 12 * 60_000L, PRANK_LATEST_MS = 40 * 60_000L;
     /** She breathes and blinks once, then holds still this long before the next breath. */
     private static final long IDLE_PAUSE_MS = 700;
     private static final long NO_TOUCH = -1;
@@ -100,6 +111,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private final Runnable rest = this::rest;
     private final Runnable closeMenu = this::closeMenu;
     private final Runnable stepBack = this::stepBack;
+    private final Runnable speak = this::speak;
+    private final Runnable closeBubble = this::closeBubble;
+    private final Runnable surprise = this::surprise;
+    private final Random random = new Random();
 
     /** Context of the overlay windows, themed for the views in them. */
     private Context ui;
@@ -117,6 +132,16 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private View panel;
     private WindowManager.LayoutParams panelParams;
     private MiniCalculatorView calculator;
+    /** The panel holds her games and not the mini calculator. */
+    private boolean panelGames;
+    /** Something she is saying, in a bubble over her head. */
+    private View bubble;
+    private WindowManager.LayoutParams bubbleParams;
+    private boolean wordsDue;
+    /** A game or a prank that has the whole screen, drawn over everything else of hers. */
+    private PlayStage stage;
+    private WindowManager.LayoutParams stageParams;
+    private boolean prankDue;
     private DismissTarget dismiss;
     private WindowManager.LayoutParams dismissParams;
     private ValueAnimator settling;
@@ -163,6 +188,55 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         watchDisplay(on);
         if (on && !(prefs.hideInApp() && appScreens > 0)) show(folded); else hide();
         keepService(on);
+        schedule();
+    }
+
+    /** Sets her up to speak, and to play a prank, some while from now, where she may do either. */
+    private void schedule() {
+        boolean shown = sprite != null && !sprite.away;
+        if (shown && prefs.chatter()) {
+            if (!wordsDue) {
+                wordsDue = true;
+                handler.postDelayed(speak, FIRST_WORDS_MS + (long) (random.nextFloat() * FIRST_WORDS_SPREAD_MS));
+            }
+        } else {
+            wordsDue = false;
+            handler.removeCallbacks(speak);
+            closeBubble();
+        }
+        if (shown && prefs.pranks()) {
+            if (!prankDue) {
+                prankDue = true;
+                handler.postDelayed(surprise, PRANK_SOONEST_MS
+                        + (long) (random.nextFloat() * (PRANK_LATEST_MS - PRANK_SOONEST_MS)));
+            }
+        } else {
+            prankDue = false;
+            handler.removeCallbacks(surprise);
+        }
+    }
+
+    /** Whether she is on screen with nothing open and nothing being done to her. */
+    private boolean idle() {
+        Display display = displays.getDisplay(Display.DEFAULT_DISPLAY);
+        return sprite != null && !sprite.away && !sprite.dragging && menu == null && panel == null && stage == null
+                && display != null && display.getState() == Display.STATE_ON;
+    }
+
+    private void speak() {
+        wordsDue = false;
+        if (idle()) say(Chatter.idle(random, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)));
+        if (sprite != null && !sprite.away && prefs.chatter()) {
+            wordsDue = true;
+            handler.postDelayed(speak, NEXT_WORDS_MS + (long) (random.nextFloat() * NEXT_WORDS_SPREAD_MS));
+        }
+    }
+
+    /** A prank she was not asked for: only while she is idle, and never over the app's own screens. */
+    private void surprise() {
+        prankDue = false;
+        if (idle() && appScreens == 0) openStage(PlaySession.PRANK);
+        schedule();
     }
 
     /** A setting changed: also sizes and places her again, and redraws what is open. */
@@ -209,7 +283,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (sprite == null) return;
         sprite.setPose(dismiss != null && overDismiss() ? POSE_SAD
                 : sprite.dragging ? (sprite.leftward ? POSE_RUN_LEFT : POSE_RUN_RIGHT)
-                : panel != null ? POSE_WORK : POSE_IDLE);
+                : panel != null && !panelGames ? POSE_WORK : POSE_IDLE);
     }
 
     private boolean prepare() {
@@ -281,6 +355,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 handler.removeCallbacks(rest);
                 closeMenu();
                 closePanel();
+                closeBubble();
+                closeStage();
                 hideDismiss();
                 if (settling != null) settling.cancel();
                 sprite.cancelGesture();
@@ -314,6 +390,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         handler.removeCallbacks(rest);
         closeMenu();
         closePanel();
+        closeBubble();
+        closeStage();
         hideDismiss();
         if (settling != null) settling.cancel();
         if (sprite == null) return;
@@ -333,7 +411,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         sprite.figure = null;
         sprite.describe();
         sprite.resume();
-        if (panel != null) openPanel();
+        if (panel != null) openPanel(panelGames);
+        closeBubble();
+        if (stage != null) fitStage();
     }
 
     private void fit() {
@@ -500,11 +580,13 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     }
 
     private void toggle(boolean calculator) {
+        closeBubble();
         if (calculator) {
+            // Whichever of the two is open, the touch that would open the calculator closes it.
             if (panel != null) {
                 closePanel();
             } else {
-                openPanel();
+                openPanel(false);
                 if (sprite != null) sprite.play(POSE_JUMP);
             }
         } else if (menu != null) {
@@ -516,9 +598,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         menuClosedBy = NO_TOUCH;
     }
 
-    private void toggleFromMenu() {
+    /** From her menu: opens the mini calculator or her games, or closes the one that is open. */
+    private void toggleFromMenu(boolean games) {
         closeMenu();
-        if (panel != null) closePanel(); else openPanel();
+        if (panel != null && panelGames == games) closePanel(); else openPanel(games);
     }
 
     private boolean dark() {
@@ -537,8 +620,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         card.setPadding(0, dp(6), 0, dp(6));
         card.setBackground(cardBackground(dark, dp(18)));
         card.setClipToOutline(true);
-        card.addView(menuRow(CompanionIcon.CALCULATOR, panel == null ? "Mini calculator" : "Close mini calculator",
-                dark, this::toggleFromMenu));
+        card.addView(menuRow(CompanionIcon.CALCULATOR, panel != null && !panelGames ? "Close mini calculator"
+                : "Mini calculator", dark, () -> toggleFromMenu(false)));
+        card.addView(menuRow(CompanionIcon.PLAY, panel != null && panelGames ? "Close the games"
+                : "Play with Halgakos", dark, () -> toggleFromMenu(true)));
         card.addView(menuRow(CompanionIcon.OPEN, "Open calculator", dark, this::openApp));
         card.addView(menuRow(CompanionIcon.SETTINGS, "Companion settings", dark, this::openSettings));
         card.addView(menuRow(CompanionIcon.POWER, "Close app", dark, this::closeApp));
@@ -590,9 +675,11 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         wake();
     }
 
-    private void openPanel() {
+    /** Opens the mini calculator beside her, or her games in its place and at its size. */
+    private void openPanel(boolean games) {
         closeMenu();
         closePanel();
+        closeBubble();
         if (sprite == null) return;
         Rect bounds = bounds();
         float density = ui.getResources().getDisplayMetrics().density;
@@ -607,11 +694,30 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 : hinge == LEVEL_HINGE ? (bounds.height() / 2f - margin * 2 - 1) / fullHeight : 1;
         if (half >= FOLD_SCALE) scale = Math.min(scale, half);
         float unit = density * Math.max(SMALLEST_SCALE, scale);
-        calculator = new MiniCalculatorView(ui, unit, dark(), haptics(), this, new MiniCalculatorView.Host() {
-            @Override public void onOpenApp() { openApp(); }
-            @Override public void onClose() { closePanel(); }
-        });
-        Holder holder = new Holder(ui, calculator, dp(14));
+        View content;
+        if (games) {
+            content = new PlayView(ui, unit, dark(), haptics(), false, new PlayView.Host() {
+                @Override public void onOpenApp() { openPlayScreen(); }
+                @Override public void onClose() { closePanel(); }
+                @Override public void onMood(boolean cheerful) {
+                    if (sprite != null) sprite.play(cheerful ? POSE_JUMP : POSE_SAD);
+                }
+                @Override public void onStage(int game) { openStage(game); }
+            });
+        } else {
+            calculator = new MiniCalculatorView(ui, unit, dark(), haptics(), this, new MiniCalculatorView.Host() {
+                @Override public void onOpenApp() { openApp(); }
+                @Override public void onClose() { closePanel(); }
+                @Override public void onError() {
+                    // A sum with no answer is exactly what her catchphrase is for.
+                    if (!prefs.chatter() || sprite == null) return;
+                    say(Chatter.CATCHPHRASE);
+                    sprite.play(POSE_SAD);
+                }
+            });
+            content = calculator;
+        }
+        Holder holder = new Holder(ui, content, dp(14));
         boolean closesOutside = prefs.closeOutside();
         // A touch on Halgakos or her menu is not one that leaves the calculator: she closes
         // it herself when tapped, and it follows her when dragged.
@@ -619,16 +725,18 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         panelParams = overlay(Math.round(MiniCalculatorView.WIDTH_DP * unit) + holder.inset * 2,
                 Math.round(MiniCalculatorView.HEIGHT_DP * unit) + holder.inset * 2,
                 POPUP_FLAGS | (closesOutside ? WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH : 0));
-        panelParams.setTitle("Halgakos mini calculator");
+        panelParams.setTitle(games ? "Play with Halgakos" : "Halgakos mini calculator");
         place(panelParams, holder.inset);
         if (!add(holder, panelParams)) {
             calculator = null;
             return;
         }
         panel = holder;
+        panelGames = games;
         makeRoom();
         pose();
-        appear(calculator);
+        appear(content);
+        if (games) return;
         // Keys pressed here go on the end, wherever the app last left its cursor.
         CalculatorSession session = CalculatorSession.get(app);
         session.engine().releaseCaret();
@@ -673,6 +781,152 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             place(panelParams, ((Holder) panel).inset);
             update(panel, panelParams);
         }
+        if (bubble != null) {
+            placeBubble();
+            update(bubble, bubbleParams);
+        }
+    }
+
+    // What she says
+
+    /** Puts up a bubble over her head with something she has to say; a touch dismisses it. */
+    private void say(String words) {
+        closeBubble();
+        if (sprite == null) return;
+        boolean dark = dark();
+        TextView text = new TextView(ui);
+        text.setText(words);
+        text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        text.setTextColor(dark ? 0xFFEBECEC : 0xFF363936);
+        text.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        text.setLineSpacing(0, 1.1f);
+        text.setPadding(dp(13), dp(9), dp(13), dp(9));
+        text.setBackground(cardBackground(dark, dp(16)));
+        text.setContentDescription("Halgakos says: " + words);
+        text.setOnClickListener(v -> closeBubble());
+        Holder holder = new Holder(ui, text, dp(10));
+        Rect span = span();
+        holder.measure(View.MeasureSpec.makeMeasureSpec(Math.min(dp(236), span.width()) + holder.inset * 2, View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        bubbleParams = overlay(holder.getMeasuredWidth(), holder.getMeasuredHeight(), POPUP_FLAGS);
+        bubbleParams.setTitle("Halgakos says");
+        placeBubble(holder.inset);
+        if (!add(holder, bubbleParams)) return;
+        bubble = holder;
+        appear(text);
+        wake();
+        handler.postDelayed(closeBubble, BUBBLE_MS + BUBBLE_LETTER_MS * words.length());
+    }
+
+    private void closeBubble() {
+        handler.removeCallbacks(closeBubble);
+        if (bubble == null) return;
+        remove(bubble);
+        bubble = null;
+    }
+
+    private void placeBubble() { placeBubble(((Holder) bubble).inset); }
+
+    /** Over her head, or under her feet where there is no room above; never off the screen. */
+    private void placeBubble(int inset) {
+        Rect span = span();
+        int width = bubbleParams.width - inset * 2, height = bubbleParams.height - inset * 2, gap = dp(2);
+        int x = spriteParams.x + spriteParams.width / 2 - width / 2;
+        int y = spriteParams.y + pad - gap - height;
+        if (y < span.top) y = spriteParams.y + spriteParams.height - pad + gap;
+        x = Math.max(span.left, Math.min(span.right - width, x));
+        y = Math.max(span.top, Math.min(span.bottom - height, y));
+        if (panel != null) {
+            // Clear of the mini calculator or the games: over the top of the card, or under it.
+            int inner = ((Holder) panel).inset;
+            int left = panelParams.x + inner, top = panelParams.y + inner;
+            int right = panelParams.x + panelParams.width - inner, bottom = panelParams.y + panelParams.height - inner;
+            if (x < right && x + width > left && y < bottom && y + height > top) {
+                y = top - dp(6) - height >= span.top ? top - dp(6) - height : Math.min(span.bottom - height, bottom + dp(6));
+            }
+        }
+        bubbleParams.x = x - inset;
+        bubbleParams.y = y - inset;
+    }
+
+    // The whole screen: her games that are played all over it, and her pranks
+
+    /** The whole of the screen in use, bars and cutouts included. */
+    @SuppressWarnings("deprecation")
+    private Rect screen() {
+        if (Build.VERSION.SDK_INT >= 30) return new Rect(windows.getMaximumWindowMetrics().getBounds());
+        Point size = new Point();
+        windows.getDefaultDisplay().getRealSize(size);
+        return new Rect(0, 0, size.x, size.y);
+    }
+
+    /**
+     * Gives her the whole screen, over whatever app is in use, for a game or a prank. She
+     * leaves her own window for it, and is back in it where she stood once it is over.
+     *
+     * @param game one of the games of {@link PlaySession} that take a stage, or its prank
+     */
+    private void openStage(int game) {
+        closeMenu();
+        closePanel();
+        closeBubble();
+        closeStage();
+        if (sprite == null || sprite.away) return;
+        if (settling != null) settling.cancel();
+        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random) : game;
+        boolean prank = PlayStage.isPrank(kind);
+        PlayStage view = new PlayStage(ui, kind, dark(), haptics(), art, animated() ? pet : null, played -> {
+            closeStage();
+            // After a game the others are offered again; a prank just ends.
+            if (!PlayStage.isPrank(played)) openPanel(true);
+        });
+        Rect screen = screen();
+        stageParams = overlay(screen.width(), screen.height(), POPUP_FLAGS);
+        stageParams.x = screen.left;
+        stageParams.y = screen.top;
+        stageParams.setTitle(prank ? "Halgakos's prank" : "Play with Halgakos, whole screen");
+        // A game takes the keys as well, so that Back leaves it and not the app underneath.
+        if (!prank) stageParams.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        view.setHome(spriteParams.x + spriteParams.width / 2f - screen.left,
+                spriteParams.y + spriteParams.height - pad - screen.top);
+        if (!add(view, stageParams)) return;
+        stage = view;
+        fitStage();
+        handler.removeCallbacks(rest);
+        sprite.onStage = true;
+        sprite.invalidate();
+    }
+
+    /** Tells the stage how much of the screen is clear of the bars, and where the fold is. */
+    private void fitStage() {
+        Rect screen = screen(), safe = bounds();
+        if (stageParams.width != screen.width() || stageParams.height != screen.height()) {
+            stageParams.width = screen.width();
+            stageParams.height = screen.height();
+            stageParams.x = screen.left;
+            stageParams.y = screen.top;
+            update(stage, stageParams);
+        }
+        stage.setSafeInsets(safe.left - screen.left, safe.top - screen.top, screen.right - safe.right, screen.bottom - safe.bottom);
+        stage.setHinge(hinge());
+    }
+
+    private void closeStage() {
+        if (stage == null) return;
+        remove(stage);
+        stage = null;
+        if (sprite != null) {
+            sprite.onStage = false;
+            sprite.invalidate();
+        }
+        wake();
+    }
+
+    /** Carries on with the games on a full screen in the app. */
+    private void openPlayScreen() {
+        closeMenu();
+        closePanel();
+        start(new Intent(app, PlayActivity.class));
     }
 
     /**
@@ -710,13 +964,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
      * folds down its middle when upright, a flip phone across it.
      */
     private int hinge() {
-        if (!fold.isFoldable()) return NO_HINGE;
-        Configuration configuration = ui.getResources().getConfiguration();
-        boolean book = configuration.smallestScreenWidthDp >= 600;
-        if (!book && !fold.isUnfolded(configuration.smallestScreenWidthDp)) return NO_HINGE;
-        int rotation = displays.getDisplay(Display.DEFAULT_DISPLAY).getRotation();
-        boolean natural = rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_180;
-        return book == natural ? UPRIGHT_HINGE : LEVEL_HINGE;
+        return fold.hinge(ui.getResources().getConfiguration().smallestScreenWidthDp,
+                displays.getDisplay(Display.DEFAULT_DISPLAY).getRotation());
     }
 
     private void openApp() {
@@ -906,6 +1155,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         private boolean moving;
         /** Kept on screen but unseen, waiting for a folded device to be opened. */
         boolean away;
+        /** She has left this window for the whole screen, for a game or a prank. */
+        boolean onStage;
 
         Sprite(Context context) {
             super(context);
@@ -937,7 +1188,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         }
 
         @Override protected void onDraw(Canvas canvas) {
-            if (away) return;
+            // While she has the whole screen she is drawn there, not here.
+            if (away || onStage) return;
             if (pet != null) {
                 int row = playing >= 0 ? playing : pose;
                 int width = pet.getWidth() / PET_COLUMNS, height = pet.getHeight() / PET_FRAMES.length;
