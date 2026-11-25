@@ -41,9 +41,15 @@ PET_ROWS = (0, 1, 2, 4, 5, 7)
 # So she holds still: every idle frame is the row's first frame, one drawing, head and body.
 # Two parts move.
 #
-# Her eyes blink. What lies inside the boxes of PET_IDLE_EYES, softened at the edge, is each
-# frame's own, moved by up to PET_IDLE_EYES_REACH pixels to where the hair and cheeks within
-# PET_IDLE_EYES_RING pixels of the boxes best match the first frame's.
+# Her eyes blink, in the frames of PET_IDLE_BLINK: closing, closed and opening. Every other
+# frame has the first frame's face exactly, because the row draws her open eyes, and the
+# hair that falls across them, a little differently each time, and a face that is redrawn
+# from frame to frame on a head that holds still flickers. In a blink frame only her eyes
+# are the frame's own. The frame is moved by up to PET_IDLE_EYES_REACH pixels to where the
+# hair and cheeks within PET_IDLE_EYES_RING pixels of the boxes of PET_IDLE_EYES best match
+# the first frame's; then what is taken from it is where, inside those boxes, any blink
+# frame differs from the first by more than PET_IDLE_EYES_CHANGE in brightness, less the
+# thin lines that are only strands of hair a pixel out of place, softened at the edge.
 #
 # Her tail swings. In the row as drawn it hardly changes place from frame to frame while its
 # colour does, from dusky to bright and back, which reads as a light playing on it and not
@@ -58,6 +64,8 @@ PET_IDLE = 0
 PET_IDLE_EYES = ((61, 72, 87, 96), (95, 66, 121, 90))
 PET_IDLE_EYES_REACH = 5
 PET_IDLE_EYES_RING = 6
+PET_IDLE_EYES_CHANGE = 70
+PET_IDLE_BLINK = (2, 3, 4)
 PET_IDLE_TAIL =(117, 158, 162, 200)
 PET_IDLE_TAIL_LAP = 4
 PET_IDLE_TAIL_ROOT = (121, 153)
@@ -242,14 +250,24 @@ def pet_atlas(sheet_path):
         moved.paste(image, by)
         return moved
 
+    # Each blink frame, moved to where its face sits over the first's: where what surrounds her eyes differs least.
+    blinks = {}
+    lids = Image.new("L", PET_CELL, 0)
+    for column in PET_IDLE_BLINK:
+        own = cells[(PET_IDLE, column)].convert("RGBa")
+        fit = min(((dx, dy) for dx in reach for dy in reach), key=lambda by: ImageStat.Stat(
+            ImageChops.difference(still, placed(own, by)).convert("RGB").convert("L"), mask=around).sum[0])
+        blinks[column] = placed(own, fit)
+        changed = ImageChops.difference(still, blinks[column]).convert("RGB").convert("L")
+        lids = ImageChops.lighter(lids, changed.point(lambda value: 255 if value > PET_IDLE_EYES_CHANGE else 0))
+    # Her eyelids: where a blink changes her, inside the boxes, without the strands of hair.
+    lids = ImageChops.multiply(lids, eyes(0, 0)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(5))
+    lids = lids.filter(ImageFilter.GaussianBlur(.8))
+
     for (row, column), cell in list(cells.items()):
         if row != PET_IDLE:
             continue
-        own = cell.convert("RGBa")
-        # Where this frame's face sits over the first's: where what surrounds her eyes differs least.
-        fit = min(((dx, dy) for dx in reach for dy in reach), key=lambda by: ImageStat.Stat(
-            ImageChops.difference(still, placed(own, by)).convert("RGB").convert("L"), mask=around).sum[0])
-        frame = Image.composite(placed(own, fit), rest, eyes(0, 1.2)).convert("RGBA")
+        frame = (Image.composite(blinks[column], rest, lids) if column in blinks else rest).convert("RGBA")
         swung = curl.rotate(PET_IDLE_TAIL_SWING[column % len(PET_IDLE_TAIL_SWING)], resample=Image.BICUBIC,
                             center=PET_IDLE_TAIL_ROOT).convert("RGBA")
         cells[(row, column)] = Image.alpha_composite(frame, swung)
