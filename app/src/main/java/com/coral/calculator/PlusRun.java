@@ -598,7 +598,7 @@ final class PlusRun {
     private void summon(int[] one) {
         int count = 2 + wave;
         for (int index = 0; index < count; index++) {
-            int kind = level.number >= RunLevels.SHAPED_FROM && index % 2 == 1 ? RunLevels.SLIME : RunLevels.MINUS;
+            int kind = level.chapter >= 2 && index % 2 == 1 ? RunLevels.SLIME : RunLevels.MINUS;
             Foe foe = new Foe(kind);
             foe.spawned = true;
             foe.left = 1;

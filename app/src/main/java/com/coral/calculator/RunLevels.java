@@ -58,8 +58,10 @@ final class RunLevels {
 
     /** What is asked in a land: nothing where someone waits at the end, or before the lands have places off them. */
     static int questOf(int number) {
-        if (number < SHAPED_FROM || bossOf(number) >= 0) return 0;
+        if (number < QUESTS_FROM || bossOf(number) >= 0) return 0;
         boolean other = number / 3 % 2 != 0;
+        // In the first chapter there is neither a cellar nor a crack in a wall yet.
+        if (chapterOf(number) == 0) return number % 3 == 2 ? CAKES : other ? TIME : LETTER;
         return number % 3 == 0 ? CELLAR : number % 3 == 2 ? other ? CAKES : ROOM : other ? TIME : LETTER;
     }
 
@@ -97,12 +99,15 @@ final class RunLevels {
     }
 
     /**
-     * From the twenty-third land on a land is a place, not a line: islands that float at
-     * different heights, ground that climbs and drops, a tower to go up and over, a high road
-     * and a low one that meet again, a cave with a low roof; and in every land a village,
-     * with someone in it and a stall.
+     * Every land is a place, not a line: ground that climbs and drops, and, as the chapters
+     * go on, a tower to go up and over, a cave with a low roof, islands that float at
+     * different heights, a high road and a low one that meet again; and in every land a
+     * village, with someone in it and a stall. The first lands are the gentlest: each
+     * chapter adds to what the one before it was made of. A door to a place off the land
+     * comes with the second land, something asked of her with the fourth, and crowds with
+     * the second chapter.
      */
-    static final int SHAPED_FROM = 23;
+    static final int SHAPED_FROM = 1, PLACES_FROM = 2, QUESTS_FROM = 4;
     private static final int ISLANDS = 40, ASCENT = 41, DESCENT = 42, TOWER = 43, SPLIT = 44, CAVE = 45, VILLAGE = 46;
     /** The shapes each chapter of the second volume adds to what it is made of. */
     private static final int[][] LATER_SHAPES = {
@@ -148,6 +153,12 @@ final class RunLevels {
      */
     private static final int PACK = 50, SWARM = 51, FLYERS = 52, SLOPE = 53, TOUGH = 54, GALLERY = 55, LINE = 56, CROWD = 57;
     private static final int[] MOBS = {PACK, PACK, SWARM, FLYERS, SLOPE, TOUGH};
+    /** What the lands of each of the first three chapters are made of: what they were, and the shapes each is ready for. */
+    private static final int[][] EARLY_POOLS = {
+            {PLAIN, PLAIN, GAP, GAP, STEPS, WALL, PEN, HIGH_ROAD, ASCENT, DESCENT},
+            {PLAIN, GAP, STEPS, SPIKES, SPIKES, BRIDGE, PEN, HIGH_ROAD, WALL, ASCENT, DESCENT, TOWER, CAVE},
+            {GAP, STEPS, SPIKES, SPRING_WALL, PATROL, HIGH_ROAD, BRIDGE, PEN, ASCENT, DESCENT, TOWER, SPLIT, ISLANDS, PACK},
+    };
     private static final int[] HIGH_POOL = {ISLANDS, ISLANDS, ASCENT, DESCENT, TOWER, SPLIT, CAVE, GAP, SPIKES, HOPPER, PILLARS, BRIDGE, SPRING_WALL, PATROL,
             PACK, PACK, SWARM, SLOPE, TOUGH};
     /** The stretches each chapter draws on; one that is named more than once comes up more often. */
@@ -164,8 +175,8 @@ final class RunLevels {
      * see the tests.
      */
     static final long[] SEEDS = {
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1,
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1,
     };
 
     /** One land: its squares, what is in it, and where it begins and ends. */
@@ -394,7 +405,7 @@ final class RunLevels {
         int stretches = boss >= 0 ? (shaped ? 8 : 6) : 6 + number / 3;
         int last = -1;
         for (int stretch = 0; stretch < stretches; stretch++) {
-            int[] pool = shaped ? HIGH_POOL : POOLS[chapter];
+            int[] pool = chapter < EARLY_POOLS.length ? EARLY_POOLS[chapter] : HIGH_POOL;
             int kind;
             do kind = pool[random.nextInt(pool.length)];
             while (kind == last || (number <= 2 && (kind == BRIDGE || kind == HIGH_ROAD)));
@@ -403,10 +414,11 @@ final class RunLevels {
             // Somewhere to stand between one stretch and the next, with a flag on it a third and two thirds of the way.
             if (stretches >= 6 && (stretch == stretches / 3 || stretch == stretches * 2 / 3)) builder.flag();
             builder.rest();
-            if (shaped && (stretch == stretches / 3 || stretch == stretches * 2 / 3)) {
+            // After the first flag a book or a brush and what it is good against, from the second chapter; after the second an ink gun and a crowd, from the third.
+            if (stretch == stretches / 3 && chapter >= 1 || stretch == stretches * 2 / 3 && chapter >= 2) {
                 boolean gallery = stretch != stretches / 3;
                 int start = builder.at;
-                builder.stretch(gallery ? GALLERY : number % 2 == 0 ? LINE : CROWD);
+                builder.stretch(gallery ? GALLERY : number % 2 == 0 || chapter < 2 ? LINE : CROWD);
                 builder.before(gallery, start + 2);
                 builder.rest();
                 builder.after();
@@ -682,6 +694,7 @@ final class RunLevels {
             ground(3);
             level.land[floor - 1][from + 1] = FLAG;
             level.flags.add(from + 1);
+            level.nooks.add(new int[]{from, floor - 3});
         }
 
         /** Fills a pit, some columns of nothing, with lava or with water, from the level of the ground down. */
@@ -784,7 +797,7 @@ final class RunLevels {
                     level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});
                     if (!inVillage) {
                         inVillage = true;
-                        door(level.number % 2 == 0 ? STASH : GAME, from + 14, false);
+                        if (level.number >= PLACES_FROM) door(level.number % 2 == 0 ? STASH : GAME, from + 14, false);
                     }                    break;
                 }
                 case PACK: {
@@ -1054,6 +1067,7 @@ final class RunLevels {
                     ledge(from + 5, floor - 4, 3);
                     pluses(from + 1, from + 3, floor - 4);
                     pluses(from + 5, from + 7, floor - 6);
+                    level.nooks.add(new int[]{from + 6, floor - 5});
                     if (hard > .15f) foe(walker(), from + 6);
                     break;
                 }

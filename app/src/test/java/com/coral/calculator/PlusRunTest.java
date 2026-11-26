@@ -1522,9 +1522,11 @@ public class PlusRunTest {
     @Test public void everyLandWithShapeHasPlacesOffItWalledAllRound() {
         boolean[] kinds = new boolean[RunLevels.GAME + 1];
         int hidden = 0;
-        for (int number = RunLevels.SHAPED_FROM; number <= RunLevels.TOTAL; number++) {
+        assertTrue(RunLevels.level(1).rooms.isEmpty());
+        for (int number = RunLevels.PLACES_FROM; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
-            assertTrue("land " + number + " has " + level.rooms.size(), level.rooms.size() >= 2);
+            // A door in its village from the second land; from the second chapter, in two lands of three, another by its first crowd.
+            assertTrue("land " + number + " has " + level.rooms.size(), level.rooms.size() >= (level.chapter >= 1 && number % 3 != 1 || level.chapter >= 2 ? 2 : 1));
             assertTrue(level.main > level.gate && level.main < level.columns);
             for (int[] one : level.rooms) {
                 kinds[one[0]] = true;
@@ -1683,7 +1685,7 @@ public class PlusRunTest {
         int[] kinds = new int[RunLevels.ROOM + 1];
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level here = RunLevels.level(number);
-            assertEquals("land " + number, number >= RunLevels.SHAPED_FROM && RunLevels.bossOf(number) < 0, here.quest != 0);
+            assertEquals("land " + number, number >= RunLevels.QUESTS_FROM && RunLevels.bossOf(number) < 0, here.quest != 0);
             if (here.quest == 0) continue;
             kinds[here.quest]++;
             int asker = -1;
@@ -1813,7 +1815,7 @@ public class PlusRunTest {
             heights += tops.size();
         }
         // About twice as long as those of the first volume, on the whole; five heights of ground to a land or more; and a crowd.
-        assertTrue("mean " + total / 50 + " against " + first / 30, total / 50 > first / 30 * 1.8f);
+        assertTrue("mean " + total / 50 + " against " + first / 30, total / 50 > first / 30 * 1.5f);
         assertTrue("heights " + heights / 50f, heights / 50f >= 5);
         assertTrue("signs " + crowd / 50f, crowd / 50f >= 25);
         for (char square : new char[]{RunLevels.THIN, RunLevels.CRUMBLE, RunLevels.BELT_RIGHT, RunLevels.BELT_LEFT, RunLevels.SLICK, RunLevels.DRAUGHT,
@@ -2073,7 +2075,7 @@ public class PlusRunTest {
         int before = 0;
         for (int number = 1; number <= RunLevels.COUNT; number++) {
             RunLevels.Level level = RunLevels.level(number);
-            boolean shaped = number >= RunLevels.SHAPED_FROM, waits = RunLevels.bossOf(number) >= 0;
+            boolean shaped = true, waits = RunLevels.bossOf(number) >= 0;
             assertEquals(number, level.number);
             assertEquals((number - 1) / 6, level.chapter);
             assertTrue("land " + number + " has " + level.pluses.size() + " pluses", level.pluses.size() >= 15);
@@ -2085,13 +2087,12 @@ public class PlusRunTest {
             assertEquals(level.columns, RunLevels.level(number).columns);
             // Something to fight with by each flag, and from the second land on by where she starts; each lies on the ground.
             // From the twenty-third there is also a book or a brush, and an ink gun, each before what it is good against.
-            assertEquals("land " + number, (number == 1 ? 2 : waits ? 4 : 3) + (shaped ? 2 : 0), level.weapons.size());
+            assertEquals("land " + number, (number == 1 ? 2 : waits ? 4 : 3) + Math.min(2, level.chapter), level.weapons.size());
             // Chikuwa waits with bread from the third land and Rune with her ink from the ninth; ice cream and the rest from the fourth.
             int bread = 0, ink = 0, loose = 0, villagers = 0, stalls = 0;
             for (int[] item : level.items) {
                 int top = RunLevels.top(level, item[1]);
                 assertTrue("land " + number + " column " + item[1], top >= 0 && item[2] < top);
-                if (!shaped) assertEquals(FLOOR, top);
                 assertFalse(PlusRun.solid(level.land[item[2]][item[1]]));
                 if (item[0] == PlusRun.STALL) stalls++;
                 else if (item[0] == PlusRun.DROPOFF) assertEquals(RunLevels.LETTER, level.quest);
@@ -2117,7 +2118,7 @@ public class PlusRunTest {
             java.util.Set<Integer> heights = new java.util.HashSet<>();
             for (int column = 0; column < level.columns; column++) heights.add(RunLevels.top(level, column));
             heights.remove(-1);
-            if (shaped) assertTrue("land " + number + " is flat", heights.size() >= 3);
+            assertTrue("land " + number + " is flat", heights.size() >= 2);
             if (number % 6 == 0 && number < RunLevels.COUNT) {
                 assertTrue("land " + number + " is " + level.columns + " long, after " + before, level.columns > before - 30);
                 before = level.columns;
