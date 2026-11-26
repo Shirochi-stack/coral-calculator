@@ -119,8 +119,9 @@ public final class CompanionSettingsActivity extends Activity {
                 });
 
         section(content, "Play with Halgakos");
-        content.addView(text("Games to play with her. Plus run, at the top of them, is a run and jump through thirty "
-                + "lands, with a story she tells in her own voice and things to fight with along the way. There are "
+        content.addView(text("Games to play with her. Plus run, at the top of them, is a run and jump through eighty "
+                + "lands, with a story told in voices, bosses, quests, and hair colours to win. Page brawl is a fight "
+                + "between her and her friends. There are "
                 + "also chess, minesweeper, a card game, tic-tac-toe and more, some on a card where the mini "
                 + "calculator opens and some over the whole screen. Hold her and choose Play with Halgakos, or "
                 + "start here.", 15, muted()));
