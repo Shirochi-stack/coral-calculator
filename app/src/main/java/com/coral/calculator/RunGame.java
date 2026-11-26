@@ -102,7 +102,7 @@ final class RunGame {
      * each step costs, and the picture beside it (-1 for her own, with her wings out).
      */
     private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings", "Glossary magnet", "Longer treats", "Bigger ink tank",
-            "Flag picnic", "Thicker ink", "Spare bookmarks"};
+            "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons"};
     private static final String[][] UP_GIVES = {
             {"A fourth heart in every land", "A fifth heart in every land"},
             {"A second jump in the air: press jump again"},
@@ -111,13 +111,25 @@ final class RunGame {
             {"The ink gun holds 24 shots", "The ink gun holds 32 shots"},
             {"Every flag she passes gives a heart back"},
             {"A ball of Rune's ink takes two hurts"},
-            {"A fourth life in every land", "A fifth life in every land", "A sixth life in every land"}};
-    private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}};
+            {"A fourth life in every land", "A fifth life in every land", "A sixth life in every land"},
+            {"Three colours worn at once", "Four colours worn at once", "Five colours worn at once", "All seven at once: white"},
+            {"A colour is ready a second sooner", "A colour is ready two seconds sooner", "A colour is ready three seconds sooner"}};
+    private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}, {200, 350, 500, 900},
+            {120, 240, 400}};
+    /** How many colours must be hers before each step of the prism is for sale: the last, all seven. */
+    private static final int[] PRISM_NEEDS = {3, 4, 5, 7};
+    private static final int PRISM = 8, QUICK = 9;
+    /** The mixes that have names, as {@link PlusRun} numbers them: what each is called, what it is made of, and what it does. */
+    private static final String[] MIX_NAMES = {"Steam", "Comet", "Tide", "Mirror", "Gale", "Ember", "Prism", "White"};
+    private static final String[] MIX_OF = {"Red + Blue", "Red + Yellow", "Blue + Green", "Brown + Purple", "Green + Yellow", "Red + Brown", "Any three", "All seven"};
+    private static final String[] MIX_DOES = {"a cloud that goes through them, and a jump more in the air", "at a run she goes through whatever she meets",
+            "she comes down slowly, and water goes both ways", "what is sent back goes on through a row", "she rises much faster",
+            "what she knocks over flies off burning", "whatever lands on her lands by half", "every power at once, and she glows"};
     /** The order they stand in at the counter: lives under hearts. And the picture that stands for her own face. */
-    private static final int[] UP_ORDER = {0, 7, 1, 2, 3, 4, 5, 6};
+    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 2, 3, 4, 5, 6};
     private static final int HER_FACE = -2;
     private static final int[] UP_ART = {BUFF_ART + PlusRun.BREAD, -1, BUFF_ART + PlusRun.MAGNET, BUFF_ART + PlusRun.ICE, WEAPON_ART + PlusRun.GUN,
-            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE};
+            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART};
     /** How long the ice cream, the magnet and the notes last before anything is bought, as {@link PlusRun} has them. */
     private static final float[] BUFF_LASTS = {0, 8, 0, 10, 6};
 
@@ -143,7 +155,19 @@ final class RunGame {
      * other. And, while a picture of her is drawn, the colour to draw it in, if it is not
      * to be the one she is in.
      */
-    private int look, lookFrom, drawnAs = -1;
+    private int look, lookFrom, drawnAs = NO_LOOK;
+    private static final int NO_LOOK = Integer.MIN_VALUE;
+    /**
+     * The ribbon and the mixing of colours: which finger is on the ribbon, or -1, and for
+     * how long; whether the colours she owns are fanned out to be picked from; which of
+     * them are picked to be put on and to be let go of, as bits; which the finger was last
+     * over; where each of them is on the screen; how long since the arrow stepped to
+     * another colour; and the mix that last formed, and how long ago.
+     */
+    private int ribbonFinger = -1, fanWant, fanDrop, fanOver = -1, seenMixings, seenFaded, seenWhitened, mixShown = -1;
+    private float ribbonHeld, sinceStep = 9, mixAge = 9;
+    private boolean fanOpen, hintMix;
+    private final RectF[] fanCells = new RectF[PlusRun.WHITE];
     private float lookAge = 9;
     private static final float LOOK = .55f;
     /** The colour she wore when she was last hurt, for the pictures of her thrown and fallen; and how long ago a hurt made her flinch. */
@@ -408,6 +432,9 @@ final class RunGame {
         PlusRun.Perks kept = new PlusRun.Perks();
         kept.hearts = PlusRun.HEARTS + bought(0);
         kept.lives = PlusRun.LIVES + bought(7);
+        // How many of her colours she may wear at once: two, and with each step of the prism one more, the last step all seven.
+        kept.together = bought(PRISM) >= PRISM_NEEDS.length ? 7 : 2 + bought(PRISM);
+        kept.recharge -= bought(QUICK);
         kept.wings = bought(1) > 0;
         kept.reach = bought(2) == 0 ? 0 : bought(2) == 1 ? 1.6f : 2.6f;
         kept.lasting = 1 + .5f * bought(3);
@@ -537,7 +564,7 @@ final class RunGame {
      * she was: in the colour before, if she was in one, so that it can fade into the new.
      */
     private int formDrawn() {
-        int form = run == null ? 0 : run.form();
+        int form = lookWanted();
         if (form == 0 || form == dyedForm) return form;
         if (!dyeing) {
             dyeing = true;
@@ -562,8 +589,33 @@ final class RunGame {
         return look == dyedForm ? look : 0;
     }
 
+    /**
+     * How she is to look: in her own hair, 0; in one colour, that colour, by its number;
+     * in white, white; under black that was put on her, black; and wearing several, their
+     * blend, as a colour in itself with every bit of its top byte set.
+     */
+    private int lookWanted() {
+        if (run == null) return 0;
+        if (run.cursed() > 0) return PlusRun.BLACK;
+        if (run.white()) return PlusRun.WHITE;
+        int mix = run.mix();
+        if (mix == 0) return 0;
+        if (Integer.bitCount(mix) == 1) return Integer.numberOfTrailingZeros(mix) + 1;
+        int red = 0, green = 0, blue = 0, count = Integer.bitCount(mix);
+        for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) {
+            if ((mix & 1 << colour - 1) == 0) continue;
+            red += Color.red(FORM_COLOURS[colour - 1]);
+            green += Color.green(FORM_COLOURS[colour - 1]);
+            blue += Color.blue(FORM_COLOURS[colour - 1]);
+        }
+        return 0xFF000000 | red / count << 16 | green / count << 8 | blue / count;
+    }
+
+    /** The colour itself of a way she may look. */
+    private static int lookColour(int look) { return look == 0 ? CalculatorLayout.CORAL : look > 0 && look <= PlusRun.WHITE ? FORM_COLOURS[look - 1] : look; }
+
     /** The colour a picture of her is to be drawn in at this moment. */
-    private int drawn() { return drawnAs >= 0 ? drawnAs : run == null || screen == MAP || screen == SHOP ? 0 : look; }
+    private int drawn() { return drawnAs != NO_LOOK ? drawnAs : run == null || screen == MAP || screen == SHOP ? 0 : look; }
 
     private Bitmap herPet() {
         int form = drawn();
@@ -627,11 +679,13 @@ final class RunGame {
         safe.set(insets);
         // Squares large enough to see, small enough that nine of them show across and the land's height fits.
         tile = Math.max(dp(30), Math.min(dp(64), Math.min(height / (float) RunLevels.ROWS, width / 9f)));
-        // Five buttons along the bottom: the arrows on the left, with room between them, and on the right the jump, with what she carries beside it
-        // and, beside that, the ribbon that calls on a colour. On a narrow screen they are smaller and closer, so that all five fit in the one row.
+        // Six buttons along the bottom, all in the one row, which lies over the ground and never over where she walks: the arrows on the
+        // left, with room between them; and on the right the jump, what she carries beside it, the ribbon that calls on a colour beside
+        // that, and beside that again the arrow that steps to the next colour, a button of its own, forty-four across at the least and
+        // touching none of the others. On a narrow screen they are smaller and closer, so that all six fit.
         boolean narrow = safe.width() < dp(430);
-        float edge = dp(narrow ? 12 : 18), apart = dp(narrow ? 10 : 26), between = dp(narrow ? 8 : 16);
-        float size = Math.min(dp(72), (safe.width() - edge * 2 - apart - between * 2 - dp(8)) / 5);
+        float edge = dp(narrow ? 12 : 18), apart = dp(narrow ? 10 : 26), between = dp(narrow ? 8 : 16), stepper = dp(44);
+        float size = Math.min(dp(72), (safe.width() - edge * 2 - apart - between * 3 - dp(8) - stepper) / 5);
         float y = safe.bottom - dp(24) - size;
         leftButton.set(safe.left + edge, y, safe.left + edge + size, y + size);
         rightButton.set(leftButton.right + apart, y, leftButton.right + apart + size, y + size);
@@ -663,8 +717,9 @@ final class RunGame {
         // the ribbon that calls on a colour of hers, with a small one on its corner that chooses which.
         float ribbon = size * .9f;
         colourButton.set(strikeButton.left - between - ribbon, y + (size - ribbon) / 2, strikeButton.left - between, y + (size + ribbon) / 2);
-        float corner = ribbon * .48f;
-        nextButton.set(colourButton.right - corner * .8f, colourButton.top - corner * .3f, colourButton.right + corner * .2f, colourButton.top + corner * .7f);
+        // Beside it, clear of it and of every other button, the arrow that steps to the next colour.
+        float arrow = Math.max(stepper, Math.min(ribbon * .7f, size * .66f));
+        nextButton.set(colourButton.left - between - arrow, y + (size - arrow) / 2, colourButton.left - between, y + (size + arrow) / 2);
         // The counter: what can be bought, one under another.
         float high = Math.max(dp(40), Math.min(dp(78), (safe.height() - dp(120)) / wares.length - dp(8)));
         float across = Math.min(safe.width() - dp(28), dp(460));
@@ -851,6 +906,12 @@ final class RunGame {
         seenLives = seenCasts = seenBraces = seenPaid = seenReminders = seenChests = 0;
         roomCardAge = roomResultAge = -1;
         tickedAt = 0;
+        seenMixings = seenFaded = seenWhitened = 0;
+        mixAge = sinceStep = 9;
+        ribbonFinger = -1;
+        fanOpen = false;
+        // The first land begun with two colours hers: a word about wearing them together.
+        hintMix = Integer.bitCount(perks.colours & 127) >= 2 && session.tally("run_hint_mix") == 0;
         handAge = -1;
         handQuiet = false;
         questLine = null;
@@ -886,6 +947,8 @@ final class RunGame {
     private void idle() {
         goLeft = goRight = goJump = goStrike = false;
         jumpPressed = strikePressed = false;
+        ribbonFinger = -1;
+        fanOpen = false;
     }
 
     private void pause() {
@@ -985,6 +1048,15 @@ final class RunGame {
         sinceParry += seconds;
         sinceStruck += seconds;
         sinceBroke += seconds;
+        sinceStep += seconds;
+        mixAge += seconds;
+        if (screen == PLAY && ribbonFinger >= 0 && !fanOpen && (ribbonHeld += seconds) >= .3f && Integer.bitCount(perks.colours & 127) > 1) {
+            fanOpen = true;
+            fanWant = fanDrop = 0;
+            fanOver = -1;
+            audio.play("page", .5f);
+            buzz(true);
+        }
         if (toastLeft <= 0 && !toasts.isEmpty() && roomCardAge < 0 && roomResultAge < 0) {
             Object[] next = toasts.remove(0);
             toast((String) next[0], (String) next[1], (Integer) next[2]);
@@ -992,6 +1064,8 @@ final class RunGame {
         // While what was won from whoever fell is rising, everything else waits.
         if (screen == PLAY && prizeAge >= 0) {
             if ((prizeAge += seconds) > 5) prizeAge = -1;
+        } else if (screen == PLAY && fanOpen) {
+            // The land waits while she chooses.
         } else if (screen == PLAY && roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
             roomCardAge += seconds;
         } else if (screen == PLAY && roomResultAge >= 0 && roomResultAge < 2.6f) {
@@ -1076,14 +1150,44 @@ final class RunGame {
             look = now;
             lookAge = 0;
         }
-        // A colour gone: it leaves her in a scatter of itself, with a sound of its own; and so does one that another takes the place of.
-        if (formBefore != 0 && run.form() != formBefore) {
+        // A colour gone: it leaves her in a scatter, with a sound of its own.
+        if (run.faded() != seenFaded) {
+            seenFaded = run.faded();
             audio.play("pop", .45f);
             for (int spark = 0; spark < 14; spark++) {
                 double way = -Math.PI / 2 + (random.nextFloat() - .5f) * 2.4f;
                 bits.add(new float[]{herX + (random.nextFloat() - .5f) * .7f, herY - 1.1f - random.nextFloat() * .5f, (float) Math.cos(way) * 2.2f,
-                        (float) Math.sin(way) * 3.4f - 2, .8f, 2 + formBefore});
+                        (float) Math.sin(way) * 3.4f - 2, .8f, formBefore > 0 && formBefore < PlusRun.WHITE ? 2 + formBefore : 0});
             }
+        }
+        // A mix that has a name has formed: its name, what it is made of and what it does, for a moment; and it is kept that she has made it.
+        if (run.mixings() != seenMixings) {
+            seenMixings = run.mixings();
+            mixShown = run.lastMix();
+            mixAge = 0;
+            audio.play("star", .7f);
+            buzz(true);
+            int made = session.tally("run_mixes");
+            if ((made & 1 << mixShown) == 0) {
+                session.keep("run_mixes", made | 1 << mixShown);
+                if (made == 0 && mixShown != PlusRun.WHITEN) speak(RunStory.MIX[1], true);
+            }
+        }
+        // White of her own seven colours: that is white won, and kept where her settings can see it.
+        if (run.whitened() != seenWhitened) {
+            seenWhitened = run.whitened();
+            if ((colours() & 1 << PlusRun.WHITE - 1) == 0) {
+                session.keep("run_colours", colours() | 1 << PlusRun.WHITE - 1);
+                toast("White is hers", "All seven worn at once. Hers in the assistant's settings too.", -PlusRun.WHITE);
+            }
+            flash = .5f;
+            audio.play("win", .8f);
+            speak(RunStory.MIX[2], true);
+        }
+        if (hintMix && run.time() > 1.2f && captionLeft <= 0 && personLeft <= 0) {
+            hintMix = false;
+            session.keep("run_hint_mix", 1);
+            speak(RunStory.MIX[0], true);
         }
 
         if (run.jumps() != seenJumps) {
@@ -1140,7 +1244,6 @@ final class RunGame {
         if (run.formed() != seenFormed) {
             seenFormed = run.formed();
             int form = run.form();
-            formLasts = Math.max(.1f, run.formLeft());
             flash = .3f;
             // A colour coming on: a ring of it closing on her.
             for (int spark = 0; spark < 16 && form > 0; spark++) {
@@ -1800,20 +1903,7 @@ final class RunGame {
                 if (action == MotionEvent.ACTION_DOWN && roomResultAge > .8f) roomResultAge = 2.6f;
                 return;
             }
-            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && perks.colours != 0) {
-                float px = event.getX(event.getActionIndex()), py = event.getY(event.getActionIndex());
-                if (colourButton.contains(px, py)) {
-                    if (!run.call(chosen)) audio.play("no", .4f);
-                    return;
-                }
-                if (nextButton.contains(px, py) && Integer.bitCount(perks.colours) > 1) {
-                    do chosen = chosen % PlusRun.WHITE + 1;
-                    while ((perks.colours & 1 << chosen - 1) == 0);
-                    session.keep("run_colour", chosen);
-                    audio.play("tap", .5f);
-                    return;
-                }
-            }
+            if (perks.colours != 0 && colourTouch(event, action)) return;
             // At a door, the same button uses it: in, out, or through the crack to it.
             if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && !run.atStall() && run.door() >= 0
                     && stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
@@ -1893,7 +1983,6 @@ final class RunGame {
                 if (sold) {
                     seenTaken = run.taken();
                     seenFormed = run.formed();
-                    formLasts = Math.max(.1f, run.formLeft());
                 }
                 return;
             }
@@ -1914,10 +2003,23 @@ final class RunGame {
         }
     }
 
+    /** What must be so before the next step of something is for sale, in a few words; or null, if it is. */
+    private String locked(int which) {
+        int has = bought(which);
+        if (which != PRISM || has >= PRISM_NEEDS.length) return null;
+        int owned = Integer.bitCount(colours() & 127);
+        return owned >= PRISM_NEEDS[has] ? null : PRISM_NEEDS[has] == 7 ? "Needs all seven colours: " + owned + " of 7 won" : "Needs " + PRISM_NEEDS[has] + " colours won: "
+                + owned + " so far";
+    }
+
     /** Buys the next step of something, if her pluses stretch to it. */
     private void buy(int which) {
         int has = bought(which);
         if (has >= UP_COSTS[which].length) return;
+        if (locked(which) != null) {
+            audio.play("no", .5f);
+            return;
+        }
         int cost = UP_COSTS[which][has];
         if (bank() < cost) {
             audio.play("no", .5f);
@@ -1930,6 +2032,97 @@ final class RunGame {
         audio.play("buy", .6f);
         buzz(true);
         speak(RunStory.SHOP[1], false);
+    }
+
+    /**
+     * A touch on the ribbon, its arrow, or the colours opened out from it. The arrow is a
+     * button of its own, clear of the ribbon, and steps to the next colour that is hers at
+     * any time. The ribbon, let go of at once, calls on the colour it shows, which is added
+     * to what she wears; held for a third of a second it opens out every colour that is
+     * hers, and the land waits: sliding onto one picks it, to be put on if it is not on and
+     * let go of if it is, and letting go of the screen does all of that at once. Another
+     * finger may be on an arrow or the jump all the while. Returns whether the touch was
+     * one of these and is done with.
+     */
+    private boolean colourTouch(MotionEvent event, int action) {
+        int index = event.getActionIndex(), finger = event.getPointerId(index);
+        float px = event.getX(index), py = event.getY(index);
+        boolean down = action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN;
+        boolean up = action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL;
+        if (fanOpen) {
+            // Whichever finger is on one of them picks it: the one that opened them, as it slides, or another, as it comes down.
+            for (int each = 0; each < event.getPointerCount(); each++) {
+                if (!down && event.getPointerId(each) != ribbonFinger) continue;
+                if (down && each != index) continue;
+                int over = -1;
+                for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) {
+                    if (fanCells[colour] != null && (perks.colours & 1 << colour - 1) != 0 && fanCells[colour].contains(event.getX(each), event.getY(each))) over = colour;
+                }
+                if (down && over >= 0) pick(over);
+                else if (!down && over != fanOver) {
+                    fanOver = over;
+                    if (over >= 0) pick(over);
+                }
+            }
+            if (up && (finger == ribbonFinger || action != MotionEvent.ACTION_POINTER_UP)) {
+                // Let go of: what was picked is done, all at once.
+                for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) if ((fanDrop & 1 << colour - 1) != 0) run.drop(colour);
+                if (fanWant != 0 && run.callAll(fanWant) == 0) audio.play("no", .4f);
+                fanOpen = false;
+                ribbonFinger = -1;
+                idle();
+            }
+            return true;
+        }
+        if (down && nextButton.contains(px, py)) {
+            if (Integer.bitCount(perks.colours & 127) > 1) {
+                do chosen = chosen % PlusRun.BLACK + 1;
+                while ((perks.colours & 1 << chosen - 1) == 0);
+                session.keep("run_colour", chosen);
+                sinceStep = 0;
+                audio.play("tap", .5f);
+                buzz(false);
+            }
+            return true;
+        }
+        if (down && colourButton.contains(px, py)) {
+            ribbonFinger = finger;
+            ribbonHeld = 0;
+            return true;
+        }
+        if (up && finger == ribbonFinger) {
+            // Let go of before the colours opened out: a tap, which calls on the colour shown, with whatever she wears.
+            ribbonFinger = -1;
+            if (!run.call(chosen)) {
+                audio.play("no", .4f);
+                pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, run.on(chosen) > 0 ? "Already on" : run.untilCall(chosen) > 0
+                        ? "Ready in " + (int) Math.ceil(run.untilCall(chosen)) + " s" : run.cursed() > 0 ? "Not under black" : "No more than " + run.together() + " at once");
+            }
+            return action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL;
+        }
+        return false;
+    }
+
+    /** One of the colours opened out is picked: on, to be let go of, or not; off and ready, to be put on, or not, if there is room for it. */
+    private void pick(int colour) {
+        int bit = 1 << colour - 1;
+        if (run.on(colour) > 0) {
+            fanDrop ^= bit;
+        } else if (run.untilCall(colour) > 0 || run.cursed() > 0) {
+            audio.play("no", .3f);
+            return;
+        } else if ((fanWant & bit) != 0) {
+            fanWant &= ~bit;
+        } else {
+            int own = run.mix() & perks.colours & ~fanDrop;
+            if (Integer.bitCount(own) + Integer.bitCount(fanWant) >= run.together()) {
+                audio.play("no", .3f);
+                return;
+            }
+            fanWant |= bit;
+        }
+        audio.play("tap", .5f);
+        buzz(false);
     }
 
     /** Which buttons are held, by however many fingers are down: one may hold an arrow while another jumps. */
@@ -2742,10 +2935,7 @@ final class RunGame {
         paint.setAlpha(255);
         pieceIn(canvas, four, hidden ? CRACK_PICTURE : one[0] == RunLevels.ARENA ? CELLAR_PICTURE : DOOR_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7),
                 stallButton.width() * .46f, 0);
-        text.setTextAlign(Paint.Align.CENTER);
-        text.setColor(0xFF292B2A);
-        text.setTextSize(dp(12.5f));
-        canvas.drawText(run.room() >= 0 ? "Leave" : hidden ? "Break" : "Enter", stallButton.centerX(), stallButton.bottom - dp(12), text);
+        label(canvas, stallButton, run.room() >= 0 ? "Leave" : hidden ? "Break" : "Enter");
         canvas.restore();
     }
 
@@ -3446,6 +3636,29 @@ final class RunGame {
                 canvas.drawCircle(feetX, feetY - tall * .45f, tall * .62f, paint);
                 paint.setColor(Color.BLACK);
             }
+            if (run.white()) {
+                // White, she glows: a halo of light about her, with rays that turn.
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(Color.WHITE);
+                float beat = .5f + .5f * (float) Math.sin(clock * 4);
+                for (int ring = 3; ring >= 1; ring--) {
+                    paint.setAlpha(Math.round((26 + 14 * beat) * (4 - ring)));
+                    canvas.drawCircle(feetX, feetY - tall * .48f, tall * (.42f + ring * .16f + .04f * beat), paint);
+                }
+                paint.setColor(0xFFFFF3C4);
+                for (int ray = 0; ray < 8; ray++) {
+                    double turn = clock * .7f + ray * Math.PI / 4;
+                    path.reset();
+                    path.moveTo(feetX, feetY - tall * .48f);
+                    path.lineTo(feetX + (float) Math.cos(turn - .09) * tall * 1.15f, feetY - tall * .48f + (float) Math.sin(turn - .09) * tall * 1.15f);
+                    path.lineTo(feetX + (float) Math.cos(turn + .09) * tall * 1.15f, feetY - tall * .48f + (float) Math.sin(turn + .09) * tall * 1.15f);
+                    path.close();
+                    paint.setAlpha(Math.round(34 + 22 * beat));
+                    canvas.drawPath(path, paint);
+                }
+                paint.setColor(Color.BLACK);
+                paint.setAlpha(255);
+            }
             int alpha = run.safe() && (int) (run.time() * 14) % 2 == 0 ? 90 : 255;
             // Full of ice cream, she leaves herself behind.
             if (run.rush() > 0 && run.running()) {
@@ -3472,14 +3685,14 @@ final class RunGame {
                 her(canvas, feetX, feetY, tall, weapon, leftward, alpha);
                 drawnAs = look;
                 her(canvas, feetX, feetY, tall, weapon, leftward, Math.round(alpha * lookAge / LOOK));
-                drawnAs = -1;
+                drawnAs = NO_LOOK;
             } else if (look != 0 && run.formLeft() > 0 && run.formLeft() < 2) {
                 // About to go, the colour flickers toward her own, faster as it nears the end.
                 her(canvas, feetX, feetY, tall, weapon, leftward, alpha);
                 float beat = .5f + .5f * (float) Math.sin(clock * (10 + (2 - run.formLeft()) * 9));
                 drawnAs = 0;
                 her(canvas, feetX, feetY, tall, weapon, leftward, Math.round(alpha * .75f * beat));
-                drawnAs = -1;
+                drawnAs = NO_LOOK;
             } else {
                 her(canvas, feetX, feetY, tall, weapon, leftward, alpha);
             }
@@ -3526,7 +3739,7 @@ final class RunGame {
             // The colour of her form about her feet, so that it is seen at once.
             if (run.form() != 0) {
                 paint.setStyle(Paint.Style.FILL);
-                paint.setColor(FORM_COLOURS[run.form() - 1]);
+                paint.setColor(lookColour(lookWanted()));
                 paint.setAlpha(Math.round(70 + 40 * (float) Math.sin(clock * 8)));
                 canvas.drawOval(feetX - tile * .55f, feetY - tile * .1f, feetX + tile * .55f, feetY + tile * .1f, paint);
                 paint.setColor(Color.BLACK);
@@ -3683,7 +3896,7 @@ final class RunGame {
                 text.setTextSize(dp(12.5f));
                 text.setTextAlign(Paint.Align.LEFT);
                 text.setColor(dark ? 0xFFF3F3F3 : colour);
-                canvas.drawText(waitName(boss.kind), bar, under + dp(15), text);
+                fitted(canvas, waitName(boss.kind), bar, under + dp(15), dp(12.5f), end - bar - dp(88));
                 // How she stands toward a blow, in a word and a mark at the end of her name's line: a shield while blows are turned aside,
                 // which flashes when one is; and, while one would land, the word for it in gold, blinking when that is about to be over.
                 int guard = run.guard(boss);
@@ -3760,14 +3973,14 @@ final class RunGame {
             int picture = asked == RunLevels.CAKES ? CAKE_PICTURE : asked == RunLevels.CELLAR ? CELLAR_PICTURE : asked == RunLevels.LETTER ? LETTER_PICTURE
                     : asked == RunLevels.TIME ? WATCH_PICTURE : CRACK_PICTURE;
             text.setTextSize(dp(13.5f));
-            float high = dp(34), wide = text.measureText(words) + dp(50);
+            float high = dp(34), wide = Math.min(text.measureText(words) + dp(50), safe.width() - margin * 2);
             box.set(safe.left + margin, under, safe.left + margin + wide, under + high);
             plate(canvas, box, high / 2, 235);
             paint.setAlpha(255);
             pieceIn(canvas, four, stands == PlusRun.ASKED ? picture : SCROLL_PICTURE, safe.left + margin + dp(19), under + high / 2, dp(24), 0);
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(stands == PlusRun.DONE || stands == PlusRun.PAID ? 0xFF2E9E6E : stands == PlusRun.FAILED ? soft : ink);
-            canvas.drawText(words, safe.left + margin + dp(36), under + dp(22), text);
+            fitted(canvas, words, safe.left + margin + dp(36), under + dp(22), dp(13.5f), wide - dp(50));
             under += high + dp(8);
         }
         // In a place off the land where something is going on, a plate of its own, apart from the land's: for a cellar, which wave it is
@@ -3822,15 +4035,38 @@ final class RunGame {
             under += high + dp(8);
         }
         // Her form: its ribbon, with how much of it is left going round it.
-        if (run.form() != 0) {
+        for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) {
+            boolean put = colour == PlusRun.BLACK && run.cursed() > 0;
+            if (run.on(colour) <= 0 && !put) continue;
             box.set(x, under, x + round, under + round);
             plate(canvas, box, round / 2, 235);
-            pieceIn(canvas, two, RIBBON_ART + run.form() - 1, x + round / 2, under + round / 2, round * .62f, 0);
-            stroke.setColor(FORM_COLOURS[run.form() - 1]);
+            pieceIn(canvas, two, RIBBON_ART + colour - 1, x + round / 2, under + round / 2, round * .62f, 0);
+            stroke.setColor(FORM_COLOURS[colour - 1]);
             stroke.setStrokeWidth(dp(2.5f));
             box.set(x + dp(2), under + dp(2), x + round - dp(2), under + round - dp(2));
-            canvas.drawArc(box, -90, 360 * Math.min(1, run.formLeft() / formLasts), false, stroke);
-            x += round + dp(6);
+            canvas.drawArc(box, -90, 360 * Math.min(1, put ? run.cursed() / 7 : run.on(colour) / Math.max(.1f, run.lasted(colour))), false, stroke);
+            x += round * (run.mix() != 0 && Integer.bitCount(run.mix()) > 3 ? .72f : 1) + dp(Integer.bitCount(run.mix()) > 3 ? 0 : 6);
+        }
+        // And, joined to them, what the mix they make is called, when it has a name: for a moment as it forms, larger, with what it does.
+        if (mixShown >= 0 && mixAge < 3.2f && run.mix() != 0) {
+            float show = Math.min(1, mixAge / .2f) * Math.max(0, Math.min(1, (3.2f - mixAge) / .4f));
+            String name = MIX_NAMES[mixShown] + "!", does = MIX_OF[mixShown] + ": " + MIX_DOES[mixShown];
+            text.setTextSize(dp(12));
+            float wide = Math.min(safe.width() - margin * 2, Math.max(dp(150), text.measureText(does) + dp(28))), high = dp(52);
+            float left = safe.centerX() - wide / 2, top = safe.top + safe.height() * .32f;
+            canvas.saveLayerAlpha(left - dp(6), top - dp(6), left + wide + dp(6), top + high + dp(10), Math.round(255 * show));
+            box.set(left, top, left + wide, top + high);
+            plate(canvas, box, dp(18), 245);
+            stroke.setColor(lookColour(lookWanted()));
+            stroke.setStrokeWidth(dp(2.5f));
+            canvas.drawRoundRect(left, top, left + wide, top + high, dp(18), dp(18), stroke);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(ink);
+            fitted(canvas, name, safe.centerX(), top + dp(24), dp(18), wide - dp(24));
+            text.setColor(soft);
+            fitted(canvas, does, safe.centerX(), top + dp(42), dp(12), wide - dp(24));
+            canvas.restore();
+            box.set(x, under, x + round, under + round);
         }
         // What is helping her, each with how much of it is left going round it.
         float[] left = {0, run.rush() / (BUFF_LASTS[PlusRun.ICE] * perks.lasting), run.shield() ? 1 : 0,
@@ -3881,11 +4117,30 @@ final class RunGame {
         canvas.scale(beat, beat, stallButton.centerX(), stallButton.centerY());
         button(canvas, stallButton, false, colour);
         basket(canvas, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .34f, colour);
+        label(canvas, stallButton, "Shop");
+        canvas.restore();
+        // What she has to spend there, apart from the button: a small pill over it.
+        String purse = "+ " + run.purse();
+        text.setTextSize(dp(12.5f));
+        float wide = text.measureText(purse) + dp(18), high = dp(22), top = stallButton.top - high - dp(4);
+        box.set(stallButton.centerX() - wide / 2, top, stallButton.centerX() + wide / 2, top + high);
+        plate(canvas, box, high / 2, 240);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(colour);
+        canvas.drawText(purse, stallButton.centerX(), top + dp(15.5f), text);
+    }
+
+    /**
+     * A word along the bottom of a round button, inside it: it is measured against the
+     * width the circle has at the height the word is written at, less a margin, and written
+     * smaller until it fits, so that nothing written on a round button crosses its rim.
+     */
+    private void label(Canvas canvas, RectF button, String word) {
+        float round = button.width() / 2, size = Math.min(dp(12.5f), round * .36f), down = round * .5f;
+        float room = 2 * (float) Math.sqrt(Math.max(0, round * round - (down + size * .3f) * (down + size * .3f))) - dp(8);
         text.setTextAlign(Paint.Align.CENTER);
         text.setColor(0xFF292B2A);
-        text.setTextSize(dp(12.5f));
-        canvas.drawText("Shop  + " + run.purse(), stallButton.centerX(), stallButton.bottom - dp(13), text);
-        canvas.restore();
+        fitted(canvas, word, button.centerX(), button.centerY() + down + size * .35f, size, room);
     }
 
     /** A little shopping basket, drawn: a bowl with a handle over it. */
@@ -4308,21 +4563,26 @@ final class RunGame {
 
     /** The button that calls on the colour she has chosen, with how full what she calls on it with is going round it; and, with more than one to choose from, a smaller one that chooses the next. */
     /**
-     * The ribbon that calls on a colour of hers, which says at a glance how things stand.
-     * While any colour is on, hers or a ribbon's, it is filled with that colour, the seconds
-     * it has left are written on it large, and a ring round it runs down with them. While
-     * she waits to call again it is grey, with the seconds to go written small under a pale
-     * ribbon, and a ring of the colour filling. And when she may call, it is bright, the
-     * ribbon whole, the ring full and beating, with nothing written on it.
+     * The ribbon that calls on a colour of hers, and the arrow over it that steps to the
+     * next. The ribbon shows the colour chosen and how that one colour stands, each way
+     * unlike the others. On: filled with the colour, a ring round it running down, the
+     * seconds left written large, and the word "on". Waiting: grey, the ribbon pale, an
+     * hourglass of a ring filling, and "wait" with the seconds to go. Ready: white, the
+     * ribbon whole and bright, a ring of the colour beating round it. Round its rim is a
+     * dot for each colour she is wearing. For a moment after the arrow has stepped, the
+     * name of the colour stepped to is written over the arrow.
      */
     private void colourControl(Canvas canvas) {
-        int owned = perks.colours;
-        if (chosen == 0 || (owned & 1 << chosen - 1) == 0) chosen = Integer.numberOfTrailingZeros(owned) + 1;
-        float charge = run.charge(), x = colourButton.centerX(), y = colourButton.centerY(), round = colourButton.width() / 2;
-        boolean on = run.coloured();
-        int colour = FORM_COLOURS[(on ? run.form() : chosen) - 1];
+        int owned = perks.colours & 127;
+        if (chosen == 0 || chosen > PlusRun.BLACK || (owned & 1 << chosen - 1) == 0) chosen = Integer.numberOfTrailingZeros(owned) + 1;
+        float x = colourButton.centerX(), y = colourButton.centerY(), round = colourButton.width() / 2;
+        boolean on = run.on(chosen) > 0, waiting = !on && run.untilCall(chosen) > 0, held = ribbonFinger >= 0;
+        int colour = FORM_COLOURS[chosen - 1];
+        boolean pale = chosen == PlusRun.YELLOW;
         box.set(colourButton.left + dp(3), colourButton.top + dp(3), colourButton.right - dp(3), colourButton.bottom - dp(3));
         text.setTextAlign(Paint.Align.CENTER);
+        canvas.save();
+        if (held) canvas.scale(.93f, .93f, x, y);
         if (on) {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(0x33000000);
@@ -4330,30 +4590,31 @@ final class RunGame {
             paint.setColor(colour);
             canvas.drawCircle(x, y, round, paint);
             paint.setColor(Color.BLACK);
-            boolean pale = run.form() == PlusRun.WHITE || run.form() == PlusRun.YELLOW;
             stroke.setColor(pale ? 0xFF3A3F45 : Color.WHITE);
-            stroke.setAlpha(run.formLeft() < 2 && (int) (clock * 10) % 2 == 0 ? 110 : 255);
+            stroke.setAlpha(run.on(chosen) < 2 && (int) (clock * 10) % 2 == 0 ? 110 : 255);
             stroke.setStrokeWidth(dp(4));
-            canvas.drawArc(box, -90, 360 * Math.max(0, Math.min(1, run.formLeft() / formLasts)), false, stroke);
+            canvas.drawArc(box, -90, 360 * Math.max(0, Math.min(1, run.on(chosen) / Math.max(.1f, run.lasted(chosen)))), false, stroke);
             stroke.setAlpha(255);
             text.setColor(pale ? 0xFF3A3F45 : Color.WHITE);
-            text.setTextSize(round * .95f);
-            canvas.drawText(String.valueOf((int) Math.ceil(run.formLeft())), x, y + round * .33f, text);
-        } else if (charge < 1) {
+            text.setTextSize(round * .8f);
+            canvas.drawText(String.valueOf((int) Math.ceil(run.on(chosen))), x, y + round * .16f, text);
+            text.setTextSize(round * .34f);
+            canvas.drawText("on", x, y + round * .58f, text);
+        } else if (waiting) {
             button(canvas, colourButton, false, 0xFF9AA0A6);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(dark ? 0xFF2F3336 : 0xFFE4E6E8);
+            paint.setColor(dark ? 0xFF2F3336 : 0xFFDDE0E2);
             canvas.drawCircle(x, y, round - dp(2), paint);
             paint.setColor(Color.BLACK);
-            paint.setAlpha(90);
-            pieceIn(canvas, two, RIBBON_ART + chosen - 1, x, y - round * .2f, round * .8f, 0);
+            paint.setAlpha(70);
+            pieceIn(canvas, two, RIBBON_ART + chosen - 1, x, y - round * .26f, round * .7f, 0);
             paint.setAlpha(255);
             stroke.setColor(colour);
             stroke.setStrokeWidth(dp(3.5f));
-            canvas.drawArc(box, -90, 360 * charge, false, stroke);
+            canvas.drawArc(box, -90, 360 * Math.max(0, Math.min(1, run.charge(chosen))), false, stroke);
             text.setColor(soft);
-            text.setTextSize(round * .5f);
-            canvas.drawText((int) Math.ceil(run.untilCall()) + " s", x, y + round * .66f, text);
+            text.setTextSize(round * .34f);
+            canvas.drawText("wait " + (int) Math.ceil(run.untilCall(chosen)) + " s", x, y + round * .58f, text);
         } else {
             float beat = .5f + .5f * (float) Math.sin(clock * 5);
             paint.setStyle(Paint.Style.FILL);
@@ -4368,13 +4629,133 @@ final class RunGame {
             stroke.setStrokeWidth(dp(3.5f));
             canvas.drawArc(box, -90, 360, false, stroke);
         }
+        canvas.restore();
+        // A dot on its rim for each colour she is wearing, whichever is shown.
+        int wearing = run.mix(), dots = Integer.bitCount(wearing), dot = 0;
+        for (int each = PlusRun.RED; each <= PlusRun.BLACK && dots > 0; each++) {
+            if ((wearing & 1 << each - 1) == 0) continue;
+            double turn = Math.toRadians(-90 + (dot - (dots - 1) / 2f) * 26);
+            float at = x + (float) Math.cos(turn) * (round + dp(1)), high = y + (float) Math.sin(turn) * (round + dp(1));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            canvas.drawCircle(at, high, dp(5.5f), paint);
+            paint.setColor(FORM_COLOURS[each - 1]);
+            canvas.drawCircle(at, high, dp(4), paint);
+            paint.setColor(Color.BLACK);
+            dot++;
+        }
+        if (fanOpen) {
+            drawFan(canvas);
+            return;
+        }
+        // The arrow, when there is more than one colour to step through: with the colour it will step to as a dot beside it.
         if (Integer.bitCount(owned) > 1) {
             button(canvas, nextButton, false, CalculatorLayout.CORAL);
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(0xFF3A3F45);
-            text.setTextSize(nextButton.height() * .7f);
-            canvas.drawText("›", nextButton.centerX(), nextButton.centerY() + nextButton.height() * .24f, text);
+            text.setTextSize(nextButton.height() * .62f);
+            canvas.drawText("›", nextButton.centerX() - nextButton.width() * .08f, nextButton.centerY() + nextButton.height() * .2f, text);
+            int next = chosen;
+            do next = next % PlusRun.BLACK + 1;
+            while ((owned & 1 << next - 1) == 0);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(FORM_COLOURS[next - 1]);
+            canvas.drawCircle(nextButton.centerX() + nextButton.width() * .2f, nextButton.centerY(), nextButton.width() * .11f, paint);
+            paint.setColor(Color.BLACK);
+            if (sinceStep < 1.4f) {
+                // The colour stepped to, by name, for a moment.
+                String name = FORM_NAMES[chosen - 1];
+                text.setTextSize(dp(13));
+                float wide = text.measureText(name) + dp(20), high = dp(24), top = nextButton.top - high - dp(4);
+                box.set(nextButton.centerX() - wide / 2, top, nextButton.centerX() + wide / 2, top + high);
+                plate(canvas, box, high / 2, Math.round(240 * Math.min(1, (1.4f - sinceStep) / .3f)));
+                text.setColor(colour == FORM_COLOURS[PlusRun.YELLOW - 1] ? 0xFF8A6A00 : colour);
+                text.setAlpha(Math.round(255 * Math.min(1, (1.4f - sinceStep) / .3f)));
+                canvas.drawText(name, nextButton.centerX(), top + dp(17), text);
+                text.setAlpha(255);
+            }
         }
+    }
+
+    /**
+     * The colours that are hers, opened out in a row over the buttons while the ribbon is
+     * held, each as it stands: on, with a ring of its time; waiting, grey, with its seconds;
+     * or ready. One picked to be put on has a gold ring and a plus; one picked to be let
+     * go of is crossed through. Over the row is how many she may wear, and what the colours
+     * that would then be on would make, if that has a name.
+     */
+    private void drawFan(Canvas canvas) {
+        int owned = perks.colours & 127, count = Integer.bitCount(owned);
+        float cell = Math.min(dp(52), (safe.width() - dp(20)) / count - dp(6)), gap = dp(6), wide = count * cell + (count - 1) * gap;
+        float left = Math.max(safe.left + dp(10), Math.min(safe.right - dp(10) - wide, colourButton.centerX() - wide / 2)), bottom = colourButton.top - dp(10);
+        // Never over her: where the row would lie across her, it lies over her head instead.
+        float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herFeet = (run.y() + PlusRun.TALL - cameraY) * tile, herTop = herFeet - tile * 1.7f;
+        if (herX > left - dp(16) && herX < left + wide + dp(16) && herFeet > bottom - cell - dp(36) && herTop < bottom + dp(6)) bottom = herTop - dp(12);
+        canvas.drawColor(0x55101018);
+        box.set(left - dp(8), bottom - cell - dp(34), left + wide + dp(8), bottom + dp(6));
+        plate(canvas, box, dp(20), 245);
+        int will = run.mix() & ~fanDrop | fanWant, at = 0;
+        for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) {
+            if ((owned & 1 << colour - 1) == 0) continue;
+            if (fanCells[colour] == null) fanCells[colour] = new RectF();
+            RectF where = fanCells[colour];
+            where.set(left + at * (cell + gap), bottom - cell, left + at * (cell + gap) + cell, bottom);
+            at++;
+            float x = where.centerX(), y = where.centerY(), round = cell / 2;
+            boolean on = run.on(colour) > 0, waiting = !on && run.untilCall(colour) > 0, want = (fanWant & 1 << colour - 1) != 0, drop = (fanDrop & 1 << colour - 1) != 0;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(waiting ? (dark ? 0xFF2F3336 : 0xFFDDE0E2) : on ? FORM_COLOURS[colour - 1] : cardColor);
+            canvas.drawCircle(x, y, round - dp(2), paint);
+            paint.setColor(Color.BLACK);
+            paint.setAlpha(waiting ? 70 : 255);
+            if (!on) pieceIn(canvas, two, RIBBON_ART + colour - 1, x, y - (waiting ? round * .2f : 0), round * (waiting ? .8f : 1.15f), 0);
+            paint.setAlpha(255);
+            stroke.setColor(waiting ? 0xFF9AA0A6 : FORM_COLOURS[colour - 1]);
+            stroke.setStrokeWidth(dp(2.5f));
+            box.set(x - round + dp(2), y - round + dp(2), x + round - dp(2), y + round - dp(2));
+            canvas.drawArc(box, -90, 360 * (on ? Math.min(1, run.on(colour) / Math.max(.1f, run.lasted(colour))) : waiting ? run.charge(colour) : 1), false, stroke);
+            text.setTextAlign(Paint.Align.CENTER);
+            if (on) {
+                text.setColor(colour == PlusRun.YELLOW ? 0xFF3A3F45 : Color.WHITE);
+                text.setTextSize(round * .8f);
+                canvas.drawText(String.valueOf((int) Math.ceil(run.on(colour))), x, y + round * .28f, text);
+            } else if (waiting) {
+                text.setColor(soft);
+                text.setTextSize(round * .42f);
+                canvas.drawText((int) Math.ceil(run.untilCall(colour)) + " s", x, y + round * .68f, text);
+            }
+            if (want) {
+                stroke.setColor(0xFFE0A21A);
+                stroke.setStrokeWidth(dp(4));
+                canvas.drawCircle(x, y, round, stroke);
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFE0A21A);
+                canvas.drawCircle(x + round * .68f, y - round * .68f, dp(8), paint);
+                paint.setColor(Color.BLACK);
+                text.setColor(Color.WHITE);
+                text.setTextSize(dp(13));
+                canvas.drawText("+", x + round * .68f, y - round * .68f + dp(4.5f), text);
+            } else if (drop) {
+                stroke.setColor(0xFF3A3F45);
+                stroke.setStrokeWidth(dp(3.5f));
+                canvas.drawLine(x - round * .6f, y - round * .6f, x + round * .6f, y + round * .6f, stroke);
+            }
+        }
+        // What that would make.
+        int named = -1;
+        boolean red = (will & 1) != 0, blue = (will & 2) != 0, brown = (will & 4) != 0, green = (will & 8) != 0, yellow = (will & 16) != 0, purple = (will & 32) != 0;
+        if (will == 127) named = PlusRun.WHITEN;
+        else if (Integer.bitCount(will) >= 3) named = PlusRun.PRISM;
+        else if (red && blue) named = PlusRun.STEAMS;
+        else if (red && yellow) named = PlusRun.COMET;
+        else if (blue && green) named = PlusRun.TIDE;
+        else if (brown && purple) named = PlusRun.MIRROR;
+        else if (green && yellow) named = PlusRun.GALE;
+        else if (red && brown) named = PlusRun.EMBER;
+        String words = named >= 0 ? MIX_NAMES[named] + ": " + MIX_DOES[named] : "Slide to pick, let go to wear  ·  " + Integer.bitCount(will & perks.colours) + " of " + run.together();
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(named >= 0 ? ink : soft);
+        fitted(canvas, words, left + wide / 2, bottom - cell - dp(13), dp(12.5f), wide);
     }
 
     private void drawStory(Canvas canvas) {
@@ -4576,7 +4957,8 @@ final class RunGame {
             int index = UP_ORDER[row];
             float left = where.left, top = where.top, right = where.right, high = where.height(), middle = where.centerY();
             int has = bought(index), steps = UP_COSTS[index].length;
-            boolean done = has >= steps, can = !done && bank >= UP_COSTS[index][has];
+            String locked = locked(index);
+            boolean done = has >= steps, can = !done && locked == null && bank >= UP_COSTS[index][has];
             plate(canvas, where, dp(16), 245);
             // Its picture: for her wings, herself at the top of a jump.
             float icon = Math.min(dp(46), high - dp(14));
@@ -4591,7 +4973,8 @@ final class RunGame {
             fitted(canvas, UP_NAMES[index], words, roomy ? top + dp(25) : middle + dp(5), dp(16), room);
             if (roomy) {
                 text.setColor(soft);
-                fitted(canvas, done ? "All of it is hers" : UP_GIVES[index][has], words, top + dp(44), dp(12.5f), room);
+                fitted(canvas, done ? "All of it is hers" : locked != null ? UP_GIVES[index][has] + ". " + locked : UP_GIVES[index][has], words, top + dp(44),
+                        dp(12.5f), room);
                 // How far along it she is: a dot for each step.
                 for (int step = 0; step < steps; step++) {
                     paint.setStyle(Paint.Style.FILL);
@@ -4609,7 +4992,7 @@ final class RunGame {
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(done ? soft : can ? Color.WHITE : CalculatorLayout.CORAL);
             text.setTextSize(dp(15));
-            canvas.drawText(done ? "Owned" : "+ " + UP_COSTS[index][has], right - dp(12) - price / 2, middle + dp(5.5f), text);
+            fitted(canvas, done ? "Owned" : locked != null ? "Locked" : "+ " + UP_COSTS[index][has], right - dp(12) - price / 2, middle + dp(5.5f), dp(15), price - dp(14));
         }
     }
 }

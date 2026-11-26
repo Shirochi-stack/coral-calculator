@@ -701,6 +701,14 @@ final class RunStory {
     static final String[][] SHIELD = {
             {"shield1", "See that shield? Nothing lands while it's up. Wait out the attack, then hit Sloppy~♡", "H",
                     PLAYER + "She is sizing up a boss who is protected by a glowing shield, and working out how to beat her. Sharp, coaching, confident." + FAST}};
+    /** About wearing colours together: that the ribbon can be held to mix them; the first mix that has a name; and white. */
+    static final String[][] MIX = {
+            {"mix1", "Two colours now. Hold the ribbon and I'll wear them together Sloppy~♡", "H",
+                    PLAYER + "She explains that holding a button lets her mix two of her hair colours at once. Helpful, bossy, pleased with herself." + FAST},
+            {"mix2", "Mixed, they do something neither does alone. Try them all Sloppy~♡", "H",
+                    PLAYER + "She has just combined two magic hair colours and found a new power. Surprised, delighted, eager." + FAST},
+            {"white1", "All seven at once. White. Look at me glow Sloppy~♡", "H",
+                    PLAYER + "All seven of her colours have just fused into shining white and she is glowing. Awed for a second, then vain and thrilled."}};
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -728,7 +736,7 @@ final class RunStory {
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
-                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD);
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX);
         return groups.toArray(new String[0][][]);
     }
 }
