@@ -408,7 +408,7 @@ public class FightTest {
             }
             assertTrue(FightCast.NAMES[kind] + " has " + frames.size(), frames.size() >= 30);
             for (int frame : frames) assertTrue(frame >= FightFrames.QS && frame < FightFrames.COUNT);
-            if (!FightFrames.FULL[kind]) continue;
+            if (!FightFrames.FULL[kind] || !FightFrames.SMOOTH[kind]) continue;
             // And each of them is a picture of its own.
             Set<String> places = new HashSet<>();
             for (int frame : frames) {
@@ -432,6 +432,300 @@ public class FightTest {
             if (blows.isEmpty() || blows.get(blows.size() - 1) != pose) blows.add(pose);
         }
         assertEquals(java.util.Arrays.asList(FightFrames.Q1, FightFrames.Q2, FightFrames.Q3, FightFrames.Q4, FightFrames.Q5), blows);
+    }
+
+    // What is counted for the companion
+
+    /** Counts for both sides of a fight, as it is run and as a device that is only shown it would count. */
+    private static final class Counted {
+        final Fight fight, shown;
+        final FightTally[] run = {new FightTally(), new FightTally()}, seen = {new FightTally(), new FightTally()};
+
+        Counted(Fight fight) {
+            this.fight = fight;
+            shown = new Fight(fight.fighters[0].kind, fight.fighters[1].kind, -1, -1, 0);
+            for (int side = 0; side < 2; side++) {
+                run[side].begin(fight, side);
+                seen[side].begin(fight, side);
+            }
+        }
+
+        void step(Fight.Pad one, Fight.Pad two) throws Exception {
+            fight.step(STEP, one, two);
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            fight.write(new java.io.DataOutputStream(bytes));
+            shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+            for (int side = 0; side < 2; side++) {
+                run[side].look(fight);
+                seen[side].look(shown);
+                assertArrayEquals(run[side].counts, seen[side].counts);
+            }
+        }
+
+        void hold(float seconds, Fight.Pad one, Fight.Pad two) throws Exception {
+            for (float gone = 0; gone < seconds; gone += STEP) step(one, two);
+        }
+
+        int of(int side, int what) { return run[side].counts[what]; }
+
+        int all(int side) {
+            int sum = 0;
+            for (int count : run[side].counts) sum += count;
+            return sum;
+        }
+    }
+
+    @Test public void whatAPlayerDoesIsCountedOnceWhereItShouldBeAndNotOtherwise() throws Exception {
+        Fight.Pad none = new Fight.Pad(), pad = new Fight.Pad();
+        // A chain of five landed in full is one; four of it is none.
+        Counted chain = new Counted(apart(Fight.HALGAKOS, Fight.CHIKUWA, 1.2f));
+        for (int frame = 0; frame < 150 && chain.fight.falls() == 0; frame++) {
+            pad.light = frame % 6 < 3;
+            chain.step(pad, none);
+        }
+        chain.hold(.5f, none, none);
+        assertEquals(1, chain.of(0, FightTally.CHAIN));
+        assertEquals(1, chain.all(0));
+        assertEquals(0, chain.all(1));
+        Counted four = new Counted(apart(Fight.HALGAKOS, Fight.CHIKUWA, 1.2f));
+        for (int frame = 0; frame < 150 && four.fight.moves() < 4; frame++) {
+            pad.light = frame % 6 < 3;
+            four.step(pad, none);
+        }
+        pad.light = false;
+        four.hold(1, pad, none);
+        assertEquals(0, four.all(0));
+
+        // A smash that lands, and one that does not.
+        for (float gap : new float[]{1.4f, 7}) {
+            Counted smash = new Counted(apart(Fight.CHIKUWA, Fight.HALGAKOS, gap));
+            pad.jump = true;
+            smash.step(pad, none);
+            pad.jump = false;
+            smash.hold(.3f, pad, none);
+            pad.heavy = true;
+            smash.step(pad, none);
+            pad.heavy = false;
+            smash.hold(1.2f, pad, none);
+            assertEquals(gap < 2 ? 1 : 0, smash.of(0, FightTally.SMASH));
+            assertEquals(gap < 2 ? 1 : 0, smash.all(0));
+        }
+
+        // A dodge that makes a swing miss is one, for whoever dodged; a dodge with nothing coming is none.
+        Counted slip = new Counted(apart(Fight.TSUBAKIEH, Fight.HALGAKOS, 1.3f));
+        Fight.Pad strike = new Fight.Pad(), dodge = new Fight.Pad();
+        strike.heavy = true;
+        for (float gone = 0; gone < .8f; gone += STEP) {
+            dodge.dodge = gone >= .2f && gone < .25f;
+            slip.step(strike, dodge);
+        }
+        assertEquals(0, lost(slip.fight, 1), 0);
+        assertEquals(1, slip.of(1, FightTally.DODGE));
+        assertEquals(1, slip.all(1));
+        assertEquals(0, slip.all(0));
+        Counted idle = new Counted(apart(Fight.TSUBAKIEH, Fight.HALGAKOS, 5));
+        dodge.dodge = true;
+        idle.hold(.6f, none, dodge);
+        assertEquals(1, idle.fight.dodges());
+        assertEquals(0, idle.all(1));
+
+        // An ultimate that lands three times is one ultimate landed; one taken on a guard is none; a flood counts when it arrives.
+        Counted grand = new Counted(apart(Fight.HALGAKOS, Fight.ILLYA, 6));
+        grand.fight.fighters[0].meter = Fight.METER;
+        pad.ultimate = true;
+        grand.step(pad, none);
+        pad.ultimate = false;
+        grand.hold(4, pad, none);
+        assertEquals(3, grand.fight.hits());
+        assertEquals(1, grand.of(0, FightTally.ULT));
+        assertEquals(1, grand.all(0));
+        Counted guarded = new Counted(apart(Fight.HALGAKOS, Fight.ILLYA, 6));
+        guarded.fight.fighters[0].meter = Fight.METER;
+        Fight.Pad guard = new Fight.Pad();
+        guard.block = true;
+        pad.ultimate = true;
+        guarded.step(pad, guard);
+        pad.ultimate = false;
+        guarded.hold(4, pad, guard);
+        assertEquals(0, guarded.fight.hits());
+        assertEquals(0, guarded.all(0));
+        Counted flood = new Counted(apart(Fight.RUNE, Fight.TSUBAKIEH, 6));
+        flood.fight.fighters[0].meter = Fight.METER;
+        pad.ultimate = true;
+        flood.step(pad, none);
+        pad.ultimate = false;
+        flood.hold(5, pad, none);
+        assertEquals(1, flood.of(0, FightTally.ULT));
+
+        // A clash: one won for whoever tapped more, one lost for the other; and her greater ultimate landing is an ultimate landed.
+        Fight met = answered(.5f);
+        Counted clash = new Counted(met);
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        for (int frame = 0; frame < 300 && met.clashWinner() < 0; frame++) {
+            one.taps = frame % 6 == 0 ? 1 : 0;
+            two.taps = frame % 12 == 0 ? 1 : 0;
+            clash.step(one, two);
+        }
+        assertEquals(0, met.clashWinner());
+        clash.hold(4, none, none);
+        assertEquals(1, clash.of(0, FightTally.CLASH));
+        assertEquals(0, clash.of(0, FightTally.CLASH_LOST));
+        assertEquals(1, clash.of(1, FightTally.CLASH_LOST));
+        assertEquals(0, clash.of(1, FightTally.CLASH));
+        assertEquals(1, clash.of(0, FightTally.ULT));
+        assertEquals(2, clash.all(0));
+        assertEquals(1, clash.all(1));
+
+        // A round won without being touched is a perfect one; won after taking a blow, or lost, it is not.
+        Counted clean = new Counted(apart(Fight.HALGAKOS, Fight.RUNE, 1.2f));
+        clean.fight.fighters[1].health = 3;
+        pad.light = true;
+        clean.step(pad, none);
+        pad.light = false;
+        clean.hold(.5f, pad, none);
+        assertEquals(Fight.ROUND_OVER, clean.fight.phase());
+        assertEquals(1, clean.of(0, FightTally.PERFECT));
+        assertEquals(0, clean.all(1));
+        Counted hurt = new Counted(apart(Fight.HALGAKOS, Fight.RUNE, 1.2f));
+        hurt.fight.fighters[1].health = 3;
+        hurt.fight.fighters[0].health -= 5;
+        pad.light = true;
+        hurt.step(pad, none);
+        pad.light = false;
+        hurt.hold(.5f, pad, none);
+        assertEquals(Fight.ROUND_OVER, hurt.fight.phase());
+        assertEquals(0, hurt.all(0));
+        assertEquals(7, FightTally.NAMES.length);
+    }
+
+    // How smoothly she moves
+
+    /** Plays a fight on with these held, and says the longest any one frame of the left fighter was shown while she was in a state, in seconds. */
+    private static float longest(Fight fight, Fight.Pad pad, float seconds, int state, Set<Integer> seen) throws Exception {
+        Fight shown = new Fight(fight.fighters[0].kind, fight.fighters[1].kind, -1, -1, 0);
+        float longest = 0, held = 0;
+        int last = -1;
+        for (float gone = 0; gone < seconds; gone += STEP) {
+            fight.step(STEP, pad, null);
+            Fight.Fighter her = fight.fighters[0];
+            int pose = FightPose.of(fight, her, 0, 0);
+            // A device that is only shown the fight shows the same frame of her, whatever she is doing.
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            fight.write(new java.io.DataOutputStream(bytes));
+            shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+            assertEquals(pose, FightPose.of(shown, shown.fighters[0], 0, 0));
+            if (her.state != state) {
+                last = -1;
+                held = 0;
+                continue;
+            }
+            seen.add(pose);
+            held = pose == last ? held + STEP : STEP;
+            last = pose;
+            longest = Math.max(longest, held);
+        }
+        return longest;
+    }
+
+    @Test public void nothingThatMovesHoldsAFrameForMuchMoreThanATenthOfASecond() throws Exception {
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            String name = FightCast.NAMES[kind];
+            Fight.Pad pad = new Fight.Pad();
+            // Standing: a breath of six frames, out and in.
+            Set<Integer> frames = new HashSet<>();
+            float held = longest(apart(kind, Fight.CHIKUWA, 6), pad, 3, Fight.IDLE, frames);
+            assertTrue(name + " stands on a frame for " + held, held <= .14f);
+            assertEquals(6, frames.size());
+            // Walking forward in twelve frames, and backward in eight.
+            frames.clear();
+            pad.right = true;
+            held = longest(apart(kind, Fight.CHIKUWA, 8), pad, .6f, Fight.WALK, frames);
+            assertTrue(name + " walks on a frame for " + held, held <= .06f);
+            assertEquals(12, frames.size());
+            frames.clear();
+            pad.right = false;
+            pad.left = true;
+            held = longest(apart(kind, Fight.CHIKUWA, 2), pad, .7f, Fight.WALK, frames);
+            assertTrue(name + " backs away on a frame for " + held, held <= .08f);
+            assertEquals(8, frames.size());
+            // A jump: the crouch, the push, up, over the top, down, and the landing.
+            frames.clear();
+            pad.left = false;
+            pad.jump = true;
+            Fight jump = apart(kind, Fight.CHIKUWA, 6);
+            held = longest(jump, pad, .75f, Fight.JUMP, frames);
+            assertTrue(name + " jumps on a frame for " + held, held <= .15f);
+            assertEquals(8, frames.size());
+            // A chain of five quick blows: for each a wind-up, the blow and a follow-through.
+            frames.clear();
+            Fight chain = apart(kind, Fight.CHIKUWA, 4);
+            Fight shown = new Fight(kind, Fight.CHIKUWA, -1, -1, 0);
+            Fight.Pad mash = new Fight.Pad();
+            float longest = 0, since = 0;
+            int last = -1;
+            for (int frame = 0; frame < 150 && chain.moves() <= 5; frame++) {
+                mash.light = frame % 6 < 3;
+                chain.step(STEP, mash, null);
+                Fight.Fighter her = chain.fighters[0];
+                if (her.state != Fight.ATTACK) continue;
+                int pose = FightPose.of(chain, her, 0, 0);
+                frames.add(pose);
+                // Back in her stance at the end of a blow she is at rest, not in the middle of a movement.
+                if (pose == FightFrames.QS) {
+                    last = -1;
+                    continue;
+                }
+                since = pose == last ? since + STEP : STEP;
+                last = pose;
+                longest = Math.max(longest, since);
+            }
+            // A blow that lands holds the whole fight still for a moment, on purpose, and that is in this.
+            assertTrue(name + " holds a frame of a chain for " + longest, longest <= .24f);
+            assertTrue(name + " shows " + frames.size() + " frames in a chain", frames.size() >= 15);
+            // Each of them a picture of its own, when she has them all.
+            if (!FightFrames.SMOOTH[kind]) continue;
+            Set<String> places = new HashSet<>();
+            int[] between = {FightFrames.BR1, FightFrames.BR6, FightFrames.WB1, FightFrames.WB6, FightFrames.BB1, FightFrames.BB4, FightFrames.GUARD_UP,
+                    FightFrames.TURN2, FightFrames.PUSH, FightFrames.RISE2, FightFrames.TOP2, FightFrames.FALL2, FightFrames.LAND2, FightFrames.HIT1R,
+                    FightFrames.HIT2R, FightFrames.STAGGER2, FightFrames.PROP, FightFrames.HALF_UP, FightFrames.QW1, FightFrames.QW5, FightFrames.QF1,
+                    FightFrames.QF5, FightFrames.HW1, FightFrames.HW5, FightFrames.HF1, FightFrames.HF5, FightFrames.AF1, FightFrames.AF3, FightFrames.AW,
+                    FightFrames.SM_TIP, FightFrames.DASH_QW, FightFrames.SHOVE_W, FightFrames.SW1, FightFrames.SW5, FightFrames.U12, FightFrames.U4R,
+                    FightFrames.SF, FightFrames.IDLE1, FightFrames.WALK1, FightFrames.Q1, FightFrames.H1, FightFrames.QS, FightFrames.HS};
+            for (int frame : between) {
+                short[] at = FightFrames.FRAMES[kind][frame];
+                assertTrue(name + ": two frames in one place: " + frame, places.add(at[0] + " " + at[1] + " " + at[2]));
+            }
+        }
+    }
+
+    @Test public void aBlowWindsUpLandsAndFollowsThroughAndSoDoTheRest() {
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            Fight.Move[] moves = Fight.MOVES[kind];
+            for (int step = 1; step <= 5; step++) {
+                int quick = step == 1 ? Fight.LIGHT : Fight.QUICK2 + step - 2, heavy = step == 1 ? Fight.HEAVY : Fight.HEAVY2 + step - 2;
+                assertEquals(FightFrames.QW1 + step - 1, shown(kind, quick, .01f, 0, 1));
+                assertEquals(FightFrames.Q1 + step - 1, shown(kind, quick, moves[quick].startup + .01f, 0, 1));
+                assertEquals(FightFrames.QF1 + step - 1, shown(kind, quick, moves[quick].startup + moves[quick].active + .02f, 0, 1));
+                assertEquals(FightFrames.QS, shown(kind, quick, moves[quick].length() - .005f, 0, 1));
+                assertEquals(FightFrames.HW1 + step - 1, shown(kind, heavy, .01f, 0, 1));
+                assertEquals(FightFrames.H1 + step - 1, shown(kind, heavy, moves[heavy].startup + .01f, 0, 1));
+                assertEquals(FightFrames.HF1 + step - 1, shown(kind, heavy, moves[heavy].startup + moves[heavy].active + .02f, 0, 1));
+            }
+            // Her special winds up the way it is about to be thrown, and her arm stays out after it.
+            for (int specials = 1; specials <= 6; specials++) {
+                int wind = shown(kind, Fight.SPECIAL, moves[Fight.SPECIAL].startup * .7f, 0, specials);
+                int thrown = shown(kind, Fight.SPECIAL, moves[Fight.SPECIAL].startup + .01f, 1, specials);
+                assertEquals(thrown - FightFrames.S1, wind - FightFrames.SW1);
+                assertEquals(FightFrames.SF, shown(kind, Fight.SPECIAL, moves[Fight.SPECIAL].startup + .2f, 1, specials));
+            }
+            assertEquals(FightFrames.BREAK_W, shown(kind, Fight.BREAK, moves[Fight.BREAK].startup * .7f, 0, 0));
+            assertEquals(FightFrames.LAUNCH_W, shown(kind, Fight.LAUNCH, .01f, 0, 0));
+            assertEquals(FightFrames.SHOVE_W, shown(kind, Fight.SHOVE, .01f, 0, 0));
+            assertEquals(FightFrames.DASH_QW, shown(kind, Fight.DASH_LIGHT, .01f, 0, 0));
+            assertEquals(FightFrames.DASH_HW, shown(kind, Fight.DASH_HEAVY, .01f, 0, 0));
+            assertEquals(FightFrames.U12, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .4f, 0, 0));
+            assertEquals(FightFrames.U23, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .9f, 0, 0));
+        }
     }
 
     // In the air
