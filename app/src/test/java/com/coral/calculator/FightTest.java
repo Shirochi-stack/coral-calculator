@@ -751,7 +751,7 @@ public class FightTest {
             assertEquals(FightFrames.SHOVE_W, shown(kind, Fight.SHOVE, .01f, 0, 0));
             assertEquals(FightFrames.DASH_QW, shown(kind, Fight.DASH_LIGHT, .01f, 0, 0));
             assertEquals(FightFrames.DASH_HW, shown(kind, Fight.DASH_HEAVY, .01f, 0, 0));
-            if (kind == Fight.TSUBAKIEH) continue;
+            if (kind == Fight.TSUBAKIEH || kind == Fight.CHIKUWA) continue;
             assertEquals(FightFrames.U12, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .4f, 0, 0));
             assertEquals(FightFrames.U23, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .9f, 0, 0));
         }
@@ -787,7 +787,8 @@ public class FightTest {
         assertEquals(hurt(Fight.TSUBAKIEH, Fight.ULTIMATE), lost(fight, 1), .01f);
         // No one else's ultimate, and no other blow of hers, throws anyone so high.
         for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
-            if (kind == Fight.TSUBAKIEH) continue;
+            // Chikuwa's has frames of its own too, and its own test.
+            if (kind == Fight.TSUBAKIEH || kind == Fight.CHIKUWA) continue;
             Fight other = apart(kind, Fight.CHIKUWA, 2);
             other.fighters[0].meter = Fight.METER;
             pad.ultimate = true;
@@ -820,6 +821,64 @@ public class FightTest {
             short[] at = FightFrames.FRAMES[Fight.TSUBAKIEH][frame];
             assertTrue(places.add(at[0] + " " + at[1] + " " + at[2]));
         }
+    }
+
+    @Test public void chikuwasBrickBreadDropIsAMoveOfItsOwnAndComesDownOnThem() throws Exception {
+        Fight fight = apart(Fight.CHIKUWA, Fight.HALGAKOS, 2.5f), shown = new Fight(Fight.CHIKUWA, Fight.HALGAKOS, -1, -1, 0);
+        fight.fighters[0].meter = Fight.METER;
+        Fight.Pad pad = new Fight.Pad();
+        pad.ultimate = true;
+        java.util.List<Integer> frames = new java.util.ArrayList<>();
+        float highest = 0;
+        for (int frame = 0; frame < 420; frame++) {
+            fight.step(STEP, pad, null);
+            pad.ultimate = false;
+            Fight.Fighter her = fight.fighters[0];
+            highest = Math.max(highest, fight.fighters[1].y);
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            fight.write(new java.io.DataOutputStream(bytes));
+            shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+            int pose = FightPose.of(fight, her, 0, 0);
+            assertEquals(pose, FightPose.of(shown, shown.fighters[0], 0, 0));
+            if (her.state == Fight.ATTACK && (frames.isEmpty() || frames.get(frames.size() - 1) != pose)) frames.add(pose);
+        }
+        // The loaf hugged and heaved while it is announced; up with it, down with it, landed on it; a bite of a roll.
+        assertEquals(java.util.Arrays.asList(FightFrames.DR1, FightFrames.DR2, FightFrames.DR3, FightFrames.DR4, FightFrames.DR5, FightFrames.DR6), frames);
+        // Whoever is under it is bounced off the ground, and it takes off what it always did.
+        assertTrue("bounced " + highest, highest > 2 && highest < 2.5f);
+        assertEquals(hurt(Fight.CHIKUWA, Fight.ULTIMATE), lost(fight, 1), .01f);
+        // On a guard it costs what a guarded blow costs and pushes her well back.
+        Fight guarded = apart(Fight.CHIKUWA, Fight.HALGAKOS, 2.5f);
+        guarded.fighters[0].meter = Fight.METER;
+        Fight.Pad guard = new Fight.Pad();
+        guard.block = true;
+        pad.ultimate = true;
+        float gap = 0;
+        for (int frame = 0; frame < 300; frame++) {
+            guarded.step(STEP, pad, guard);
+            pad.ultimate = false;
+            gap = Math.max(gap, guarded.fighters[1].x - guarded.fighters[0].x);
+        }
+        assertEquals(1, guarded.blocks());
+        assertEquals(hurt(Fight.CHIKUWA, Fight.ULTIMATE) * .2f, lost(guarded, 1), .01f);
+        assertTrue("pushed to " + gap, gap > 2.4f);
+        Set<String> places = new HashSet<>();
+        for (int frame = FightFrames.DR1; frame <= FightFrames.DR6; frame++) {
+            short[] at = FightFrames.FRAMES[Fight.CHIKUWA][frame];
+            assertTrue(places.add(at[0] + " " + at[1] + " " + at[2]));
+        }
+        // Tsubakieh's greater home run, for winning a clash, is swung with the frames of her home run.
+        Fight clash = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 3);
+        Fight.Fighter winner = clash.fighters[0];
+        winner.state = Fight.ATTACK;
+        winner.move = Fight.CLASH;
+        winner.clock = .01f;
+        assertEquals(FightFrames.HR2, FightPose.of(clash, winner, 0, 0));
+        winner.clock = Fight.MOVES[Fight.TSUBAKIEH][Fight.CLASH].startup + .05f;
+        winner.landed = 1;
+        assertEquals(FightFrames.HR4, FightPose.of(clash, winner, 0, 0));
+        winner.clock = Fight.MOVES[Fight.TSUBAKIEH][Fight.CLASH].length() - .05f;
+        assertEquals(FightFrames.HR6, FightPose.of(clash, winner, 0, 0));
     }
 
     // On the floor

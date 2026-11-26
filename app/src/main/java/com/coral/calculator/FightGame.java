@@ -804,6 +804,13 @@ final class FightGame {
             int by = two[1 - fight.hitSide()].kind;
             audio.play(hard ? by == Fight.TSUBAKIEH ? "bat" : by == Fight.CHIKUWA ? "bread" : "heavy" : "hit", hard ? .8f : .55f);
             if (hard) audio.play("heavy", .5f);
+            if (fight.hitGrand() && hard && two[1 - fight.hitSide()].kind == Fight.CHIKUWA) {
+                // The great loaf comes down: a deep thud, crumbs pattering, a happy note; and loaves and rolls burst out across the stage.
+                audio.play("drop", .95f);
+                flash = .14f;
+                shake = .5f;
+                for (int burst = -2; burst <= 2; burst++) sparks.add(new float[]{fight.hitX() + burst * 1.3f, 0, 0, 3, burst % 2 == 0 ? BRICK_FX : ROLL_FX});
+            }
             if (fight.hitGrand() && hard && two[1 - fight.hitSide()].kind == Fight.TSUBAKIEH) {
                 // The crack of the bat, a far cheer, and the whistle of what she hit going away.
                 audio.play("homer", .95f);
@@ -1208,6 +1215,11 @@ final class FightGame {
             paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK ? Math.round(190 + 65 * (float) Math.sin(clock * 34)) : 255);
             // She is drawn at the one size her frames are kept at: nothing stretches, squashes or scales her.
             float bob = fighter.state == Fight.WALK ? unit * .022f * (float) Math.abs(Math.sin(Math.PI * fighter.clock / (fighter.backing ? .24f : .255f))) : 0;
+            if (fighter.kind == Fight.CHIKUWA && fighter.state == Fight.ATTACK && fighter.move == Fight.ULTIMATE && fight.phase() == Fight.FIGHTING
+                    && fighter.clock < fighter.doing().startup) {
+                // She leaps high with the loaf, off the top of the screen on a small one, and comes down as the move lands. Her shadow stays below.
+                y -= unit * 6.5f * (float) Math.sin(Math.PI * fighter.clock / fighter.doing().startup);
+            }
             // Sent off by a home run she goes up and away, smaller the higher she is, with a twinkle where she is furthest: no other
             // blow throws anyone so high.
             float away = fighter.state == Fight.DOWN ? Math.min(.6f, Math.max(0, (fighter.y - 2.5f) / 8)) : 0;

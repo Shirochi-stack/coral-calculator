@@ -89,9 +89,12 @@ SHEETS = [
     # Tsubakieh's ultimate, drawn as one move of its own: the called shot, the wind-up, the swing, contact, the
     # follow-through held, and watching it go. She stands simply in the last, and the sheet is sized by that one.
     ("homer", "HR1 HR2 HR3 HR4 HR5 HR6", (5,)),
+    # Chikuwa's ultimate, drawn as one move: the great loaf hugged, heaved overhead, the leap, the drop, the landing, and
+    # a bite of a roll afterwards. She stands simply in the first, and the sheet is sized by that one.
+    ("drop", "DR1 DR2 DR3 DR4 DR5 DR6", (0,)),
 ]
 # A sheet that only some fighters have: for the others what they had stands in.
-ONLY = {"homer": ("tsubakieh",)}
+ONLY = {"homer": ("tsubakieh",), "drop": ("chikuwa",)}
 # A sheet in which nothing stands simply upright can have each of its frames sized by itself, by how wide her face is
 # against her face as she stands. None is at present: by her face Tsubakieh's home run came out a tenth too small,
 # and it has a frame in which she stands.
@@ -108,7 +111,7 @@ BETWEENS = {
 NAMES = [name for _, names, _ in SHEETS for name in names.split()]
 # Frames that are placed by the middle of what is drawn, not by where her feet are: in the air, lying down, and
 # leaning far out of a dodge.
-CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2 ADODGE BDODGE2 FDODGE "
+CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2 ADODGE BDODGE2 FDODGE DR3 DR4 "
               "RISE2 TOP2 AF1 AF2 AF3 AW SM_TIP PROP".split())
 # What stands in for the dodge and the clash while a fighter has no sheet of them yet.
 SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U3", "C3": "U4",
@@ -122,6 +125,7 @@ SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U
          "HW1": "HS", "HW2": "H1", "HW3": "H2", "HW4": "H3", "HW5": "H4", "HF1": "H1", "HF2": "H2", "HF3": "H3", "HF4": "H4", "HF5": "H5",
          "AF1": "A1", "AF2": "A2", "AF3": "A3", "AW": "A1", "SM_TIP": "SM_UP",
          "DASH_QW": "DASH_Q", "DASH_HW": "DASH_H", "BREAK_W": "MS", "LAUNCH_W": "LAUNCH", "SHOVE_W": "SHOVE",
+         "DR1": "U1", "DR2": "U2", "DR3": "U2", "DR4": "U3", "DR5": "U3", "DR6": "U4",
          "HR1": "U1", "HR2": "U2", "HR3": "U3", "HR4": "U3", "HR5": "U4", "HR6": "U4",
          "SW1": "SS", "SW2": "SS", "SW3": "SS", "SW4": "SS", "SW5": "SS", "U12": "U1", "U23": "U2", "U34": "U3", "U4R": "U4", "SF": "SS"}
 # For a fighter who has only her first twelve frames (standing, walking, jumping, guarding, hit, down, quick, heavy,

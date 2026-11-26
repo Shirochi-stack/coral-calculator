@@ -137,6 +137,11 @@ SOUNDS = {
                  .5 * fade(tone(.25, 300, 120), .002),
                  .35 * after(numpy.zeros(int(RATE * .08)), fade(tone(1.1, 1500, 3200, "sine", .01, 9), .05, .5)),
                  .3 * after(numpy.zeros(int(RATE * .25)), fade(rise(soft(noise(1.3), .09)), .3, .6))),
+    # The brick bread drop: something heavy whistling down, a deep thud, crumbs pattering, and a happy note.
+    "drop": mix(.4 * fade(tone(.45, 2400, 500, "sine", .01, 7), .05, .1),
+                after(numpy.zeros(int(RATE * .42)), mix(fade(tone(.6, 120, 28), .002), .8 * fade(soft(noise(.35), .1), .002))),
+                .3 * after(numpy.zeros(int(RATE * .6)), fade(soft(noise(.7), .7) * (random.uniform(0, 1, int(RATE * .7)) > .93), .01)),
+                .5 * after(numpy.zeros(int(RATE * 1.0)), after(note(1047, .08), note(1568, .25)))),
     # One tap of a clash: a small bright tick.
     "tick": fade(tone(.035, 1500, 1900, "triangle"), .001),
 }
