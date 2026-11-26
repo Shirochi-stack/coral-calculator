@@ -813,6 +813,66 @@ public class FightTest {
         assertTrue(greater.times > usual.times);
     }
 
+    @Test public void theBarOfAClashShowsWhoIsWinningAndFillsAtOnceForWhoeverWon() throws Exception {
+        // In the middle while they are level; toward the right end as the left leads, and the other way about.
+        assertEquals(.5f, Fight.clashBar(0, 0), 0);
+        assertEquals(.5f, Fight.clashBar(17, 17), 0);
+        for (int lead = 1; lead <= 60; lead++) {
+            float at = Fight.clashBar(lead, 0);
+            assertTrue(at > Fight.clashBar(lead - 1, 0) || lead > 40);
+            assertEquals(1, at + Fight.clashBar(0, lead), .0001f);
+            assertEquals(at, Fight.clashBar(lead + 9, 9), .0001f);
+            // However far ahead, it is never at the end while they still tap.
+            assertTrue(at < .95f && Fight.clashBar(0, lead) > .05f);
+        }
+        // A tap of a lead can be seen, and a few taps plainly.
+        assertTrue(Fight.clashBar(1, 0) - .5f > .04f);
+        assertTrue(Fight.clashBar(4, 0) - .5f > .18f);
+        assertTrue(Fight.clashBar(12, 0) > .88f);
+
+        Fight fight = answered(.5f), shown = new Fight(Fight.HALGAKOS, Fight.ILLYA, -1, -1, 0);
+        assertEquals(-1, fight.clashWinner());
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        one.taps = 2;
+        two.taps = 7;
+        fight.step(STEP, one, two);
+        assertEquals(Fight.clashBar(2, 7), fight.clashBar(), 0);
+        assertTrue(fight.clashBar() < .5f);
+        // A device that is only shown the fight has the same bar and the same number.
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        fight.write(new java.io.DataOutputStream(bytes));
+        shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+        assertEquals(fight.clashBar(), shown.clashBar(), 0);
+        assertEquals(fight.clashLeft(), shown.clashLeft(), 0);
+        assertEquals(-1, shown.clashWinner());
+        // The right taps more and wins: for a moment after, the bar is hers, filling quickly and then full.
+        tapped(fight, 10, 21);
+        assertEquals(1, fight.clashWinner());
+        assertTrue(fight.clashSweep() < 1);
+        float before = fight.clashSweep();
+        fight.step(STEP, one, two);
+        assertTrue(fight.clashSweep() > before);
+        bytes.reset();
+        fight.write(new java.io.DataOutputStream(bytes));
+        shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+        assertEquals(1, shown.clashWinner());
+        assertEquals(fight.clashSweep(), shown.clashSweep(), 0);
+        assertEquals(fight.clashAge(), shown.clashAge(), 0);
+        hold(fight, Fight.CLASH_SWEEP, one, two);
+        assertEquals(1, fight.clashSweep(), 0);
+        assertEquals(1, fight.clashWinner());
+        assertTrue(Fight.CLASH_SWEEP < .2f && Fight.CLASH_SHOWN < Fight.FLOURISH_SECONDS / 2);
+        // Once her greater ultimate is let go the clash is done with.
+        rest(fight, Fight.FLOURISH_SECONDS);
+        assertEquals(-1, fight.clashWinner());
+        assertEquals(0, fight.clashSweep(), 0);
+        // Level, the bar is in the middle to the end, and then it is whoever went second who has it.
+        Fight level = answered(.3f);
+        tapped(level, 15, 15);
+        assertEquals(.5f, level.clashBar(), 0);
+        assertEquals(level.clashSecond(), level.clashWinner());
+    }
+
     @Test public void theOtherWinsAClashByTappingMoreAndLevelItGoesToWhoeverWentSecond() {
         Fight fight = answered(.9f);
         assertEquals(Fight.CLASHING, fight.phase());
