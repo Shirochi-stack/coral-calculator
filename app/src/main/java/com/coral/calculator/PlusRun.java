@@ -107,6 +107,35 @@ final class PlusRun {
     /** A chest in a place off the land: opened by touching it, and what is in it is kept. */
     static final int CHEST = 20;
     /**
+     * And what else is in such places: a key, which opens the locked door of the place it
+     * lies in; a lever, which raises that place's bridge for good; a plate, which lifts its
+     * bars for a few seconds every time it is stood on; and a shrine, which takes a heart
+     * from whoever has more than one and ties a ribbon of its colour on her.
+     */
+    static final int KEY = 21, LEVER = 22, PLATE = 23, SHRINE = 24;
+    static final float BARS_OPEN = 6;
+    private int unlocked, raised, barsRoom = -1, keys, levers, plates, shrines;
+    private float bars;
+    private final java.util.Set<Integer> pulled = new java.util.HashSet<>();
+
+    int keys() { return keys; }
+    int levers() { return levers; }
+    int plates() { return plates; }
+    int shrines() { return shrines; }
+    /** For how much longer the bars of the place she is in are lifted. */
+    float barsLeft() { return bars; }
+    boolean pulled(int column) { return pulled.contains(column); }
+    /** A square of the land as it was laid, whatever has become of it since. */
+    char laid(int column, int row) {
+        return column < 0 || column >= columns || row < 0 || row >= level.land.length ? RunLevels.AIR : level.land[row][column];
+    }
+
+    /** Which place off the land a column is in, or -1. */
+    private int placeOf(int column) {
+        for (int index = 0; index < level.rooms.size(); index++) if (column >= level.rooms.get(index)[3] && column <= level.rooms.get(index)[4]) return index;
+        return -1;
+    }
+    /**
      * A pet that lies waiting in a land or a cellar to be taken along: this and its kind.
      * Taken, it keeps beside her for the whole of the land, through doors and a life lost,
      * and goes at whatever is near her by itself, each kind in its own way. An ink jar
@@ -953,6 +982,11 @@ final class PlusRun {
         char here = level.land[row][column];
         // A ledge that has crumbled is not there until it is back.
         if (here == RunLevels.CRUMBLE && !crumble.isEmpty() && crumbling(column, row) < 0) return RunLevels.AIR;
+        // In a place off the land: a door is a wall until its key is taken, a bridge is nothing until its lever is pulled, and bars are
+        // a wall but while they are lifted.
+        if (here == RunLevels.LOCKED) return (unlocked >> placeOf(column) & 1) != 0 ? RunLevels.AIR : RunLevels.BLOCK;
+        if (here == RunLevels.SPAN) return (raised >> placeOf(column) & 1) != 0 ? RunLevels.LEDGE : RunLevels.AIR;
+        if (here == RunLevels.GRILLE) return bars > 0 && barsRoom == placeOf(column) ? RunLevels.AIR : RunLevels.BLOCK;
         return here;
     }
 
@@ -2123,6 +2157,11 @@ final class PlusRun {
                 picked++;
             }
         }
+        if (bars > 0 && (bars -= seconds) <= 0) {
+            for (int column = (int) Math.floor(x); column <= (int) Math.floor(x + WIDE - .001f); column++) {
+                for (int row = (int) Math.floor(y); row <= (int) Math.floor(y + TALL - .001f); row++) if (laid(column, row) == RunLevels.GRILLE) bars = .05f;
+            }
+        }
         atStall = false;
         for (int index = items.size() - 1; index >= 0; index--) {
             int[] item = items.get(index);
@@ -2141,11 +2180,45 @@ final class PlusRun {
                         && y + TALL > item[2] + .1f) done();
                 continue;
             }
+            // A lever and a plate stay where they are: the one is pulled once, the other lifts the bars again every time it is stood on.
+            if (item[0] == LEVER || item[0] == PLATE) {
+                if (x < item[1] + .9f && x + WIDE > item[1] + .1f && y < item[2] + 1 && y + TALL > item[2]) {
+                    if (item[0] == LEVER) {
+                        if (pulled.add(item[1])) {
+                            raised |= 1 << room;
+                            levers++;
+                        }
+                    } else {
+                        if (bars <= 0) plates++;
+                        bars = BARS_OPEN;
+                        barsRoom = room;
+                    }
+                }
+                continue;
+            }
+            // A shrine takes a heart from whoever has more than one, and gives its ribbon; from anyone else it takes nothing and gives nothing.
+            if (item[0] == SHRINE) {
+                if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f && halves > 2 && cursed <= 0) {
+                    items.remove(index);
+                    halves -= 2;
+                    shrines++;
+                    tookX = item[1] + .5f;
+                    tookY = item[2] + .5f;
+                    take(FORM + item[4]);
+                }
+                continue;
+            }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST) continue;
                 items.remove(index);
                 tookX = item[1] + .5f;
                 tookY = item[2] + .5f;
+                // A key opens the locked door of the place it lay in.
+                if (item[0] == KEY) {
+                    unlocked |= 1 << room;
+                    keys++;
+                    continue;
+                }
                 // A pet that lay waiting goes with her from here on, in place of any that was with her.
                 if (item[0] >= PET && item[0] < PET + PETS) {
                     adopt(item[0] - PET);

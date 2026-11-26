@@ -269,6 +269,18 @@ final class RunGame {
     /** How many pieces of a heart make a heart, and how many hearts they can make. */
     private static final int PIECES = 4, PIECE_HEARTS = 2;
     private Bitmap inside;
+    /** The inside of a stash, a passage or a room for a game, by its look; what stands about in them; and what each look is called. */
+    private static final int[] LOOK_ART = {R.drawable.plus_run_room_wine, R.drawable.plus_run_room_maps, R.drawable.plus_run_room_vault, R.drawable.plus_run_room_clock,
+            R.drawable.plus_run_room_green, R.drawable.plus_run_room_print, R.drawable.plus_run_room_crystal, R.drawable.plus_run_room_treasure};
+    private static final String[] LOOK_NAMES = {"A wine cellar", "A map room", "A flooded vault", "Inside a clock tower", "A greenhouse", "A printing room", "A crystal cave",
+            "A treasure vault"};
+    /** Its walls, the boards on top of them, and the light that lies over it. */
+    private static final int[] LOOK_WALL = {0xFF3A2430, 0xFF2E2A22, 0xFF1F3A36, 0xFF3A2C24, 0xFF1C2440, 0xFF33241C, 0xFF241C3C, 0xFF35302C};
+    private static final int[] LOOK_CAP = {0xFF9A6A52, 0xFF8A6A44, 0xFF5FA08A, 0xFFC09552, 0xFF5A78B8, 0xFFA8744A, 0xFF9A7AE0, 0xFFD0AC58};
+    private static final int[] LOOK_LIGHT = {0x16FFB060, 0x0CFFE0A0, 0x2030C8A8, 0x18FFA070, 0x263050B0, 0x10FFC080, 0x24A070FF, 0x16FFD060};
+    private Bitmap lookArt, props;
+    private int lookOf = -1;
+    private int seenKeys, seenLevers, seenPlates, seenShrines;
     private final float[] artWide = new float[ART_COUNT], artTall = new float[ART_COUNT];
     private Bitmap sky;
     private int skyOf = -1;
@@ -278,7 +290,7 @@ final class RunGame {
     private final Rect source = new Rect();
     private final RectF target = new RectF(), safe = new RectF(), box = new RectF();
     private final RectF leftButton = new RectF(), rightButton = new RectF(), jumpButton = new RectF(), strikeButton = new RectF();
-    private final RectF pauseButton = new RectF(), closeButton = new RectF(), soundButton = new RectF(), shopButton = new RectF();
+    private final RectF pauseButton = new RectF(), closeButton = new RectF(), soundButton = new RectF(), shopButton = new RectF(), goButton = new RectF();
     private final RectF[] pills = {new RectF(), new RectF(), new RectF()};
     private final String[] pillLabels = new String[3];
     private final int[] pillActions = new int[3];
@@ -666,7 +678,7 @@ final class RunGame {
         toastRarity = all.contains("piece of a heart") || all.contains("a life,") || all.contains("medal") || all.contains("is beaten") || all.contains("a heart more") ? 2
                 : most >= 30 || all.contains("ribbon") ? 1 : 0;
         toastX = run == null ? 0 : run.x() + PlusRun.WIDE / 2;
-        toastY = run == null ? 0 : run.y() + PlusRun.TALL * .4f;
+        toastY = run == null ? 0 : run.y() - .8f;
         if (run != null && all.contains("piece of a heart")) flyTo((toastX - cameraX) * tile, (toastY - cameraY) * tile, true, 1);
         else if (run != null && most >= 10) flyTo((toastX - cameraX) * tile, (toastY - cameraY) * tile, false, Math.min(10, most / 10 + 2));
         audio.play("star", toastRarity == 2 ? .9f : .6f);
@@ -901,7 +913,7 @@ final class RunGame {
         pauseButton.set(safe.right - margin - small, safe.top + margin, safe.right - margin, safe.top + margin + small);
         closeButton.set(pauseButton);
         soundButton.set(closeButton.left - dp(8) - small, closeButton.top, closeButton.left - dp(8), closeButton.bottom);
-        // The map: a page for each volume, with a row of lands for each of its chapters under the chapter's name, and the counter under them all.
+        // The map: a page for each volume, with a row of lands for each of its chapters under the chapter's name, and the button that goes on under them all.
         float room = safe.height() - dp(92) - dp(150) - dp(44);
         for (int volume = 0; volume < 2; volume++) {
             int each = volume == 0 ? RunLevels.IN_CHAPTER : RunLevels.IN_LATER_CHAPTER, from = volume == 0 ? 0 : RunLevels.COUNT;
@@ -939,12 +951,19 @@ final class RunGame {
         }
     }
 
-    /** Shows the lands of a volume, with the counter under the last of them. */
+    /**
+     * Shows the lands of a volume, with the button that goes on to the next land under the
+     * last of them, where a thumb goes first. The counter is up beside the sound, a little
+     * lower than the round buttons so that it clears the line under the heading.
+     */
     private void turnTo(int volume) {
         page = volume;
         int from = volume == 0 ? 0 : RunLevels.COUNT, last = volume == 0 ? RunLevels.COUNT - 1 : RunLevels.TOTAL - 1;
         float under = lands[last].bottom + dp(16);
-        shopButton.set(lands[from].left, under, lands[last].right, under + dp(48));
+        goButton.set(lands[from].left, under, lands[last].right, under + dp(48));
+        text.setTextSize(dp(26));
+        float from0 = safe.left + dp(18) + text.measureText("Plus run") + dp(12), to = soundButton.left - dp(8);
+        shopButton.set(Math.max(from0, to - dp(128)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
     }
 
     void close() { audio.close(); }
@@ -1090,6 +1109,7 @@ final class RunGame {
         seenDrops = seenBeams = seenBlasts = jumpsAtFall = seenCracks = seenShatters = seenThrownBack = 0;
         seenPetJoined = seenPetStrikes = seenPetKills = 0;
         seenPetGifts = seenPetWards = seenPetCopies = 0;
+        seenKeys = seenLevers = seenPlates = seenShrines = 0;
         petWordLeft = 0;
         wardAge = 9;
         flights.clear();
@@ -1708,6 +1728,30 @@ final class RunGame {
             seenPetKills = run.petKills();
             petGlad = 0;
         }
+        // In a place off the land: a key taken, a lever pulled, a plate stood on, a shrine paid.
+        if (run.keys() != seenKeys) {
+            seenKeys = run.keys();
+            audio.play("unlock");
+            buzz(true);
+            toast("A key", "The locked door of this place is open", 0);
+        }
+        if (run.levers() != seenLevers) {
+            seenLevers = run.levers();
+            audio.play("unlock");
+            buzz(true);
+            shake = Math.max(shake, .2f);
+            pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "A bridge!");
+        }
+        if (run.plates() != seenPlates) {
+            seenPlates = run.plates();
+            audio.play("ding", .8f);
+            pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "The bars are up: run!");
+        }
+        if (run.shrines() != seenShrines) {
+            seenShrines = run.shrines();
+            audio.play("star", .8f);
+            pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "A heart for a ribbon");
+        }
         // The small stuffed ones: a roll handed over, the ring of light used, and a word in a tiny bubble now and then.
         petWordLeft -= seconds;
         sincePetWord += seconds;
@@ -1952,7 +1996,7 @@ final class RunGame {
             if (in >= 0) {
                 int kind = here.rooms.get(in)[0];
                 boolean todo = (run.roomsDone() & 1 << in) == 0;
-                if (BuildConfig.DEBUG && session.tally("run_spot") > 0 && kind == RunLevels.ARENA) {
+                if (BuildConfig.DEBUG && session.tally("run_spot") > 0) {
                     int spot = session.tally("run_spot");
                     run.place(here.rooms.get(in)[3] + spot % 1000, here.rooms.get(in)[11] - spot / 1000 * RunLevels.STOREY - PlusRun.TALL - .05f);
                 }
@@ -1962,7 +2006,15 @@ final class RunGame {
                     aside(RunStory.ROOMS[kind]);
                 }
                 // And a card that says what it is and what to do in it: before anything in it begins, where something is about to.
-                if (todo || kind == RunLevels.PASSAGE) {
+                if (kind <= RunLevels.PASSAGE) {
+                    int[] one = here.rooms.get(in);
+                    if (todo || kind == RunLevels.PASSAGE) {
+                        toast(LOOK_NAMES[Math.max(0, one[13])] + (kind == RunLevels.STASH ? ": a stash" : ": a way through"), kind == RunLevels.PASSAGE ? "It comes out further on"
+                                : one[14] == RunLevels.HOLDS_PET ? "A pet waits in it, by its chest" : one[14] == RunLevels.HOLDS_SHRINE ? "A shrine stands by its chest"
+                                : "Find the way through to its chest", 0);
+                        audio.play("page", .7f);
+                    }
+                } else if (todo) {
                     roomCard = in;
                     roomCardAge = 0;
                     tickedAt = 0;
@@ -2013,7 +2065,8 @@ final class RunGame {
                 && (int) (sincePhase / 1.2f) != (int) ((sincePhase - seconds) / 1.2f)) run.sweep();
         // A chest opened: ten pluses in it. The one by a passage's far door has a purse in it besides, the first time; a stash's is the
         // doing of the stash, and is told with that.
-        chestAge += seconds;
+        // (In a build made for testing it can be slowed, to be looked at: run_slow is the hundredths of its pace.)
+        chestAge += seconds * (BuildConfig.DEBUG && session.tally("run_slow") > 0 ? session.tally("run_slow") / 100f : 1);
         if (run.chests() != seenChests) {
             seenChests = run.chests();
             audio.play("unlock");
@@ -2490,6 +2543,11 @@ final class RunGame {
                 counterFrom = MAP;
                 screen = SHOP;
                 speak(RunStory.SHOP[0], false);
+            } else if (goButton.contains(x, y)) {
+                // On with the furthest land she has reached.
+                audio.play("tap", .5f);
+                buzz(false);
+                play(open());
             } else if (open() > RunLevels.COUNT && (tabs[0].contains(x, y) || tabs[1].contains(x, y))) {
                 audio.play("page", .5f);
                 turnTo(tabs[1].contains(x, y) ? 1 : 0);
@@ -3023,23 +3081,50 @@ final class RunGame {
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
             // Over a hundred, it is something of the fourth sheet: a chest in a stash.
-            if (decor[0] >= 100) pieceTall(canvas, four, decor[0] - 100, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 1.3f, false);
+            if (decor[0] >= 200) {
+                if (props == null) props = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_props);
+                paint.setAlpha(235);
+                cell(canvas, props, decor[0] - 200, 16, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 2.5f, false);
+                paint.setAlpha(255);
+            } else if (decor[0] >= 100) pieceTall(canvas, four, decor[0] - 100, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 1.3f, false);
             else pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
         }
         for (int column = first; column <= last; column++) {
             float left = (column - cameraX) * tile;
             for (int row = top; row <= bottom; row++) {
                 char here = run.at(column, row);
-                if (here == RunLevels.AIR) continue;
                 float y = (row - cameraY) * tile;
+                char laid = run.room() >= 0 ? run.laid(column, row) : RunLevels.AIR;
+                if (laid == RunLevels.LOCKED || laid == RunLevels.SPAN || laid == RunLevels.GRILLE) {
+                    if (laid != RunLevels.SPAN || here == RunLevels.AIR) {
+                        drawFixture(canvas, laid, here, column, row, left, y);
+                        continue;
+                    }
+                }
+                if (here == RunLevels.AIR) continue;
                 if (here == RunLevels.BLOCK && run.room() >= 0) {
-                    // In a place off the land, its walls are dark wood, with a lighter board where they are stood on.
+                    // In a place off the land, its walls are dark, of the colour of the place, with a lighter board where they are stood on.
                     boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
+                    int look = look();
+                    int[] in = level.rooms.get(run.room());
+                    // (What stands inside it, between its floor and its ceiling, is masonry of the place's own colour, with its courses
+                    // showing: a pillar, a tower, a wall with a door in it; not the dark that lies round the place.)
+                    boolean within = look >= 0 && row >= in[12] && row < in[11] && column >= in[3] && column <= in[4];
                     paint.setStyle(Paint.Style.FILL);
-                    paint.setColor(0xFF2A1D1A);
+                    paint.setColor(look < 0 ? 0xFF2A1D1A : within ? mixed(LOOK_WALL[look], LOOK_CAP[look], .42f) : LOOK_WALL[look]);
                     canvas.drawRect(left, y, left + tile + 1, y + tile + 1, paint);
+                    if (within) {
+                        paint.setColor(mixed(LOOK_WALL[look], LOOK_CAP[look], .2f));
+                        canvas.drawRect(left, y + tile * .94f, left + tile + 1, y + tile + 1, paint);
+                        float seam = left + tile * ((row + column) % 2 == 0 ? .5f : .02f);
+                        canvas.drawRect(seam, y, seam + tile * .05f, y + tile * .94f, paint);
+                        if (run.at(column - 1, row) != RunLevels.BLOCK) {
+                            paint.setColor(mixed(LOOK_WALL[look], LOOK_CAP[look], .7f));
+                            canvas.drawRect(left, y, left + tile * .07f, y + tile + 1, paint);
+                        }
+                    }
                     if (capped) {
-                        paint.setColor(0xFF8A5F3E);
+                        paint.setColor(look < 0 ? 0xFF8A5F3E : LOOK_CAP[look]);
                         canvas.drawRect(left, y, left + tile + 1, y + tile * .16f, paint);
                     }
                     paint.setColor(Color.BLACK);
@@ -3120,8 +3205,11 @@ final class RunGame {
         }
         // Of a place off the land only itself is seen: what lies to either side of its walls is dark.
         if (run.room() >= 0) {
+            int look = look();
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0xFF2A1D1A);
+            // (And the light of the place lies over all of it.)
+            if (look >= 0) canvas.drawColor(LOOK_LIGHT[look]);
+            paint.setColor(look < 0 ? 0xFF2A1D1A : LOOK_WALL[look]);
             float from = (run.roomFrom() - 1 - cameraX) * tile, to = (run.roomTo() + 2 - cameraX) * tile;
             if (from > 0) canvas.drawRect(0, 0, from + 1, height, paint);
             if (to < width) canvas.drawRect(to - 1, 0, width, height, paint);
@@ -3201,6 +3289,10 @@ final class RunGame {
         // What lies about to help, in a ring of its own colour; what a friend holds out is in her hands already.
         for (int[] item : run.items()) {
             if (item[3] != 0 || item[1] < first - 1 || item[1] > last + 1) continue;
+            if (item[0] == PlusRun.LEVER || item[0] == PlusRun.PLATE || item[0] == PlusRun.SHRINE) {
+                drawStanding(canvas, item);
+                continue;
+            }
             float x = (item[1] + .5f - cameraX) * tile;
             float y = (item[2] + .45f - cameraY) * tile + (float) Math.sin(clock * 3.2f + item[1]) * tile * .07f;
             ring(canvas, x, y, item[0] > PlusRun.FORM && item[0] < PlusRun.CHEST ? FORM_COLOURS[item[0] - PlusRun.FORM - 1] : 0xFFFFC53D);
@@ -3535,17 +3627,156 @@ final class RunGame {
 
     /** The inside of a place off the land, behind everything in it: one picture, side by side with itself turned about, drifting a little as she goes. */
     private void drawInside(Canvas canvas) {
-        if (inside == null) inside = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_room);
-        float wide = height * (float) inside.getWidth() / inside.getHeight(), drift = cameraX * tile * .15f % (wide * 2);
+        int look = look();
+        Bitmap inside;
+        if (look < 0) {
+            if (this.inside == null) this.inside = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_room);
+            inside = this.inside;
+        } else {
+            // One look's picture is kept at a time: the next place's takes its room.
+            if (lookOf != look) {
+                if (lookArt != null) lookArt.recycle();
+                lookArt = BitmapFactory.decodeResource(context.getResources(), LOOK_ART[look]);
+                lookOf = look;
+            }
+            inside = lookArt;
+        }
+        // A cellar's picture fills the screen. One of the eight is as tall as its place: its wall, with what stands along it, from
+        // the ceiling to the floor, and the picture's own floor out of sight under the floor she walks on; and it goes by as she does.
+        float tall = look < 0 ? height : tile * RunLevels.ROOM_TALL / .66f, top = look < 0 ? 0 : (run.level().rooms.get(run.room())[12] - cameraY) * tile;
+        float wide = tall * (float) inside.getWidth() / inside.getHeight(), drift = cameraX * tile * (look < 0 ? .15f : .55f) % (wide * 2);
+        if (look >= 0) canvas.drawColor(LOOK_WALL[look]);
         paint.setAlpha(255);
         for (int copy = 0; copy * wide - drift < width; copy++) {
             float left = copy * wide - drift;
-            target.set(left - 1, 0, left + wide + 1, height);
+            target.set(left - 1, top, left + wide + 1, top + tall);
             canvas.save();
             if (copy % 2 != 0) canvas.scale(-1, 1, left + wide / 2, 0);
             canvas.drawBitmap(inside, null, target, paint);
             canvas.restore();
         }
+    }
+
+    /** One colour with so much of another in it. */
+    private static int mixed(int one, int other, float much) {
+        return Color.rgb(Math.round(Color.red(one) + (Color.red(other) - Color.red(one)) * much), Math.round(Color.green(one) + (Color.green(other) - Color.green(one)) * much),
+                Math.round(Color.blue(one) + (Color.blue(other) - Color.blue(one)) * much));
+    }
+
+    /** The look of the place she is in: one of the eight, or -1 for a cellar, which has its own. */
+    private int look() {
+        if (run == null || run.room() < 0) return -1;
+        int[] in = run.level().rooms.get(run.room());
+        return in.length > 13 ? in[13] : -1;
+    }
+
+    /**
+     * What is only in the places off a land. A locked door: boards banded with iron and a
+     * keyhole, which swings away when its key is taken. A bridge not yet raised: its
+     * planks in outline. Bars: iron, which lift into the wall over them when a plate is
+     * stood on, and blink before they come down.
+     */
+    private void drawFixture(Canvas canvas, char what, char now, int column, int row, float left, float y) {
+        paint.setStyle(Paint.Style.FILL);
+        if (what == RunLevels.SPAN) {
+            stroke.setColor(Color.WHITE);
+            stroke.setAlpha(Math.round(70 + 40 * (float) Math.sin(clock * 3 + column)));
+            stroke.setStrokeWidth(tile * .04f);
+            canvas.drawLine(left + tile * .1f, y + tile * .12f, left + tile * .5f, y + tile * .12f, stroke);
+            canvas.drawLine(left + tile * .7f, y + tile * .12f, left + tile * .95f, y + tile * .12f, stroke);
+            stroke.setAlpha(255);
+        } else if (what == RunLevels.LOCKED) {
+            if (now == RunLevels.AIR) return;
+            paint.setColor(0xFF7A4A2A);
+            canvas.drawRect(left, y, left + tile + 1, y + tile + 1, paint);
+            paint.setColor(0xFF4A2C1A);
+            canvas.drawRect(left + tile * .46f, y, left + tile * .54f, y + tile + 1, paint);
+            paint.setColor(0xFF8C8C96);
+            canvas.drawRect(left, y + tile * .12f, left + tile + 1, y + tile * .24f, paint);
+            canvas.drawRect(left, y + tile * .76f, left + tile + 1, y + tile * .88f, paint);
+            // Its lock, on the lower of its two squares, where the two columns meet.
+            if (run.laid(column, row + 1) != RunLevels.LOCKED && run.laid(column - 1, row) == RunLevels.LOCKED) {
+                paint.setColor(0xFFE0B13A);
+                canvas.drawCircle(left, y + tile * .2f, tile * .26f, paint);
+                paint.setColor(0xFF2B2440);
+                canvas.drawCircle(left, y + tile * .14f, tile * .08f, paint);
+                canvas.drawRect(left - tile * .04f, y + tile * .14f, left + tile * .04f, y + tile * .34f, paint);
+            }
+        } else {
+            // Bars: down, or up in the wall; with a second and a half left they blink.
+            float left_ = run.barsLeft();
+            boolean up = now == RunLevels.AIR;
+            if (up && left_ < 1.5f && (int) (clock * 8) % 2 == 0) up = false;
+            float lift = up ? tile * 1.7f : 0;
+            paint.setColor(0xFF9AA0AE);
+            for (int bar = 0; bar < 3; bar++) {
+                float x = left + tile * (.2f + bar * .3f);
+                canvas.drawRect(x - tile * .05f, y - lift, x + tile * .05f, y + tile + 1 - lift, paint);
+            }
+            paint.setColor(0xFF6E7482);
+            canvas.drawRect(left, y + tile * .4f - lift, left + tile + 1, y + tile * .5f - lift, paint);
+        }
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+    }
+
+    /** A lever, a plate or a shrine: they stand where they are, and are drawn as what they are. */
+    private void drawStanding(Canvas canvas, int[] item) {
+        float x = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+        paint.setStyle(Paint.Style.FILL);
+        if (item[0] == PlusRun.LEVER) {
+            boolean pulled = run.pulled(item[1]);
+            paint.setColor(0xFF6E7482);
+            canvas.drawRoundRect(x - tile * .3f, feet - tile * .2f, x + tile * .3f, feet, tile * .08f, tile * .08f, paint);
+            stroke.setColor(0xFF4A2C1A);
+            stroke.setStrokeWidth(tile * .09f);
+            float lean = pulled ? .32f : -.32f;
+            canvas.drawLine(x, feet - tile * .15f, x + tile * lean, feet - tile * .7f, stroke);
+            paint.setColor(pulled ? 0xFF2E9E6E : 0xFFE0483A);
+            canvas.drawCircle(x + tile * lean, feet - tile * .72f, tile * .13f, paint);
+            if (!pulled) mark(canvas, x, feet - tile * 1.25f + (float) Math.sin(clock * 4) * tile * .05f, "Lever", 0xFFE0483A, false);
+        } else if (item[0] == PlusRun.PLATE) {
+            boolean down = run.barsLeft() > 0;
+            paint.setColor(0xFF6E7482);
+            canvas.drawRoundRect(x - tile * .42f, feet - tile * (down ? .05f : .12f), x + tile * .42f, feet, tile * .05f, tile * .05f, paint);
+            paint.setColor(down ? 0xFF2E9E6E : 0xFFE0A21A);
+            canvas.drawRoundRect(x - tile * .32f, feet - tile * (down ? .09f : .2f), x + tile * .32f, feet - tile * (down ? .04f : .1f), tile * .05f, tile * .05f, paint);
+            if (down) {
+                // How much longer the bars stay up: a ring over the plate that runs down.
+                stroke.setColor(0xFF2E9E6E);
+                stroke.setStrokeWidth(tile * .08f);
+                box.set(x - tile * .28f, feet - tile * 1.3f, x + tile * .28f, feet - tile * .74f);
+                canvas.drawArc(box, -90, 360 * run.barsLeft() / PlusRun.BARS_OPEN, false, stroke);
+            }
+        } else {
+            // A shrine: a small stone house with a ribbon of its colour hung in it, and what it asks over it.
+            int colour = FORM_COLOURS[Math.max(0, Math.min(FORM_COLOURS.length - 1, item[4] - 1))];
+            paint.setColor(0xFF8C8C96);
+            canvas.drawRoundRect(x - tile * .5f, feet - tile * 1.1f, x + tile * .5f, feet, tile * .1f, tile * .1f, paint);
+            paint.setColor(0xFF6E7482);
+            path.reset();
+            path.moveTo(x - tile * .66f, feet - tile * 1.05f);
+            path.lineTo(x, feet - tile * 1.6f);
+            path.lineTo(x + tile * .66f, feet - tile * 1.05f);
+            path.close();
+            canvas.drawPath(path, paint);
+            paint.setColor(0xFF2B2440);
+            canvas.drawRoundRect(x - tile * .3f, feet - tile * .85f, x + tile * .3f, feet - tile * .1f, tile * .2f, tile * .2f, paint);
+            paint.setColor(colour);
+            paint.setAlpha(Math.round(120 + 60 * (float) Math.sin(clock * 3)));
+            canvas.drawCircle(x, feet - tile * .5f, tile * .3f, paint);
+            paint.setColor(Color.BLACK);
+            paint.setAlpha(255);
+            pieceIn(canvas, two, RIBBON_ART + item[4] - 1, x, feet - tile * .5f, tile * .5f, 0);
+            artIn(canvas, HEART_ART, x - tile * .22f, feet - tile * 1.95f, tile * .34f);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setTextSize(tile * .3f);
+            text.setColor(Color.WHITE);
+            canvas.drawText("for it", x, feet - tile * 1.85f, text);
+        }
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        stroke.setAlpha(255);
     }
 
     /**
@@ -3566,7 +3797,9 @@ final class RunGame {
                 // Found, a door has a mark over it that says what kind of place it leads to: and a tick, once that is done with.
                 boolean found = been || (session.tally("run_rooms_" + number) & 1 << index) != 0 || known && one[7] != 1;
                 boolean done = (run.roomsDone() & 1 << index) != 0;
-                if (found && at != index) doorMark(canvas, one[0], one[1], one[2], done);
+                // (A stash she has not yet been into says only that it is something: a question mark. Been into, it says what it holds.)
+                boolean inside = been || (session.tally("run_rooms_" + number) & 1 << index) != 0;
+                if (found && at != index) doorMark(canvas, one[0] == RunLevels.STASH && !inside ? -1 : one[0], one[1], one[2], done, one.length > 14 ? one[14] : 0);
             } else if (in == index) {
                 // Shut until what happens in it is over, its door is dim.
                 if (run.sealed()) paint.setAlpha(110);
@@ -3589,7 +3822,7 @@ final class RunGame {
      * a stash, two arrows for a passage, a sword for a cellar, and a star for a game. Once
      * the place is done with it is pale, with a tick on it.
      */
-    private void doorMark(Canvas canvas, int kind, int column, int floor, boolean done) {
+    private void doorMark(Canvas canvas, int kind, int column, int floor, boolean done, int holds) {
         float x = (column + .5f - cameraX) * tile, y = (floor - cameraY) * tile - tile * 2.15f, round = tile * .3f;
         if (x < -tile * 2 || x > width + tile * 2) return;
         y += (float) Math.sin(clock * 2.4f + column) * tile * .04f;
@@ -3599,14 +3832,30 @@ final class RunGame {
         paint.setColor(cardColor);
         paint.setAlpha(done ? 150 : 255);
         canvas.drawCircle(x, y, round, paint);
-        int colour = kind == RunLevels.ARENA ? 0xFFC0392B : kind == RunLevels.PASSAGE ? 0xFF3B7BE0 : kind == RunLevels.STASH ? 0xFF8A5A33 : 0xFFE0A21A;
+        int colour = kind == RunLevels.ARENA ? 0xFFC0392B : kind == RunLevels.PASSAGE ? 0xFF3B7BE0 : kind <= RunLevels.STASH ? 0xFF8A5A33 : 0xFFE0A21A;
         stroke.setColor(colour);
         stroke.setAlpha(done ? 110 : 255);
         stroke.setStrokeWidth(tile * .045f);
         canvas.drawCircle(x, y, round, stroke);
         paint.setColor(Color.BLACK);
         paint.setAlpha(done ? 110 : 255);
-        if (kind == RunLevels.STASH) {
+        if (kind < 0) {
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setTextSize(round * 1.5f);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setColor(0xFF8A5A33);
+            canvas.drawText("?", x, y + round * .52f, text);
+            text.setTypeface(Typeface.DEFAULT);
+        } else if (kind == RunLevels.STASH && holds == RunLevels.HOLDS_PET) {
+            // A paw: a pet waits in it.
+            paint.setColor(0xFF8A5A33);
+            paint.setAlpha(done ? 110 : 255);
+            canvas.drawOval(x - round * .4f, y - round * .05f, x + round * .4f, y + round * .6f, paint);
+            for (int toe = 0; toe < 3; toe++) canvas.drawCircle(x + (toe - 1) * round * .42f, y - round * (toe == 1 ? .5f : .3f), round * .2f, paint);
+            paint.setColor(Color.BLACK);
+        } else if (kind == RunLevels.STASH && holds == RunLevels.HOLDS_SHRINE) {
+            pieceIn(canvas, two, RIBBON_ART + RunLevels.ribbonsOf(number)[0] - 1, x, y, round * 1.3f, 0);
+        } else if (kind == RunLevels.STASH) {
             pieceIn(canvas, four, CHEST_PICTURE, x, y, round * 1.35f, 0);
         } else if (kind == RunLevels.ARENA) {
             thing(canvas, PlusRun.SWORD, x, y, round * 1.3f, 35, false, false);
@@ -3800,12 +4049,12 @@ final class RunGame {
             int kind = one[0];
             boolean holds = roomHolds() && roomCardAge < 2.4f;
             String title = kind == RunLevels.ARENA ? "Cellar: three waves" : kind == RunLevels.GAME ? "Mini game: catch the pluses" : kind == RunLevels.RANGE
-                    ? "Mini game: the range" : kind == RunLevels.TRAMPLE ? "Mini game: flatten them" : kind == RunLevels.STASH ? "A stash: climb to the chest"
-                    : "A passage: another way through";
+                    ? "Mini game: the range" : kind == RunLevels.TRAMPLE ? "Mini game: flatten them" : kind == RunLevels.STASH ? LOOK_NAMES[Math.max(0, one[13])] + ": a stash"
+                    : LOOK_NAMES[Math.max(0, one[13])] + ": a way through";
             String words = kind == RunLevels.ARENA ? (one[10] != 0 ? "An arena. Each wave is different; something sleeps under the last." : "An arena. Each wave is different; lose a life and the wave starts again.")
                     : kind == RunLevels.GAME ? "10 seconds. Catch " + PlusRun.ENOUGH + " for the prize." : kind == RunLevels.RANGE
                     ? "12 seconds, and an ink gun that never empties. Hit " + PlusRun.ENOUGH + "." : kind == RunLevels.TRAMPLE
-                    ? "15 seconds. They keep coming: flatten " + PlusRun.ENOUGH + "." : kind == RunLevels.STASH ? "It is in sight. Find the way up to it."
+                    ? "15 seconds. They keep coming: flatten " + PlusRun.ENOUGH + "." : kind == RunLevels.STASH ? (one[14] == RunLevels.HOLDS_PET ? "A pet waits in it, by its chest." : one[14] == RunLevels.HOLDS_SHRINE ? "A shrine stands by its chest." : "Find the way through to its chest.")
                     : "Spikes, signs, and a chest by the far door.";
             float show = Math.min(1, roomCardAge / .25f) * (holds ? 1 : Math.max(0, Math.min(1, (3.4f - roomCardAge) / .4f)));
             if (holds) canvas.drawColor(Color.argb(Math.round(90 * show), 20, 16, 30));
@@ -3903,6 +4152,19 @@ final class RunGame {
             // A pet that lies waiting: it sits there, and hops now and then.
             float hop = Math.abs((float) Math.sin(clock * 3 + x)) * size * .12f;
             cell(canvas, petArt(kind - PlusRun.PET), (int) (clock * 1.2f) % 4 == 0 ? 5 : 0, 6, x, y + size * .62f - hop, size * 1.5f, false);
+            return;
+        }
+        if (kind == PlusRun.KEY) {
+            // A key: a ring, a shaft and two teeth, in gold.
+            canvas.save();
+            canvas.rotate(-35 + 8 * (float) Math.sin(clock * 3), x, y);
+            stroke.setColor(0xFFE0A21A);
+            stroke.setStrokeWidth(size * .13f);
+            canvas.drawCircle(x - size * .28f, y, size * .17f, stroke);
+            canvas.drawLine(x - size * .1f, y, x + size * .42f, y, stroke);
+            canvas.drawLine(x + size * .28f, y, x + size * .28f, y + size * .18f, stroke);
+            canvas.drawLine(x + size * .42f, y, x + size * .42f, y + size * .18f, stroke);
+            canvas.restore();
             return;
         }
         if (kind == PlusRun.CHEST) pieceIn(canvas, four, CHEST_PICTURE, x, y, size * 1.5f, 0);
@@ -4988,41 +5250,35 @@ final class RunGame {
     }
 
     /**
-     * A chest opens where it stood: it jumps, its lid flies off turning, light comes out
-     * of it in rays, and what was in it goes up to the count at the top.
+     * A chest is picked up: it blinks white, goes up over her head and is gone, with a
+     * few rays where it stood, and what was in it goes up to the count at the top.
      */
     private float chestAge = 9, chestX, chestY;
 
     private void drawChest(Canvas canvas) {
-        if (chestAge > .9f) return;
-        float x = (chestX - cameraX) * tile, y = (chestY - cameraY) * tile, through = chestAge / .9f, hop = (float) Math.sin(Math.min(1, through * 2.5f) * Math.PI) * tile * .35f;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFFFFD24A);
+        // Half a second: it blinks white twice, as a thing picked up does, and goes up over her head, smaller and fainter as it goes,
+        // with a few thin rays where it stood. Nothing of it is across her for more than a blink.
+        if (chestAge > .5f) return;
+        float through = chestAge / .5f, x = (chestX - cameraX) * tile, y = (chestY - cameraY) * tile - tile * 1.5f * through * (2 - through) / 1f;
+        stroke.setColor(0xFFFFE08A);
+        stroke.setStrokeWidth(tile * .05f);
+        stroke.setAlpha(Math.round(200 * (1 - through)));
         for (int ray = 0; ray < 8; ray++) {
-            double turn = clock * 1.6f + ray * Math.PI / 4;
-            path.reset();
-            path.moveTo(x, y - hop);
-            path.lineTo(x + (float) Math.cos(turn - .16) * tile * 1.7f * through, y - hop + (float) Math.sin(turn - .16) * tile * 1.7f * through);
-            path.lineTo(x + (float) Math.cos(turn + .16) * tile * 1.7f * through, y - hop + (float) Math.sin(turn + .16) * tile * 1.7f * through);
-            path.close();
-            paint.setAlpha(Math.round(130 * (1 - through)));
-            canvas.drawPath(path, paint);
+            double turn = ray * Math.PI / 4 + .3;
+            float from = tile * (.35f + .5f * through), to = tile * (.6f + .9f * through), baseY = (chestY - cameraY) * tile;
+            canvas.drawLine(x + (float) Math.cos(turn) * from, baseY + (float) Math.sin(turn) * from, x + (float) Math.cos(turn) * to, baseY + (float) Math.sin(turn) * to, stroke);
         }
+        stroke.setAlpha(255);
+        boolean white = chestAge < .06f || chestAge > .12f && chestAge < .18f;
+        if (white) paint.setColorFilter(WHITENED);
         paint.setColor(Color.BLACK);
-        paint.setAlpha(Math.round(255 * Math.min(1, (1 - through) * 3)));
-        pieceIn(canvas, four, CHEST_PICTURE, x, y - hop, tile * 1.1f * (1 + .15f * (float) Math.sin(through * Math.PI)), 0);
-        // Its lid, off and away.
-        canvas.save();
-        float lidX = x + tile * 1.2f * through, lidY = y - hop - tile * (.5f + 2.2f * (float) Math.sin(through * Math.PI * .75f));
-        canvas.rotate(through * 420, lidX, lidY);
-        paint.setColor(0xFF8A4B2A);
-        canvas.drawRoundRect(lidX - tile * .45f, lidY - tile * .14f, lidX + tile * .45f, lidY + tile * .14f, tile * .12f, tile * .12f, paint);
-        paint.setColor(0xFFE0B13A);
-        canvas.drawRect(lidX - tile * .08f, lidY - tile * .14f, lidX + tile * .08f, lidY + tile * .14f, paint);
-        canvas.restore();
-        paint.setColor(Color.BLACK);
+        paint.setAlpha(Math.round(255 * (through < .35f ? 1 : Math.max(0, 1 - (through - .35f) / .65f))));
+        pieceIn(canvas, four, CHEST_PICTURE, x, y, tile * 1.1f * (1 - .55f * through), 0);
+        paint.setColorFilter(null);
         paint.setAlpha(255);
     }
+
+    private static final android.graphics.ColorFilter WHITENED = new android.graphics.PorterDuffColorFilter(Color.WHITE, android.graphics.PorterDuff.Mode.SRC_ATOP);
 
     private static final String[] IMP_SAYS = {"Too slow~", "Hehe~", "Mine~", "Sloppy~"};
     private float wardAge = 9;
@@ -6435,24 +6691,43 @@ final class RunGame {
             paint.setAlpha(255);
             pieceIn(canvas, four, SCROLL_PICTURE, where.right - where.width() * .1f, where.top + where.width() * .1f, where.width() * .42f, 0);
         }
-        // The counter, where her pluses buy what she keeps.
+        // Under the lands, on with the furthest land she has reached: the button a thumb finds first.
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0x33000000);
-        float round = shopButton.height() / 2;
-        canvas.drawRoundRect(shopButton.left, shopButton.top + dp(2), shopButton.right, shopButton.bottom + dp(3), round, round, paint);
+        float round = goButton.height() / 2;
+        canvas.drawRoundRect(goButton.left, goButton.top + dp(2), goButton.right, goButton.bottom + dp(3), round, round, paint);
         paint.setColor(CalculatorLayout.CORAL);
-        canvas.drawRoundRect(shopButton, round, round, paint);
+        canvas.drawRoundRect(goButton, round, round, paint);
         paint.setColor(Color.BLACK);
         text.setColor(Color.WHITE);
         text.setTextAlign(Paint.Align.RIGHT);
         text.setTextSize(dp(16));
-        String has = "+ " + bank() + "  ›";
-        canvas.drawText(has, shopButton.right - dp(18), shopButton.centerY() + dp(5.5f), text);
+        String next = "Land " + open + "  ›";
+        canvas.drawText(next, goButton.right - dp(18), goButton.centerY() + dp(5.5f), text);
         text.setTextAlign(Paint.Align.LEFT);
-        fitted(canvas, "Guild counter: upgrades", shopButton.left + dp(20), shopButton.centerY() + dp(5.5f), dp(16),
-                shopButton.width() - dp(52) - text.measureText(has));
+        fitted(canvas, open == 1 && starsOf(1) == 0 ? "Start" : starsOf(open) > 0 ? "Play again" : "Continue", goButton.left + dp(20), goButton.centerY() + dp(5.5f), dp(16),
+                goButton.width() - dp(52) - text.measureText(next));
+        // The counter, where her pluses buy what she keeps: up beside the sound, with what she has to spend under its name, and a dot
+        // on its corner when she has enough for something.
+        boolean enough = false;
+        for (int which : UP_ORDER) {
+            if (bought(which) < UP_COSTS[which].length && locked(which) == null && bank() >= UP_COSTS[which][bought(which)]) enough = true;
+        }
+        plate(canvas, shopButton, shopButton.height() / 2, 235);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(ink);
+        fitted(canvas, shopButton.width() < dp(96) ? "Counter" : "Guild counter", shopButton.centerX(), shopButton.top + dp(15.5f), dp(12), shopButton.width() - dp(20));
+        text.setColor(CalculatorLayout.CORAL);
+        fitted(canvas, "+ " + bank() + "  ›", shopButton.centerX(), shopButton.bottom - dp(6.5f), dp(13), shopButton.width() - dp(20));
+        if (enough) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(CalculatorLayout.CORAL);
+            canvas.drawCircle(shopButton.right - dp(7), shopButton.top + dp(5), dp(5), paint);
+            paint.setColor(Color.BLACK);
+        }
+        text.setTextAlign(Paint.Align.LEFT);
         // Her, under it all, with a word about what is next.
-        float tall = Math.min(dp(96), safe.bottom - shopButton.bottom - dp(20));
+        float tall = Math.min(dp(96), safe.bottom - goButton.bottom - dp(20));
         if (tall > dp(40)) {
             float feet = safe.bottom - dp(14), middle = safe.left + dp(26) + tall * .45f;
             paint.setAlpha(255);
