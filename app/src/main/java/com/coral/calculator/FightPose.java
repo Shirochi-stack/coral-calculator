@@ -7,7 +7,7 @@ import static com.coral.calculator.FightFrames.*;
  * has been doing it. It goes by the fight's own clocks and nothing else, so two devices
  * showing the same fight show the same frame.
  *
- * Standing she goes through the four frames of her stance, which were drawn together. A walk is the frames that were drawn together as one
+ * Standing she goes through the eight frames of her stance, which were drawn together. A walk is the frames that were drawn together as one
  * cycle. What happens once has frames between its poses: a jump goes through ten, and every
  * blow has a wind-up before it and a follow-through after.
  */
@@ -87,8 +87,8 @@ final class FightPose {
                 if (hold > .45f) return TAUNT;
                 if (fighter.turned < .05f) return TURN;
                 if (fighter.turned < .1f) return TURN2;
-                // Her stance, shifting her weight: the four frames of it that were drawn together, as they have always been shown.
-                return IDLE1 + (int) (fight.time() / .28f + fighter.side * 2) % 4;
+                // Her stance, shifting her weight: eight frames of it drawn together in one picture, round and round.
+                return ST1 + (int) (fight.time() / .14f + fighter.side * 4) % 8;
         }
     }
 

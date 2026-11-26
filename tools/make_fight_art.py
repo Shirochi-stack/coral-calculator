@@ -92,9 +92,13 @@ SHEETS = [
     # Chikuwa's ultimate, drawn as one move: the great loaf hugged, heaved overhead, the leap, the drop, the landing, and
     # a bite of a roll afterwards. She stands simply in the first, and the sheet is sized by that one.
     ("drop", "DR1 DR2 DR3 DR4 DR5 DR6", (0,)),
+    # Standing: eight frames of her stance drawn together in one picture, four across and two down, kept beside her other
+    # sheets as candidates/stance8.webp. They are sized together, the tallest to her standing height, and stood on the
+    # ground.
+    ("stance8", "ST1 ST2 ST3 ST4 ST5 ST6 ST7 ST8", ()),
 ]
 # A sheet that only some fighters have: for the others what they had stands in.
-ONLY = {"homer": ("tsubakieh",), "drop": ("chikuwa",)}
+ONLY = {"homer": ("tsubakieh",), "drop": ("chikuwa",), "stance8": FIGHTERS}
 # A sheet in which nothing stands simply upright can have each of its frames sized by itself, by how wide her face is
 # against her face as she stands. None is at present: by her face Tsubakieh's home run came out a tenth too small,
 # and it has a frame in which she stands.
@@ -103,7 +107,7 @@ FACED = set()
 MORE = [sheet for sheet, _, _ in SHEETS[17:] if sheet not in ONLY]
 # A frame that is only there to give its sheet her height is not kept; nor is one that is no longer shown: the
 # halves of the walk backward, and the second stagger.
-DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S BB1 BB2 BB3 BB4 STAGGER2".split()
+DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S BB1 BB2 BB3 BB4 STAGGER2 IDLE2 IDLE3 IDLE4".split()
 # An in-between is as tall as the two frames it goes between are, taken together: these are the two, for each frame of a sheet.
 BETWEENS = {
     "back2": [(f"BACK{n}", f"BACK{n % 4 + 1}") for n in range(1, 5)],
@@ -125,6 +129,7 @@ SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U
          "HW1": "HS", "HW2": "H1", "HW3": "H2", "HW4": "H3", "HW5": "H4", "HF1": "H1", "HF2": "H2", "HF3": "H3", "HF4": "H4", "HF5": "H5",
          "AF1": "A1", "AF2": "A2", "AF3": "A3", "AW": "A1", "SM_TIP": "SM_UP",
          "DASH_QW": "DASH_Q", "DASH_HW": "DASH_H", "BREAK_W": "MS", "LAUNCH_W": "LAUNCH", "SHOVE_W": "SHOVE",
+         "ST1": "IDLE1", "ST2": "IDLE1", "ST3": "IDLE1", "ST4": "IDLE1", "ST5": "IDLE1", "ST6": "IDLE1", "ST7": "IDLE1", "ST8": "IDLE1",
          "DR1": "U1", "DR2": "U2", "DR3": "U2", "DR4": "U3", "DR5": "U3", "DR6": "U4",
          "HR1": "U1", "HR2": "U2", "HR3": "U3", "HR4": "U3", "HR5": "U4", "HR6": "U4",
          "SW1": "SS", "SW2": "SS", "SW3": "SS", "SW4": "SS", "SW5": "SS", "U12": "U1", "U23": "U2", "U34": "U3", "U4R": "U4", "SF": "SS"}
@@ -359,6 +364,20 @@ def fighter(name, report):
         for slot, picture, (_, body, feet) in zip(names.split(), pictures, parts):
             across = (body[0] + body[2]) / 2 if slot in CENTRED else feet
             frames[slot] = (picture, across, body[3], None)
+    eight = folder / "candidates" / "stance8.webp"
+    if eight.exists():
+        # The eight were drawn together at one size, and are kept at one: the tallest of them is as tall as she stands, as
+        # the tallest of the four frames of her stance before them was. Sized each by her face they came out as much as a
+        # sixth too small for one fighter and a tenth apart from one another for three, which is her changing size as she
+        # stands; her face is not a sure enough measure for that.
+        cut = cells(clean(Image.open(eight)), 4, 2)
+        scale = STAND / max(body[3] - body[1] for _, body, _ in cut)
+        scales = []
+        for slot, (image, body, feet) in zip([f"ST{n}" for n in range(1, 9)], cut):
+            size = (max(1, round(image.size[0] * scale)), max(1, round(image.size[1] * scale)))
+            frames[slot] = (image.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), feet * scale, body[3] * scale, None)
+            scales.append(round((body[3] - body[1]) * scale))
+        report[f"{name} stance of eight, her height in each"] = scales
     for slot, spare in SPARE.items():
         frames.setdefault(slot, frames[spare])
     for slot in FLOOR:

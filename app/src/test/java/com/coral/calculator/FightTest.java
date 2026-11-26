@@ -634,16 +634,16 @@ public class FightTest {
             // Standing she goes through the four frames of her stance, as she did before any frames were added.
             Set<Integer> frames = new HashSet<>();
             float held = longest(apart(kind, Fight.CHIKUWA, 6), pad, 3, Fight.IDLE, frames);
-            assertTrue(name + " holds a frame of her stance for " + held, held <= .3f && held >= .25f);
+            assertTrue(name + " holds a frame of her stance for " + held, held <= .16f && held >= .12f);
             Set<Integer> stance = new HashSet<>();
-            for (int frame = FightFrames.IDLE1; frame <= FightFrames.IDLE4; frame++) stance.add(frame);
+            for (int frame = FightFrames.ST1; frame <= FightFrames.ST8; frame++) stance.add(frame);
             assertEquals(stance, frames);
             // The four are pictures of their own, all but the same height, and stand on the ground.
             Set<String> where = new HashSet<>();
-            for (int frame = FightFrames.IDLE1; frame <= FightFrames.IDLE4; frame++) {
+            for (int frame = FightFrames.ST1; frame <= FightFrames.ST8; frame++) {
                 short[] at = FightFrames.FRAMES[kind][frame];
                 assertTrue(where.add(at[0] + " " + at[1] + " " + at[2]));
-                assertTrue(name + " stands " + at[6] + " in frame " + frame, at[6] <= FightFrames.STAND * 1.01f && at[6] >= FightFrames.STAND * .94f);
+                assertTrue(name + " stands " + at[6] + " in frame " + frame, at[6] <= FightFrames.STAND * 1.01f && at[6] >= FightFrames.STAND * .93f);
                 assertTrue(at[4] - at[6] <= 3);
             }
             // A walk is the frames that were drawn together as one stride and only those: six forward, four backward.
@@ -797,7 +797,8 @@ public class FightTest {
                 other.step(STEP, pad, null);
                 pad.ultimate = false;
                 top = Math.max(top, other.fighters[1].y);
-                assertTrue(FightPose.of(other, other.fighters[0], 0, 0) < FightFrames.HR1);
+                int pose = FightPose.of(other, other.fighters[0], 0, 0);
+                assertTrue(pose < FightFrames.HR1 || pose > FightFrames.HR6);
             }
             assertTrue(FightCast.NAMES[kind] + " threw her " + top, top < 2.5f);
         }
