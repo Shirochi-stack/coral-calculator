@@ -1137,12 +1137,18 @@ final class FightGame {
         canvas.save();
         canvas.translate(jolt, 0);
         float scale = Fight.TALL * unit / STANDING;
-        // A soft shadow under each, smaller the higher she is.
+        // A soft shadow under each, smaller the higher she is. Under one who lies on the floor it is as wide as she lies, and under the middle of her.
         paint.setStyle(Paint.Style.FILL);
         for (Fight.Fighter fighter : two) {
-            float wide = unit * (.75f - Math.min(.4f, fighter.y * .12f));
+            float wide = unit * (.75f - Math.min(.4f, fighter.y * .12f)), middle = across(fighter.x);
+            boolean lying = fighter.y <= .05f && (fighter.state == Fight.DOWN || fighter.state == Fight.OUT);
+            if (lying) {
+                short[] at = FightFrames.FRAMES[fighter.kind][pose(fighter)];
+                wide = Math.max(wide, at[3] * scale * .5f);
+                middle += (at[3] / 2f - at[5]) * scale * (fighter.facingLeft ? -1 : 1);
+            }
             paint.setColor(0x33000000);
-            box.set(across(fighter.x) - wide, groundY - unit * .09f, across(fighter.x) + wide, groundY + unit * .09f);
+            box.set(middle - wide, groundY - unit * .09f, middle + wide, groundY + unit * .09f);
             canvas.drawOval(box, paint);
         }
         paint.setColor(Color.BLACK);
