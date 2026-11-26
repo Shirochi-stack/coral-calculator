@@ -508,6 +508,27 @@ final class RunStory {
             {"phase8b", "Then be ordinary. See how long they stay.", "M",
                     "The lonely other self, nearly beaten, throws a black ribbon that makes her opponent an ordinary girl. Hollow, low, her voice wavering."},
     };
+    /** As she goes through a door into a place off the land, by its kind: a stash, a passage, a cellar, a room where pluses fall. */
+    static final String[][] ROOMS = {
+            {"room0", "A hidden room. Finders keepers Sloppy~♡", "H",
+                    PLAYER + "She has just stepped through a door into a secret room full of treasure. Delighted, greedy, half whispering." + FAST},
+            {"room1", "A secret passage. I knew this book had one Sloppy~♡", "H",
+                    PLAYER + "She has just found a secret passage behind a wall. Smug, pleased with herself." + FAST},
+            {"room2", "A cellar. And it shut behind me. Clear them out Sloppy~♡", "H",
+                    PLAYER + "A cellar door has just slammed shut behind her and enemies are appearing. Alarmed, then bossy." + FAST},
+            {"room3", "Pluses are falling from the ceiling. Catch them Sloppy~♡", "H",
+                    PLAYER + "She has walked into a room where coins rain from above. Excited, urgent." + FAST},
+    };
+    /** When she comes near a crack with a door behind it; and when a cellar is cleared and when the pluses stop falling. */
+    static final String[][] CRACK = {
+            {"crack1", "There's a draught from that crack. Break it open Sloppy~♡", "H",
+                    PLAYER + "She has noticed a cracked wall with air coming through it. Curious, conspiratorial." + FAST}};
+    static final String[][] ROOM_WON = {
+            {"clear1", "Cellar cleared. Was that all of them Sloppy~♡", "H",
+                    PLAYER + "She has just beaten the last wave of enemies in a sealed cellar. Out of breath, cocky." + FAST},
+            {"caught1", "Time. Not bad for one pair of hands Sloppy~♡", "H",
+                    PLAYER + "A coin-catching game has just ended. Pleased, a little smug." + FAST},
+    };
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -534,7 +555,7 @@ final class RunStory {
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
-                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT);
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON);
         return groups.toArray(new String[0][][]);
     }
 }

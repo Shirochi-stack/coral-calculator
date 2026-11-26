@@ -25,6 +25,14 @@ final class RunLevels {
      * way or the other; slime, on which there is no stopping; a draught that lifts; a bookmark
      * door; and lava and water, which fill pits.
      */
+    /**
+     * A door into a place of its own, off the land: a hidden room with a stash in it, a
+     * secret passage that comes out further on, a cellar that shuts behind her and fills
+     * with signs until they are cleared, or a room where pluses fall to be caught. The door
+     * is not solid; she goes in when she chooses to.
+     */
+    static final char ENTRY = 'H';
+    static final int STASH = 0, PASSAGE = 1, ARENA = 2, GAME = 3;
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
@@ -90,8 +98,8 @@ final class RunLevels {
     };
     /** The numbers the lands of the second volume are made from, picked as those of the first were. */
     static final long[] LATER_SEEDS = {
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1,
     };
 
     private static final int PLAIN = 0, GAP = 1, STEPS = 2, WALL = 3, BRIDGE = 4, HIGH_ROAD = 5, SPIKES = 6, SPRING_WALL = 7,
@@ -145,6 +153,17 @@ final class RunLevels {
         final List<int[]> doors = new ArrayList<>();
         /** What stands about in its villages to be looked at: which picture, the column and the row it stands in. */
         final List<int[]> decor = new ArrayList<>();
+        /**
+         * The places off the land that its doors lead to: for each, its kind; the column and
+         * the floor of its door in the land; the first and last columns of the place itself,
+         * which lies beyond the end of the land; the column she comes out at, which for a
+         * passage is further on; the column of its door inside; whether its door in the land
+         * is hidden until she breaks through to it; the column of its far door inside, for a
+         * passage, or -1; and the floor she comes out onto.
+         */
+        final List<int[]> rooms = new ArrayList<>();
+        /** How many columns the land proper has: what lies beyond is the places its doors lead to. */
+        int main;
         /** Where the place begins in which someone waits, or -1. */
         int arena = -1;
         int gate;
@@ -193,8 +212,12 @@ final class RunLevels {
             builder.rest();
             // After the first flag a book or a brush and what it is good against; after the second an ink gun and a crowd; and in half the lands another after the third.
             if (stretch == stretches / 4 || stretch == stretches / 2 || stretch == stretches * 3 / 4 && number % 2 == 1) {
-                builder.stretch(stretch == stretches / 4 ? number % 2 == 0 ? LINE : CROWD : GALLERY);
+                boolean gallery = stretch != stretches / 4;
+                int start = builder.at;
+                builder.stretch(gallery ? GALLERY : number % 2 == 0 ? LINE : CROWD);
+                builder.before(gallery, start + 2);
                 builder.rest();
+                builder.after();
             }
             if (stretch == 1 || stretch == stretches * 5 / 8) {
                 builder.stretch(VILLAGE);
@@ -206,7 +229,11 @@ final class RunLevels {
         draft.gate = builder.at;
         int gateFloor = builder.floor;
         builder.ground(6);
+        draft.main = builder.at;
+        builder.rooms();
         Level level = new Level(number, builder.at);
+        level.main = draft.main;
+        level.rooms.addAll(draft.rooms);
         for (int row = 0; row < ROWS; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
         level.land[gateFloor - 1][draft.gate] = GATE;
         level.land[gateFloor - 2][draft.gate] = GATE;
@@ -336,8 +363,12 @@ final class RunLevels {
             if (stretches >= 6 && (stretch == stretches / 3 || stretch == stretches * 2 / 3)) builder.flag();
             builder.rest();
             if (shaped && (stretch == stretches / 3 || stretch == stretches * 2 / 3)) {
-                builder.stretch(stretch == stretches / 3 ? number % 2 == 0 ? LINE : CROWD : GALLERY);
+                boolean gallery = stretch != stretches / 3;
+                int start = builder.at;
+                builder.stretch(gallery ? GALLERY : number % 2 == 0 ? LINE : CROWD);
+                builder.before(gallery, start + 2);
                 builder.rest();
+                builder.after();
             }
             // Its village, a little way in.
             if (shaped && stretch == 1) {
@@ -350,7 +381,11 @@ final class RunLevels {
         draft.gate = builder.at;
         int gateFloor = builder.floor;
         builder.ground(6);
+        draft.main = builder.at;
+        builder.rooms();
         Level level = new Level(number, builder.at);
+        level.main = draft.main;
+        level.rooms.addAll(draft.rooms);
         for (int row = 0; row < ROWS; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
         level.land[gateFloor - 1][draft.gate] = GATE;
         level.land[gateFloor - 2][draft.gate] = GATE;
@@ -448,6 +483,100 @@ final class RunLevels {
             this.random = random;
             this.hard = hard;
             this.chapter = chapter;
+        }
+
+        /** The doors asked for so far: the kind of place each leads to, its column and floor, whether it is hidden, and for a passage where it comes out and onto what floor. */
+        final List<int[]> wanted = new ArrayList<>();
+        private int[] passage;
+        private boolean inVillage;
+
+        /** A door in the land, where the ground is being laid now, to a place of a kind. */
+        int[] door(int kind, int column, boolean hidden) {
+            level.land[floor - 1][column] = ENTRY;
+            int[] want = {kind, column, floor, hidden ? 1 : 0, column, floor};
+            wanted.add(want);
+            return want;
+        }
+
+        /**
+         * At the near end of a crowd, between what lies there to fight with and its shelf: in
+         * one land in three a cellar door, by the book or the brush; in another a crack in the
+         * wall there with a stash behind it; and in the third a crack by the ink gun, with a
+         * passage behind it that comes out beyond the crowd.
+         */
+        void before(boolean gallery, int column) {
+            int number = level.number;
+            if (gallery) {
+                if (number % 3 == 1 && passage == null && !has(PASSAGE)) passage = door(PASSAGE, column, true);
+            } else if (number % 3 == 0) {
+                if (!has(ARENA)) door(ARENA, column, false);
+            } else if (number % 3 == 2 && !has(STASH)) {
+                door(STASH, column, true);
+            }
+        }
+
+        private boolean has(int kind) {
+            for (int[] want : wanted) if (want[0] == kind && (kind != STASH || want[3] != 0)) return true;
+            return false;
+        }
+
+        /** After it: where a passage begun before it comes out. */
+        void after() {
+            if (passage == null || passage[4] != passage[1]) return;
+            passage[4] = at - 1;
+            passage[5] = floor;
+            level.land[floor - 1][at - 1] = ENTRY;
+        }
+
+        /** A wall from the top of the land to the bottom, some columns thick. */
+        void wall(int columns) {
+            for (int column = at; column < at + columns; column++) {
+                for (int row = 0; row < ROWS; row++) level.land[row][column] = BLOCK;
+            }
+            at += columns;
+        }
+
+        /**
+         * The places the doors lead to, laid one after another beyond the end of the land,
+         * each walled all round: a floor, a ceiling eight squares over it, and what is in it.
+         */
+        void rooms() {
+            floor = FLOOR;
+            for (int[] want : wanted) {
+                int kind = want[0], wide = kind == PASSAGE ? 16 : kind == ARENA ? 14 : kind == GAME ? 12 : 10;
+                wall(2);
+                int from = at, to = from + wide - 1, far = -1;
+                for (int column = from; column <= to; column++) {
+                    for (int row = 0; row < ROWS; row++) if (row < FLOOR - 8 || row >= FLOOR) level.land[row][column] = BLOCK;
+                }
+                at += wide;
+                wall(2);
+                level.land[FLOOR - 1][from + 1] = ENTRY;
+                if (kind == STASH) {
+                    // Pluses along the floor and over a ledge, a chest to look at, and something to help.
+                    ledge(from + 4, FLOOR - 2, 4);
+                    pluses(from + 3, from + 8, FLOOR - 1);
+                    pluses(from + 4, from + 7, FLOOR - 4);
+                    level.decor.add(new int[]{106, from + 6, FLOOR - 1});
+                    int[] treats = {PlusRun.ICE, PlusRun.MAGNET, PlusRun.BREAD, PlusRun.NOTES};
+                    level.items.add(new int[]{want[3] != 0 ? PlusRun.FORM + PlusRun.YELLOW : treats[level.number % treats.length], from + 8, FLOOR - 3, 0});
+                } else if (kind == PASSAGE) {
+                    // A way through, with something to collect on it, and a door at the far end.
+                    far = to - 1;
+                    level.land[FLOOR - 1][far] = ENTRY;
+                    ledge(from + 5, FLOOR - 2, 3);
+                    ledge(from + 9, FLOOR - 3, 3);
+                    pluses(from + 3, to - 3, FLOOR - 1);
+                    pluses(from + 5, from + 7, FLOOR - 4);
+                    pluses(from + 9, from + 11, FLOOR - 5);
+                } else if (kind == ARENA) {
+                    ledge(from + 2, FLOOR - 2, 3);
+                    ledge(to - 4, FLOOR - 2, 3);
+                } else {
+                    ledge(from + 5, FLOOR - 2, 2);
+                }
+                level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5]});
+            }
         }
 
         /** Flat ground for some columns. */
@@ -593,7 +722,11 @@ final class RunLevels {
                     level.decor.add(new int[]{5, from + 17, floor - 1});
                     level.decor.add(new int[]{6 + random.nextInt(2), from + 21, floor - 1});
                     level.items.add(new int[]{who == NURI ? PlusRun.NOTES : GIVES[who - SOMI], from + 7, floor - 1, who});
-                    level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});                    break;
+                    level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});
+                    if (!inVillage) {
+                        inVillage = true;
+                        door(level.number % 2 == 0 ? STASH : GAME, from + 14, false);
+                    }                    break;
                 }
                 case PACK: {
                     // Three to five walking together between two blocks, and a ledge over them.

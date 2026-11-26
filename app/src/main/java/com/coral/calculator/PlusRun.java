@@ -58,6 +58,11 @@ final class PlusRun {
      * ordinary girl for a while.
      */
     static final int SHOCK = 14, BOOMERANG = 15, DEBRIS = 16, BLADE = 17, DARK = 18, GLOB = 19, CURSE = 20;
+    /** And a plus that falls, in the room where they are caught: it hurts no one, and is hers if she is under it. */
+    static final int PLUSDROP = 21;
+    /** How many waves of signs a cellar fills with, how long the pluses fall, and how many of them caught win something more. */
+    static final int WAVES = 3, ENOUGH = 8;
+    static final float FALLING = 10;
     /** How long rubble hangs before it falls, how long someone takes to arrive, and how long they take over changing. */
     static final float HANGS = .55f, ENTER = 2, FLOURISH = 1.2f;
     /**
@@ -186,6 +191,11 @@ final class PlusRun {
     private int form, formed, inkLeft, doorsUsed, quakes, cleared, parried, censors, riding = -1;
     private float formLeft, censored, doorWait, offIt;
     private int spent, giver, greetings;
+    /** Which place off the land she is in, or -1; which she has been into, which she has finished, and which hidden doors she has broken through to. */
+    private int room = -1, roomsFound, roomsDone, revealed;
+    private int entered, reveals, roomWins, wave, caught, dice = 12345;
+    private float gameLeft, sinceDrop;
+    private boolean quitting;
     private boolean atStall;
     /** The stalls she has been up to, by the column each stands in: its keeper greets her the first time only. */
     private final java.util.Set<Integer> greeted = new java.util.HashSet<>();
@@ -290,6 +300,19 @@ final class PlusRun {
         giver = other.giver;
         atStall = other.atStall;
         greetings = other.greetings;
+        room = other.room;
+        roomsFound = other.roomsFound;
+        roomsDone = other.roomsDone;
+        revealed = other.revealed;
+        entered = other.entered;
+        reveals = other.reveals;
+        roomWins = other.roomWins;
+        wave = other.wave;
+        caught = other.caught;
+        dice = other.dice;
+        gameLeft = other.gameLeft;
+        sinceDrop = other.sinceDrop;
+        quitting = other.quitting;
         greeted.addAll(other.greeted);
         locked = other.locked;
         leaving = other.leaving;
@@ -465,6 +488,162 @@ final class PlusRun {
         take(kind);
         return true;
     }
+
+    /**
+     * Which of the land's doors she stands at and may use, or -1: outside, either door of
+     * a place; inside, its door or its far door, unless the place is shut until what
+     * happens in it is over.
+     */
+    int door() {
+        if (state != PLAYING || !onGround) return -1;
+        float middle = x + WIDE / 2, feet = y + TALL;
+        if (room >= 0) {
+            int[] in = level.rooms.get(room);
+            if (sealed() || Math.abs(feet - RunLevels.FLOOR) > .3f) return -1;
+            return Math.abs(middle - in[6] - .5f) < .8f || in[8] >= 0 && Math.abs(middle - in[8] - .5f) < .8f ? room : -1;
+        }
+        for (int index = 0; index < level.rooms.size(); index++) {
+            int[] one = level.rooms.get(index);
+            if (Math.abs(middle - one[1] - .5f) < .8f && Math.abs(feet - one[2]) < .3f) return index;
+            if (one[5] != one[1] && Math.abs(middle - one[5] - .5f) < .8f && Math.abs(feet - one[9]) < .3f) return index;
+        }
+        return -1;
+    }
+
+    /**
+     * She uses the door she stands at: into the place it leads to, or out of it again, to
+     * where she went in or, by the far door of a passage, to where it comes out. A hidden
+     * door is first broken through to, and only then gone in by. Returns whether there was
+     * a door to use.
+     */
+    boolean enter() {
+        int at = door();
+        if (at < 0) return false;
+        int[] one = level.rooms.get(at);
+        float middle = x + WIDE / 2;
+        boolean far;
+        if (room < 0) {
+            far = one[5] != one[1] && Math.abs(middle - one[5] - .5f) < .8f;
+            if (!far && one[7] != 0 && (revealed & 1 << at) == 0) {
+                revealed |= 1 << at;
+                reveals++;
+                return true;
+            }
+            room = at;
+            roomsFound |= 1 << at;
+            revealed |= 1 << at;
+            put(far ? one[8] : one[6], RunLevels.FLOOR);
+            if ((roomsDone & 1 << at) == 0) {
+                if (one[0] == RunLevels.ARENA) {
+                    // The cellar shuts, and the first of the signs are in it.
+                    wave = 1;
+                    summon(one);
+                } else if (one[0] == RunLevels.GAME) {
+                    gameLeft = FALLING;
+                    caught = 0;
+                    sinceDrop = 0;
+                } else {
+                    roomsDone |= 1 << at;
+                }
+            }
+        } else {
+            far = one[8] >= 0 && Math.abs(middle - one[8] - .5f) < .8f;
+            room = -1;
+            put(far ? one[5] : one[1], far ? one[9] : one[2]);
+        }
+        entered++;
+        return true;
+    }
+
+    private void put(int column, int floor) {
+        x = column + (1 - WIDE) / 2;
+        y = floor - TALL;
+        speedAcross = 0;
+        speedDown = 0;
+        riding = -1;
+        safe = Math.max(safe, .5f);
+    }
+
+    /** Whether the place she is in is shut until what happens in it is over. */
+    boolean sealed() {
+        return room >= 0 && (level.rooms.get(room)[0] == RunLevels.ARENA && wave > 0 || level.rooms.get(room)[0] == RunLevels.GAME && gameLeft > 0);
+    }
+
+    /** A wave of signs in a cellar: one more in each wave than in the last, spread along it, and a moment before any of them moves. */
+    private void summon(int[] one) {
+        int count = 2 + wave;
+        for (int index = 0; index < count; index++) {
+            int kind = level.number >= RunLevels.SHAPED_FROM && index % 2 == 1 ? RunLevels.SLIME : RunLevels.MINUS;
+            Foe foe = new Foe(kind);
+            foe.spawned = true;
+            foe.left = 1;
+            foe.x = one[3] + 3.5f + index * (one[4] - one[3] - 6f) / Math.max(1, count - 1);
+            foe.ground = RunLevels.FLOOR - foe.tall();
+            foe.y = foe.ground;
+            foe.home = foe.x;
+            foe.leftward = index % 2 == 0;
+            foe.dazed = .8f;
+            foes.add(foe);
+        }
+    }
+
+    /** What happens in the place she is in: a cellar's waves, one after another until the last is cleared; and pluses falling for a while. */
+    private void rooms(float seconds) {
+        int[] one = level.rooms.get(room);
+        if (one[0] == RunLevels.ARENA && wave > 0) {
+            for (Foe foe : foes) if (foe.spawned && !foe.flat) return;
+            if (wave < WAVES) {
+                wave++;
+                summon(one);
+                return;
+            }
+            // Cleared: twenty pluses, and a heart if she is short of one.
+            wave = 0;
+            roomsDone |= 1 << room;
+            roomWins++;
+            bonus += 20;
+            if (hearts < perks.hearts) hearts++;
+        } else if (one[0] == RunLevels.GAME && gameLeft > 0) {
+            if ((sinceDrop += seconds) > .42f) {
+                sinceDrop = 0;
+                dice = dice * 1103515245 + 12345;
+                float at = one[3] + 1.5f + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 3);
+                shoot(PLUSDROP, false, at, RunLevels.FLOOR - 7.6f, 0, 5.5f, 2);
+            }
+            if ((gameLeft -= seconds) <= 0) {
+                gameLeft = 0;
+                roomsDone |= 1 << room;
+                roomWins++;
+                if (caught >= ENOUGH) bonus += 10;
+                for (Shot shot : shots) if (shot.kind == PLUSDROP) shot.left = 0;
+            }
+        }
+    }
+
+    /** Out of the place she was in, sent back to the flag: it is as it was before she went in, and what was in it with her is gone. */
+    private void quit() {
+        quitting = false;
+        room = -1;
+        wave = 0;
+        gameLeft = 0;
+        if (!locked) for (int index = foes.size() - 1; index >= 0; index--) if (foes.get(index).spawned) foes.remove(index);
+    }
+
+    /** The place off the land she is in, or -1, and where it begins and ends; which she has been into, finished, and broken through to, as bits. */
+    int room() { return room; }
+    int roomFrom() { return level.rooms.get(room)[3]; }
+    int roomTo() { return level.rooms.get(room)[4]; }
+    int roomsFound() { return roomsFound; }
+    int roomsDone() { return roomsDone; }
+    int revealed() { return revealed; }
+    /** Counts that only go up: doors used, hidden doors broken through to, and cellars cleared or falls of pluses seen out. */
+    int entered() { return entered; }
+    int reveals() { return reveals; }
+    int roomWins() { return roomWins; }
+    /** Which wave a cellar is at, 0 when none; how much longer pluses fall; and how many she has caught. */
+    int wave() { return wave; }
+    float gameLeft() { return gameLeft; }
+    int caught() { return caught; }
 
     /** Her form, 0 for her own, and how much longer it lasts. */
     int form() { return form; }
@@ -648,6 +827,8 @@ final class PlusRun {
         if (offIt > 0) offIt -= seconds;
         sinceShot += seconds;
         if (leaving) leave();
+        if (quitting) quit();
+        if (room >= 0) rooms(seconds);
         // A moment after the last of them is down, both ways open.
         if (opening > 0 && (opening -= seconds) <= 0) {
             locked = false;
@@ -853,6 +1034,8 @@ final class PlusRun {
         }
         // A flag she has passed, at any height, is where she comes back to; passing the gate is the end.
         float middle = x + WIDE / 2;
+        // In a place off the land she is neither further on in it nor at its end.
+        if (room >= 0) return;
         for (int flag : level.flags) {
             if (middle >= flag && startX < flag) {
                 startX = flag + (1 - WIDE) / 2;
@@ -1136,6 +1319,13 @@ final class PlusRun {
             if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x >= to || foe.x + foe.wide() <= from || foe.y >= bottom || foe.y + foe.tall() <= top) continue;
             beat(foe);
         }
+        for (int index = 0; index < level.rooms.size() && room < 0; index++) {
+            int[] one = level.rooms.get(index);
+            if (one[7] != 0 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
+                revealed |= 1 << index;
+                reveals++;
+            }
+        }
         for (int index = shots.size() - 1; index >= 0; index--) {
             Shot shot = shots.get(index);
             if (shot.hers || shot.x < from - .2f || shot.x > to + .2f || shot.y < top - .2f || shot.y > bottom + .2f) continue;
@@ -1169,6 +1359,13 @@ final class PlusRun {
             if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > RunLevels.ROWS
                     || (in == RunLevels.LEDGE ? shot.down > Math.abs(shot.across) : solid(in))) {
                 shots.remove(index);
+            } else if (shot.kind == PLUSDROP) {
+                // A falling plus is hers if she is under it.
+                if (shot.x > x - .3f && shot.x < x + WIDE + .3f && shot.y > y - .2f && shot.y < y + TALL) {
+                    shots.remove(index);
+                    caught++;
+                    bonus++;
+                }
             } else if (shot.hers) {
                 for (Foe foe : foes) {
                     if (foe.flat || absent(foe) || shot.x < foe.x - .2f || shot.x > foe.x + foe.wide() + .2f || shot.y < foe.y - .2f
@@ -1254,8 +1451,9 @@ final class PlusRun {
         speedAcross = 0;
         speedDown = 0;
         safe = SAFE;
-        // Out of the place where someone waits, it is as it was before she came in.
+        // Out of the place where someone waits, it is as it was before she came in; and so is a place off the land.
         if (locked) leaving = true;
+        if (room >= 0) quitting = true;
         return true;
     }
 
@@ -1275,7 +1473,7 @@ final class PlusRun {
             speedAcross = 0;
         }
         // A gate that is still shut stops her like a wall.
-        if (!gateOpen() && x + WIDE > level.gate) {
+        if (room < 0 && !gateOpen() && x + WIDE > level.gate) {
             x = level.gate - WIDE;
             speedAcross = 0;
         }

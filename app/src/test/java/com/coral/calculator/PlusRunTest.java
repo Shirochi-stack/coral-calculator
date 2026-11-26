@@ -1345,6 +1345,221 @@ public class PlusRunTest {
         assertEquals(1, run.taken());
     }
 
+    // The places off the land
+
+    /** The first land from one on that has a place of a kind off it, hidden or not, with her standing at its door; and which of its places that is. */
+    private static PlusRun atDoor(int from, int kind, boolean hidden, int[] which) {
+        for (int number = from; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            for (int index = 0; index < level.rooms.size(); index++) {
+                int[] one = level.rooms.get(index);
+                if (one[0] != kind || (one[7] != 0) != hidden) continue;
+                PlusRun run = new PlusRun(level);
+                run.place(one[1] + (1 - PlusRun.WIDE) / 2, one[2] - PlusRun.TALL);
+                run.step(STEP, false, false, false);
+                which[0] = index;
+                return run;
+            }
+        }
+        throw new AssertionError("no place of kind " + kind);
+    }
+
+    @Test public void aDoorLeadsToAStashAndBackAndAHiddenOneIsBrokenThroughToFirst() {
+        int[] which = new int[1];
+        PlusRun run = atDoor(RunLevels.SHAPED_FROM, RunLevels.STASH, false, which);
+        int[] one = run.level().rooms.get(which[0]);
+        assertEquals(which[0], run.door());
+        assertEquals(-1, run.room());
+        int collected = run.collected(), taken = run.taken();
+        assertTrue(run.enter());
+        assertEquals(which[0], run.room());
+        assertTrue(run.x() >= one[3] && run.x() <= one[4]);
+        assertEquals(1 << which[0], run.roomsFound());
+        assertEquals(1, run.entered());
+        // What is in it is hers for the walking: pluses along the floor, and something to help up on its ledge.
+        hold(run, 1.4f, false, true, false);
+        assertTrue(run.collected() >= collected + 5);
+        assertTrue(run.x() <= one[4] + 1);
+        // Back at its door, she goes out where she came in.
+        while (run.x() > one[6] + .3f) run.step(STEP, true, false, false);
+        hold(run, .2f, false, false, false);
+        assertEquals(which[0], run.door());
+        assertTrue(run.enter());
+        assertEquals(-1, run.room());
+        assertEquals(one[1] + (1 - PlusRun.WIDE) / 2, run.x(), .01f);
+        assertEquals(one[2] - PlusRun.TALL, run.y(), .01f);
+        assertEquals(taken, run.taken());
+        // A hidden one: the first use of it only breaks through to it.
+        run = atDoor(RunLevels.SHAPED_FROM, RunLevels.STASH, true, which);
+        assertEquals(which[0], run.door());
+        assertEquals(0, run.revealed());
+        assertTrue(run.enter());
+        assertEquals(-1, run.room());
+        assertEquals(1, run.reveals());
+        assertEquals(1 << which[0], run.revealed());
+        assertTrue(run.enter());
+        assertEquals(which[0], run.room());
+        assertEquals(1, run.reveals());
+        // Away from any door there is none to use.
+        hold(run, .5f, false, true, false);
+        assertEquals(-1, run.door());
+        assertFalse(run.enter());
+    }
+
+    @Test public void aPassageComesOutFurtherOnAndCanBeGoneBackThrough() {
+        int[] which = new int[1];
+        PlusRun run = atDoor(RunLevels.SHAPED_FROM, RunLevels.PASSAGE, true, which);
+        int[] one = run.level().rooms.get(which[0]);
+        assertTrue("comes out at " + one[5] + " from " + one[1], one[5] > one[1] + 20);
+        assertTrue(run.enter());
+        assertTrue(run.enter());
+        assertEquals(which[0], run.room());
+        // Through it to its far door, and out beyond the crowd it passes.
+        for (int step = 0; step < 600 && run.x() < one[8] - .2f; step++) run.step(STEP, false, true, false);
+        hold(run, .2f, false, false, false);
+        assertEquals(which[0], run.door());
+        assertTrue(run.enter());
+        assertEquals(-1, run.room());
+        assertEquals(one[5] + (1 - PlusRun.WIDE) / 2, run.x(), .01f);
+        assertEquals(0, run.hurts());
+        // And back in by the door it came out at, which leads to the far end.
+        hold(run, .2f, false, false, false);
+        assertEquals(which[0], run.door());
+        assertTrue(run.enter());
+        assertEquals(which[0], run.room());
+        assertEquals(one[8] + (1 - PlusRun.WIDE) / 2, run.x(), .01f);
+    }
+
+    @Test public void aCellarShutsAndFillsWithThreeWavesAndPaysWhenTheyAreCleared() {
+        int[] which = new int[1];
+        PlusRun run = atDoor(RunLevels.SHAPED_FROM, RunLevels.ARENA, false, which);
+        int[] one = run.level().rooms.get(which[0]);
+        int bonus = run.bonus();
+        assertTrue(run.enter());
+        assertTrue(run.sealed());
+        assertEquals(1, run.wave());
+        for (int wave = 1; wave <= PlusRun.WAVES; wave++) {
+            assertEquals(wave, run.wave());
+            int there = 0;
+            for (PlusRun.Foe foe : run.foes()) {
+                if (!foe.spawned || foe.flat) continue;
+                there++;
+                assertTrue(foe.x >= one[3] && foe.x <= one[4]);
+                // (Dealt with, for the purposes of this.)
+                foe.flat = true;
+            }
+            assertEquals(2 + wave, there);
+            // Shut until the last of them is: there is no door to use.
+            assertEquals(-1, run.door());
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(0, run.wave());
+        assertFalse(run.sealed());
+        assertEquals(1, run.roomWins());
+        assertEquals(bonus + 20, run.bonus());
+        assertEquals(1 << which[0], run.roomsDone());
+        hold(run, .2f, false, false, false);
+        assertEquals(which[0], run.door());
+        assertTrue(run.enter());
+        assertEquals(-1, run.room());
+        // Cleared, it does not fill again.
+        hold(run, .2f, false, false, false);
+        assertTrue(run.enter());
+        assertEquals(0, run.wave());
+        assertFalse(run.sealed());
+        // A hurt in there, before it is cleared, sends her back to the flag outside, and it is as it was.
+        run = atDoor(RunLevels.SHAPED_FROM, RunLevels.ARENA, false, which);
+        assertTrue(run.enter());
+        for (int step = 0; step < 60 * 30 && run.hurts() == 0; step++) {
+            PlusRun.Foe near = null;
+            for (PlusRun.Foe foe : run.foes()) if (foe.spawned && !foe.flat && foe.dazed <= 0) near = foe;
+            if (near != null) run.place(near.x + near.wide() - .1f, near.y + near.tall() - PlusRun.TALL);
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(1, run.hurts());
+        hold(run, .1f, false, false, false);
+        assertEquals(-1, run.room());
+        assertTrue(run.x() < run.level().main);
+        for (PlusRun.Foe foe : run.foes()) assertFalse(foe.spawned);
+        assertEquals(0, run.roomsDone());
+    }
+
+    @Test public void pluseFallForTenSecondsInTheRoomWhereTheyAreCaught() {
+        int[] which = new int[1];
+        PlusRun run = atDoor(RunLevels.SHAPED_FROM, RunLevels.GAME, false, which);
+        int[] one = run.level().rooms.get(which[0]);
+        int bonus = run.bonus();
+        assertTrue(run.enter());
+        assertTrue(run.sealed());
+        assertEquals(PlusRun.FALLING, run.gameLeft(), .01f);
+        // Under each as it falls, she catches it.
+        int fell = 0;
+        for (int step = 0; step < 60 * 11 && run.gameLeft() > 0; step++) {
+            PlusRun.Shot lowest = null;
+            for (PlusRun.Shot shot : run.shots()) if (shot.kind == PlusRun.PLUSDROP && (lowest == null || shot.y > lowest.y)) lowest = shot;
+            if (lowest != null) {
+                assertTrue(lowest.x >= one[3] && lowest.x <= one[4] + 1);
+                fell++;
+            }
+            float want = lowest == null ? run.x() : lowest.x - PlusRun.WIDE / 2;
+            run.step(STEP, want < run.x() - .15f, want > run.x() + .15f, false);
+            assertEquals(-1, run.door());
+        }
+        assertTrue(fell > 0);
+        assertEquals(0, run.gameLeft(), 0);
+        assertFalse(run.sealed());
+        assertTrue("caught " + run.caught(), run.caught() >= PlusRun.ENOUGH);
+        assertEquals(bonus + run.caught() + 10, run.bonus());
+        assertEquals(1, run.roomWins());
+        assertEquals(0, run.hurts());
+        // And then the door lets her out.
+        while (run.x() > one[6] + .3f) run.step(STEP, true, false, false);
+        hold(run, .2f, false, false, false);
+        assertTrue(run.enter());
+        assertEquals(-1, run.room());
+    }
+
+    @Test public void everyLandWithShapeHasPlacesOffItWalledAllRound() {
+        boolean[] kinds = new boolean[RunLevels.GAME + 1];
+        int hidden = 0;
+        for (int number = RunLevels.SHAPED_FROM; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            assertTrue("land " + number + " has " + level.rooms.size(), level.rooms.size() >= 2);
+            assertTrue(level.main > level.gate && level.main < level.columns);
+            for (int[] one : level.rooms) {
+                kinds[one[0]] = true;
+                if (one[7] != 0) hidden++;
+                // Its door is in the land proper, on the ground; the place itself is beyond the end of it.
+                assertTrue("land " + number, one[1] < level.gate && one[3] >= level.main && one[4] < level.columns - 1);
+                assertEquals("land " + number, RunLevels.ENTRY, level.land[one[2] - 1][one[1]]);
+                assertEquals("land " + number, one[2], RunLevels.top(level, one[1]));
+                assertEquals(RunLevels.ENTRY, level.land[FLOOR - 1][one[6]]);
+                for (int row = 0; row < RunLevels.ROWS; row++) {
+                    assertEquals(RunLevels.BLOCK, level.land[row][one[3] - 1]);
+                    assertEquals(RunLevels.BLOCK, level.land[row][one[4] + 1]);
+                }
+                for (int column = one[3]; column <= one[4]; column++) {
+                    assertEquals(RunLevels.BLOCK, level.land[FLOOR][column]);
+                    assertEquals(RunLevels.BLOCK, level.land[FLOOR - 9][column]);
+                    assertFalse(PlusRun.solid(level.land[FLOOR - 1][column]));
+                }
+                // A passage comes out on the ground further on, at a door of its own.
+                if (one[0] == RunLevels.PASSAGE) {
+                    assertTrue(one[5] > one[1] && one[5] < level.gate && one[8] > one[6]);
+                    assertEquals(RunLevels.ENTRY, level.land[one[9] - 1][one[5]]);
+                    assertEquals(RunLevels.ENTRY, level.land[FLOOR - 1][one[8]]);
+                } else {
+                    assertEquals(one[1], one[5]);
+                }
+            }
+            // No sign of the land is in them, and nothing of the land's to fight with.
+            for (int[] foe : level.foes) assertTrue(foe[1] < level.main);
+            for (int[] weapon : level.weapons) assertTrue(weapon[1] < level.main);
+        }
+        for (int kind = 0; kind <= RunLevels.GAME; kind++) assertTrue("no place of kind " + kind, kinds[kind]);
+        assertTrue(hidden >= 20);
+    }
+
     @Test public void aFlagOnHighGroundBringsHerBackOntoIt() {
         RunLevels.Level level = flat(40);
         for (int column = 10; column < 20; column++) for (int row = FLOOR - 3; row < FLOOR; row++) level.land[row][column] = RunLevels.BLOCK;
@@ -1449,7 +1664,8 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37, lines);
+        assertEquals(95 + 86 + 37 + 7, lines);
+        assertEquals(RunLevels.GAME + 1, RunStory.ROOMS.length);
         assertEquals(RunLevels.NURI - RunLevels.SOMI + 1, RunStory.MEET.length);
         assertEquals(8, RunStory.ENTER.length);
         assertEquals(16, RunStory.PHASES.length);
@@ -1633,9 +1849,10 @@ public class PlusRunTest {
                     .append(columns / lands).append(" columns, one every ").append(columns / (float) signs).append(" columns\n");
         }
         // And where there is something to go and look at, in a few of them.
-        for (int number : new int[]{23, 27, 31, 36, 44, 47, 55, 58, 66, 69, 77}) {
+        for (int number : new int[]{2, 5, 9, 14, 23, 24, 25, 27, 31, 36, 44, 47, 55, 58, 66, 69, 77}) {
             RunLevels.Level level = RunLevels.level(number);
             found.append("land ").append(number).append(": arena ").append(level.arena).append(" gate ").append(level.gate);
+            for (int[] one : level.rooms) found.append(" room").append(one[0]).append(one[7] != 0 ? "h " : " ").append(one[1]);
             for (int[] item : level.items) if (item[3] >= RunLevels.SOMI) found.append(item[0] == PlusRun.STALL ? " stall " : " who" + item[3] + " ").append(item[1]);
             for (int[] weapon : level.weapons) if (weapon[0] == PlusRun.GUN) found.append(" gun ").append(weapon[1]);
             for (int[] item : level.items) if (item[0] > PlusRun.FORM) found.append(" ribbon").append(item[0] - PlusRun.FORM).append(" ").append(item[1]);

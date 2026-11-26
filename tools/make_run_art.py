@@ -395,6 +395,16 @@ def places():
         left = max(0, min(VILLAGER_CELL[0] - size[0], round(VILLAGER_CELL[0] / 2 - middle)))
         row.alpha_composite(small, (index * VILLAGER_CELL[0] + left, VILLAGER_CELL[1] - size[1]))
     row.save(RES / "run_npc.webp", quality=92, method=6)
+    # The doors and what quests are about, in a fourth sheet; and the inside of a place off the land.
+    fourth = Image.new("RGBA", (PLACE_CELL * 4, PLACE_CELL * 2), (0, 0, 0, 0))
+    for index, piece in enumerate(pieces("rooms", 2, 4)):
+        scale = (PLACE_CELL - 4) / max(piece.size)
+        size = (max(1, round(piece.size[0] * scale)), max(1, round(piece.size[1] * scale)))
+        small = piece.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        fourth.alpha_composite(small, (index % 4 * PLACE_CELL + (PLACE_CELL - size[0]) // 2, index // 4 * PLACE_CELL + PLACE_CELL - size[1]))
+    fourth.save(RES / "plus_run_art4.webp", quality=92, method=6)
+    inside = Image.open(SOURCE / "room.png").convert("RGB")
+    inside.resize((SKY_WIDTH, round(inside.size[1] * SKY_WIDTH / inside.size[0])), Image.LANCZOS).save(RES / "plus_run_room.webp", quality=82, method=6)
     return sheet, row
 
 

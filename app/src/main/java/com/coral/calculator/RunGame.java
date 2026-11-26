@@ -173,6 +173,10 @@ final class RunGame {
     }
 
     private final Sheet two = new Sheet(R.drawable.plus_run_art2, 8), three = new Sheet(R.drawable.plus_run_art3, 4);
+    /** And a fourth: a door, a crack in a wall, a cellar door, rice cakes, a letter, a stopwatch, a chest, and a scroll. */
+    private final Sheet four = new Sheet(R.drawable.plus_run_art4, 4);
+    private static final int DOOR_PICTURE = 0, CRACK_PICTURE = 1, CELLAR_PICTURE = 2;
+    private Bitmap inside;
     private final float[] artWide = new float[ART_COUNT], artTall = new float[ART_COUNT];
     private Bitmap sky;
     private int skyOf = -1;
@@ -219,7 +223,9 @@ final class RunGame {
     private final boolean[] saidForm = new boolean[PlusRun.WHITE + 1];
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
     private float formLasts = 1, shake, sinceBump = 9, sinceShut = 9, sinceOpened = 9, sinceParry = 9, flash;
-    private int seenGreetings;
+    private int seenGreetings, seenEntered, seenReveals, seenWins;
+    /** Which cracks she has had a word about in this land, and which kinds of place off it. */
+    private int hinted, saidRoom;
     /** The name of the line last said; and how much longer what someone met in the land is saying is not to be talked over. */
     private String saying;
     private float personLeft;
@@ -643,7 +649,8 @@ final class RunGame {
         java.util.Arrays.fill(remarked, false);
         java.util.Arrays.fill(saidForm, false);
         saidCombo = saidLast = saidFlag = saidCharm = false;
-        seenGreetings = 0;
+        seenGreetings = seenEntered = seenReveals = seenWins = 0;
+        hinted = saidRoom = 0;
         personLeft = 0;
         saying = null;
         shake = flash = 0;
@@ -788,6 +795,15 @@ final class RunGame {
             goal = to - from <= across ? from - (across - (to - from)) / 2 : Math.max(from, Math.min(to - across, goal));
             goal = Math.max(0, Math.min(Math.max(0, run.columns() - across), goal));
         }
+        // In a place off the land the view keeps to it; in the land, it stops at the land's end, short of them.
+        if (run.room() >= 0) {
+            float from = run.roomFrom() - 1, to = run.roomTo() + 2;
+            goal = to - from <= across ? from - (across - (to - from)) / 2 : Math.max(from, Math.min(to - across, run.x() + PlusRun.WIDE / 2 - across / 2));
+        } else {
+            goal = Math.min(goal, Math.max(0, run.level().main - across));
+        }
+        // Through a door she is somewhere else at once, and so is the view.
+        if (run.entered() != seenEntered) cameraX = goal;
         // The view stays where she was hurt for a moment, so she is seen to be thrown, before it goes to where she is now.
         boolean held = knockAge >= 0 && knockAge < .5f;
         if (!held) cameraX += (goal - cameraX) * Math.min(1, seconds * 7);
@@ -855,7 +871,12 @@ final class RunGame {
                 speak(RunStory.FORMS[form - 1], true);
             }
         }
-        if (run.bonus() != seenBonus) {
+        // A plus caught as it falls is only a plus.
+        if (run.room() >= 0 && run.bonus() != seenBonus && run.roomWins() == seenWins) {
+            audio.play("plus", .5f);
+            seenBonus = run.bonus();
+        }
+        if (run.bonus() != seenBonus && run.roomWins() == seenWins) {
             // One sign after another: landed on without touching the ground between, or hit with what she throws.
             int row = run.streak() > 1 ? run.streak() : run.combo();
             pop(run.foeX(), run.foeY() - 1, "× " + row + "   + " + (run.bonus() - seenBonus));
@@ -978,6 +999,51 @@ final class RunGame {
             seenWiped = run.wiped();
             pop(herX, herY - 1.6f, "× 0");
             buzz(true);
+        }
+        RunLevels.Level here = run.level();
+        if (run.entered() != seenEntered) {
+            seenEntered = run.entered();
+            audio.play("door", .7f);
+            buzz(false);
+            // The places she has found are kept, land by land.
+            session.keep("run_rooms_" + number, session.tally("run_rooms_" + number) | run.roomsFound());
+            int in = run.room();
+            if (in >= 0) {
+                int kind = here.rooms.get(in)[0];
+                // Her word about the kind of place it is, the first time in a land; of a cellar or a fall of pluses, only while it is still to do.
+                if ((saidRoom & 1 << kind) == 0 && (kind <= RunLevels.PASSAGE || run.sealed())) {
+                    saidRoom |= 1 << kind;
+                    aside(RunStory.ROOMS[kind]);
+                }
+            }
+        }
+        if (run.reveals() != seenReveals) {
+            seenReveals = run.reveals();
+            audio.play("crumble", .8f);
+            shake = .2f;
+            buzz(true);
+            for (int crumb = 0; crumb < 10; crumb++) {
+                bits.add(new float[]{herX, herY - .8f, (random.nextFloat() - .5f) * 6, -random.nextFloat() * 4, .5f, 1});
+            }
+        }
+        if (run.roomWins() != seenWins) {
+            seenWins = run.roomWins();
+            boolean cellar = run.room() >= 0 && here.rooms.get(run.room())[0] == RunLevels.ARENA;
+            audio.play("unlock");
+            buzz(true);
+            pop(herX, herY - 1.6f, cellar ? "+ 20" : "+ " + run.caught() + (run.caught() >= PlusRun.ENOUGH ? "   + 10" : ""));
+            seenBonus = run.bonus();
+            speak(RunStory.ROOM_WON[cellar ? 0 : 1], true);
+            session.keep("run_roomsdone_" + number, session.tally("run_roomsdone_" + number) | run.roomsDone());
+        }
+        // Near a crack with a door behind it she has a word about the draught, once.
+        for (int index = 0; index < here.rooms.size() && run.room() < 0; index++) {
+            int[] one = here.rooms.get(index);
+            if (one[7] != 0 && (run.revealed() & 1 << index) == 0 && (hinted & 1 << index) == 0 && Math.abs(run.x() - one[1]) < 2.5f
+                    && Math.abs(run.y() + PlusRun.TALL - one[2]) < 2) {
+                hinted |= 1 << index;
+                aside(RunStory.CRACK[0]);
+            }
         }
         // At a stall its keeper calls out the first time she comes up to it, and not again however often she comes back.
         if (run.greetings() != seenGreetings) {
@@ -1128,6 +1194,13 @@ final class RunGame {
             if (action == MotionEvent.ACTION_DOWN && pauseButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 pause();
+                return;
+            }
+            // At a door, the same button uses it: in, out, or through the crack to it.
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && !run.atStall() && run.door() >= 0
+                    && stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                idle();
+                run.enter();
                 return;
             }
             // At a stall, its button opens it, and so does a tap on the sign over its keeper; the land waits.
@@ -1291,8 +1364,12 @@ final class RunGame {
                 control(canvas, rightButton, goRight, 0, charmed);
                 control(canvas, jumpButton, goJump, 270, false);
                 if (run.weapon() != PlusRun.UNARMED || run.has(PlusRun.RED) || run.has(PlusRun.BLUE)) strikeControl(canvas);
-                if (run.atStall()) stallControl(canvas);
-                else stallSign.setEmpty();
+                if (run.atStall()) {
+                    stallControl(canvas);
+                } else {
+                    stallSign.setEmpty();
+                    if (run.door() >= 0) doorControl(canvas);
+                }
             } else if (screen == STALL) {
                 canvas.drawColor(0x8C000000);
                 drawStall(canvas);
@@ -1423,7 +1500,8 @@ final class RunGame {
     private void drawLand(Canvas canvas) {
         RunLevels.Level level = run.level();
         int chapter = level.chapter;
-        drawSky(canvas, chapter, cameraX * tile * .2f);
+        if (run.room() >= 0) drawInside(canvas);
+        else drawSky(canvas, chapter, cameraX * tile * .2f);
         float across = width / tile, down = height / tile;
         int first = Math.max(0, (int) cameraX), last = Math.min(run.columns() - 1, (int) (cameraX + across) + 1);
         int top = Math.max(0, (int) Math.floor(cameraY)), bottom = Math.min(RunLevels.ROWS - 1, (int) (cameraY + down) + 1);
@@ -1436,7 +1514,9 @@ final class RunGame {
         // What stands in its villages, behind everything else.
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
-            pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
+            // Over a hundred, it is something of the fourth sheet: a chest in a stash.
+            if (decor[0] >= 100) pieceTall(canvas, four, decor[0] - 100, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 1.3f, false);
+            else pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
         }
         for (int column = first; column <= last; column++) {
             float left = (column - cameraX) * tile;
@@ -1444,7 +1524,18 @@ final class RunGame {
                 char here = run.at(column, row);
                 if (here == RunLevels.AIR) continue;
                 float y = (row - cameraY) * tile;
-                if (here == RunLevels.BLOCK) {
+                if (here == RunLevels.BLOCK && run.room() >= 0) {
+                    // In a place off the land, its walls are dark wood, with a lighter board where they are stood on.
+                    boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(0xFF2A1D1A);
+                    canvas.drawRect(left, y, left + tile + 1, y + tile + 1, paint);
+                    if (capped) {
+                        paint.setColor(0xFF8A5F3E);
+                        canvas.drawRect(left, y, left + tile + 1, y + tile * .16f, paint);
+                    }
+                    paint.setColor(Color.BLACK);
+                } else if (here == RunLevels.BLOCK) {
                     // The top of a pile has the turf on it; the rest is what lies under. Every other one is
                     // turned about, so the same picture side by side does not show as a pattern.
                     boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
@@ -1517,6 +1608,15 @@ final class RunGame {
                 }
             }
         }
+        // Of a place off the land only itself is seen: what lies to either side of its walls is dark.
+        if (run.room() >= 0) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFF2A1D1A);
+            float from = (run.roomFrom() - 1 - cameraX) * tile, to = (run.roomTo() + 2 - cameraX) * tile;
+            if (from > 0) canvas.drawRect(0, 0, from + 1, height, paint);
+            if (to < width) canvas.drawRect(to - 1, 0, width, height, paint);
+            paint.setColor(Color.BLACK);
+        }
         // The ledges that move: books lying open on the air.
         for (int index = 0; index < level.movers.size(); index++) {
             float x = run.moverX(index, run.time()), y = (run.moverY(index, run.time()) - cameraY) * tile;
@@ -1528,6 +1628,7 @@ final class RunGame {
         }
         // The ways that are shut while someone waits: the gate ahead, and, once she is in, the way back.
         if (level.arena >= 0 && level.guarded) drawWays(canvas, level);
+        drawDoors(canvas, level);
         // The pluses, each bobbing a little and turning as it hangs there.
         for (int[] plus : run.pluses()) {
             if (plus[0] < first - 1 || plus[0] > last + 1) continue;
@@ -1669,6 +1770,9 @@ final class RunGame {
                     paint.setColor(Color.BLACK);
                     break;
                 }
+                case PlusRun.PLUSDROP:
+                    art(canvas, PLUS_ART, x, y + tile * .36f, tile * .72f * Math.max(.25f, Math.abs((float) Math.cos(shot.age * 7))), false);
+                    break;
                 case PlusRun.BOOK:
                     thing(canvas, PlusRun.BOOK, x, y, tile * .58f, spin, leftward, false);
                     break;
@@ -1778,6 +1882,73 @@ final class RunGame {
         }
         // A flash when her hair turns, or when someone changes.
         if (flash > 0) canvas.drawColor(Color.argb(Math.round(120 * Math.min(1, flash / .3f)), 255, 255, 255));
+    }
+
+    /** The inside of a place off the land, behind everything in it: one picture, side by side with itself turned about, drifting a little as she goes. */
+    private void drawInside(Canvas canvas) {
+        if (inside == null) inside = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_room);
+        float wide = height * (float) inside.getWidth() / inside.getHeight(), drift = cameraX * tile * .15f % (wide * 2);
+        paint.setAlpha(255);
+        for (int copy = 0; copy * wide - drift < width; copy++) {
+            float left = copy * wide - drift;
+            target.set(left - 1, 0, left + wide + 1, height);
+            canvas.save();
+            if (copy % 2 != 0) canvas.scale(-1, 1, left + wide / 2, 0);
+            canvas.drawBitmap(inside, null, target, paint);
+            canvas.restore();
+        }
+    }
+
+    /**
+     * The doors of the land and of the places off it. A hidden one is a crack in the wall
+     * until she has broken through to it; a cellar's is low and banded with iron. Over the
+     * one she stands at is what the button over the jump will do.
+     */
+    private void drawDoors(Canvas canvas, RunLevels.Level level) {
+        int at = run.door(), in = run.room();
+        for (int index = 0; index < level.rooms.size(); index++) {
+            int[] one = level.rooms.get(index);
+            boolean known = one[7] == 0 || (run.revealed() & 1 << index) != 0, been = (run.roomsFound() & 1 << index) != 0;
+            int picture = one[0] == RunLevels.ARENA ? CELLAR_PICTURE : DOOR_PICTURE;
+            if (in < 0) {
+                door(canvas, known ? picture : CRACK_PICTURE, one[1], one[2], at == index, known ? "Enter" : "Break");
+                // Where a passage comes out looks like a crack too, until she has come out of it.
+                if (one[5] != one[1]) door(canvas, been ? DOOR_PICTURE : CRACK_PICTURE, one[5], one[9], at == index, "Enter");
+            } else if (in == index) {
+                // Shut until what happens in it is over, its door is dim.
+                if (run.sealed()) paint.setAlpha(110);
+                door(canvas, picture, one[6], RunLevels.FLOOR, at == index, "Leave");
+                if (one[8] >= 0) door(canvas, DOOR_PICTURE, one[8], RunLevels.FLOOR, at == index, "Leave");
+                paint.setAlpha(255);
+            }
+        }
+    }
+
+    private void door(Canvas canvas, int picture, int column, int floor, boolean here, String word) {
+        float x = (column + .5f - cameraX) * tile, y = (floor - cameraY) * tile;
+        if (x < -tile * 2 || x > width + tile * 2) return;
+        pieceTall(canvas, four, picture, x, y, tile * 1.85f, false);
+        if (here && Math.abs(run.x() + PlusRun.WIDE / 2 - column - .5f) < .9f) mark(canvas, x, y - tile * 2.05f, word, 0xFF8A5A33, false);
+    }
+
+    /** The button that uses the door she stands at: round, over the jump, with a door on it and what it will do. */
+    private void doorControl(Canvas canvas) {
+        int at = run.door();
+        int[] one = run.level().rooms.get(at);
+        boolean hidden = run.room() < 0 && one[7] != 0 && (run.revealed() & 1 << at) == 0
+                && Math.abs(run.x() + PlusRun.WIDE / 2 - one[1] - .5f) < .9f;
+        float beat = 1 + .04f * (float) Math.sin(clock * 6);
+        canvas.save();
+        canvas.scale(beat, beat, stallButton.centerX(), stallButton.centerY());
+        button(canvas, stallButton, false, 0xFF8A5A33);
+        paint.setAlpha(255);
+        pieceIn(canvas, four, hidden ? CRACK_PICTURE : one[0] == RunLevels.ARENA ? CELLAR_PICTURE : DOOR_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7),
+                stallButton.width() * .46f, 0);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(0xFF292B2A);
+        text.setTextSize(dp(12.5f));
+        canvas.drawText(run.room() >= 0 ? "Leave" : hidden ? "Break" : "Enter", stallButton.centerX(), stallButton.bottom - dp(12), text);
+        canvas.restore();
     }
 
     /** Something that helps, by its kind: what lay about in the first volume, what her friends hold out in the second, and the ribbons. */
@@ -2264,6 +2435,19 @@ final class RunGame {
                 paint.setColor(Color.BLACK);
                 under += high + dp(8);
             }
+        }
+        // In a cellar that has shut behind her, which wave it is; where pluses fall, how long they will and how many she has.
+        if (run.room() >= 0 && run.sealed()) {
+            String words = run.wave() > 0 ? "Wave " + run.wave() + " of " + PlusRun.WAVES
+                    : "Catch them   " + (int) Math.ceil(run.gameLeft()) + " s   + " + run.caught();
+            text.setTextSize(dp(14.5f));
+            float wide = text.measureText(words) + dp(40), high = dp(38), from = safe.centerX() - wide / 2;
+            box.set(from, under, from + wide, under + high);
+            plate(canvas, box, high / 2, 235);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(ink);
+            canvas.drawText(words, safe.centerX(), under + dp(24.5f), text);
+            under += high + dp(8);
         }
         // Her form: its ribbon, with how much of it is left going round it.
         if (run.form() != 0) {
