@@ -791,6 +791,11 @@ final class RunStory {
                     PLAYER + "The capsule machine has just exploded in her face and taken her prizes with it. Stunned, sooty, dismayed, a little funny." + FAST},
     };
     /**
+     * What is read from the book once the flight is won, before what nothing announces: not here yet. While there is nothing in it,
+     * the last land ends with the flight.
+     */
+    static final String[][] REVEAL = {};
+    /**
      * Lucy, the Dragon of Lost Words, at the end of the last land, and what is said to her. In order: as she comes; as she goes at her
      * visitor; when a blow lands; when her dragon side comes out; the black ribbon; the white that turned it; the flight, which
      * Halgakos begins; twice more in the air; and, where the ribbon was not turned, the three lines of the land unmade.

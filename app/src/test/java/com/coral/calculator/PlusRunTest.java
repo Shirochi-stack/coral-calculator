@@ -5396,6 +5396,149 @@ public class PlusRunTest {
         assertTrue(cut > 3);
     }
 
+    // The ride: Halgakos on Lucy's back, and the Mother Tongue
+
+    /** How far clear of something the Mother has sent a place is: nothing or less, and it lands there. */
+    private static float clearOf(RunRide.Thing thing, float x, float y) {
+        return thing.kind == RunRide.BLOCKS ? RunRide.GAP - Math.abs(x - thing.x) : thing.kind == RunRide.PRESS ? RunRide.SLIT - Math.abs(y - thing.y)
+                : thing.kind == RunRide.PASS ? Math.abs(x - thing.x) - RunRide.PASS_WIDE : (float) Math.hypot(x - thing.x, y - thing.y) - RunRide.NEAR;
+    }
+
+    /**
+     * The ride ridden by someone who has understood it: to the way through what is coming, in time; otherwise to where the Mother is,
+     * with Lucy's breath always, and the beam when she is open or nearly so. Without the breath, or without the beam, if asked.
+     */
+    private static void ride(RunRide ride, float seconds, boolean beams, boolean breathes) {
+        float[][] ways = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        for (int step = 0; step < seconds * 60 && ride.state() == RunRide.FLYING; step++) {
+            float x = ride.x(), y = ride.y(), pace = RunRide.SPEED * (ride.beam() > 0 ? RunRide.SLOWED : 1);
+            boolean threatened = false;
+            for (RunRide.Thing thing : ride.things()) {
+                threatened |= !thing.gone && thing.far / thing.speed < (thing.kind == RunRide.NAME ? .5f : 1.7f) && clearOf(thing, x, y) < .08f;
+            }
+            if (threatened) {
+                int chosen = 0;
+                float best = -9;
+                for (int way = 0; way < ways.length; way++) {
+                    float least = 9;
+                    for (RunRide.Thing thing : ride.things()) {
+                        float until = thing.far / thing.speed;
+                        if (thing.gone || until > (thing.kind == RunRide.NAME ? .6f : 1.9f)) continue;
+                        float thereX = Math.max(-1, Math.min(1, x + ways[way][0] * pace * until));
+                        float thereY = Math.max(-RunRide.HIGH, Math.min(RunRide.HIGH, y + ways[way][1] * pace * until));
+                        least = Math.min(least, Math.min(.2f, clearOf(thing, thereX, thereY)));
+                    }
+                    if (least > best + .001f) {
+                        best = least;
+                        chosen = way;
+                    }
+                }
+                ride.step(STEP, ways[chosen][0] < 0, ways[chosen][0] > 0, ways[chosen][1] < 0, ways[chosen][1] > 0, false, breathes);
+            } else {
+                ride.step(STEP, ride.herX() < x - .06f, ride.herX() > x + .06f, ride.herY() < y - .06f, ride.herY() > y + .06f,
+                        beams && (ride.open() > 0 || ride.shield() <= 1), breathes);
+            }
+        }
+    }
+
+    @Test public void theMotherTongueIsReadOnlyWhileHerShieldIsBrokenAndTheLastOfItTakesTheBeamAndTheBreathTogether() {
+        int hurts = 0;
+        for (long seed = 1; seed <= 16; seed++) {
+            RunRide ride = new RunRide(6, 2, seed);
+            assertEquals(RunRide.SHIELD[0], ride.shield());
+            assertEquals(0, ride.open(), 0);
+            ride(ride, 400, true, true);
+            assertEquals("seed " + seed + " after " + ride.time() + " with " + ride.hurts() + " hurts", RunRide.WON, ride.state());
+            // The beam took all of it but the last; her shield was broken once for each stage at the least; and every piece of it went to a breath or a friend.
+            assertEquals(RunRide.TAKES - 1, ride.hits());
+            assertEquals(0, ride.left(), 0);
+            assertEquals(2, ride.stages());
+            assertTrue("seed " + seed, ride.opens() >= 3);
+            assertTrue("seed " + seed, ride.chips() >= RunRide.SHIELD[0] + RunRide.SHIELD[1] + RunRide.SHIELD[2]);
+            assertTrue("seed " + seed, ride.puffs() > ride.chips() - ride.helps());
+            assertTrue(ride.things().isEmpty());
+            hurts += ride.hurts();
+        }
+        assertTrue("hurts " + hurts, hurts < 32);
+        // With the beam and no breath: her friends break her shield for her, in time, and the beam reads her; but the last of it never goes.
+        RunRide beamOnly = new RunRide(6000, 2, 3);
+        ride(beamOnly, 500, true, false);
+        assertEquals(RunRide.FLYING, beamOnly.state());
+        assertEquals(RunRide.TAKES - 1, beamOnly.hits());
+        assertTrue(beamOnly.finishing());
+        assertEquals(beamOnly.chips(), beamOnly.helps());
+        assertEquals(0, beamOnly.puffs());
+        // With the breath and no beam: her shield is broken over and over, and nothing is ever read.
+        RunRide breathOnly = new RunRide(6000, 2, 3);
+        ride(breathOnly, 200, false, true);
+        assertEquals(RunRide.FLYING, breathOnly.state());
+        assertEquals(1, breathOnly.left(), 0);
+        assertEquals(0, breathOnly.hits());
+        assertTrue(breathOnly.opens() >= 4);
+        // And someone who only makes for her, with both buttons held, flies into what she sends, and falls.
+        RunRide careless = new RunRide(6, 2, 4);
+        for (int step = 0; step < 60 * 300 && careless.state() == RunRide.FLYING; step++) {
+            careless.step(STEP, careless.herX() < careless.x() - .06f, careless.herX() > careless.x() + .06f, careless.herY() < careless.y() - .06f,
+                    careless.herY() > careless.y() + .06f, true, true);
+        }
+        assertEquals(RunRide.FELL, careless.state());
+        assertEquals(3, careless.hurts());
+    }
+
+    @Test public void whatTheMotherSendsIsFlownRoundEachInItsOwnWay() {
+        RunRide.Thing blocks = new RunRide.Thing(), press = new RunRide.Thing(), name = new RunRide.Thing(), pass = new RunRide.Thing();
+        blocks.kind = RunRide.BLOCKS;
+        blocks.x = .62f;
+        press.kind = RunRide.PRESS;
+        press.y = -.3f;
+        name.kind = RunRide.NAME;
+        name.x = .2f;
+        name.y = .2f;
+        pass.kind = RunRide.PASS;
+        pass.x = -.58f;
+        // A row of blocks lands everywhere but in its way through, whatever the height.
+        assertFalse(RunRide.lands(blocks, .62f, .7f));
+        assertFalse(RunRide.lands(blocks, .4f, -.7f));
+        assertTrue(RunRide.lands(blocks, 0, 0));
+        assertTrue(RunRide.lands(blocks, -.62f, 0));
+        // A press lands everywhere but at its slit, wherever across.
+        assertFalse(RunRide.lands(press, -.9f, -.3f));
+        assertFalse(RunRide.lands(press, .9f, -.1f));
+        assertTrue(RunRide.lands(press, 0, .3f));
+        // A name lands only where it arrives; and her pass, down its own side of the sky.
+        assertTrue(RunRide.lands(name, .3f, .3f));
+        assertFalse(RunRide.lands(name, .6f, .2f));
+        assertTrue(RunRide.lands(pass, -.9f, .5f));
+        assertTrue(RunRide.lands(pass, -.2f, -.5f));
+        assertFalse(RunRide.lands(pass, 0, 0));
+        // A name follows whoever it is for, and the breath cuts it out of the air; blocks and a press are not cut by anything.
+        RunRide ride = new RunRide(6000, 2, 2);
+        int followed = 0;
+        for (int step = 0; step < 60 * 60; step++) {
+            float[] was = null;
+            for (RunRide.Thing thing : ride.things()) if (thing.kind == RunRide.NAME && thing.far > RunRide.LOCKS + .05f && !thing.gone) was = new float[]{thing.x, thing.y, ride.x(), ride.y()};
+            RunRide.Thing one = null;
+            for (RunRide.Thing thing : ride.things()) if (thing.kind == RunRide.NAME && thing.far > RunRide.LOCKS + .05f && !thing.gone) one = thing;
+            ride.step(STEP, step / 120 % 2 == 0, step / 120 % 2 == 1, false, false, false, false);
+            if (was != null && one != null && !one.gone && Math.hypot(was[2] - was[0], was[3] - was[1]) > .05) {
+                assertTrue(Math.hypot(ride.x() - one.x, ride.y() - one.y) < Math.hypot(was[2] - was[0], was[3] - was[1]) + .03);
+                followed++;
+            }
+        }
+        assertTrue(followed > 60);
+        assertEquals(0, ride.cut());
+        RunRide breathing = new RunRide(6000, 2, 2);
+        for (int step = 0; step < 60 * 60; step++) breathing.step(STEP, false, false, false, false, false, true);
+        assertTrue(breathing.cut() >= 4);
+        int kinds = 0;
+        for (int step = 0; step < 60 * 30; step++) {
+            breathing.step(STEP, false, false, false, false, true, true);
+            for (RunRide.Thing thing : breathing.things()) if (thing.kind != RunRide.NAME) assertFalse(thing.gone);
+            for (RunRide.Thing thing : breathing.things()) kinds |= 1 << thing.kind;
+        }
+        assertTrue((kinds & 1 << RunRide.BLOCKS) != 0 && (kinds & 1 << RunRide.PRESS) != 0);
+    }
+
     // The ribbon gacha, and the pots of black ink
 
     /** A run of a land that has a ribbon gacha in it, with her standing at its machine; or, not gone in, at its door. The room is put in the array. */
