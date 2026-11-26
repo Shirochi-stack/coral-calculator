@@ -269,6 +269,17 @@ final class FightGame {
         backdrop = null;
     }
 
+    /**
+     * Left for the home screen: a fight against her stops on its pause, to be come back to as
+     * it stands. A fight against another device cannot wait: false, and it is closed.
+     */
+    boolean hold() {
+        if (mode != SOLO) return false;
+        if (screen == FIGHT) pause();
+        audio.hush();
+        return true;
+    }
+
     /** The Back key: out of a fight to its pause, out of anything else to the fighters; false to leave the game. */
     boolean back() {
         if (screen == FIGHT) {
