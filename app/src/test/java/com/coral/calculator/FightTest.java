@@ -756,6 +756,34 @@ public class FightTest {
         }
     }
 
+    // On the floor
+
+    @Test public void lyingOnTheFloorHerBodyRestsOnTheGroundAndDoesNotFloat() {
+        assertEquals(6, FightFrames.FLOOR.length);
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            for (int index = 0; index < FightFrames.FLOOR.length; index++) {
+                short[] at = FightFrames.FRAMES[kind][FightFrames.FLOOR[index]];
+                // The ground of the frame is the row the tool found her body to rest on, to within a pixel: not the foot of something that hangs lower.
+                assertTrue(FightCast.NAMES[kind] + " frame " + FightFrames.FLOOR[index] + ": ground " + at[6] + ", rests " + FightFrames.REST[kind][index],
+                        Math.abs(at[6] - FightFrames.REST[kind][index]) <= 1);
+                assertTrue(at[6] > 20 && at[6] <= at[4]);
+            }
+        }
+        // The frames she shows when she is down and has landed are among them, and she is on the ground then, not above it.
+        Fight fight = apart(Fight.CHIKUWA, Fight.HALGAKOS, 1.3f);
+        press(fight, Fight.HEAVY, 1.0f);
+        Fight.Fighter down = fight.fighters[1];
+        assertEquals(Fight.DOWN, down.state);
+        assertEquals(0, down.y, 0);
+        assertEquals(FightFrames.LYING, FightPose.of(fight, down, 0, 0));
+        Set<Integer> floor = new HashSet<>();
+        for (int frame : FightFrames.FLOOR) floor.add(frame);
+        // As she begins to get up she is still on it.
+        for (int frame = 0; frame < 120 && down.state != Fight.RISE; frame++) fight.step(STEP, new Fight.Pad(), null);
+        assertEquals(Fight.RISE, down.state);
+        assertTrue(floor.contains(FightPose.of(fight, down, 0, 0)));
+    }
+
     // In the air
 
     @Test public void threeQuickBlowsInTheAirAndNoMore() {

@@ -262,6 +262,20 @@ def sized(parts, upright, factor=1.0):
     return out, scale
 
 
+# The frames in which she is on the floor: lying, knocked out, and getting up as far as one knee.
+FLOOR = "LYING KO SIT_UP KNEEL_UP PROP HALF_UP".split()
+
+
+def resting(picture):
+    """
+    How far down a picture the floor is under one who lies or sits on it: the lowest row across which there is a good
+    part of her. Her feet are not what touches the ground then, and something that hangs lower than she lies (a ring
+    of keys, a strap) must not be taken for it, or she would float above the floor by as much as it hangs.
+    """
+    across = (numpy.asarray(picture.getchannel("A")) > 128).sum(axis=1)
+    return int(numpy.where(across >= max(8, across.max() * .25))[0].max()) + 1
+
+
 def fighter(name, report):
     """A fighter's frames by name: each a picture, and where in it she stands (across to her feet, down to the ground)."""
     old = []
@@ -305,6 +319,10 @@ def fighter(name, report):
             frames[slot] = (picture, across, body[3], None)
     for slot, spare in SPARE.items():
         frames.setdefault(slot, frames[spare])
+    for slot in FLOOR:
+        picture, across, down, old = frames[slot]
+        report[f"{name} {slot} on the floor"] = f"was {round(down)}, is {resting(picture)}"
+        frames[slot] = (picture, across, resting(picture), old)
     for slot in DROP:
         frames[slot] = frames["IDLE1"]
     return frames, True, not missing and all((folder / f"{sheet}.webp").exists() for sheet in MORE)
@@ -386,7 +404,7 @@ def preview(name, frames, folder):
     board.convert("RGB").save(folder / f"{name}.jpg", quality=80)
 
 
-def java(tables, sizes, full, smooth):
+def java(tables, sizes, full, smooth, rests):
     lines = ["package com.coral.calculator;", "",
              "/**",
              " * Where every frame of every fighter of Page brawl is, in the pictures they are packed into. Written by",
@@ -409,6 +427,9 @@ def java(tables, sizes, full, smooth):
     lines.append("    static final boolean[] FULL = {" + ", ".join("true" if one else "false" for one in full) + "};")
     lines.append("    /** Whether she has the frames that go between the others as well, or the others standing in for them. */")
     lines.append("    static final boolean[] SMOOTH = {" + ", ".join("true" if one else "false" for one in smooth) + "};")
+    lines.append("    /** The frames in which she is on the floor; and, for each fighter, how far down each of them the tool found her body to rest. */")
+    lines.append("    static final int[] FLOOR = {" + ", ".join(FLOOR) + "};")
+    lines.append("    static final int[][] REST = {" + ", ".join("{" + ", ".join(str(value) for value in one) + "}" for one in rests) + "};")
     lines.append("    private static final String[] DATA = {")
     for table in tables:
         text = " ".join(" ".join(str(value) for value in row) for row in table)
@@ -434,13 +455,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=pathlib.Path)
     args = parser.parse_args()
-    report, tables, sizes, full, smooth = {}, [], [], [], []
+    report, tables, sizes, full, smooth, rests = {}, [], [], [], [], []
     for old in RES.glob("fight_*.webp"):
         if old.stem.split("_")[1] in FIGHTERS:
             old.unlink()
     for name in FIGHTERS:
         frames, whole, between = fighter(name, report)
         smooth.append(between)
+        rests.append([resting(frames[slot][0]) for slot in FLOOR])
         atlases, table = packed(name, frames)
         for index, atlas in enumerate(atlases):
             atlas.save(RES / f"fight_{name}_{index}.webp", quality=80, alpha_quality=90, method=6)
@@ -452,7 +474,7 @@ def main():
         if args.preview:
             args.preview.mkdir(parents=True, exist_ok=True)
             preview(name, frames, args.preview)
-    java(tables, sizes, full, smooth)
+    java(tables, sizes, full, smooth, rests)
 
     faces = Image.new("RGBA", (FACE * len(FIGHTERS), FACE), (0, 0, 0, 0))
     for index, name in enumerate(FIGHTERS):
