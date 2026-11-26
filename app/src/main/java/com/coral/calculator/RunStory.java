@@ -105,7 +105,7 @@ final class RunStory {
             case 30: return new String[][]{
                     {"in30a", "I have written it already♡ Heroine: Illya. Supporting cast: none♡", "I",
                             "The idol stands on the last page of the book, sure she has won. Triumphant, sweet, sing-song, a little too bright."},
-                    {"in30b", "And her 'none' got up and walked. That's Zero. Nothing thrown gets through him Sloppy~♡", "H",
+                    {"in30b", "And her 'none' got up and walked. That's Zero. Nothing thrown gets through it Sloppy~♡", "H",
                             PLAYER + "She faces the final enemy, a giant zero. Grim, focused, a dry edge of humour."},
                     {"in30c", "Sixty years of notes. I could not finish them alone. Take them.", "M",
                             "The lonely older self, at last, hands over her life's work to help. Softened, hesitant, close to tears but composed."}};
@@ -186,8 +186,8 @@ final class RunStory {
                     {"out6a", "Passed the guild exam. They gave me a heart for it. Not bad Sloppy~♡", "H",
                             PLAYER + "She has just beaten the guild's guard in an entrance exam and been given an extra heart. Proud, pleased." + FAST}};
             case 12: return new String[][]{
-                    {"out12a", "A butler who is a pen. He refilled my ink gun, eight shots bigger Sloppy~♡", "H",
-                            PLAYER + "She has just beaten a fountain-pen butler, who politely enlarged her ink gun. Amused, pleased." + FAST}};
+                    {"out12a", "A butler who is a pen. She refilled my ink gun, eight shots bigger Sloppy~♡", "H",
+                            PLAYER + "She has just beaten a fountain-pen lady butler, who politely enlarged her ink gun. Amused, pleased." + FAST}};
             case 35: return new String[][]{
                     {"out35a", "The scribe wrote me back in. And my colours come quicker now Sloppy~♡", "H",
                             PLAYER + "She has just beaten the court scribe, who has put her back in the record. Satisfied, bright." + FAST}};
@@ -434,7 +434,7 @@ final class RunStory {
             {"blow7", "One chunk off him. Keep cutting Sloppy~♡", "H", PLAYER + "She has just cut a piece off a giant slime. Fierce, pleased." + FAST},
             {"blow8", "...You hit like someone with friends.", "M", "The lonely other self has just been hit, and it stirs something in her. Quiet, surprised, a crack in her coldness."},
             {"blow9", "Ow! That is a pass mark!", "D", "The knight has just been hit and has to admit it was a good one. Earnest, startled, loud."},
-            {"blow10", "My nib! Most irregular.", "F", "The fountain-pen butler has just been hit. Affronted, prim, pained."},
+            {"blow10", "My nib! Most irregular.", "F", "The fountain-pen lady butler has just been hit. Affronted, prim, pained."},
             {"blow11", "Oh... that will have to be written down.", "Q", "The quiet scribe has just been hit. Soft, surprised, a little dazed."},
             {"blow12", "That one is going on your bill!", "V", "The merchant girl has just been hit. Indignant, quick, bright."},
             {"blow13", "Bwah! Okay, that was a good one!", "X", "The diver girl has just been hit and laughs it off. Loud, sunny, winded."},
@@ -450,7 +450,7 @@ final class RunStory {
             {"aim6", "Excuse my cut. Mmm.", "Y", "The sleepy swordswoman steps out behind her opponent and swings, half asleep. Drowsy, polite, slow."},
             {"aim8", "Alone is easier.", "M", "The lonely other self throws black feathers at the friend who came for her. Cold, tired, hollow."},
             {"aim9", "Thrusting. Please step back.", "D", "The knight warns the opponent before thrusting the halberd. Earnest, formal, loud."},
-            {"aim10", "A small correction, if I may.", "F", "The fountain-pen butler flicks ink at his opponent. Polite, dry."},
+            {"aim10", "A small correction, if I may.", "F", "The fountain-pen lady butler flicks ink at her opponent. Polite, dry."},
             {"aim11", "Noted.", "Q", "The quiet scribe throws a scroll at her opponent. Soft, flat."},
             {"aim12", "Catch! Exact change!", "V", "The merchant girl flings coins at her opponent. Bright, gleeful."},
             {"aim13", "Coming up!", "X", "The diver girl bursts up out of the page under her opponent. Loud, sunny."},
@@ -504,7 +504,7 @@ final class RunStory {
      * them, Miri speaking for the twins. For Zero and King Slime, who say nothing, she says it.
      */
     static final String[][] ENTER = {
-            {"enter0", "Zero. He rolled in and the whole page shook. Off his floor when he glows Sloppy~♡", "H",
+            {"enter0", "Zero. It rolled in and the whole page shook. Off its floor when it glows Sloppy~♡", "H",
                     PLAYER + "A giant zero has just crashed into the arena in front of her. Braced, urgent, coaching." + FAST},
             {"enter1", "Lights, please♡ Tonight's stage is all for you, Halgakos-ssi♡", "I",
                     "The magical-girl idol floats down into a spotlight to begin a duel as if it were her concert. Sparkling, sweet, high, sing-song."},
@@ -524,7 +524,7 @@ final class RunStory {
             {"enter9", "Halt! Guild entrance exam. Three questions, and all of them are halberd.", "D",
                     "A knight in full armour blocks the way and announces an entrance exam, halberd in hand. Earnest, loud, stern, a little muffled by the helmet."},
             {"enter10", "Good evening. Kindly do not smudge the Archive. I should have to blot you.", "F",
-                    "A prim butler who is a living fountain pen bars the way with perfect manners and a faint threat. Polite, dry, unhurried."},
+                    "A prim lady butler who is a living fountain pen bars the way with perfect manners and a faint threat. Polite, dry, unhurried."},
             {"enter11", "The court record says you were never here. I am correcting the land to match.", "Q",
                     "A quiet court scribe girl looks up from her book and says, softly, that she will write the heroine out. Soft, flat, precise, almost a whisper."},
             {"enter12", "Toll! Every plus you carry, plus interest. I counted them on your way in.", "V",
@@ -540,9 +540,9 @@ final class RunStory {
     };
     /** What is said when each of them changes, at a third and at two thirds of the way: two lines each, in the same order; of the twins, Miri first and then Gari. */
     static final String[][] PHASES = {
-            {"phase0a", "He's glowing. Times nothing! Get off the floor Sloppy~♡", "H",
+            {"phase0a", "It's glowing. Times nothing! Get off the floor Sloppy~♡", "H",
                     PLAYER + "The giant zero begins a new attack that erases whatever she carries. Alarmed, urgent." + FAST},
-            {"phase0b", "Now he's making little ones. Typical nothing Sloppy~♡", "H",
+            {"phase0b", "Now it's making little ones. Typical nothing Sloppy~♡", "H",
                     PLAYER + "The giant zero, nearly beaten, starts spawning small minus signs. Exasperated, fierce." + FAST},
             {"phase1a", "Encore♡ Hearts from every side this time♡", "I",
                     "The idol, hit a few times in a duel, spins and starts a harder song. Sparkling, breathless, still sweet."},
@@ -571,8 +571,8 @@ final class RunStory {
                     "The lonely other self, nearly beaten, throws a black ribbon that makes her opponent an ordinary girl. Hollow, low, her voice wavering."},
             {"phase9a", "Second question! It is also halberd, but lower!", "D", "The knight, hit a few times, announces the next part of the exam. Earnest, loud, flustered."},
             {"phase9b", "Final question! Forward, march!", "D", "The knight, nearly beaten, gives the order to charge. Earnest, loud, determined."},
-            {"phase10a", "Permit me to underline that.", "F", "The fountain-pen butler, hit a few times, readies a dash on his nib. Polite, dry, a little sharper."},
-            {"phase10b", "This will require my signature.", "F", "The fountain-pen butler, nearly beaten, prepares his finest attack with wounded dignity. Polite, cold, clipped."},
+            {"phase10a", "Permit me to underline that.", "F", "The fountain-pen lady butler, hit a few times, readies a dash on her nib. Polite, dry, a little sharper."},
+            {"phase10b", "This will require my signature.", "F", "The fountain-pen lady butler, nearly beaten, prepares her finest attack with wounded dignity. Polite, cold, clipped."},
             {"phase11a", "Footnote. See below.", "Q", "The quiet scribe, hit a few times, makes ink fall from above. Soft, flat, precise."},
             {"phase11b", "Struck from the record. In ink.", "Q", "The quiet scribe, nearly beaten, sends a black bar to strike the heroine out. Soft, cold, final."},
             {"phase12a", "Prices just went up!", "V", "The merchant girl, hit a few times, slides in on her abacus. Bright, gleeful, quick."},
