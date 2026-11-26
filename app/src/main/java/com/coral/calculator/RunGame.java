@@ -123,6 +123,25 @@ final class RunGame {
      * there, and how lately each got further.
      */
     private boolean huntsOpen;
+    /**
+     * The smithy, open over the land, or, from the map, only what she wears: which of the
+     * three sisters' work is looked at; the thing to fight with and the piece to wear that
+     * are looked at; its card, its tabs, its rows and cells and buttons; what was last made,
+     * in a line; and which sister last made something and how long ago, for her hammer.
+     */
+    private boolean smithOpen;
+    private int smithTab, smithFrom = PLAY, forgeOn = PlusRun.TABLET, gearSlot, gearTier = 1, hammerer = -1;
+    private float hammered = 9;
+    private String smithSaid = "";
+    private final RectF smithCard = new RectF(), smithAct = new RectF(), packWear = new RectF();
+    private final RectF[] smithTabs = {new RectF(), new RectF(), new RectF()}, tradeBuys = {new RectF(), new RectF(), new RectF()},
+            tradeSells = {new RectF(), new RectF(), new RectF()}, forgeRows = new RectF[RunArms.COUNT], reforges = new RectF[RunArms.COUNT],
+            gearCells = new RectF[RunGear.SLOTS * RunGear.TIERS];
+    private static final int[] SMITH_ART = {R.drawable.run_smith_moru, R.drawable.run_smith_pulmu, R.drawable.run_smith_sutdol};
+    private final Bitmap[] smiths = new Bitmap[SMITH_ART.length];
+    /** The colours of the three sets of what she wears: tinplate, wrought iron and type-steel. And where those who keep the smithy come among those who speak. */
+    private static final int[] SET_COLOURS = {0xFFB9C2C9, 0xFF5B6168, 0xFF3F7FC4};
+    private static final int FIRST_SMITH = 28;
     private final RectF huntsCard = new RectF();
     private final RectF[] huntActs = {new RectF(), new RectF(), new RectF()}, huntDrops = {new RectF(), new RectF(), new RectF()};
     private int dropAsk = -1, seenFells;
@@ -149,7 +168,8 @@ final class RunGame {
             R.drawable.run_face_gari, R.drawable.run_face_yeobaek, R.drawable.run_face_nuri};
     private static final int[] SPEAKER_COLOURS = {CalculatorLayout.CORAL, 0xFFD2452F, 0xFF3F7FC4, 0xFFE8779A, 0xFF7A5A9A, 0xFF6B2A3A,
             0xFF6A3FA0, 0xFFC9892B, 0xFF4A5560, 0xFF5E8FA6, 0xFF2E9E6E, 0xFF7D7FD0, 0xFF394A8C, 0xFFB5651D, 0xFF6B7A2A, 0xFF5B4BB5, 0xFF2F8F5B,
-            0xFFC0392B, 0xFFB8860B, 0xFF1E9C8B, 0xFF5C7FA8, 0xFF4A4A5A, 0xFF3F8F5A, 0xFFE08A2B, 0xFFE0662F, 0xFF7A8088, 0xFFC0392B, 0xFF8A5A33};
+            0xFFC0392B, 0xFFB8860B, 0xFF1E9C8B, 0xFF5C7FA8, 0xFF4A4A5A, 0xFF3F8F5A, 0xFFE08A2B, 0xFFE0662F, 0xFF7A8088, 0xFFC0392B, 0xFF8A5A33,
+            0xFFC8552B, 0xFF7A4B8A};
     private static final int JUMP_FRAMES = 6;
     /** The six frames of her losing: hit, knocked into the air, falling, sitting dazed, sulking, and crying. */
     private static final int LOSE_FRAMES = 6, HIT = 0, TUMBLE = 1, DROP = 2, DAZED = 3, SULK = 4, CRY = 5;
@@ -645,6 +665,14 @@ final class RunGame {
         kept.recharge = Math.max(4, kept.recharge);
         // The pieces of a heart found in chests: four of them are a heart, and there are two hearts to be made of them.
         kept.hearts += Math.min(PIECE_HEARTS, session.tally("run_pieces") / PIECES);
+        // What the smithy has made: how far each thing to fight with has been worked on; and what she wears, which is one thing for each
+        // piece, and a heart more for all four of one set.
+        for (int kind = 0; kind < RunArms.COUNT; kind++) kept.levels[kind] = forged(kind);
+        int on = gearOn();
+        kept.defence = RunGear.defence(on);
+        kept.mercy = RunGear.mercy(on);
+        kept.stomp = RunGear.stomp(on);
+        if (RunGear.whole(on)) kept.hearts++;
         return kept;
     }
 
@@ -716,6 +744,572 @@ final class RunGame {
             }
             speak(RunStory.ROVERS[4], true);
         }
+    }
+
+    // The smithy
+
+    /** How far a thing to fight with has been worked on; what she has had made to wear, as bits; what of it she has on; and what she has of the three a smith works with. */
+    private int forged(int kind) { return Math.max(0, Math.min(RunArms.LEVELS, session.tally("run_w_" + kind))); }
+    private int gearMade() { return session.tally("run_gear"); }
+    private int gearOn() { return RunGear.sound(session.tally("run_gear_on"), gearMade()); }
+    private int[] stuff() { return new int[]{session.tally("run_mat_0"), session.tally("run_mat_1"), session.tally("run_mat_2")}; }
+
+    /** Pays a price: pluses, and of each of the three. */
+    private void pay(int pluses, int[] needs) {
+        session.keep("run_bank", bank() - pluses);
+        for (int index = 0; index < needs.length; index++) if (needs[index] != 0) session.keep("run_mat_" + index, session.tally("run_mat_" + index) - needs[index]);
+    }
+
+    private Bitmap smith(int which) {
+        if (smiths[which] == null) smiths[which] = BitmapFactory.decodeResource(context.getResources(), SMITH_ART[which]);
+        return smiths[which];
+    }
+
+    /** Whether all three sisters are in the smithy she is in: where they are not, Moru does her sisters' work, and has the word for it. */
+    private boolean sisters() { return smithFrom == PLAY && number >= RunLevels.SISTERS_FROM; }
+
+    /** One of the three is walked up to: her work is looked at, and the land waits. The first time, she says who she is. From the map: only what she wears, to put on. */
+    private void openSmith(int who, int from) {
+        smithOpen = true;
+        smithFrom = from;
+        smithTab = from == MAP ? RunGear.PULMU : who;
+        smithSaid = "";
+        if ((kept().pack >> forgeOn & 1) == 0) forgeOn = PlusRun.TABLET;
+        goLeft = goRight = goJump = goStrike = false;
+        jumpPressed = strikePressed = false;
+        audio.play("page", .6f);
+        int met = session.tally("run_smiths_met");
+        if (from == PLAY && (met >> who & 1) == 0) {
+            session.keep("run_smiths_met", met | 1 << who);
+            person(RunStory.SMITHS[who * 2]);
+        }
+    }
+
+    /** Something has been made: whoever made it brings her hammer down on it, and has her word. */
+    private void made(int who, String what) {
+        smithSaid = what;
+        hammerer = sisters() ? who : RunGear.MORU;
+        hammered = 0;
+        regrant();
+        audio.play("blow", .7f);
+        audio.play("buy", .5f);
+        buzz(true);
+        if (smithFrom == PLAY) person(RunStory.SMITHS[hammerer * 2 + 1]);
+    }
+
+    private void smithTouch(float x, float y) {
+        int bank = bank();
+        int[] has = stuff();
+        if (smithFrom == PLAY) {
+            for (int tab = 0; tab < smithTabs.length; tab++) {
+                if (!smithTabs[tab].contains(x, y)) continue;
+                smithTab = tab;
+                smithSaid = "";
+                audio.play("tap", .5f);
+                return;
+            }
+        }
+        if (smithTab == RunGear.MORU) {
+            int owned = kept().pack;
+            for (int kind = 0; kind < RunArms.COUNT; kind++) {
+                if ((owned >> kind & 1) == 0 || forgeRows[kind] == null || !forgeRows[kind].contains(x, y)) continue;
+                forgeOn = kind;
+                audio.play("tap", .5f);
+                return;
+            }
+            if (!smithAct.isEmpty() && smithAct.contains(x, y)) {
+                // A step of work on it: it does more from now on, here and in every land.
+                int level = forged(forgeOn);
+                if (level >= RunArms.LEVELS || !RunGear.affords(bank, has, RunGear.stepPluses(level + 1), RunGear.stepNeeds(level + 1))) {
+                    audio.play("no", .5f);
+                    return;
+                }
+                pay(RunGear.stepPluses(level + 1), RunGear.stepNeeds(level + 1));
+                session.keep("run_w_" + forgeOn, level + 1);
+                made(RunGear.MORU, RunArms.NAMES[forgeOn] + ", level " + (level + 2) + ": " + RunArms.step(forgeOn, level + 1));
+                return;
+            }
+        } else if (smithTab == RunGear.PULMU) {
+            for (int index = 0; index < gearCells.length; index++) {
+                if (gearCells[index] == null || !gearCells[index].contains(x, y)) continue;
+                gearSlot = index / RunGear.TIERS;
+                gearTier = index % RunGear.TIERS + 1;
+                audio.play("tap", .5f);
+                return;
+            }
+            if (!smithAct.isEmpty() && smithAct.contains(x, y)) {
+                int made = gearMade(), on = gearOn(), bit = RunGear.bit(gearSlot, gearTier);
+                if ((made & bit) == 0) {
+                    // Made, and put on there and then.
+                    if (smithFrom != PLAY || !RunGear.affords(bank, has, RunGear.piecePluses(gearTier), RunGear.pieceNeeds(gearTier))) {
+                        audio.play("no", .5f);
+                        return;
+                    }
+                    pay(RunGear.piecePluses(gearTier), RunGear.pieceNeeds(gearTier));
+                    session.keep("run_gear", made | bit);
+                    session.keep("run_gear_on", RunGear.wear(on, gearSlot, gearTier));
+                    made(RunGear.PULMU, "The " + RunGear.name(gearSlot, gearTier).toLowerCase(java.util.Locale.ROOT) + " is made, and on her");
+                } else {
+                    // One she has is put on, or taken off.
+                    session.keep("run_gear_on", RunGear.wear(on, gearSlot, RunGear.worn(on, gearSlot) == gearTier ? 0 : gearTier));
+                    smithSaid = "";
+                    regrant();
+                    audio.play("unlock", .5f);
+                    buzz(false);
+                }
+                return;
+            }
+        } else {
+            for (int index = 0; index < 3; index++) {
+                if (tradeBuys[index].contains(x, y)) {
+                    if (bank < RunGear.BUYS[index]) {
+                        audio.play("no", .5f);
+                        return;
+                    }
+                    pay(RunGear.BUYS[index], new int[]{index == 0 ? -1 : 0, index == 1 ? -1 : 0, index == 2 ? -1 : 0});
+                    smithSaid = "Bought: 1 " + RunHunts.MATERIALS[index].toLowerCase(java.util.Locale.ROOT);
+                    audio.play("buy", .6f);
+                    return;
+                }
+                if (tradeSells[index].contains(x, y)) {
+                    if (has[index] <= 0) {
+                        audio.play("no", .5f);
+                        return;
+                    }
+                    pay(-RunGear.SELLS[index], new int[]{index == 0 ? 1 : 0, index == 1 ? 1 : 0, index == 2 ? 1 : 0});
+                    smithSaid = "Sold: 1 " + RunHunts.MATERIALS[index].toLowerCase(java.util.Locale.ROOT) + " for + " + RunGear.SELLS[index];
+                    audio.play("buy", .5f);
+                    return;
+                }
+            }
+            for (int kind = 0; kind < RunArms.COUNT; kind++) {
+                if (reforges[kind] == null || reforges[kind].isEmpty() || !reforges[kind].contains(x, y)) continue;
+                // Re-forged: as it was found, and what went into it comes back.
+                int level = forged(kind);
+                if (level <= 0 || bank < RunGear.REFORGE) {
+                    audio.play("no", .5f);
+                    return;
+                }
+                int[] back = RunGear.spent(level);
+                pay(RunGear.REFORGE, new int[]{-back[0], -back[1], -back[2]});
+                session.keep("run_w_" + kind, 0);
+                made(RunGear.SUTDOL, RunArms.NAMES[kind] + " is as it was found: its metal is hers again");
+                return;
+            }
+        }
+        if (!smithCard.contains(x, y)) {
+            smithOpen = false;
+            audio.play("tap", .3f);
+        }
+    }
+
+    /** A small picture of a piece to wear, by its place: a helm, a coat, a boot, a charm on its cord. */
+    private void gearIcon(Canvas canvas, int slot, float x, float y, float size, int colour) {
+        float half = size / 2;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(colour);
+        path.reset();
+        if (slot == RunGear.HELM) {
+            box.set(x - half, y - half, x + half, y + half * 1.2f);
+            path.addArc(box, 180, 180);
+            path.lineTo(x + half * 1.15f, y + half * .1f);
+            path.lineTo(x + half * 1.15f, y + half * .45f);
+            path.lineTo(x - half * 1.15f, y + half * .45f);
+            path.lineTo(x - half * 1.15f, y + half * .1f);
+            path.close();
+        } else if (slot == RunGear.COAT) {
+            path.moveTo(x - half * .45f, y - half);
+            path.lineTo(x + half * .45f, y - half);
+            path.lineTo(x + half * 1.1f, y - half * .45f);
+            path.lineTo(x + half * .8f, y + half * .05f);
+            path.lineTo(x + half * .6f, y - half * .1f);
+            path.lineTo(x + half * .7f, y + half);
+            path.lineTo(x - half * .7f, y + half);
+            path.lineTo(x - half * .6f, y - half * .1f);
+            path.lineTo(x - half * .8f, y + half * .05f);
+            path.lineTo(x - half * 1.1f, y - half * .45f);
+            path.close();
+        } else if (slot == RunGear.BOOTS) {
+            path.moveTo(x - half * .6f, y - half);
+            path.lineTo(x + half * .1f, y - half);
+            path.lineTo(x + half * .1f, y + half * .2f);
+            path.lineTo(x + half, y + half * .45f);
+            path.lineTo(x + half, y + half);
+            path.lineTo(x - half * .6f, y + half);
+            path.close();
+        } else {
+            path.moveTo(x, y - half * .35f);
+            path.lineTo(x + half * .7f, y + half * .3f);
+            path.lineTo(x, y + half);
+            path.lineTo(x - half * .7f, y + half * .3f);
+            path.close();
+            stroke.setColor(colour);
+            stroke.setStrokeWidth(size * .1f);
+            canvas.drawCircle(x, y - half * .6f, half * .32f, stroke);
+        }
+        canvas.drawPath(path, paint);
+        stroke.setColor(mixed(colour, Color.BLACK, .4f));
+        stroke.setStrokeWidth(Math.max(1, size * .06f));
+        canvas.drawPath(path, stroke);
+        paint.setColor(Color.BLACK);
+    }
+
+    /** A button of the smithy's: filled where it can be used, grey where it cannot. */
+    private void smithButton(Canvas canvas, RectF where, String word, boolean can, int colour) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(can ? colour : dark ? 0xFF2F3336 : 0xFFEDEEEE);
+        canvas.drawRoundRect(where, where.height() / 2, where.height() / 2, paint);
+        paint.setColor(Color.BLACK);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(can ? Color.WHITE : soft);
+        fitted(canvas, word, where.centerX(), where.centerY() + dp(5), dp(13.5f), where.width() - dp(14));
+    }
+
+    /**
+     * The smithy, over the land. At its head what she has to pay with: her pluses, and the
+     * three a smith works with. Then the three sisters' work, a tab each. Moru's: every
+     * thing to fight with that she has, with how far it has been worked on, and for the one
+     * looked at what the next step adds, what it costs, and a button that has it done.
+     * Pulmu's: the four pieces in their three sets, and for the one looked at what it does,
+     * what it costs, and a button that has it made, puts it on or takes it off. Sutdol's:
+     * the three a smith works with, bought and sold; and every thing that has been worked
+     * on, to be re-forged. From the map there is only what she wears, to put on.
+     */
+    private void drawSmithy(Canvas canvas) {
+        canvas.drawColor(0x99000000);
+        int bank = bank();
+        int[] has = stuff();
+        boolean here = smithFrom == PLAY;
+        float wide = Math.min(safe.width() - dp(24), dp(430)), pad = dp(16), body = dp(here ? 424 : 330);
+        float tall = pad + dp(here ? 92 : 52) + body + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
+        smithCard.set(left, top, left + wide, top + tall);
+        plate(canvas, smithCard, dp(22), 255);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        fitted(canvas, here ? "The smithy" : "What she wears", left + pad, top + pad + dp(18), dp(20), wide * .5f);
+        text.setTypeface(Typeface.DEFAULT);
+        text.setTextAlign(Paint.Align.RIGHT);
+        text.setColor(CalculatorLayout.CORAL);
+        fitted(canvas, "+ " + bank, left + wide - pad, top + pad + dp(17), dp(15), wide * .3f);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        fitted(canvas, has[0] + " type metal  ·  " + has[1] + " ink crystal  ·  " + has[2] + " gold leaf" + (here ? "  ·  hunts pay them" : ""), left + pad, top + pad + dp(38), dp(12),
+                wide - pad * 2);
+        float y = top + pad + dp(50);
+        if (here) {
+            // The three sisters' work: a tab each, with whose it is where all three are in.
+            float each = (wide - pad * 2 - dp(12)) / 3;
+            String[] words = sisters() ? new String[]{"Moru: forge", "Pulmu: armour", "Sutdol: trade"} : new String[]{"Forge", "Armour", "Trade"};
+            for (int tab = 0; tab < 3; tab++) {
+                smithTabs[tab].set(left + pad + tab * (each + dp(6)), y, left + pad + tab * (each + dp(6)) + each, y + dp(32));
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(tab == smithTab ? CalculatorLayout.CORAL : dark ? 0xFF2C3033 : 0xFFF0F1F2);
+                canvas.drawRoundRect(smithTabs[tab], dp(16), dp(16), paint);
+                paint.setColor(Color.BLACK);
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(tab == smithTab ? Color.WHITE : ink);
+                fitted(canvas, words[tab], smithTabs[tab].centerX(), smithTabs[tab].centerY() + dp(4.5f), dp(13), each - dp(10));
+            }
+            y += dp(40);
+        }
+        float bottom = top + tall - pad;
+        smithAct.setEmpty();
+        if (smithTab == RunGear.MORU) {
+            int owned = kept().pack, count = Integer.bitCount(owned);
+            float row = Math.max(dp(30), Math.min(dp(38), (body - dp(150)) / Math.max(1, count)));
+            for (int kind = 0; kind < RunArms.COUNT; kind++) {
+                if ((owned >> kind & 1) == 0) {
+                    forgeRows[kind] = null;
+                    continue;
+                }
+                if (forgeRows[kind] == null) forgeRows[kind] = new RectF();
+                RectF at = forgeRows[kind];
+                at.set(left + dp(8), y, left + wide - dp(8), y + row - dp(3));
+                boolean on = kind == forgeOn;
+                int level = forged(kind);
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(on ? (dark ? 0xFF44292E : 0xFFFCE9EB) : dark ? 0xFF2C3033 : 0xFFF5F6F7);
+                canvas.drawRoundRect(at, dp(12), dp(12), paint);
+                paint.setColor(Color.BLACK);
+                boolean upright = kind != PlusRun.GUN && kind != PlusRun.BOOK && kind < PlusRun.TABLET;
+                thing(canvas, kind, at.left + dp(24), at.centerY(), at.height() * (upright ? .8f : .62f), upright ? 35 : 0, false, false);
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(ink);
+                text.setTypeface(on ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+                fitted(canvas, RunArms.NAMES[kind], at.left + dp(48), at.centerY() + dp(5), dp(14), at.width() * .45f);
+                text.setTypeface(Typeface.DEFAULT);
+                // How far it has been worked on: a mark for each step, filled as far as it has got.
+                for (int step = 0; step < RunArms.LEVELS; step++) {
+                    float cx = at.right - dp(74) + step * dp(13), cy = at.centerY();
+                    paint.setColor(step < level ? CalculatorLayout.CORAL : dark ? 0xFF3A3F45 : 0xFFDFE2E4);
+                    canvas.drawRoundRect(cx - dp(4.5f), cy - dp(4.5f), cx + dp(4.5f), cy + dp(4.5f), dp(2), dp(2), paint);
+                }
+                paint.setColor(Color.BLACK);
+                text.setTextAlign(Paint.Align.RIGHT);
+                text.setColor(level > 0 ? CalculatorLayout.CORAL : soft);
+                fitted(canvas, "lv " + (level + 1), at.right - dp(10), at.centerY() + dp(4.5f), dp(12), dp(30));
+                y += row;
+            }
+            // The one looked at: what the next step makes of it, and what the step costs.
+            int kind = forgeOn, level = forged(kind);
+            y += dp(8);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            fitted(canvas, RunArms.NAMES[kind] + "  ·  level " + (level + 1) + "  ·  a blow counts for " + RunArms.blows(kind, level), left + pad, y + dp(14), dp(14.5f), wide - pad * 2);
+            text.setTypeface(Typeface.DEFAULT);
+            if (level >= RunArms.LEVELS) {
+                text.setColor(soft);
+                fitted(canvas, "It is as far as a smith can take it.", left + pad, y + dp(36), dp(12.5f), wide - pad * 2);
+            } else {
+                int pluses = RunGear.stepPluses(level + 1);
+                int[] needs = RunGear.stepNeeds(level + 1);
+                boolean can = RunGear.affords(bank, has, pluses, needs);
+                text.setColor(ink);
+                text.setTextSize(dp(12.5f));
+                List<String> lines = wrap("Level " + (level + 2) + ": " + RunArms.step(kind, level + 1)
+                        + (RunArms.blows(kind, level + 1) > RunArms.blows(kind, level) ? " A blow counts for " + RunArms.blows(kind, level + 1) + "." : ""), wide - pad * 2);
+                for (int index = 0; index < Math.min(2, lines.size()); index++) canvas.drawText(lines.get(index), left + pad, y + dp(36) + index * dp(16.5f), text);
+                smithAct.set(left + pad, bottom - dp(40), left + wide - pad, bottom);
+                smithButton(canvas, smithAct, (can ? "Forge  " : "Not enough for  ") + RunGear.price(pluses, needs), can, CalculatorLayout.CORAL);
+            }
+            if (!smithSaid.isEmpty()) {
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(0xFF2E9E6E);
+                fitted(canvas, smithSaid, left + pad, bottom - dp(52), dp(12.5f), wide - pad * 2);
+            }
+        } else if (smithTab == RunGear.PULMU) {
+            int made = gearMade(), on = gearOn();
+            float label = dp(58), gap = dp(6), cellWide = (wide - pad * 2 - label - gap * 3) / 3, cellTall = dp(46);
+            // The three sets, across; and the four pieces, down.
+            text.setTextAlign(Paint.Align.CENTER);
+            for (int tier = 1; tier <= RunGear.TIERS; tier++) {
+                text.setColor(soft);
+                fitted(canvas, RunGear.SET_NAMES[tier - 1], left + pad + label + gap + (tier - 1) * (cellWide + gap) + cellWide / 2, y + dp(12), dp(12), cellWide);
+            }
+            y += dp(20);
+            for (int slot = 0; slot < RunGear.SLOTS; slot++) {
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(ink);
+                fitted(canvas, RunGear.SLOT_NAMES[slot], left + pad, y + cellTall / 2 + dp(5), dp(13.5f), label);
+                for (int tier = 1; tier <= RunGear.TIERS; tier++) {
+                    int index = slot * RunGear.TIERS + tier - 1;
+                    if (gearCells[index] == null) gearCells[index] = new RectF();
+                    RectF at = gearCells[index];
+                    float x = left + pad + label + gap + (tier - 1) * (cellWide + gap);
+                    at.set(x, y, x + cellWide, y + cellTall);
+                    boolean hers = (made & RunGear.bit(slot, tier)) != 0, worn = RunGear.worn(on, slot) == tier, looked = slot == gearSlot && tier == gearTier;
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(worn ? (dark ? 0xFF44292E : 0xFFFCE9EB) : dark ? 0xFF2C3033 : 0xFFF5F6F7);
+                    canvas.drawRoundRect(at, dp(12), dp(12), paint);
+                    if (looked || worn) {
+                        stroke.setColor(worn ? CalculatorLayout.CORAL : dark ? 0xFF9AA0A6 : 0xFF8A8F94);
+                        stroke.setStrokeWidth(dp(worn ? 2.5f : 1.5f));
+                        canvas.drawRoundRect(at, dp(12), dp(12), stroke);
+                    }
+                    paint.setAlpha(hers ? 255 : 110);
+                    gearIcon(canvas, slot, at.left + dp(20), at.centerY(), dp(20), hers ? SET_COLOURS[tier - 1] : mixed(SET_COLOURS[tier - 1], dark ? 0xFF2C3033 : 0xFFF5F6F7, .55f));
+                    paint.setAlpha(255);
+                    text.setTextAlign(Paint.Align.LEFT);
+                    text.setColor(worn ? CalculatorLayout.CORAL : hers ? ink : soft);
+                    fitted(canvas, worn ? "on her" : hers ? "made" : "+ " + RunGear.piecePluses(tier), at.left + dp(38), at.centerY() + dp(4.5f), dp(12), cellWide - dp(44));
+                }
+                y += cellTall + gap;
+            }
+            // The one looked at: what it does, and what it costs.
+            boolean hers = (made & RunGear.bit(gearSlot, gearTier)) != 0, worn = RunGear.worn(on, gearSlot) == gearTier;
+            y += dp(4);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            fitted(canvas, RunGear.name(gearSlot, gearTier), left + pad, y + dp(14), dp(14.5f), wide - pad * 2);
+            text.setTypeface(Typeface.DEFAULT);
+            text.setTextSize(dp(12.5f));
+            List<String> lines = wrap(RunGear.does(gearSlot, gearTier) + " All four of one set: a heart more" + (RunGear.whole(on) ? ", which she has." : "."), wide - pad * 2);
+            for (int index = 0; index < Math.min(3, lines.size()); index++) canvas.drawText(lines.get(index), left + pad, y + dp(34) + index * dp(16.5f), text);
+            smithAct.set(left + pad, bottom - dp(40), left + wide - pad, bottom);
+            if (hers) {
+                smithButton(canvas, smithAct, worn ? "Take it off" : "Put it on", true, worn ? 0xFF7A8088 : CalculatorLayout.CORAL);
+            } else if (here) {
+                boolean can = RunGear.affords(bank, has, RunGear.piecePluses(gearTier), RunGear.pieceNeeds(gearTier));
+                smithButton(canvas, smithAct, (can ? "Make  " : "Not enough for  ") + RunGear.price(RunGear.piecePluses(gearTier), RunGear.pieceNeeds(gearTier)), can, CalculatorLayout.CORAL);
+            } else {
+                smithAct.setEmpty();
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(soft);
+                fitted(canvas, "Made at a smithy, in a village: " + RunGear.price(RunGear.piecePluses(gearTier), RunGear.pieceNeeds(gearTier)), left + wide / 2, bottom - dp(14), dp(12.5f), wide - pad * 2);
+            }
+            if (!smithSaid.isEmpty()) {
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(0xFF2E9E6E);
+                fitted(canvas, smithSaid, left + pad, bottom - dp(52), dp(12.5f), wide - pad * 2);
+            }
+        } else {
+            // What a smith works with, bought and sold.
+            for (int index = 0; index < 3; index++) {
+                box.set(left + dp(8), y, left + wide - dp(8), y + dp(44));
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(dark ? 0xFF2C3033 : 0xFFF5F6F7);
+                canvas.drawRoundRect(box, dp(12), dp(12), paint);
+                paint.setColor(index == 0 ? 0xFF8F979E : index == 1 ? 0xFF3F5FD0 : 0xFFE0A21A);
+                canvas.drawRoundRect(left + dp(20), y + dp(14), left + dp(36), y + dp(30), dp(index == 1 ? 8 : 3), dp(index == 1 ? 8 : 3), paint);
+                paint.setColor(Color.BLACK);
+                tradeSells[index].set(left + wide - dp(18) - dp(68), y + dp(7), left + wide - dp(18), y + dp(37));
+                tradeBuys[index].set(tradeSells[index].left - dp(6) - dp(76), y + dp(7), tradeSells[index].left - dp(6), y + dp(37));
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(ink);
+                fitted(canvas, RunHunts.MATERIALS[index], left + dp(46), y + dp(20), dp(13.5f), tradeBuys[index].left - left - dp(52));
+                text.setColor(soft);
+                fitted(canvas, "she has " + has[index], left + dp(46), y + dp(36), dp(11.5f), tradeBuys[index].left - left - dp(52));
+                smithButton(canvas, tradeBuys[index], "Buy + " + RunGear.BUYS[index], bank >= RunGear.BUYS[index], CalculatorLayout.CORAL);
+                smithButton(canvas, tradeSells[index], "Sell + " + RunGear.SELLS[index], has[index] > 0, 0xFF2E9E6E);
+                y += dp(50);
+            }
+            // And her sisters' work undone: a thing re-forged is as it was found, and what went into it comes back.
+            y += dp(6);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            fitted(canvas, "Re-forge  ·  + " + RunGear.REFORGE, left + pad, y + dp(14), dp(14.5f), wide - pad * 2);
+            text.setTypeface(Typeface.DEFAULT);
+            text.setColor(soft);
+            text.setTextSize(dp(12));
+            List<String> what = wrap("A thing re-forged is as it was found, and what went into it comes back, to spend on another.", wide - pad * 2);
+            for (int index = 0; index < Math.min(2, what.size()); index++) canvas.drawText(what.get(index), left + pad, y + dp(32) + index * dp(15.5f), text);
+            y += dp(42) + (what.size() > 1 ? dp(15.5f) : 0);
+            boolean any = false;
+            for (int kind = 0; kind < RunArms.COUNT; kind++) {
+                if (reforges[kind] == null) reforges[kind] = new RectF();
+                reforges[kind].setEmpty();
+                int level = forged(kind);
+                if (level <= 0 || y + dp(34) > bottom - dp(20)) continue;
+                any = true;
+                int[] back = RunGear.spent(level);
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(ink);
+                fitted(canvas, RunArms.NAMES[kind] + ", level " + (level + 1) + ": " + back[0] + " metal, " + back[1] + " crystal, " + back[2] + " leaf back", left + pad, y + dp(21), dp(12.5f),
+                        wide - pad * 2 - dp(96));
+                reforges[kind].set(left + wide - pad - dp(88), y + dp(2), left + wide - pad, y + dp(30));
+                smithButton(canvas, reforges[kind], "Re-forge", bank >= RunGear.REFORGE, 0xFF7A4B8A);
+                y += dp(34);
+            }
+            if (!any) {
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(soft);
+                fitted(canvas, "Nothing of hers has been worked on yet.", left + pad, y + dp(18), dp(12.5f), wide - pad * 2);
+            }
+            if (!smithSaid.isEmpty()) {
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(0xFF2E9E6E);
+                fitted(canvas, smithSaid, left + pad, bottom - dp(6), dp(12.5f), wide - pad * 2);
+            }
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /**
+     * One of the three who keep the smithy, at her anvil: at ease; her hammer up and down,
+     * now and then, as she works; hard at it for a moment when she has made something, and
+     * then pleased with it. Over her head, what she does.
+     */
+    private void drawSmith(Canvas canvas, int[] item) {
+        int which = Math.max(0, Math.min(2, item[4] - PlusRun.SMITH));
+        float x = (item[1] + 2.3f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile, anvil = x - tile * .95f;
+        // Her anvil, on its block, in front of her.
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF6B4426);
+        canvas.drawRect(anvil - tile * .2f, feet - tile * .3f, anvil + tile * .2f, feet, paint);
+        paint.setColor(0xFF4A4F57);
+        path.reset();
+        path.moveTo(anvil - tile * .42f, feet - tile * .62f);
+        path.lineTo(anvil + tile * .3f, feet - tile * .62f);
+        path.lineTo(anvil + tile * .3f, feet - tile * .5f);
+        path.lineTo(anvil + tile * .14f, feet - tile * .44f);
+        path.lineTo(anvil + tile * .24f, feet - tile * .3f);
+        path.lineTo(anvil - tile * .24f, feet - tile * .3f);
+        path.lineTo(anvil - tile * .14f, feet - tile * .44f);
+        path.lineTo(anvil - tile * .22f, feet - tile * .5f);
+        path.close();
+        canvas.drawPath(path, paint);
+        paint.setColor(0xFF7C838C);
+        canvas.drawRect(anvil - tile * .4f, feet - tile * .62f, anvil + tile * .3f, feet - tile * .57f, paint);
+        paint.setColor(Color.BLACK);
+        // What she is at: making something, pleased with it, or now and then a few blows by herself.
+        boolean making = hammerer == which && hammered < 1.6f, pleased = hammerer == which && hammered >= 1.6f && hammered < 3.2f;
+        boolean idle = (int) (clock * .45f + which * 1.7f) % 5 == 0;
+        int frame = pleased ? 3 : making ? ((int) (hammered * 7) % 2 == 0 ? 1 : 2) : idle ? ((int) (clock * 3.2f) % 2 == 0 ? 1 : 2) : 0;
+        Bitmap sheet = smith(which);
+        cell(canvas, sheet, frame, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+        boolean at = run.spot() == item[4];
+        mark(canvas, x, feet - tile * (at ? 1.75f : 1.65f), which == 0 ? "Forge" : which == 1 ? "Armour" : "Trade", SPEAKER_COLOURS[which == 0 ? 18 : FIRST_SMITH + which - 1], false);
+    }
+
+    /**
+     * What the smith's work leaves in the air: a burst of ink where a pen ended or a blot
+     * splashed, of light where a page turned; and the pages of a book, burning for a while
+     * where it burst.
+     */
+    private void drawSmithWork(Canvas canvas) {
+        for (float[] boom : run.booms()) {
+            int by = (int) boom[3];
+            // (A book's own burst is drawn where a book bursts.)
+            if (by != PlusRun.PEN && by != PlusRun.GUN && by != PlusRun.PAGE) continue;
+            float out = Math.min(1, boom[4] / .4f), x = (boom[0] - cameraX) * tile, y = (boom[1] - cameraY) * tile, round = boom[2] * tile;
+            int colour = by == PlusRun.PAGE ? 0xFF3FD8C8 : 0xFF2A3FC8;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(colour);
+            paint.setAlpha(Math.round(120 * (1 - out)));
+            canvas.drawCircle(x, y, round * (.4f + .6f * out), paint);
+            stroke.setColor(colour);
+            stroke.setAlpha(Math.round(255 * (1 - out)));
+            stroke.setStrokeWidth(tile * .09f);
+            canvas.drawCircle(x, y, round * out, stroke);
+            // Drops of it, flung out.
+            paint.setAlpha(Math.round(230 * (1 - out)));
+            for (int drop = 0; drop < 7; drop++) {
+                double turn = drop * Math.PI * 2 / 7 + boom[0];
+                canvas.drawCircle(x + (float) Math.cos(turn) * round * out * 1.05f, y + (float) Math.sin(turn) * round * out * 1.05f, tile * .07f, paint);
+            }
+            stroke.setAlpha(255);
+            paint.setColor(Color.BLACK);
+            paint.setAlpha(255);
+        }
+        for (float[] fire : run.fires()) {
+            float x = (fire[0] - cameraX) * tile, y = (fire[1] - cameraY) * tile, round = fire[2] * tile, fade = Math.min(1, fire[3] / .4f);
+            paint.setStyle(Paint.Style.FILL);
+            for (int flame = 0; flame < 9; flame++) {
+                float across = (flame - 4) / 4f * round * .9f, lick = (float) Math.abs(Math.sin(clock * 9 + flame * 1.9f));
+                float high = tile * (.25f + .45f * lick), base = y + round * .25f - (float) Math.abs(across) * .2f;
+                paint.setColor(0xFFE8622A);
+                paint.setAlpha(Math.round(190 * fade));
+                canvas.drawOval(x + across - tile * .14f, base - high, x + across + tile * .14f, base, paint);
+                paint.setColor(0xFFFFD25A);
+                paint.setAlpha(Math.round(220 * fade));
+                canvas.drawOval(x + across - tile * .07f, base - high * .6f, x + across + tile * .07f, base, paint);
+            }
+            paint.setColor(Color.BLACK);
+            paint.setAlpha(255);
+        }
+    }
+
+    /** A slash wave in the air: a crescent, as tall as it reaches, turned the way it flies; white from a sword, thin and pale from a knife, in her colour from a brush. */
+    private void drawSlash(Canvas canvas, PlusRun.Shot shot, float x, float y) {
+        float high = shot.high * tile, fade = Math.min(1, shot.left / .08f);
+        int colour = shot.of == PlusRun.BRUSH ? lookColour(drawn()) : shot.of == PlusRun.KNIFE ? 0xFF9FB2C6 : 0xFF6FB4FF;
+        canvas.save();
+        canvas.rotate((float) Math.toDegrees(Math.atan2(shot.down, shot.across)), x, y);
+        float deep = high * (shot.of == PlusRun.KNIFE ? 1.6f : .8f);
+        for (int layer = 0; layer < 3; layer++) {
+            float back = layer * high * .28f;
+            box.set(x - deep - back, y - high, x + deep * .25f - back, y + high);
+            stroke.setColor(layer == 0 ? Color.WHITE : colour);
+            stroke.setAlpha(Math.round((layer == 0 ? 255 : layer == 1 ? 190 : 90) * fade));
+            stroke.setStrokeWidth(tile * (layer == 0 ? .07f : layer == 1 ? .2f : .28f) * (shot.of == PlusRun.KNIFE ? .6f : 1));
+            canvas.drawArc(box, -68, 136, false, stroke);
+        }
+        stroke.setAlpha(255);
+        canvas.restore();
     }
 
     // The hunts
@@ -1377,6 +1971,11 @@ final class RunGame {
             closeHunts();
             return true;
         }
+        if (smithOpen) {
+            smithOpen = false;
+            audio.play("tap", .3f);
+            return true;
+        }
         if (fanOpen) {
             fanOpen = false;
             idle();
@@ -1524,6 +2123,8 @@ final class RunGame {
         sinceHeavy = panelAge = 9;
         packOpen = false;
         huntsOpen = false;
+        smithOpen = false;
+        hammerer = -1;
         seenFells = 0;
         swapFinger = -1;
         petWordLeft = 0;
@@ -1541,6 +2142,13 @@ final class RunGame {
         }
         run = new PlusRun(RunLevels.level(land), perks);
         huntsHere();
+        // How tough the land is, said the first time its creatures take more, or a hurt costs more, than in any land she has been in.
+        int tougher = run.tough() * 10 + run.bite();
+        if (tougher > session.tally("run_tough_told")) {
+            session.keep("run_tough_told", tougher);
+            toast("A level " + RunLevels.levelOf(land) + " land", "Creatures take " + (1 + run.tough()) + (run.tough() == 0 ? " blow" : " blows") + "  ·  a hurt costs "
+                    + (run.bite() == 0 ? "a heart" : run.bite() == 1 ? "a heart and a half" : "two hearts"), 0);
+        }
         // For looking at a land's later parts in a build made for testing: she starts by its first flag, its second,
         // inside the place where someone waits, or, for a number over a thousand, at the column that many over it.
         int from = BuildConfig.DEBUG ? session.tally("run_from") : 0;
@@ -1653,7 +2261,8 @@ final class RunGame {
         screen = RESULT;
         captionLeft = 0;
         // Whatever she collected is hers to spend, whether she reached the gate or not.
-        banked = run.purse();
+        // (And a charm lets her keep more of them.)
+        banked = run.purse() * (100 + RunGear.luck(gearOn())) / 100;
         session.keep("run_bank", bank() + banked);
         if (won) {
             float share = run.total() == 0 ? 1 : run.collected() / (float) run.total();
@@ -1734,6 +2343,7 @@ final class RunGame {
         sinceStep += seconds;
         mixAge += seconds;
         for (int slot = 0; slot < huntFlash.length; slot++) huntFlash[slot] = Math.max(0, huntFlash[slot] - seconds / 3);
+        hammered += seconds;
         if (screen == PLAY && ribbonFinger >= 0 && !fanOpen && (ribbonHeld += seconds) >= .3f && Integer.bitCount(perks.colours & 127) > 1) openPicker(false);
         // Held, the button that changes what she holds opens her backpack, and the land waits.
         if (screen == PLAY && swapFinger >= 0 && !packOpen && (swapHeld += seconds) >= .35f) openPack(PLAY);
@@ -1747,7 +2357,7 @@ final class RunGame {
         // While what was won from whoever fell is rising, everything else waits.
         if (screen == PLAY && prizeAge >= 0 && prizeAge < 2) {
             prizeAge += seconds;
-        } else if (screen == PLAY && (fanOpen || packOpen || huntsOpen)) {
+        } else if (screen == PLAY && (fanOpen || packOpen || huntsOpen || smithOpen)) {
             // The land waits while she chooses.
         } else if (screen == PLAY && roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
             roomCardAge += seconds;
@@ -2484,7 +3094,9 @@ final class RunGame {
                 if (kind == RunLevels.HOUSE) {
                     int sort = here.rooms.get(in)[14];
                     toast(LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
-                            : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk" : "Somebody is in", 0);
+                            : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
+                            : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
+                            : "Somebody is in", 0);
                     audio.play("page", .7f);
                 } else if (kind <= RunLevels.PASSAGE) {
                     int[] one = here.rooms.get(in);
@@ -2973,6 +3585,10 @@ final class RunGame {
             if (action == MotionEvent.ACTION_DOWN) huntsTouch(x, y);
             return;
         }
+        if (smithOpen) {
+            if (action == MotionEvent.ACTION_DOWN) smithTouch(x, y);
+            return;
+        }
         if (screen == PLAY) {
             if (action == MotionEvent.ACTION_DOWN && pauseButton.contains(x, y)) {
                 audio.play("tap", .5f);
@@ -3004,6 +3620,10 @@ final class RunGame {
                 idle();
                 if (what == PlusRun.BOARD) {
                     openHunts();
+                    return;
+                }
+                if (what >= PlusRun.SMITH) {
+                    openSmith(what - PlusRun.SMITH, PLAY);
                     return;
                 }
                 counterFrom = PLAY;
@@ -3487,18 +4107,19 @@ final class RunGame {
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0xFFFFF3C4);
                 paint.setAlpha(Math.round(170 * (1 - out)));
-                canvas.drawCircle(at, high, tile * PlusRun.BLAST * (.35f + .65f * out), paint);
+                canvas.drawCircle(at, high, tile * run.blastWide() * (.35f + .65f * out), paint);
                 paint.setColor(Color.WHITE);
                 paint.setAlpha(Math.round(230 * (1 - out)));
-                canvas.drawCircle(at, high, tile * PlusRun.BLAST * .4f * (1 - out * .5f), paint);
+                canvas.drawCircle(at, high, tile * run.blastWide() * .4f * (1 - out * .5f), paint);
                 stroke.setColor(0xFFE0A21A);
                 stroke.setAlpha(Math.round(255 * (1 - out)));
                 stroke.setStrokeWidth(tile * .1f);
-                canvas.drawCircle(at, high, tile * PlusRun.BLAST * out, stroke);
+                canvas.drawCircle(at, high, tile * run.blastWide() * out, stroke);
                 stroke.setAlpha(255);
                 paint.setColor(Color.BLACK);
                 paint.setAlpha(255);
             }
+            drawSmithWork(canvas);
             if (screen == PLAY && prizeAge >= 0) drawPrize(canvas);
             if (screen == PLAY && handAge >= 0) drawHandOver(canvas);
             // With the lights out, the dark lies over the place and under everything that is said and shown of how she stands.
@@ -3556,8 +4177,12 @@ final class RunGame {
                         paint.setAlpha(255);
                         if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
                         else if (what == PlusRun.BOARD) pieceIn(canvas, four, SCROLL_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
+                        else if (what == PlusRun.SMITH) thing(canvas, PlusRun.SWORD, stallButton.centerX(), stallButton.centerY() - dp(6), stallButton.height() * .5f, 35, false, false);
+                        else if (what == PlusRun.SMITH + 1) gearIcon(canvas, RunGear.HELM, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .36f, SET_COLOURS[2]);
+                        else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
-                        label(canvas, stallButton, what < 100 ? "Look" : what == PlusRun.BOARD ? "Hunts" : what == 100 + PETS_TAB ? "Pets" : "Counter");
+                        label(canvas, stallButton, what < 100 ? "Look" : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
@@ -3572,7 +4197,7 @@ final class RunGame {
                 canvas.drawColor(0x8C000000);
                 if (screen == PAUSED) {
                     // (With her backpack to look into.)
-                    float inside = card(canvas, "Paused", RunStory.CHAPTERS[RunLevels.chapterOf(number)] + ", land " + number, dp(52));
+                    float inside = card(canvas, "Paused", RunStory.CHAPTERS[RunLevels.chapterOf(number)] + ", land " + number + "  ·  level " + RunLevels.levelOf(number), dp(52));
                     packButton.set(box.left + dp(20), inside, box.right - dp(20), inside + dp(42));
                     paint.setStyle(Paint.Style.FILL);
                     paint.setColor(dark ? 0xFF33373B : 0xFFF1F3F4);
@@ -3590,6 +4215,7 @@ final class RunGame {
         // Her backpack, over whatever is there.
         if (packOpen) drawPack(canvas);
         if (huntsOpen) drawHunts(canvas);
+        if (smithOpen) drawSmithy(canvas);
     }
 
     /** Her backpack is opened: from a land, where the land waits; from the pause; or from the map. */
@@ -3612,6 +4238,11 @@ final class RunGame {
             if ((owned >> kind & 1) == 0 || packRows[kind] == null || !packRows[kind].contains(x, y)) continue;
             audio.play("tap", .5f);
             packOn = kind;
+            return;
+        }
+        if (!packWear.isEmpty() && packWear.contains(x, y)) {
+            packOpen = false;
+            openSmith(RunGear.PULMU, MAP);
             return;
         }
         if (!packAct.isEmpty() && packAct.contains(x, y)) {
@@ -3650,7 +4281,7 @@ final class RunGame {
         int owned = packed(), count = Integer.bitCount(owned), main = kept().main;
         boolean inLand = packFrom != MAP && run != null;
         float wide = Math.min(safe.width() - dp(24), dp(430)), row = Math.max(dp(40), Math.min(dp(52), (safe.height() - dp(350)) / Math.max(1, count))), pad = dp(16);
-        float tall = pad + dp(30) + count * row + dp(10) + dp(216) + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
+        float tall = pad + dp(30) + count * row + dp(10) + dp(234) + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
         packCard.set(left, top, left + wide, top + tall);
         plate(canvas, packCard, dp(22), 255);
         text.setTextAlign(Paint.Align.LEFT);
@@ -3660,7 +4291,15 @@ final class RunGame {
         text.setTypeface(Typeface.DEFAULT);
         text.setColor(soft);
         text.setTextAlign(Paint.Align.RIGHT);
-        fitted(canvas, inLand ? "what she has found, and what is hers" : "what is kept from land to land", left + wide - pad, top + pad + dp(17), dp(12), wide - pad * 2 - dp(110));
+        packWear.setEmpty();
+        if (inLand) {
+            fitted(canvas, "what she has found, and what is hers", left + wide - pad, top + pad + dp(17), dp(12), wide - pad * 2 - dp(110));
+        } else {
+            // From the map: a button to what she wears.
+            packWear.set(left + wide - pad - dp(132), top + pad - dp(2), left + wide - pad, top + pad + dp(26));
+            smithButton(canvas, packWear, "What she wears  ›", true, 0xFF3F7FC4);
+            text.setTextAlign(Paint.Align.RIGHT);
+        }
         float y = top + pad + dp(30);
         for (int kind = 0; kind < RunArms.COUNT; kind++) {
             if ((owned >> kind & 1) == 0) {
@@ -3717,11 +4356,12 @@ final class RunGame {
         float reach = RunArms.reach(kind, level) * (boosted && !swung ? RunArms.BOOST_FAR : 1) + (boosted && swung ? RunArms.BOOST_SWING : 0);
         float bite = RunArms.bite(kind, level) + (boosted ? RunArms.BOOST_BITE : 0);
         String up = boosted ? " \u2191" : "";
-        String first = "Power: 1 blow  \u00B7  reach " + figure(reach) + up + " squares  \u00B7  " + figure(RunArms.pace(kind, level)) + " a second";
+        int blows = RunArms.blows(kind, level);
+        String first = "Power: " + blows + (blows == 1 ? " blow" : " blows") + "  ·  reach " + figure(reach) + up + " squares  ·  " + figure(RunArms.pace(kind, level)) + " a second";
         String second = "Shield: " + figure(bite) + up + (bite == 1 ? " piece" : " pieces") + " a blow"
                 + (RunArms.area(kind, level) > 0 ? "  \u00B7  " + (kind == PlusRun.BOOK ? "burst " : "sweep ") + figure(RunArms.area(kind, level)) + " squares" : "")
-                + (kind == PlusRun.TABLET ? "  \u00B7  panel " + figure(RunArms.PANEL_WIDE) + " by " + figure(RunArms.PANEL_TALL) + ", " + figure(RunArms.PANEL_BITE) + " pieces" : "")
-                + (kind == PlusRun.KEYS ? "  \u00B7  fan of " + RunArms.FAN : "");
+                + (kind == PlusRun.TABLET ? "  ·  panel " + figure(RunArms.panelWide(level)) + " by " + figure(RunArms.panelTall(level)) + ", " + figure(RunArms.PANEL_BITE) + " pieces" : "")
+                + (kind == PlusRun.KEYS ? "  ·  fan of " + RunArms.fan(level) : "");
         int holds = RunArms.holds(kind, perks.shots);
         String third = holds == 0 ? "No end to it" : kind == PlusRun.GUN ? (inLand ? run.rounds() + " shots left of " : "Holds ") + holds + (inLand ? "" : " shots")
                 : (inLand ? run.books() + " left of " : "") + holds + " to a land";
@@ -3733,8 +4373,11 @@ final class RunGame {
         // What it does, and what it is good for: no more than four lines of it.
         text.setColor(ink);
         text.setTextSize(dp(12.5f));
-        List<String> lines = wrap(RunArms.does(kind) + " " + RunArms.goodFor(kind), wide - pad * 2);
-        for (int index = 0; index < Math.min(5, lines.size()); index++) canvas.drawText(lines.get(index), left + pad, y + dp(92) + index * dp(16.5f), text);
+        // (With what the smith has made of it, a step at a time.)
+        StringBuilder told = new StringBuilder(RunArms.does(kind));
+        for (int step = 1; step <= level; step++) told.append(' ').append(RunArms.step(kind, step));
+        List<String> lines = wrap(told + " " + RunArms.goodFor(kind), wide - pad * 2);
+        for (int index = 0; index < Math.min(6, lines.size()); index++) canvas.drawText(lines.get(index), left + pad, y + dp(92) + index * dp(16.5f), text);
         // The button: take it in hand; or begin every land with it.
         boolean can = inLand ? run.weapon() != kind && run.usable(kind) : RunArms.main(kind) && main != kind;
         if (can) {
@@ -3814,7 +4457,7 @@ final class RunGame {
     /** The panel of translation her tablet-book opens: a pane of light in front of her with lines of writing in it, there for a third of a second. */
     private void drawPanel(Canvas canvas) {
         if (panelAge > .36f) return;
-        float through = panelAge / .36f, wide = RunArms.PANEL_WIDE * tile, tall = RunArms.PANEL_TALL * tile, open = Math.min(1, through * 4);
+        float through = panelAge / .36f, wide = RunArms.panelWide(perks.levels[PlusRun.TABLET]) * tile, tall = RunArms.panelTall(perks.levels[PlusRun.TABLET]) * tile, open = Math.min(1, through * 4);
         float near = (panelX - cameraX) * tile, top = (panelY - cameraY) * tile, far = near + (panelLeft ? -1 : 1) * wide * open;
         float from = Math.min(near, far), to = Math.max(near, far);
         paint.setStyle(Paint.Style.FILL);
@@ -4213,7 +4856,8 @@ final class RunGame {
                 continue;
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
-                drawBoard(canvas, item);
+                if (item[4] >= PlusRun.SMITH) drawSmith(canvas, item);
+                else drawBoard(canvas, item);
                 continue;
             }
             if (item[0] == PlusRun.SPOT) {
@@ -4338,6 +4982,21 @@ final class RunGame {
                 }
             }
         }
+        // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
+        for (PlusRun.Foe foe : run.foes()) {
+            if (foe.flat || foe.left <= 1 || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
+            int marks = Math.min(6, foe.left);
+            float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, over = (foe.y - cameraY) * tile - tile * .2f, each = tile * .17f;
+            for (int index = 0; index < marks; index++) {
+                float px = middle + (index - (marks - 1) / 2f) * each;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(Color.WHITE);
+                canvas.drawCircle(px, over, tile * .075f, paint);
+                paint.setColor(0xFFE0362F);
+                canvas.drawCircle(px, over, tile * .052f, paint);
+            }
+            paint.setColor(Color.BLACK);
+        }
         // Whatever is in the air.
         for (PlusRun.Shot shot : run.shots()) {
             float x = (shot.x - cameraX) * tile, y = (shot.y - cameraY) * tile;
@@ -4357,6 +5016,10 @@ final class RunGame {
             }
             if (shot.kind == PlusRun.PAGE || shot.kind == PlusRun.THROWN_KEY) {
                 drawFlick(canvas, shot, x, y);
+                continue;
+            }
+            if (shot.kind == PlusRun.SLASH) {
+                drawSlash(canvas, shot, x, y);
                 continue;
             }
             if (shot.pets && shot.kind <= PlusRun.GUN) {
@@ -5886,7 +6549,12 @@ final class RunGame {
         canvas.drawCircle(x, y, radius, paint);
         paint.setColor(Color.BLACK);
         Bitmap picture;
-        if (who >= FIRST_OTHER) {
+        if (who >= FIRST_SMITH) {
+            // (One of Moru's sisters: her head, from her own sheet.)
+            picture = smith(who - FIRST_SMITH + 1);
+            int cell = picture.getWidth() / 4, sideOf = picture.getHeight() * 44 / 100;
+            source.set(cell / 2 - sideOf / 2, picture.getHeight() * 38 / 100, cell / 2 + sideOf / 2, picture.getHeight() * 38 / 100 + sideOf);
+        } else if (who >= FIRST_OTHER) {
             picture = later(RunLevels.GUARD - RunLevels.GOKHAE + who - FIRST_OTHER);
             int cell = picture.getWidth() / 4, sideOf = Math.min(cell, picture.getHeight() * 55 / 100);
             source.set(cell / 2 - sideOf / 2, picture.getHeight() * 30 / 100, cell / 2 + sideOf / 2, picture.getHeight() * 30 / 100 + sideOf);
@@ -6518,6 +7186,17 @@ final class RunGame {
             }
         }
         paint.setAlpha(255);
+        // What she wears, under her hearts: a small picture of each piece, in the colour of its set.
+        int wearing = gearOn();
+        if (wearing != 0) {
+            float at = plateLeft + dp(18);
+            for (int slot = 0; slot < RunGear.SLOTS; slot++) {
+                int tier = RunGear.worn(wearing, slot);
+                if (tier == 0) continue;
+                gearIcon(canvas, slot, at, plateMiddle + dp(15.5f), dp(8.5f), SET_COLOURS[tier - 1]);
+                at += dp(13);
+            }
+        }
         float livesAt = plateLeft + dp(20) + heart * hearts + dp(8);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(dark ? 0xFF4A4F54 : 0xFFD9DCDD);
@@ -7163,6 +7842,20 @@ final class RunGame {
             text.setColor(goStrike ? Color.WHITE : 0xFF292B2A);
             canvas.drawText(String.valueOf(weapon == PlusRun.GUN ? run.rounds() : run.books()), where.centerX(), where.bottom - dp(8), text);
         }
+        if (weapon >= 0 && perks.levels[weapon] > 0) {
+            // How far the smith has worked on it: its level, on the button's corner.
+            float cx = where.left + dp(9), cy = where.top + dp(9);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(cardColor);
+            canvas.drawCircle(cx, cy, dp(9), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextSize(dp(11.5f));
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setColor(CalculatorLayout.CORAL);
+            canvas.drawText(String.valueOf(perks.levels[weapon] + 1), cx, cy + dp(4), text);
+            text.setTypeface(Typeface.DEFAULT);
+        }
         if (weapon >= 0 && RunArms.heavy(weapon) && run.heldFor() > 0 && !run.mastered()) {
             box.set(where.left - dp(3), where.top - dp(3), where.right + dp(3), where.bottom + dp(3));
             stroke.setColor(Color.WHITE);
@@ -7721,6 +8414,14 @@ final class RunGame {
                 text.setColor(land <= open ? ink : soft);
                 text.setTextSize(dp(14));
                 canvas.drawText(RunStory.CHAPTERS[RunLevels.chapterOf(land)], where.left, where.top - dp(8), text);
+                // The levels of its lands: how tough they are.
+                float named = text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]);
+                int low = RunLevels.levelOf(land), high = RunLevels.levelOf(Math.min(RunLevels.TOTAL, land + each - 1));
+                text.setColor(soft);
+                text.setTextSize(dp(11.5f));
+                canvas.drawText(low == high ? "level " + low : "levels " + low + " to " + high, where.left + named + dp(26), where.top - dp(8), text);
+                text.setColor(land <= open ? ink : soft);
+                text.setTextSize(dp(14));
                 if (session.tally("run_medal_" + RunLevels.chapterOf(land)) != 0) {
                     paint.setAlpha(255);
                     art(canvas, STAR_ART, where.left + text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) + dp(12), where.top - dp(4), dp(16), false);
