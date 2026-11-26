@@ -423,6 +423,25 @@ def places():
         strip_of(pieces(f"fly_{name}", 1, 4), 96, (230, 160), f"fly_{name}")
     inside = Image.open(SOURCE / "room.png").convert("RGB")
     inside.resize((SKY_WIDTH, round(inside.size[1] * SKY_WIDTH / inside.size[0])), Image.LANCZOS).save(RES / "plus_run_room.webp", quality=82, method=6)
+    # The insides of the stashes, the passages and the rooms for games: eight of them, a wine cellar, a map room, a flooded vault, the
+    # inside of a clock tower, a greenhouse, a printing room, a crystal cave and a treasure vault.
+    for name in ("wine", "maps", "vault", "clock", "green", "print", "crystal", "treasure"):
+        look = Image.open(SOURCE / f"room_{name}.png").convert("RGB")
+        look.resize((SKY_WIDTH, round(look.size[1] * SKY_WIDTH / look.size[0])), Image.LANCZOS).save(RES / f"plus_run_room_{name}.webp", quality=82, method=6)
+    # And what stands about in them: two things for each, sixteen in a row, all at one scale, each standing on the bottom of its cell.
+    things = pieces("props_a", 2, 4) + pieces("props_b", 2, 4)
+    if len(things) != 16:
+        raise SystemExit(f"props: {len(things)} pieces")
+    scale = 200 / max(thing.size[1] for thing in things)
+    standing = Image.new("RGBA", (240 * 16, 208), (0, 0, 0, 0))
+    for index, thing in enumerate(things):
+        size = (max(1, round(thing.size[0] * scale)), max(1, round(thing.size[1] * scale)))
+        if size[0] > 236:
+            raise SystemExit(f"prop {index} is {size}")
+        small = thing.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        standing.alpha_composite(small, (index * 240 + (240 - size[0]) // 2, 208 - size[1]))
+    clear = Image.new("RGBA", standing.size, (0, 0, 0, 0))
+    Image.composite(standing, clear, standing.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_props.webp", lossless=True, quality=100, method=6, exact=True)
     return sheet, row
 
 

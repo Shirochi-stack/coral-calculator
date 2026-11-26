@@ -155,6 +155,42 @@ final class RunLevels {
         if (den && wave == 3) made[made.length - 1] = OLD_BOOK;
         return made;
     }
+    /**
+     * And three that are only in the places off a land: a door that is shut until its key
+     * has been taken; a bridge that is not there until its lever has been pulled; and bars
+     * that lift for a few seconds when a plate before them is stood on.
+     */
+    static final char LOCKED = 'K', SPAN = 'b', GRILLE = 'g';
+    /**
+     * What the inside of a place off the land looks like: a wine cellar, a map room, a
+     * flooded vault, the inside of a clock tower, a greenhouse at night, a printing room,
+     * a crystal cave or a treasure vault. Each chapter has three of them, and which a
+     * place is goes by the land and by which of the land's places it is, so that no two
+     * places of one land look alike.
+     */
+    static final int WINE = 0, MAPS = 1, VAULT = 2, CLOCK = 3, GREENHOUSE = 4, PRINT = 5, CRYSTAL = 6, TREASURE = 7, LOOKS = 8;
+    private static final int[][] LOOKS_OF = {{WINE, MAPS, GREENHOUSE}, {MAPS, PRINT, WINE}, {GREENHOUSE, TREASURE, CLOCK}, {CRYSTAL, CLOCK, VAULT},
+            {PRINT, VAULT, TREASURE}, {TREASURE, WINE, MAPS}, {PRINT, CLOCK, MAPS}, {VAULT, GREENHOUSE, CRYSTAL}, {VAULT, CRYSTAL, GREENHOUSE},
+            {CLOCK, TREASURE, PRINT}};
+
+    static int lookOf(int number, int which) {
+        int[] of = LOOKS_OF[Math.min(LOOKS_OF.length - 1, chapterOf(number))];
+        return of[(number * 2 + which) % of.length];
+    }
+
+    /** What a stash holds besides its chest: something to help, a pet that waits to be taken along, or a shrine that sells a ribbon for a heart. */
+    static final int HOLDS_TREAT = 0, HOLDS_PET = 1, HOLDS_SHRINE = 2;
+    /**
+     * What a stash or a passage is put together from, in an order of its own in every
+     * land. Each piece begins and ends on the floor and can be crossed either way: spikes
+     * hopped over on ledges; a tower of blocks to climb and come down; a spring under a
+     * shelf with something on it; a run of ledges that crumble over spikes; a ledge that
+     * rides across them; a locked door, whose key is up somewhere before it; a pit of
+     * spikes with a bridge that a lever raises; bars that a plate lifts for a while; a
+     * place where creatures stand guard; and a wall that only a spring gets her over.
+     */
+    static final int HOP = 0, STACK = 1, SHELF = 2, CRUMBLING = 3, RIDE = 4, LOCK = 5, SPAN_PIT = 6, BARRED = 7, GUARDS = 8, SPRING_OVER = 9, PIECES = 10;
+
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
@@ -667,6 +703,8 @@ final class RunLevels {
          * a chest on it for whoever can fly: which place, from which column to which, and its row.
          */
         final List<int[]> spawns = new ArrayList<>(), lofts = new ArrayList<>();
+        /** What each stash and passage was put together from: which place, and then its pieces in order. */
+        final List<int[]> made = new ArrayList<>();
         /** How many columns the land proper has: what lies beyond is the places its doors lead to. */
         int main;
         /** What is asked of her in it, or 0; and the out-of-the-way places in it where something may be hidden: the column and row of each. */
@@ -707,7 +745,7 @@ final class RunLevels {
     private static Level later(int number, long seed) {
         Random random = new Random(seed * 6151 + number);
         int chapter = chapterOf(number), boss = bossOf(number);
-        Level draft = new Level(number, 1200, DEEP);
+        Level draft = new Level(number, 1700, DEEP);
         Builder builder = new Builder(draft, random, 1, chapter);
         builder.ground(6);
         // (Longer as they go: eighteen stretches in the thirty-first, twenty-seven in the seventy-ninth.)
@@ -753,6 +791,7 @@ final class RunLevels {
         level.rooms.addAll(draft.rooms);
         level.spawns.addAll(draft.spawns);
         level.lofts.addAll(draft.lofts);
+        level.made.addAll(draft.made);
         for (int row = 0; row < level.land.length; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
         level.land[gateFloor - 1][draft.gate] = GATE;
         level.land[gateFloor - 2][draft.gate] = GATE;
@@ -872,7 +911,7 @@ final class RunLevels {
         int chapter = chapterOf(number);
         float hard = (number - 1) / (float) (COUNT - 1);
         // Worked out on a strip longer than any land needs, then cut to length.
-        Level draft = new Level(number, 1000, DEEP);
+        Level draft = new Level(number, 1500, DEEP);
         Builder builder = new Builder(draft, random, hard, chapter);
         builder.ground(6);
         int boss = bossOf(number);
@@ -920,6 +959,7 @@ final class RunLevels {
         level.rooms.addAll(draft.rooms);
         level.spawns.addAll(draft.spawns);
         level.lofts.addAll(draft.lofts);
+        level.made.addAll(draft.made);
         for (int row = 0; row < level.land.length; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
         level.land[gateFloor - 1][draft.gate] = GATE;
         level.land[gateFloor - 2][draft.gate] = GATE;
@@ -1128,6 +1168,10 @@ final class RunLevels {
                     arena(want, den);
                     continue;
                 }
+                if (kind == STASH || kind == PASSAGE) {
+                    secret(want);
+                    continue;
+                }
                 wall(2);
                 int from = at, to = from + wide - 1, far = -1, middle = (from + to) / 2;
                 for (int column = from; column <= to; column++) {
@@ -1139,54 +1183,7 @@ final class RunLevels {
                 char step = second ? CRUMBLE : THIN;
                 int[] treats = {PlusRun.ICE, PlusRun.MAGNET, PlusRun.BREAD, PlusRun.NOTES};
                 int treat = want[3] != 0 ? PlusRun.FORM + PlusRun.YELLOW : treats[number % treats.length];
-                if (kind == STASH) {
-                    pluses(from + 3, from + 8, FLOOR - 1);
-                    if (number % 4 < 2) {
-                        // Steps up the room, each two squares over the last, to a shelf along its far wall with the chest on it.
-                        put(from + 5, FLOOR - 2, 3, THIN);
-                        put(from + 9, FLOOR - 4, 3, step);
-                        put(from + 13, FLOOR - 6, 3, step);
-                        ledge(from + 17, FLOOR - 8, to - from - 16);
-                        pluses(from + 9, from + 11, FLOOR - 6);
-                        pluses(from + 13, from + 15, FLOOR - 8);
-                        level.items.add(new int[]{treat, from + 14, FLOOR - 7, 0});
-                        if (number >= BLACK_FROM) level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, from + 12, FLOOR - 6, 0});
-                        level.items.add(new int[]{PlusRun.CHEST, to - 1, FLOOR - 9, 0});
-                    } else {
-                        // A spring on the floor to a shelf half way up, and a spring at the end of that to a shelf under the ceiling, where the chest is.
-                        level.land[FLOOR - 1][from + 9] = SPRING;
-                        ledge(from + 12, FLOOR - 5, to - from - 11);
-                        level.land[FLOOR - 6][to - 3] = SPRING;
-                        ledge(to - 11, FLOOR - 10, 6);
-                        pluses(from + 13, from + 17, FLOOR - 7);
-                        level.items.add(new int[]{treat, from + 15, FLOOR - 6, 0});
-                        if (number >= BLACK_FROM) level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, from + 18, FLOOR - 7, 0});
-                        level.items.add(new int[]{PlusRun.CHEST, to - 9, FLOOR - 11, 0});
-                    }
-                } else if (kind == PASSAGE) {
-                    // A way through: two stretches of spikes, each crossed on ledges; signs that walk between them; an upper way to
-                    // something worth having; and a chest by the door at the far end.
-                    far = to - 1;
-                    level.land[FLOOR - 1][far] = ENTRY;
-                    if (chapter >= 1) put(from + 7, FLOOR - 1, 6, SPIKE);
-                    put(from + 9, FLOOR - 3, 2, THIN);
-                    pluses(from + 8, from + 11, FLOOR - 5);
-                    ledge(from + 15, FLOOR - 3, 4);
-                    pluses(from + 15, from + 18, FLOOR - 4);
-                    level.lodgers.add(new int[]{MINUS, from + 17, FLOOR - 1});
-                    if (chapter >= 1) put(from + 22, FLOOR - 1, 9, SPIKE);
-                    put(from + 24, FLOOR - 3, 2, step);
-                    put(from + 28, FLOOR - 3, 2, step);
-                    pluses(from + 24, from + 29, FLOOR - 5);
-                    level.lodgers.add(new int[]{chapter >= 2 ? TIMES : MINUS, from + 35, FLOOR - 1});
-                    if (chapter >= 2) level.lodgers.add(new int[]{THROWER, from + 33, FLOOR - 4});
-                    ledge(from + 32, FLOOR - 3, 3);
-                    ledge(from + 36, FLOOR - 5, 3);
-                    pluses(from + 32, from + 34, FLOOR - 4);
-                    level.items.add(new int[]{PlusRun.FORM + (number % 2 == 0 ? PlusRun.YELLOW : PlusRun.GREEN), from + 37, FLOOR - 6, 0});
-                    pluses(from + 39, to - 6, FLOOR - 1);
-                    level.items.add(new int[]{PlusRun.CHEST, to - 4, FLOOR - 1, 0});
-                } else if (kind == GAME) {
+                if (kind == GAME) {
                     ledge(from + 4, FLOOR - 3, 3);
                     ledge(to - 6, FLOOR - 3, 3);
                 } else if (kind == RANGE) {
@@ -1197,8 +1194,217 @@ final class RunLevels {
                     ledge(from + 6, FLOOR - 3, 3);
                     ledge(to - 8, FLOOR - 3, 3);
                 }
-                level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], 0, FLOOR, ceiling});
+                level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], 0, FLOOR, ceiling, lookOf(number, level.rooms.size()), 0});
             }
+        }
+
+        /** Some columns of a place off the land: floor under them, ceiling over them, and nothing between. */
+        private void open(int columns) {
+            for (int column = at; column < at + columns; column++) {
+                for (int row = 0; row < ROWS; row++) if (row < FLOOR - ROOM_TALL || row >= FLOOR) level.land[row][column] = BLOCK;
+            }
+            at += columns;
+        }
+
+        /** Blocks standing on the floor of a place, so many high. */
+        private void rise(int column, int high) {
+            for (int up = 1; up <= high; up++) level.land[FLOOR - up][column] = BLOCK;
+        }
+
+        /**
+         * A stash or a passage: several screens long, put together from pieces chosen and
+         * ordered by chances of its own, so that no two lands' are alike. A stash is four or
+         * five pieces and then a chamber, where the chest stands on a shelf to be climbed or
+         * sprung to, something guards it from the second chapter on, and there is one thing
+         * more: something to help, a pet that waits, or a shrine. A passage is six or seven
+         * pieces, with a chest by its far door and a ribbon up out of the way. There is a
+         * puzzle in it at most, two in the second volume: a locked door, a bridge to raise, or
+         * bars to lift. The first chapter's have no spikes in them, as its lands have none.
+         */
+        void secret(int[] want) {
+            // (Where a land has two places of a kind, the second is laid and looks otherwise than the first.)
+            int number = level.number, kind = want[0], ceiling = FLOOR - ROOM_TALL, which = level.rooms.size(), look = lookOf(number, which);
+            boolean second = number > COUNT, through = kind == PASSAGE;
+            Random dice = new Random(number * 7477L + kind * 131 + 17 + which * 7919L);
+            int count = through ? 6 + dice.nextInt(2) : 4 + dice.nextInt(2), puzzles = 0, used = 0;
+            int[] plan = new int[count];
+            for (int index = 0; index < count; index++) {
+                int piece;
+                boolean puzzle;
+                do {
+                    piece = dice.nextInt(PIECES);
+                    puzzle = piece == LOCK || piece == SPAN_PIT || piece == BARRED;
+                } while ((used >> piece & 1) != 0 || puzzle && puzzles >= (second ? 2 : 1) || piece == LOCK && through
+                        || chapter == 0 && (piece == CRUMBLING || piece == RIDE || piece == SPAN_PIT || piece == BARRED));
+                if (puzzle) puzzles++;
+                plan[index] = piece;
+                used |= 1 << piece;
+            }
+            int walker = second ? new int[]{SLIME, POGO, BAR, FAN, BAR}[Math.min(4, chapter - CHAPTERS)] : chapter >= 2 && dice.nextInt(3) == 0 ? TIMES : MINUS;
+            char step = second ? CRUMBLE : THIN;
+            List<int[]> perches = new ArrayList<>();
+            wall(2);
+            int from = at;
+            open(10);
+            level.land[FLOOR - 1][from + 1] = ENTRY;
+            pluses(from + 3, from + 8, FLOOR - 1);
+            for (int piece : plan) {
+                int x0 = at;
+                switch (piece) {
+                    case HOP:
+                        open(11);
+                        if (chapter == 0) {
+                            // (In the first chapter: a low wall to hop.)
+                            rise(x0 + 5, 2);
+                            rise(x0 + 6, 2);
+                        } else {
+                            put(x0 + 3, FLOOR - 1, 5, SPIKE);
+                            put(x0 + 3, FLOOR - 2, 2, THIN);
+                            put(x0 + 6, FLOOR - 2, 2, step);
+                        }
+                        pluses(x0 + 3, x0 + 7, FLOOR - 4);
+                        break;
+                    case STACK:
+                        open(12);
+                        for (int column = 3; column <= 9; column++) rise(x0 + column, column >= 5 && column <= 7 ? 4 : 2);
+                        perches.add(new int[]{x0 + 6, FLOOR - 5});
+                        pluses(x0 + 5, x0 + 7, FLOOR - 7);
+                        break;
+                    case SHELF:
+                        open(10);
+                        level.land[FLOOR - 1][x0 + 2] = SPRING;
+                        ledge(x0 + 4, FLOOR - 5, 4);
+                        perches.add(new int[]{x0 + 6, FLOOR - 6});
+                        pluses(x0 + 4, x0 + 5, FLOOR - 6);
+                        if (chapter >= 1) level.lodgers.add(new int[]{walker, x0 + 6, FLOOR - 1});
+                        break;
+                    case CRUMBLING:
+                        open(14);
+                        put(x0 + 2, FLOOR - 1, 10, SPIKE);
+                        put(x0 + 2, FLOOR - 2, 10, CRUMBLE);
+                        for (int column = x0 + 3; column <= x0 + 10; column += 2) pluses(column, column, FLOOR - 4);
+                        break;
+                    case RIDE:
+                        open(14);
+                        put(x0 + 2, FLOOR - 1, 10, SPIKE);
+                        level.movers.add(new int[]{x0 + 2, FLOOR - 2, 2, 8, 0, 60});
+                        pluses(x0 + 4, x0 + 9, FLOOR - 4);
+                        break;
+                    case LOCK: {
+                        // Its key is up on the first high place before it; or, where there is none, on a shelf of its own over a spring.
+                        boolean own = perches.isEmpty();
+                        open(own ? 16 : 10);
+                        if (own) {
+                            level.land[FLOOR - 1][x0 + 1] = SPRING;
+                            ledge(x0 + 3, FLOOR - 5, 4);
+                            level.items.add(new int[]{PlusRun.KEY, x0 + 5, FLOOR - 6, 0});
+                        } else {
+                            int[] perch = perches.remove(0);
+                            level.items.add(new int[]{PlusRun.KEY, perch[0], perch[1], 0});
+                        }
+                        for (int column = at - 4; column <= at - 3; column++) {
+                            for (int row = ceiling; row < FLOOR; row++) level.land[row][column] = row >= FLOOR - 2 ? LOCKED : BLOCK;
+                        }
+                        break;
+                    }
+                    case SPAN_PIT:
+                        // The lever is up on a shelf over a spring; a way through has another on its far side, on the floor.
+                        open(16);
+                        level.land[FLOOR - 1][x0 + 1] = SPRING;
+                        ledge(x0 + 3, FLOOR - 5, 3);
+                        level.items.add(new int[]{PlusRun.LEVER, x0 + 4, FLOOR - 6, 0});
+                        put(x0 + 6, FLOOR - 1, 8, SPIKE);
+                        put(x0 + 6, FLOOR - 2, 8, SPAN);
+                        if (through) level.items.add(new int[]{PlusRun.LEVER, x0 + 15, FLOOR - 1, 0});
+                        break;
+                    case BARRED:
+                        // A plate on either side of the bars, and two spikes to be jumped on the way from the near one.
+                        open(14);
+                        level.items.add(new int[]{PlusRun.PLATE, x0 + 1, FLOOR - 1, 0});
+                        put(x0 + 4, FLOOR - 1, 2, SPIKE);
+                        for (int column = x0 + 8; column <= x0 + 9; column++) {
+                            for (int row = ceiling; row < FLOOR; row++) level.land[row][column] = row >= FLOOR - 2 ? GRILLE : BLOCK;
+                        }
+                        level.items.add(new int[]{PlusRun.PLATE, x0 + 12, FLOOR - 1, 0});
+                        break;
+                    case GUARDS:
+                        open(10);
+                        ledge(x0 + 3, FLOOR - 2, 4);
+                        level.lodgers.add(new int[]{walker, x0 + 7, FLOOR - 1});
+                        if (chapter >= 2) level.lodgers.add(new int[]{second ? GUNNER : THROWER, x0 + 5, FLOOR - 3});
+                        pluses(x0 + 3, x0 + 6, FLOOR - 4);
+                        break;
+                    default:
+                        // A wall five blocks high, with a spring on either side of it.
+                        open(12);
+                        rise(x0 + 5, 5);
+                        rise(x0 + 6, 5);
+                        level.land[FLOOR - 1][x0 + 3] = SPRING;
+                        level.land[FLOOR - 1][x0 + 8] = SPRING;
+                        perches.add(new int[]{x0 + 5, FLOOR - 6});
+                        pluses(x0 + 5, x0 + 6, FLOOR - 8);
+                        break;
+                }
+            }
+            int end = at, far = -1, holds = HOLDS_TREAT;
+            if (through) {
+                // The far end: a chest by its door; and a ribbon up out of the way, on the first high place there is, or on a ledge here.
+                open(8);
+                far = at - 1;
+                level.land[FLOOR - 1][far] = ENTRY;
+                level.items.add(new int[]{PlusRun.CHEST, far - 3, FLOOR - 1, 0});
+                int ribbon = PlusRun.FORM + (number % 2 == 0 ? PlusRun.YELLOW : PlusRun.GREEN);
+                if (perches.isEmpty()) {
+                    put(end + 1, FLOOR - 2, 2, THIN);
+                    level.items.add(new int[]{ribbon, end + 2, FLOOR - 4, 0});
+                } else {
+                    level.items.add(new int[]{ribbon, perches.get(0)[0], perches.get(0)[1], 0});
+                }
+            } else {
+                // The chamber: the chest on a shelf, climbed to by blocks or sprung to; what else it holds on the floor under it; and its guard.
+                open(13);
+                int[] treats = {PlusRun.ICE, PlusRun.MAGNET, PlusRun.BREAD, PlusRun.NOTES};
+                int treat = want[3] != 0 ? PlusRun.FORM + PlusRun.YELLOW : treats[number % treats.length];
+                if (dice.nextBoolean()) {
+                    rise(end + 1, 2);
+                    rise(end + 2, 2);
+                    rise(end + 3, 4);
+                    rise(end + 4, 4);
+                    // (And a block beyond them, to get back up from under the shelf.)
+                    rise(end + 5, 2);
+                    ledge(end + 6, FLOOR - 6, 5);
+                    level.items.add(new int[]{PlusRun.CHEST, end + 9, FLOOR - 7, 0});
+                } else {
+                    level.land[FLOOR - 1][end + 2] = SPRING;
+                    ledge(end + 4, FLOOR - 5, 7);
+                    level.items.add(new int[]{PlusRun.CHEST, end + 9, FLOOR - 6, 0});
+                }
+                holds = number < 4 ? HOLDS_TREAT : dice.nextInt(3);
+                if (holds == HOLDS_PET) level.items.add(new int[]{PlusRun.PET + dice.nextInt(PlusRun.PETS), end + 7, FLOOR - 1, 0});
+                else if (holds == HOLDS_SHRINE) level.items.add(new int[]{PlusRun.SHRINE, end + 7, FLOOR - 1, 0, ribbonsOf(number)[0]});
+                else level.items.add(new int[]{treat, end + 7, FLOOR - 1, 0});
+                // (Black hangs in its far corner, where only a jump takes it.)
+                if (number >= BLACK_FROM) level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, end + 11, FLOOR - 3, 0});
+                if (chapter >= 1) level.lodgers.add(new int[]{walker, end + 8, FLOOR - 1});
+            }
+            int to = at - 1;
+            wall(2);
+            // What stands about in it to be looked at: two things of its kind, on clear floor, well apart.
+            int stood = 0;
+            for (int column = from + 4; column < to - 3 && stood < 4; column++) {
+                boolean clear = level.land[FLOOR - 1][column] == AIR && level.land[FLOOR - 2][column] == AIR && level.land[FLOOR - 1][column + 1] == AIR
+                        && level.land[FLOOR - 1][column - 1] == AIR;
+                for (int[] item : level.items) clear &= Math.abs(item[1] - column) > 1 || item[2] < FLOOR - 2;
+                if (!clear || dice.nextInt(3) != 0) continue;
+                level.decor.add(new int[]{200 + look * 2 + stood % 2, column, FLOOR - 1});
+                stood++;
+                column += 11;
+            }
+            int[] record = new int[count + 1];
+            record[0] = level.rooms.size();
+            System.arraycopy(plan, 0, record, 1, count);
+            level.made.add(record);
+            level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], 0, FLOOR, ceiling, look, holds});
         }
 
         /**
@@ -1342,7 +1548,7 @@ final class RunLevels {
                     if (open) level.spawns.add(new int[]{index, IN_AIR, column, row});
                 }
             }
-            level.rooms.add(new int[]{ARENA, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], den ? 1 : 0, floor, 2});
+            level.rooms.add(new int[]{ARENA, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], den ? 1 : 0, floor, 2, -1, 0});
         }
 
         /** Flat ground for some columns. */

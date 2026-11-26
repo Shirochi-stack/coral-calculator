@@ -1720,7 +1720,8 @@ public class PlusRunTest {
             RunLevels.Level level = RunLevels.level(number);
             int waiting = 0;
             for (int[] item : level.items) {
-                if (item[0] < PlusRun.PET || item[0] >= PlusRun.PET + PlusRun.PETS) continue;
+                // (One that waits in a stash is another matter.)
+                if (item[0] < PlusRun.PET || item[0] >= PlusRun.PET + PlusRun.PETS || item[1] >= level.main) continue;
                 waiting++;
                 assertEquals("land " + number, RunLevels.petOf(number), item[0] - PlusRun.PET);
                 assertTrue("land " + number, item[1] > level.flags.get(0) && item[1] < level.flags.get(0) + 12 && item[1] < level.main);
@@ -3028,20 +3029,19 @@ public class PlusRunTest {
         assertTrue(run.enter());
         assertTrue(run.enter());
         assertEquals(which[0], run.room());
-        // It is a way of its own, three screens long: spikes to cross on ledges, signs walking in it, something worth having up out of the
-        // way, and a chest by its far door.
+        // It is a way of its own, several screens long, with a ribbon up out of the way and a chest by its far door.
         RunLevels.Level level = run.level();
-        assertTrue(one[4] - one[3] >= 40);
-        int spikes = 0, walkers = 0, ribbons = 0, chests = 0;
-        for (int column = one[3]; column <= one[4]; column++) if (level.land[FLOOR - 1][column] == RunLevels.SPIKE) spikes++;
-        for (int[] foe : level.foes) if (foe[1] >= one[3] && foe[1] <= one[4]) walkers++;
+        assertTrue(one[4] - one[3] >= 70);
+        int ribbons = 0, chests = 0;
         for (int[] item : level.items) {
             if (item[1] < one[3] || item[1] > one[4]) continue;
             if (item[0] > PlusRun.FORM && item[0] < PlusRun.CHEST) ribbons++;
-            if (item[0] == PlusRun.CHEST) chests++;
+            if (item[0] == PlusRun.CHEST) {
+                chests++;
+                assertEquals(one[8] - 3, item[1]);
+                assertEquals(FLOOR - 1, item[2]);
+            }
         }
-        assertEquals(level.chapter >= 1 ? 15 : 0, spikes);
-        assertEquals(level.chapter >= 2 ? 3 : 2, walkers);
         assertEquals(1, ribbons);
         assertEquals(1, chests);
         // The chest by the far door is opened by touching it: ten pluses, once.
@@ -3576,9 +3576,13 @@ public class PlusRunTest {
                 for (int column = one[3]; column <= one[4]; column++) {
                     assertEquals(RunLevels.BLOCK, level.land[FLOOR][column]);
                     assertEquals(RunLevels.BLOCK, level.land[FLOOR - RunLevels.ROOM_TALL - 1][column]);
+                    // (The rooms where a game is played are open from wall to wall; a stash and a passage have things in the way.)
+                    if (one[0] < RunLevels.GAME) continue;
                     assertEquals(RunLevels.AIR, level.land[FLOOR - RunLevels.ROOM_TALL][column]);
                     assertFalse(PlusRun.solid(level.land[FLOOR - 1][column]));
                 }
+                // Each has a look of its own kind: one of the eight.
+                assertTrue("land " + number, one[13] >= 0 && one[13] < RunLevels.LOOKS);
                 // A passage comes out on the ground further on, at a door of its own.
                 if (one[0] == RunLevels.PASSAGE) {
                     assertTrue(one[5] > one[1] && one[5] < level.gate && one[8] > one[6]);
@@ -3591,20 +3595,20 @@ public class PlusRunTest {
             // They are places to move in: a stash and the rooms for games twenty squares and more across, a cellar wider, a passage twice that.
             for (int[] one : level.rooms) {
                 int wide = one[4] - one[3] + 1;
-                assertTrue("land " + number + " kind " + one[0] + " is " + wide, wide >= (one[0] == RunLevels.PASSAGE ? 44 : one[0] == RunLevels.ARENA ? 100 : 30));
+                assertTrue("land " + number + " kind " + one[0] + " is " + wide, wide >= (one[0] == RunLevels.PASSAGE ? 80 : one[0] == RunLevels.ARENA ? 100 : one[0] == RunLevels.STASH ? 60 : 30));
                 // A stash has a chest, which is not on its floor; a passage has one too.
                 int chests = 0;
                 for (int[] item : level.items) {
                     if (item[0] != PlusRun.CHEST || item[1] < one[3] || item[1] > one[4]) continue;
                     chests++;
-                    if (one[0] == RunLevels.STASH) assertTrue("land " + number, item[2] <= FLOOR - 9);
+                    if (one[0] == RunLevels.STASH) assertTrue("land " + number, item[2] <= FLOOR - 6);
                 }
                 assertEquals("land " + number, one[0] == RunLevels.STASH || one[0] == RunLevels.PASSAGE || one[0] == RunLevels.ARENA ? 1 : 0, chests);
             }
             // No sign of the land is in them but those that walk in its passages, and nothing of the land's to fight with.
             for (int[] foe : level.foes) {
                 boolean passing = false;
-                for (int[] one : level.rooms) passing |= one[0] == RunLevels.PASSAGE && foe[1] >= one[3] && foe[1] <= one[4];
+                for (int[] one : level.rooms) passing |= one[0] <= RunLevels.PASSAGE && foe[1] >= one[3] && foe[1] <= one[4];
                 assertTrue(foe[1] < level.main || passing);
             }
             for (int[] weapon : level.weapons) assertTrue(weapon[1] < level.main);
@@ -3615,6 +3619,320 @@ public class PlusRunTest {
         assertTrue("passages " + passages, passages >= 35);
         assertTrue("dens " + dens, dens >= 8);
         assertTrue(hidden >= 20);
+    }
+
+    /** Whether she could stand on a square of a place off the land, with its puzzles solved or not: never in spikes, and never inside a door, a bridge that is not there, or anything else. */
+    private static boolean rests(RunLevels.Level level, int column, int row, int solved) {
+        if (row < 3 || row > FLOOR || column < 1 || column >= level.columns - 1) return false;
+        char under = seen(level, column, row, solved), here = seen(level, column, row - 1, solved), over = seen(level, column, row - 2, solved);
+        boolean holds = under == RunLevels.BLOCK || under == RunLevels.LEDGE || under == RunLevels.THIN || under == RunLevels.CRUMBLE;
+        return holds && here != RunLevels.BLOCK && here != RunLevels.SPIKE && over != RunLevels.BLOCK;
+    }
+
+    /**
+     * A square as it is with the place's bridges raised (1) or not, and its doors unlocked
+     * (2) or not. Bars count as lifted either way: there is a plate on each side of them,
+     * which is checked apart.
+     */
+    private static char seen(RunLevels.Level level, int column, int row, int solved) {
+        char here = level.land[row][column];
+        if (here == RunLevels.LOCKED) return (solved & 2) != 0 ? RunLevels.AIR : RunLevels.BLOCK;
+        if (here == RunLevels.SPAN) return (solved & 1) != 0 ? RunLevels.LEDGE : RunLevels.AIR;
+        if (here == RunLevels.GRILLE) return RunLevels.AIR;
+        return here;
+    }
+
+    /**
+     * Whether she can get from one square she could stand on to another in one go: a walk
+     * or a jump of four across on the level, two up and three across, a drop of any height
+     * within five across, or from a spring five up and three across; and never through a
+     * wall that stands between them.
+     */
+    private static boolean goes(RunLevels.Level level, int[] from, int[] to, int solved) {
+        int across = Math.abs(to[0] - from[0]), up = from[1] - to[1];
+        boolean spring = level.land[from[1] - 1][from[0]] == RunLevels.SPRING;
+        boolean can = up == 0 && across <= 4 || up > 0 && up <= 2 && across <= 3 || up < 0 && across <= 5 || spring && up > 0 && up <= 5 && across <= 3;
+        if (!can) return false;
+        // What is between them, at the height of the higher of the two and for two squares over it, is not wall.
+        int high = Math.min(from[1], to[1]);
+        for (int column = Math.min(from[0], to[0]) + 1; column < Math.max(from[0], to[0]); column++) {
+            if (seen(level, column, high - 1, solved) == RunLevels.BLOCK || seen(level, column, high - 2, solved) == RunLevels.BLOCK) return false;
+        }
+        // Going up, there is nothing solid over her head where she leaves the ground; a ledge is no matter.
+        if (up > 0) for (int row = from[1] - 3; row >= to[1] - 2 && row >= 2; row--) if (seen(level, from[0], row, solved) == RunLevels.BLOCK && across == 0) return false;
+        return true;
+    }
+
+    /** Every square of a place she can get to from one of them, forwards, or every square she can get to it from, backwards. */
+    private static boolean[][] spread(RunLevels.Level level, int[] one, int column, int solved, boolean backwards) {
+        boolean[][] reached = new boolean[RunLevels.ROWS][level.columns];
+        java.util.ArrayDeque<int[]> queue = new java.util.ArrayDeque<>();
+        reached[FLOOR][column] = true;
+        queue.add(new int[]{column, FLOOR});
+        while (!queue.isEmpty()) {
+            int[] at = queue.poll();
+            for (int next = Math.max(one[3], at[0] - 5); next <= Math.min(one[4], at[0] + 5); next++) {
+                for (int row = 3; row <= FLOOR; row++) {
+                    if (reached[row][next] || !rests(level, next, row, solved)) continue;
+                    int[] other = {next, row};
+                    if (backwards ? !goes(level, other, at, solved) : !goes(level, at, other, solved)) continue;
+                    reached[row][next] = true;
+                    queue.add(other);
+                }
+            }
+            // A ledge that rides across spikes: from the floor at one end of its way to the floor at the other, either way.
+            for (int[] mover : level.movers) {
+                if (mover[4] != 0 || mover[0] < one[3] || mover[0] > one[4]) continue;
+                int near = mover[0] - 1, far = mover[0] + mover[2] + mover[3];
+                for (int[] pair : new int[][]{{near, far}, {far, near}}) {
+                    if (at[0] == pair[0] && at[1] == FLOOR && !reached[FLOOR][pair[1]] && rests(level, pair[1], FLOOR, solved)) {
+                        reached[FLOOR][pair[1]] = true;
+                        queue.add(new int[]{pair[1], FLOOR});
+                    }
+                }
+            }
+        }
+        return reached;
+    }
+
+    /** Whether something that lies in a place can be touched from somewhere she can get to: from beside it or under it, within a jump. */
+    private static boolean touched(boolean[][] reached, int[] item) {
+        for (int column = item[1] - 1; column <= item[1] + 1; column++) {
+            for (int row = item[2] + 1; row <= Math.min(FLOOR, item[2] + 3); row++) if (reached[row][column]) return true;
+        }
+        return false;
+    }
+
+    @Test public void everyStashAndPassageIsItsOwnAndCanBeGotThroughAndBackWithNoDeadEnd() {
+        java.util.Set<String> plans = new java.util.HashSet<>();
+        boolean[] pieces = new boolean[RunLevels.PIECES], looks = new boolean[RunLevels.LOOKS], holds = new boolean[3];
+        int places = 0, locks = 0, spans = 0, bars = 0, pets = 0, shrines = 0;
+        java.util.Map<Integer, java.util.Set<Integer>> byChapter = new java.util.TreeMap<>();
+        for (int number = RunLevels.PLACES_FROM; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            for (int[] made : level.made) {
+                int[] one = level.rooms.get(made[0]);
+                String where = "land " + number + " place " + made[0] + " " + java.util.Arrays.toString(made);
+                boolean through = one[0] == RunLevels.PASSAGE;
+                assertTrue(where, one[0] == RunLevels.STASH || through);
+                places++;
+                // Four or five pieces to a stash and six or seven to a passage; no piece twice; a puzzle at most, two in the second
+                // volume; and in the first chapter nothing with spikes in it.
+                assertEquals(where, true, through ? made.length == 7 || made.length == 8 : made.length == 5 || made.length == 6);
+                int puzzles = 0, pits = 0, grilles = 0;
+                for (int index = 1; index < made.length; index++) {
+                    pieces[made[index]] = true;
+                    if (made[index] == RunLevels.SPAN_PIT) pits++;
+                    if (made[index] == RunLevels.BARRED) grilles++;
+                    for (int before = 1; before < index; before++) assertTrue(where, made[index] != made[before]);
+                    if (made[index] == RunLevels.LOCK || made[index] == RunLevels.SPAN_PIT || made[index] == RunLevels.BARRED) puzzles++;
+                }
+                assertTrue(where, puzzles <= (number > RunLevels.COUNT ? 2 : 1));
+                plans.add(one[0] + java.util.Arrays.toString(java.util.Arrays.copyOfRange(made, 1, made.length)));
+                looks[one[13]] = true;
+                assertEquals(where, RunLevels.lookOf(number, made[0]), one[13]);
+                for (int[] other : level.rooms) if (other != one && other[13] >= 0) assertTrue(where, other[13] != one[13]);
+                if (!byChapter.containsKey(level.chapter)) byChapter.put(level.chapter, new java.util.TreeSet<>());
+                byChapter.get(level.chapter).add(one[13]);
+                int door = one[6], floor = one[11];
+                assertEquals(where, FLOOR, floor);
+                // What is in it.
+                int[] chest = null, key = null;
+                java.util.List<int[]> levers = new java.util.ArrayList<>(), plates = new java.util.ArrayList<>();
+                int spikes = 0;
+                for (int[] item : level.items) {
+                    if (item[1] < one[3] || item[1] > one[4]) continue;
+                    if (item[0] == PlusRun.CHEST) chest = item;
+                    if (item[0] == PlusRun.KEY) key = item;
+                    if (item[0] == PlusRun.LEVER) levers.add(item);
+                    if (item[0] == PlusRun.PLATE) plates.add(item);
+                    if (item[0] >= PlusRun.PET) pets++;
+                    if (item[0] == PlusRun.SHRINE) {
+                        shrines++;
+                        assertTrue(where, item[4] >= PlusRun.RED && item[4] <= PlusRun.PURPLE);
+                    }
+                    // Nothing lies inside anything solid.
+                    assertEquals(where + " item " + item[0] + " at " + (item[1] - one[3]), RunLevels.AIR, level.land[item[2]][item[1]]);
+                }
+                boolean locked = false, spanned = false, barred = false;
+                for (int column = one[3]; column <= one[4]; column++) {
+                    for (int row = 0; row < RunLevels.ROWS; row++) {
+                        locked |= level.land[row][column] == RunLevels.LOCKED;
+                        spanned |= level.land[row][column] == RunLevels.SPAN;
+                        barred |= level.land[row][column] == RunLevels.GRILLE;
+                        if (level.land[row][column] == RunLevels.SPIKE) spikes++;
+                    }
+                }
+                if (level.chapter == 0) assertEquals(where, 0, spikes);
+                assertEquals(where, locked, key != null);
+                assertEquals(where, pits > 0, spanned);
+                assertEquals(where, pits * (through ? 2 : 1), levers.size());
+                assertEquals(where, grilles * 2, plates.size());
+                if (locked) locks++;
+                if (spanned) spans++;
+                if (barred) bars++;
+                if (!through) holds[one[14]] = true;
+                assertTrue(where, chest != null);
+
+                // From its door she solves it in whatever order it is laid in: at every stage, wherever she can get to she can get back
+                // from; and there is always the next lever or the key among the things she can touch, until all of it is open.
+                int solved = 0, all = (spanned ? 1 : 0) | (locked ? 2 : 0);
+                boolean[][] out, home;
+                while (true) {
+                    out = spread(level, one, door, solved, false);
+                    home = spread(level, one, door, solved, true);
+                    for (int row = 3; row <= FLOOR; row++) {
+                        for (int column = one[3]; column <= one[4]; column++) {
+                            if (out[row][column]) assertTrue(where + " solved " + solved + " no way back from " + (column - one[3]) + "/" + (FLOOR - row), home[row][column]);
+                        }
+                    }
+                    boolean lever = false;
+                    for (int[] each : levers) lever |= touched(out, each);
+                    if ((solved & 1) == 0 && spanned && lever) solved |= 1;
+                    else if ((solved & 2) == 0 && key != null && touched(out, key)) solved |= 2;
+                    else break;
+                }
+                assertEquals(where + " is stuck at", all, solved);
+                // With all of it open: its chest can be touched; and, in a passage, its far door reached.
+                assertTrue(where + " chest", touched(out, chest));
+                if (through) {
+                    assertTrue(where + " far door", out[FLOOR][one[8]]);
+                    // Come into by its far door with nothing solved, she can get back out of that door from wherever she gets to, and there
+                    // is a lever on that side for her to pull; and with that done, the way to the near door is open.
+                    boolean[][] back = spread(level, one, one[8], 0, false), again = spread(level, one, one[8], 0, true);
+                    for (int row = 3; row <= FLOOR; row++) {
+                        for (int column = one[3]; column <= one[4]; column++) {
+                            if (back[row][column]) assertTrue(where + " no way back to the far door from " + (column - one[3]), again[row][column]);
+                        }
+                    }
+                    if (spanned) assertTrue(where + " far lever", touched(back, levers.get(levers.size() - 1)));
+                    assertTrue(where, spread(level, one, one[8], all, false)[FLOOR][door]);
+                }
+                // A plate on either side of the bars, each within a few squares' run of them.
+                if (barred) {
+                    int first = -1, last = -1;
+                    for (int column = one[3]; column <= one[4]; column++) {
+                        if (level.land[FLOOR - 1][column] != RunLevels.GRILLE) continue;
+                        if (first < 0) first = column;
+                        last = column;
+                    }
+                    boolean before = false, after = false;
+                    for (int[] plate : plates) {
+                        before |= plate[1] < first && first - plate[1] <= 9;
+                        after |= plate[1] > last && plate[1] - last <= 5;
+                    }
+                    assertTrue(where + " plates", before && after);
+                }
+            }
+            // A stash's chamber holds one thing more; what stands about in a place stands on clear floor.
+            for (int[] thing : level.decor) {
+                if (thing[0] < 200) continue;
+                assertTrue("land " + number, thing[0] < 200 + RunLevels.LOOKS * 2 && thing[1] >= level.main);
+                assertEquals("land " + number, RunLevels.AIR, level.land[thing[2]][thing[1]]);
+                assertEquals("land " + number, RunLevels.BLOCK, level.land[thing[2] + 1][thing[1]]);
+            }
+        }
+        // No two alike, or very nearly (the few that are laid alike are in different lands, and most of those look different): every piece is used somewhere, every look, every thing a chamber may hold, and each of the puzzles often.
+        assertTrue("places " + places + " plans " + plans.size(), places >= 80 && plans.size() >= places * 9 / 10);
+        for (int piece = 0; piece < RunLevels.PIECES; piece++) assertTrue("piece " + piece, pieces[piece]);
+        for (int look = 0; look < RunLevels.LOOKS; look++) assertTrue("look " + look, looks[look]);
+        for (java.util.Map.Entry<Integer, java.util.Set<Integer>> entry : byChapter.entrySet()) assertTrue("chapter " + entry.getKey() + " looks " + entry.getValue(), entry.getValue().size() >= 2);
+        assertTrue(holds[RunLevels.HOLDS_TREAT] && holds[RunLevels.HOLDS_PET] && holds[RunLevels.HOLDS_SHRINE]);
+        assertTrue("locks " + locks + " spans " + spans + " bars " + bars + " pets " + pets + " shrines " + shrines, locks >= 5 && spans >= 8 && bars >= 8 && pets >= 5 && shrines >= 5);
+    }
+
+    @Test public void aKeyOpensItsDoorALeverRaisesItsBridgeAPlateLiftsTheBarsAndAShrineSellsARibbonForAHeart() {
+        // A place of its own, twenty-four squares long: a locked door, a pit with a bridge, and bars.
+        RunLevels.Level level = flat(60);
+        level.main = 20;
+        for (int column = 22; column <= 55; column++) level.land[1][column] = RunLevels.BLOCK;
+        level.rooms.add(new int[]{RunLevels.STASH, 10, FLOOR, 22, 55, 10, 23, 0, -1, FLOOR, 0, FLOOR, 2, 0, 0});
+        level.land[FLOOR - 1][10] = RunLevels.ENTRY;
+        level.land[FLOOR - 1][23] = RunLevels.ENTRY;
+        for (int row = 2; row < FLOOR; row++) level.land[row][30] = row >= FLOOR - 2 ? RunLevels.LOCKED : RunLevels.BLOCK;
+        level.items.add(new int[]{PlusRun.KEY, 26, FLOOR - 1, 0});
+        for (int column = 34; column <= 37; column++) {
+            level.land[FLOOR - 1][column] = RunLevels.SPIKE;
+            level.land[FLOOR - 2][column] = RunLevels.SPAN;
+        }
+        level.items.add(new int[]{PlusRun.LEVER, 32, FLOOR - 1, 0});
+        for (int row = 2; row < FLOOR; row++) level.land[row][44] = row >= FLOOR - 2 ? RunLevels.GRILLE : RunLevels.BLOCK;
+        level.items.add(new int[]{PlusRun.PLATE, 41, FLOOR - 1, 0});
+        level.items.add(new int[]{PlusRun.SHRINE, 50, FLOOR - 1, 0, PlusRun.GREEN});
+        PlusRun run = new PlusRun(level);
+        run.place(10 + (1 - PlusRun.WIDE) / 2, GROUND);
+        run.step(STEP, false, false, false);
+        assertTrue(run.enter());
+        assertEquals(0, run.room());
+        // The door is a wall, and stops her; with the key taken it is nothing.
+        assertEquals(RunLevels.BLOCK, run.at(30, FLOOR - 1));
+        assertEquals(RunLevels.LOCKED, run.laid(30, FLOOR - 1));
+        run.place(28, GROUND);
+        hold(run, 1, false, true, false);
+        assertTrue(run.x() < 30 - PlusRun.WIDE + .01f);
+        assertEquals(0, run.keys());
+        run.place(26.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(1, run.keys());
+        assertEquals(RunLevels.AIR, run.at(30, FLOOR - 1));
+        assertEquals(RunLevels.AIR, run.at(30, FLOOR - 2));
+        assertEquals(RunLevels.BLOCK, run.at(30, FLOOR - 3));
+        run.place(28, GROUND);
+        hold(run, .6f, false, true, false);
+        assertTrue(run.x() > 30);
+        // The bridge is not there; with the lever pulled it is, for good, and holds her over the spikes.
+        assertEquals(RunLevels.AIR, run.at(35, FLOOR - 2));
+        assertEquals(0, run.levers());
+        assertFalse(run.pulled(32));
+        run.place(32.2f, GROUND);
+        hold(run, .2f, false, false, false);
+        assertEquals(1, run.levers());
+        assertTrue(run.pulled(32));
+        assertEquals(RunLevels.LEDGE, run.at(35, FLOOR - 2));
+        run.place(35.2f, FLOOR - 2 - PlusRun.TALL - .5f);
+        hold(run, 1, false, false, false);
+        assertEquals(FLOOR - 2 - PlusRun.TALL, run.y(), .01f);
+        assertEquals(0, run.hurts());
+        hold(run, .2f, false, false, false);
+        assertEquals(1, run.levers());
+        // The bars are a wall; the plate lifts them for six seconds, each time it is stood on, and then they are a wall again: but not
+        // while she stands in the way.
+        assertEquals(RunLevels.BLOCK, run.at(44, FLOOR - 1));
+        run.place(41.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(1, run.plates());
+        assertEquals(PlusRun.BARS_OPEN, run.barsLeft(), .05f);
+        assertEquals(RunLevels.AIR, run.at(44, FLOOR - 1));
+        assertEquals(RunLevels.BLOCK, run.at(44, FLOOR - 3));
+        run.place(38, GROUND);
+        hold(run, PlusRun.BARS_OPEN + .2f, false, false, false);
+        assertEquals(RunLevels.BLOCK, run.at(44, FLOOR - 1));
+        run.place(41.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(2, run.plates());
+        run.place(44.2f, GROUND);
+        hold(run, PlusRun.BARS_OPEN + 1, false, false, false);
+        assertEquals(RunLevels.AIR, run.at(44, FLOOR - 1));
+        assertEquals(0, run.hurts());
+        run.place(47, GROUND);
+        hold(run, .3f, false, false, false);
+        assertEquals(RunLevels.BLOCK, run.at(44, FLOOR - 1));
+        // The shrine: a heart for its ribbon, from whoever has more than one; from anyone with one heart, nothing.
+        assertEquals(PlusRun.HEARTS * 2, run.halves());
+        assertFalse(run.has(PlusRun.GREEN));
+        run.place(50.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(1, run.shrines());
+        assertEquals(PlusRun.HEARTS * 2 - 2, run.halves());
+        assertTrue(run.has(PlusRun.GREEN));
+        PlusRun poor = new PlusRun(level);
+        poor.wound();
+        poor.wound();
+        assertEquals(2, poor.halves());
+        poor.place(50.2f, GROUND);
+        hold(poor, .3f, false, false, false);
+        assertEquals(0, poor.shrines());
+        assertEquals(2, poor.halves());
     }
 
     // What is asked of her
@@ -5205,6 +5523,9 @@ public class PlusRunTest {
                 RunLevels.Level level = RunLevels.level(number);
                 found.append(number).append(" gate ").append(level.gate).append(" flags ").append(level.flags);
                 for (int[] room : level.rooms) if (room[0] == RunLevels.ARENA) found.append(" arena door ").append(room[1]).append(" style ").append(number / 3 % 3);
+                for (int[] room : level.rooms) if (room[0] <= RunLevels.PASSAGE) found.append(room[0] == RunLevels.STASH ? " stash " : " passage ").append(room[1]).append(room[7] == 1 ? "c" : room[7] == 2 ? "u" : "").append(" look ").append(room[13]).append(" holds ").append(room[14]).append(" wide ").append(room[4] - room[3] + 1);
+                for (int[] made : level.made) found.append(" ").append(java.util.Arrays.toString(made));
+                if (System.getenv("RUN_SHOW").equals("places")) continue;
                 for (int[] foe : level.foes) {
                     if (RunLevels.rover(foe[0])) found.append(" rover ").append(foe[0]).append("@").append(foe[1]);
                     if (RunLevels.flier(foe[0])) found.append(" f").append(foe[0]).append("@").append(foe[1]);
@@ -5249,7 +5570,7 @@ public class PlusRunTest {
             // Two flags along the way, and one more at the door of whoever waits at the end.
             assertEquals(waits ? 3 : 2, level.flags.size());
             assertEquals(RunLevels.GATE, level.land[RunLevels.top(level, level.gate) - 1][level.gate]);
-            assertTrue("land " + number + " is " + level.columns, level.columns > 60 && level.columns < (shaped ? 600 : 400));
+            assertTrue("land " + number + " is " + level.main, level.main > 60 && level.main < (shaped ? 600 : 400));
             // Made from the number kept for it, it is the same land every time.
             assertEquals(level.columns, RunLevels.level(number).columns);
             // Something to fight with by each flag, and from the second land on by where she starts; each lies on the ground.
@@ -5289,8 +5610,8 @@ public class PlusRunTest {
             heights.remove(-1);
             assertTrue("land " + number + " is flat", heights.size() >= 2);
             if (number % 6 == 0 && number < RunLevels.COUNT) {
-                assertTrue("land " + number + " is " + level.columns + " long, after " + before, level.columns > before - 30);
-                before = level.columns;
+                assertTrue("land " + number + " is " + level.main + " long, after " + before, level.main > before - 30);
+                before = level.main;
             }
         }
         RunLevels.Level last = RunLevels.level(RunLevels.COUNT);
