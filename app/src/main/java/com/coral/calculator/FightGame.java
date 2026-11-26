@@ -112,6 +112,12 @@ final class FightGame {
     private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase, seenQuakes, seenDodges, seenClashes;
     /** How long her ultimate's button has been on show, for each side; how long ago the round ended; and where each was a moment ago, for what she leaves behind her as she dodges. */
     private float grandAge = 9, sinceOver, trailAge;
+    /** Whether this device has little memory to spare; and, for testing, how long drawing has taken. */
+    private final boolean tight;
+    private long drawNanos, drawnSince, painting;
+    private final FightTally tally = new FightTally();
+    private final int[] counted = new int[FightTally.COUNT];
+    private int drawn;
     private int slipTest;
     private final float[][] trail = new float[2][6];
     private final int[] seenState = new int[2], seenLanded = new int[2];
@@ -130,6 +136,10 @@ final class FightGame {
     FightGame(PlayStage stage, Context context, boolean dark, boolean haptics, Bitmap still, Bitmap pet) {
         this.stage = stage;
         this.context = context;
+        android.app.ActivityManager manager = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        android.app.ActivityManager.MemoryInfo memory = new android.app.ActivityManager.MemoryInfo();
+        if (manager != null) manager.getMemoryInfo(memory);
+        tight = manager != null && (manager.isLowRamDevice() || memory.totalMem < 3_500_000_000L);
         this.dark = dark;
         this.haptics = haptics;
         session = PlaySession.get(context);
@@ -255,6 +265,8 @@ final class FightGame {
         groundY = landscape ? height * .8f : height * .6f;
         // Her pictures are read in no larger than she is drawn here, in tenths; a change of screen reads them in again.
         float need = Math.max(.5f, Math.min(1, (float) Math.ceil(Fight.TALL * unit / STANDING * 10.4f) / 10));
+        // A device with little memory has them smaller still: two fighters' frames are many.
+        if (tight) need = Math.min(need, .7f);
         if (need != detail) {
             detail = need;
             keepOnly(-1, -1);
@@ -525,6 +537,8 @@ final class FightGame {
         seenDodges = 0;
         seenClashes = 0;
         grandAge = 9;
+        tally.begin(fight, mode == GUEST ? 1 : 0);
+        java.util.Arrays.fill(counted, 0);
         // In a build made for testing, a number kept under this name starts both of them with their meters full.
         if (BuildConfig.DEBUG && session.tally("fight_full") > 0) for (Fight.Fighter fighter : fight.fighters) fighter.meter = Fight.METER;
         // And a number kept under this one gives the dodge a way to go without a second finger, which a test cannot put down.
@@ -573,6 +587,14 @@ final class FightGame {
 
     private void finish() {
         won = fight.winner() == (mode == GUEST ? 1 : 0);
+        // Kept for the companion: fights played and won as this fighter, whom she has beaten, and fights against another device.
+        int mine = fight.fighters[mode == GUEST ? 1 : 0].kind, theirs = fight.fighters[mode == GUEST ? 0 : 1].kind;
+        session.keep("fight_played_" + mine, session.tally("fight_played_" + mine) + 1);
+        if (won) {
+            session.keep("fight_wins_" + mine, session.tally("fight_wins_" + mine) + 1);
+            session.keep("fight_beat_" + theirs, session.tally("fight_beat_" + theirs) + 1);
+        }
+        if (mode != SOLO) session.keep("fight_net", session.tally("fight_net") + 1);
         java.util.Arrays.fill(held, false);
         screen = RESULT;
         if (mode != SOLO) {
@@ -729,6 +751,13 @@ final class FightGame {
     /** What has just happened in the fight, made into sounds, flashes and words. */
     private void heard() {
         Fight.Fighter[] two = fight.fighters;
+        // What this player has done that the companion keeps count of, as it happens.
+        tally.look(fight);
+        for (int index = 0; index < FightTally.COUNT; index++) {
+            if (tally.counts[index] == counted[index]) continue;
+            session.keep(FightTally.NAMES[index], session.tally(FightTally.NAMES[index]) + tally.counts[index] - counted[index]);
+            counted[index] = tally.counts[index];
+        }
         if (fight.moves() != seenMoves) {
             seenMoves = fight.moves();
             for (int side = 0; side < 2; side++) {
@@ -943,6 +972,23 @@ final class FightGame {
 
     void draw(Canvas canvas) {
         if (width == 0) return;
+        if (BuildConfig.DEBUG) {
+            // In a build made for testing: how long the last few hundred pictures took to draw, and how many there were a second.
+            long now = System.nanoTime();
+            if (drawnSince == 0) drawnSince = now;
+            if (++drawn >= 240) {
+                android.util.Log.d("Fight", "drew " + Math.round(drawn * 1e9 / (now - drawnSince)) + " a second, " + drawNanos / drawn / 1000 + " us each");
+                drawn = 0;
+                drawNanos = 0;
+                drawnSince = now;
+            }
+            painting = now;
+        }
+        paintAll(canvas);
+        if (BuildConfig.DEBUG) drawNanos += System.nanoTime() - painting;
+    }
+
+    private void paintAll(Canvas canvas) {
         if (screen == SELECT) {
             drawSelect(canvas);
         } else if (screen == LOBBY) {
@@ -1118,8 +1164,10 @@ final class FightGame {
             float x = across(fighter.x), y = up(fighter.y);
             // She breathes as she stands, and leans into a blow as it goes out.
             float breath = fighter.state == Fight.IDLE ? 1 + .012f * (float) Math.sin(clock * 3 + fighter.side * 2) : 1;
-            float lunge = fighter.state == Fight.ATTACK && fighter.doing().shot == Fight.NOTHING && fighter.clock >= fighter.doing().startup
-                    && fighter.clock < fighter.doing().startup + .12f ? unit * .18f * (fighter.facingLeft ? -1 : 1) : 0;
+            // The lean goes out with the blow and comes back after it, smoothly: it used to step out and step back.
+            float into = fighter.state == Fight.ATTACK && fighter.doing().shot == Fight.NOTHING
+                    ? (fighter.clock - fighter.doing().startup * .5f) / (fighter.doing().startup * .5f + .2f) : 0;
+            float lunge = into > 0 && into < 1 ? unit * .18f * (float) Math.sin(Math.PI * into) * (fighter.facingLeft ? -1 : 1) : 0;
             // A hop back lifts her off the ground a little; a dodge, a dash or a hop leaves her likeness behind her where she was.
             if (fighter.state == Fight.BACKSTEP) y -= unit * .3f * (float) Math.sin(Math.PI * Math.min(1, fighter.clock / Fight.BACKSTEP_SECONDS));
             if (fighter.state == Fight.DODGE || fighter.state == Fight.DASH || fighter.state == Fight.BACKSTEP) {
@@ -1130,7 +1178,8 @@ final class FightGame {
                 }
             }
             // Getting up, she cannot be hit, and flickers to show it.
-            paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK && (int) (clock * 16) % 2 == 0 ? 120 : 255);
+            // It is a soft pulse: blinking on and off made her look as if the screen were dropping frames.
+            paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK ? Math.round(190 + 65 * (float) Math.sin(clock * 34)) : 255);
             canvas.save();
             canvas.scale(1, breath, x, y);
             frame(canvas, fighter.kind, pose(fighter), x + lunge, y, scale, fighter.facingLeft);
@@ -1813,7 +1862,7 @@ final class FightGame {
             paint.setColor(Color.BLACK);
             canvas.save();
             canvas.scale(1, 1 + .012f * (float) Math.sin(clock * 3), x, bandBottom);
-            frame(canvas, player, FightFrames.IDLE1 + (int) (clock / .3f) % 4, x, bandBottom, scale, false);
+            frame(canvas, player, FightPose.breathing(clock), x, bandBottom, scale, false);
             canvas.restore();
         }
         box.set(cardLeft, cardTop, cardRight, cardBottom);

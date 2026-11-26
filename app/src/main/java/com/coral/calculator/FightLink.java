@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * the place of an older one that has not gone yet.
  */
 final class FightLink {
-    static final int PORT = 47816, VERSION = 2;
+    static final int PORT = 47816, VERSION = 3;
     /** The kinds of message: who I am, what I hold down, how the fight stands, a fight beginning, a wish for another, and leaving. */
     static final int HELLO = 1, PAD = 2, STATE = 3, START = 4, AGAIN = 5, BYE = 6;
     private static final int LONGEST = 4096;

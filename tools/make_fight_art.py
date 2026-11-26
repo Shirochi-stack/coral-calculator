@@ -6,7 +6,7 @@ Builds the art of Page brawl from the pictures in assets/fight.
 The pictures were made with an image model (gpt-6-astra, through Glossarion) on transparent
 backgrounds, each fighter drawn from her own non-chibi design sheet of the webtoon:
 
-  * NAME/SHEET.webp are a fighter's frames: seventeen sheets of six, three across and two down.
+  * NAME/SHEET.webp are a fighter's frames: thirty sheets of six, three across and two down.
     Eight are of how she moves (idle and guard, walking, walking back, dashing, jumping, being
     hit, going down and getting up, winning and losing) and eight of how she fights (the five
     blows of her quick chain, of her heavy chain, in the air, the smash, her specials, her
@@ -70,20 +70,57 @@ SHEETS = [
     ("extra", "XS DODGE1 DODGE2 C1 C2 C3", (0,)),
     # Her dodges that go somewhere: back away from the other (its start, its furthest, its end), forward past her, and in the air.
     ("slip", "SLIP_S BDODGE1 BDODGE2 BDODGE3 FDODGE ADODGE", (0,)),
+    # The frames that go between the others, for smoother movement: a breath in six steps; the halves of the walk
+    # forward and of the walk backward, with the guard coming up and a turn half made; the jump's in-betweens; coming
+    # round from a blow and getting up; then for every blow the wind-up before it and the follow-through after it.
+    ("breath", "BR1 BR2 BR3 BR4 BR5 BR6", (0, 1, 2, 3, 4, 5)),
+    ("walk2", "WB1 WB2 WB3 WB4 WB5 WB6", (0, 1, 2, 3, 4, 5)),
+    ("back2", "BB1 BB2 BB3 BB4 GUARD_UP TURN2", (0, 1, 2, 3)),
+    ("jump2", "J_S PUSH RISE2 TOP2 FALL2 LAND2", (0,)),
+    ("hits2", "H_S HIT1R HIT2R STAGGER2 PROP HALF_UP", (0,)),
+    ("quick2", "QW_S QW1 QW2 QW3 QW4 QW5", (0,)),
+    ("quick3", "QF_S QF1 QF2 QF3 QF4 QF5", (0,)),
+    ("heavy2", "HW_S HW1 HW2 HW3 HW4 HW5", (0,)),
+    ("heavy3", "HF_S HF1 HF2 HF3 HF4 HF5", (0,)),
+    ("air2", "A_S AF1 AF2 AF3 AW SM_TIP", (0,)),
+    ("moves2", "MW_S DASH_QW DASH_HW BREAK_W LAUNCH_W SHOVE_W", (0,)),
+    ("special2", "SW_S SW1 SW2 SW3 SW4 SW5", (0,)),
+    ("ult2", "UW_S U12 U23 U34 U4R SF", (0,)),
 ]
+# The sheets of in-betweens, which a fighter may be without: what she had before stands in for them.
+MORE = [sheet for sheet, _, _ in SHEETS[17:]]
+# A frame that is only there to give its sheet her height is not kept.
+DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S".split()
+# An in-between is as tall as the two frames it goes between are, taken together: these are the two, for each frame of a sheet.
+BETWEENS = {
+    "walk2": [(f"WALK{n}", f"WALK{n % 6 + 1}") for n in range(1, 7)],
+    "back2": [(f"BACK{n}", f"BACK{n % 4 + 1}") for n in range(1, 5)],
+}
 NAMES = [name for _, names, _ in SHEETS for name in names.split()]
 # Frames that are placed by the middle of what is drawn, not by where her feet are: in the air, lying down, and
 # leaning far out of a dodge.
 CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2 ADODGE BDODGE2 FDODGE".split())
 # What stands in for the dodge and the clash while a fighter has no sheet of them yet.
 SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U3", "C3": "U4",
-         "SLIP_S": "XS", "BDODGE1": "HOP1", "BDODGE2": "HOP2", "BDODGE3": "HOP1", "FDODGE": "DODGE1", "ADODGE": "DODGE2"}
+         "SLIP_S": "XS", "BDODGE1": "HOP1", "BDODGE2": "HOP2", "BDODGE3": "HOP1", "FDODGE": "DODGE1", "ADODGE": "DODGE2",
+         "BR1": "IDLE4", "BR2": "IDLE4", "BR3": "IDLE1", "BR4": "IDLE1", "BR5": "IDLE2", "BR6": "IDLE2",
+         "WB1": "WALK1", "WB2": "WALK2", "WB3": "WALK3", "WB4": "WALK4", "WB5": "WALK5", "WB6": "WALK6",
+         "BB1": "BACK1", "BB2": "BACK2", "BB3": "BACK3", "BB4": "BACK4", "GUARD_UP": "GUARD", "TURN2": "TURN",
+         "PUSH": "PREJUMP", "RISE2": "RISE", "TOP2": "TOP", "FALL2": "FALL", "LAND2": "LAND",
+         "HIT1R": "HIT1", "HIT2R": "HIT2", "STAGGER2": "STAGGER", "PROP": "SIT_UP", "HALF_UP": "KNEEL_UP",
+         "QW1": "QS", "QW2": "Q1", "QW3": "Q2", "QW4": "Q3", "QW5": "Q4", "QF1": "Q1", "QF2": "Q2", "QF3": "Q3", "QF4": "Q4", "QF5": "Q5",
+         "HW1": "HS", "HW2": "H1", "HW3": "H2", "HW4": "H3", "HW5": "H4", "HF1": "H1", "HF2": "H2", "HF3": "H3", "HF4": "H4", "HF5": "H5",
+         "AF1": "A1", "AF2": "A2", "AF3": "A3", "AW": "A1", "SM_TIP": "SM_UP",
+         "DASH_QW": "DASH_Q", "DASH_HW": "DASH_H", "BREAK_W": "MS", "LAUNCH_W": "LAUNCH", "SHOVE_W": "SHOVE",
+         "SW1": "SS", "SW2": "SS", "SW3": "SS", "SW4": "SS", "SW5": "SS", "U12": "U1", "U23": "U2", "U34": "U3", "U4R": "U4", "SF": "SS"}
 # For a fighter who has only her first twelve frames (standing, walking, jumping, guarding, hit, down, quick, heavy,
 # special, ultimate, win, and one more), which of them stands in for each frame.
 OLD = dict(zip(NAMES, [
     0, 0, 0, 0, 3, 3, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 2, 2, 0, 1, 1, 1, 0, 0, 0, 0, 2, 2, 2, 0, 4, 4, 4, 4, 4, 3, 4, 5, 5, 5, 0, 5,
     10, 10, 10, 5, 5, 10, 0, 6, 6, 6, 6, 6, 0, 7, 7, 7, 7, 7, 0, 6, 6, 6, 8, 8, 2, 7, 7, 0, 0, 0, 8, 8, 11, 8, 11, 8, 0, 6, 7, 7, 7, 6,
     9, 9, 11, 9, 10, 10, 0, 2, 2, 9, 11, 9, 0, 2, 2, 2, 2, 2]))
+for _name in NAMES:
+    OLD.setdefault(_name, 0)
 # Roughly the colour of each one's hair, to find it by; what it is exactly is measured from her first sheet.
 HAIR = {"halgakos": (238, 160, 180), "chikuwa": (200, 150, 110), "tsubakieh": (150, 122, 150), "rune": (150, 200, 240), "illya": (245, 190, 150)}
 # A sheet whose upright frame came out a different size from the rest of it is put right by hand here: (fighter, sheet) to a factor.
@@ -239,12 +276,17 @@ def fighter(name, report):
         for slot, index in OLD.items():
             image, body, feet = old[index]
             frames[slot] = (image, feet, body[3], index)
-        return frames, False
+        return frames, False, False
     for sheet, names, upright in SHEETS:
         path = folder / f"{sheet}.webp"
         if not path.exists():
             continue
-        parts, scale = sized(cells(clean(Image.open(path)), 3, 2), upright, RESIZE.get((name, sheet), 1.0))
+        cut, factor = cells(clean(Image.open(path)), 3, 2), RESIZE.get((name, sheet), 1.0)
+        parts, scale = sized(cut, upright, factor)
+        if sheet in BETWEENS:
+            ratios = sorted((part[1][3] - part[1][1]) / ((frames[one][0].size[1] + frames[other][0].size[1]) / 2)
+                            for part, (one, other) in zip(parts, BETWEENS[sheet]))
+            parts, scale = sized(cut, upright, factor / ratios[len(ratios) // 2])
         pictures, gains = matched([part[0] for part in parts], hair)
         report[f"{name} {sheet}"] = {"scale": round(scale, 3), "hair": gains,
                                     "tall": [round(part[1][3] - part[1][1]) for part in parts]}
@@ -253,7 +295,9 @@ def fighter(name, report):
             frames[slot] = (picture, across, body[3], None)
     for slot, spare in SPARE.items():
         frames.setdefault(slot, frames[spare])
-    return frames, True
+    for slot in DROP:
+        frames[slot] = frames["IDLE1"]
+    return frames, True, all((folder / f"{sheet}.webp").exists() for sheet in MORE)
 
 
 def packed(name, frames):
@@ -332,7 +376,7 @@ def preview(name, frames, folder):
     board.convert("RGB").save(folder / f"{name}.jpg", quality=80)
 
 
-def java(tables, sizes, full):
+def java(tables, sizes, full, smooth):
     lines = ["package com.coral.calculator;", "",
              "/**",
              " * Where every frame of every fighter of Page brawl is, in the pictures they are packed into. Written by",
@@ -353,6 +397,8 @@ def java(tables, sizes, full):
     lines.append(f"    static final int WIDE = {ATLAS};")
     lines.append("    /** Whether a fighter has all her frames, or only her first twelve standing in for the rest. */")
     lines.append("    static final boolean[] FULL = {" + ", ".join("true" if one else "false" for one in full) + "};")
+    lines.append("    /** Whether she has the frames that go between the others as well, or the others standing in for them. */")
+    lines.append("    static final boolean[] SMOOTH = {" + ", ".join("true" if one else "false" for one in smooth) + "};")
     lines.append("    private static final String[] DATA = {")
     for table in tables:
         text = " ".join(" ".join(str(value) for value in row) for row in table)
@@ -378,12 +424,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=pathlib.Path)
     args = parser.parse_args()
-    report, tables, sizes, full = {}, [], [], []
+    report, tables, sizes, full, smooth = {}, [], [], [], []
     for old in RES.glob("fight_*.webp"):
         if old.stem.split("_")[1] in FIGHTERS:
             old.unlink()
     for name in FIGHTERS:
-        frames, whole = fighter(name, report)
+        frames, whole, between = fighter(name, report)
+        smooth.append(between)
         atlases, table = packed(name, frames)
         for index, atlas in enumerate(atlases):
             atlas.save(RES / f"fight_{name}_{index}.webp", quality=80, alpha_quality=90, method=6)
@@ -395,7 +442,7 @@ def main():
         if args.preview:
             args.preview.mkdir(parents=True, exist_ok=True)
             preview(name, frames, args.preview)
-    java(tables, sizes, full)
+    java(tables, sizes, full, smooth)
 
     faces = Image.new("RGBA", (FACE * len(FIGHTERS), FACE), (0, 0, 0, 0))
     for index, name in enumerate(FIGHTERS):
