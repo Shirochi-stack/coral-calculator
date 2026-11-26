@@ -26,12 +26,12 @@ final class RunStory {
     /** The second volume, which falls on her head as the first did. */
     static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
-    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZabcde";
+    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZabcdef";
     static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang", "Gokhae", "Miri", "Gari", "Yeobaek",
             "Nuri-yeowang",
             "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul",
             "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi", "The Brake Pads", "The Straight-Ahead Party", "The Old Book",
-            "Pulmu", "Sutdol", "Lucy"};
+            "Pulmu", "Sutdol", "Lucy", "The Mother Tongue"};
 
     private static final String PLAYER = "She is talking to the player who controls her in a platform game, whom she calls Sloppy. ";
 
@@ -293,15 +293,6 @@ final class RunStory {
                             "The beaten interpreter, sentenced to proofreading, sulks in her stiff, over-formal way. Defeated, grumbling, put out."},
                     {"out80f", "Two volumes, read to the end. Now can I have my ice cream Sloppy~♡", "H",
                             PLAYER + "Both books are finished and she is worn out and happy. Tired, fond, teasing, a contented sigh, talking quickly."}};
-            case 100: return new String[][]{
-                    {"out100a", "...It didn't hurt. You read me, and it didn't hurt.", "e",
-                            "The little dragon girl, a child again and worn out after the fight, is astonished that being understood did not hurt. Very small, quiet, sniffling, wondering."},
-                    {"out100b", "It never does. I only say what was meant. Now show me the book Sloppy~♡", "H",
-                            PLAYER + "She kneels by the little dragon girl she has just beaten and speaks gently to her. Soft, kind, sure of herself, a little tired."},
-                    {"out100c", "...Promise you won't change a single word?", "e",
-                            "The little dragon girl hugs a book to her chest and asks the translator for a promise. A child's voice, small, suspicious, hopeful."},
-                    {"out100d", "Every word as written. Honorifics and all. Cross my horns Sloppy~♡", "H",
-                            PLAYER + "She makes a solemn promise to a child, and means it, with a small joke at the end. Warm, steady, fond."}};
             default: return null;
         }
     }
@@ -791,10 +782,51 @@ final class RunStory {
                     PLAYER + "The capsule machine has just exploded in her face and taken her prizes with it. Stunned, sooty, dismayed, a little funny." + FAST},
     };
     /**
-     * What is read from the book once the flight is won, before what nothing announces: not here yet. While there is nothing in it,
-     * the last land ends with the flight.
+     * What is said once the flight is won, in the sky over the library, before what nothing announces: Lucy, read and unhurt, hands
+     * over her brother's book; Halgakos reads it as it was written; and the one who had it made readable answers from the sky. Then
+     * the Mother Tongue rises, and Halgakos is on Lucy's back.
      */
-    static final String[][] REVEAL = {};
+    static final String[][] REVEAL = {
+            {"out100a", "...It didn't hurt. You read me, and it didn't hurt.", "e",
+                    "The little dragon girl, a child again and worn out after the fight, is astonished that being understood did not hurt. Very small, quiet, sniffling, wondering."},
+            {"out100b", "It never does. I only say what was meant. Now show me the book Sloppy~♡", "H",
+                    PLAYER + "She kneels by the little dragon girl she has just beaten and speaks gently to her. Soft, kind, sure of herself, a little tired."},
+            {"out100c", "...Promise you won't change a single word?", "e",
+                    "The little dragon girl hugs a book to her chest and asks the translator for a promise. A child's voice, small, suspicious, hopeful."},
+            {"out100d", "Every word as written. Honorifics and all. Cross my horns Sloppy~♡", "H",
+                    PLAYER + "She makes a solemn promise to a child, and means it, with a small joke at the end. Warm, steady, fond."},
+            {"rev1", "'Lucy-tan. If you can read this, I am already late. Onii-tan is sorry.' That is what he wrote. Word for word Sloppy~♡", "H",
+                    PLAYER + "She reads aloud, faithfully, the first lines a long-lost brother wrote to his little sister, and then says that this is exactly what he wrote. Gentle and careful while reading, then quiet and certain."},
+            {"rev2", "...Lucy-tan. He wrote Lucy-tan. Then who wrote 'Miss Lucy'?", "e",
+                    "The little dragon girl hears, for the first time in a hundred years, the name her brother really called her, and realises someone changed it. A child's voice, stunned, trembling, then sharp."},
+            {"rev3", "I did, little one. I had it made readable.", "f",
+                    "A vast elder dragon answers her daughter from high in the sky, perfectly calm, as if it were the most reasonable thing in the world. Cold, smooth, unhurried, faintly amused."},
+            {"rev4", "Your brother wrote in a child's words. I gave you proper ones. One tongue. Mine. Everything is clearer in mine.", "f",
+                    "The vast elder dragon explains to her daughter why she rewrote her son's book in her own language. Serene, certain, patient, each short sentence placed like a verdict."},
+            {"rev5", "You pulped it. And you let me hate every translator in the world. For a hundred years.", "e",
+                    "The little dragon girl understands what her mother did to her brother's book and to her. A child's voice, shaking with anger and hurt, close to tears, getting louder."},
+            {"rev6", "I let you be useful. Every book you stopped was one less voice that is not mine.", "f",
+                    "The vast elder dragon admits, without shame, that she used her daughter's grief. Cold, composed, almost kind in tone, utterly certain."},
+            {"rev7", "So that's the great evil. Not translation. A mother who thinks every language should sound like hers Sloppy~♡", "H",
+                    PLAYER + "She looks up at the vast dragon in the sky and finally understands who the real enemy is. Dry, disgusted, steady, a little grim."},
+            {"rev8", "Translator. You keep their little words. -tan. -nim. Onii. Noise. I will make you readable too.", "f",
+                    "The vast elder dragon turns her attention to the translator and promises, calmly, to flatten her as well. Cold, disdainful, slow, a quiet threat."},
+            {"rev9", "Get on my back, translator. I'm done being readable.", "e",
+                    "The little dragon girl makes up her mind and offers to carry the translator into battle against her own mother. A child's voice, fierce, decided, no longer crying."},
+            {"rev10", "Riding a dragon into a sky of every script. Best day off yet. Hold still, Mother Tongue, this will be faithful Sloppy~♡", "H",
+                    PLAYER + "She climbs onto the dragon's back and flies up at the vast elder dragon, delighted and determined. Grinning, bold, teasing, excited." + FAST},
+    };
+    /** And what is said when the Mother Tongue has been read: she is small, and listens; and Lucy has the last word but one. */
+    static final String[][] READ = {
+            {"read1", "...So that is what he called her.", "f",
+                    "The elder dragon, made small and quiet, hears her son's own words for the first time and has nothing left to correct. Very soft, slow, humbled, wondering."},
+            {"read2", "You can stay. You can listen. You don't get to talk for a while.", "e",
+                    "The little dragon girl tells her mother, who has been made small, what happens now. A child's voice, firm, tired, fair, not cruel."},
+            {"read3", "Read it again. The lullaby. As he wrote it.", "e",
+                    "The little dragon girl asks the translator to read her brother's lullaby to her once more. A child's voice, small, sleepy, hopeful."},
+            {"read4", "As written. Every honorific where he put it. That's the job Sloppy~♡", "H",
+                    PLAYER + "She opens the book again to read a lullaby to a child exactly as it was written, proud of her work. Warm, quiet, content, a little smug."},
+    };
     /**
      * Lucy, the Dragon of Lost Words, at the end of the last land, and what is said to her. In order: as she comes; as she goes at her
      * visitor; when a blow lands; when her dragon side comes out; the black ribbon; the white that turned it; the flight, which
@@ -985,7 +1017,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET, GACHA, PLEDGES, LUCY);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET, GACHA, PLEDGES, LUCY, REVEAL, READ);
         return groups.toArray(new String[0][][]);
     }
 }

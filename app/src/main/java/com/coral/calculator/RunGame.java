@@ -196,7 +196,7 @@ final class RunGame {
     private static final int[] SPEAKER_COLOURS = {CalculatorLayout.CORAL, 0xFFD2452F, 0xFF3F7FC4, 0xFFE8779A, 0xFF7A5A9A, 0xFF6B2A3A,
             0xFF6A3FA0, 0xFFC9892B, 0xFF4A5560, 0xFF5E8FA6, 0xFF2E9E6E, 0xFF7D7FD0, 0xFF394A8C, 0xFFB5651D, 0xFF6B7A2A, 0xFF5B4BB5, 0xFF2F8F5B,
             0xFFC0392B, 0xFFB8860B, 0xFF1E9C8B, 0xFF5C7FA8, 0xFF4A4A5A, 0xFF3F8F5A, 0xFFE08A2B, 0xFFE0662F, 0xFF7A8088, 0xFFC0392B, 0xFF8A5A33,
-            0xFFC8552B, 0xFF7A4B8A, 0xFF2FA89A};
+            0xFFC8552B, 0xFF7A4B8A, 0xFF2FA89A, 0xFFB9862C};
     private static final int JUMP_FRAMES = 6;
     /** The six frames of her losing: hit, knocked into the air, falling, sitting dazed, sulking, and crying. */
     private static final int LOSE_FRAMES = 6, HIT = 0, TUMBLE = 1, DROP = 2, DAZED = 3, SULK = 4, CRY = 5;
@@ -397,7 +397,7 @@ final class RunGame {
     private Bitmap rideArt, motherArt, pagesSky;
     private boolean goBreath;
     private int seenRideHits, seenRideHurts, seenRideBeams, seenRideStages, seenRideSent, seenRidePuffs, seenRideChips, seenRideOpens;
-    private static final int LUCY_FACE = 30;
+    private static final int LUCY_FACE = 30, MOTHER_FACE = 31;
     private static final String[] READ = {"Onii-tan", "...wait for me", "Onii-tan!", "...read it to me", "Onii-tan...", "...don't change it"};
     private final Bitmap[] lucyArt = new Bitmap[3], whiteArt = new Bitmap[2];
     private int finale, unmadeSaid;
@@ -3163,7 +3163,7 @@ final class RunGame {
         if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "flight");
     }
 
-    /** Whether there is anything after the flight: there is once what is read from the book is there to be told. (In a build made for testing it can be said to be so.) */
+    /** Whether there is anything after the flight: there is, since what is read from the book is there to be told. */
     private boolean fourth() { return RunStory.REVEAL.length > 0 || BuildConfig.DEBUG && session.tally("run_fourth") > 0; }
 
     /** After the flight, and after what the book says has been read: the sky is another sky, and the Mother Tongue rises into it. That it has been seen is kept. */
@@ -3179,6 +3179,7 @@ final class RunGame {
         idle();
         dye(PlusRun.WHITE);
         session.keep("run_ending", session.tally("run_ending") | 4);
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "rise");
         audio.play("quake", .8f);
         shake = .5f;
         buzz(true);
@@ -3252,6 +3253,7 @@ final class RunGame {
         if (ride.state() == RunRide.WON) {
             finale = RIDDEN;
             finaleAge = 0;
+            if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "ridden");
             flash = 1;
             idle();
             talk.clear();
@@ -3675,10 +3677,13 @@ final class RunGame {
             rideTick(seconds);
         } else if (finale == RIDDEN) {
             if (finaleAge > 6) {
-                // The true ending: reached, and kept.
+                // The true ending: reached, and kept; and what is said at it, before its card.
                 session.keep("run_ending", session.tally("run_ending") | 2);
-                run.flown();
-                finish(true);
+                tell(RunStory.READ, RunLevels.chapterOf(number), () -> {
+                    screen = PLAY;
+                    run.flown();
+                    finish(true);
+                });
             }
         } else if (unmadeSaid == 0 && finaleAge > 5.6f) {
             unmadeSaid = 1;
@@ -8645,7 +8650,13 @@ final class RunGame {
         canvas.drawCircle(x, y, radius, paint);
         paint.setColor(Color.BLACK);
         Bitmap picture;
-        if (who == LUCY_FACE) {
+        if (who == MOTHER_FACE) {
+            // (The Mother Tongue: her head and her crown, from the first picture of her sheet.)
+            if (motherArt == null) motherArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_mother);
+            picture = motherArt;
+            int cell = picture.getWidth() / 7, sideOf = picture.getHeight() * 44 / 100;
+            source.set(cell / 2 - sideOf / 2, picture.getHeight() * 9 / 100, cell / 2 + sideOf / 2, picture.getHeight() * 9 / 100 + sideOf);
+        } else if (who == LUCY_FACE) {
             // (Lucy: her head, from the sheet of her as a child.)
             picture = lucy(0);
             int cell = picture.getWidth() / 4, sideOf = picture.getHeight() * 46 / 100;
