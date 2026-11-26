@@ -2495,6 +2495,205 @@ public class PlusRunTest {
         assertFalse(run.foes().get(1).flat);
     }
 
+    @Test public void herPetsAreThoseThatAreHersForGoodAndTheStraysOfALandAsManyAsSheHasRoomFor() {
+        // To begin with there is room for one stray: one found goes with her; another found lies where it is and is offered; changed for,
+        // it takes the place of the stray she had.
+        RunLevels.Level level = flat(120);
+        level.items.add(new int[]{PlusRun.PET + PlusRun.CAT, 10, FLOOR - 1, 0});
+        level.items.add(new int[]{PlusRun.PET + PlusRun.DOG, 20, FLOOR - 1, 0});
+        PlusRun run = new PlusRun(level);
+        assertTrue(run.herd().isEmpty());
+        assertEquals(-1, run.pet());
+        run.place(10.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(1, run.herd().size());
+        assertEquals(PlusRun.CAT, run.pet());
+        assertFalse(run.herd().get(0).stays);
+        assertEquals(1, run.strays());
+        assertEquals(1, run.petJoined());
+        assertEquals(PlusRun.CAT, run.lastJoined());
+        assertEquals(-1, run.petOffer());
+        assertFalse(run.swapPet());
+        run.place(20.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.DOG, run.petOffer());
+        assertEquals(1, run.herd().size());
+        assertEquals(PlusRun.CAT, run.pet());
+        assertEquals(1, run.items().size());
+        hold(run, .5f, false, false, false);
+        assertEquals(PlusRun.DOG, run.petOffer());
+        assertTrue(run.swapPet());
+        assertEquals(1, run.herd().size());
+        assertEquals(PlusRun.DOG, run.pet());
+        assertEquals(1, run.petSwaps());
+        assertEquals(2, run.petJoined());
+        assertEquals(0, run.items().size());
+        run.step(STEP, false, false, false);
+        assertEquals(-1, run.petOffer());
+
+        // Those that are hers for good come into the land with her, before any stray, and are never the ones changed.
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.petWith = 1 << PlusRun.DUCK | 1 << PlusRun.CAT;
+        perks.tempSlots = 2;
+        level = flat(120);
+        level.items.add(new int[]{PlusRun.PET + PlusRun.DOG, 10, FLOOR - 1, 0});
+        level.items.add(new int[]{PlusRun.PET + PlusRun.MONKEY, 20, FLOOR - 1, 0});
+        level.items.add(new int[]{PlusRun.PET + PlusRun.JAR, 30, FLOOR - 1, 0});
+        run = new PlusRun(level, perks);
+        assertEquals(2, run.herd().size());
+        assertEquals(PlusRun.CAT, run.herd().get(0).kind);
+        assertEquals(PlusRun.DUCK, run.herd().get(1).kind);
+        assertTrue(run.herd().get(0).stays && run.herd().get(1).stays);
+        assertEquals(0, run.petJoined());
+        assertEquals(0, run.strays());
+        for (float column : new float[]{10.2f, 20.2f}) {
+            run.place(column, GROUND);
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(4, run.herd().size());
+        assertEquals(2, run.strays());
+        assertEquals(PlusRun.DOG, run.herd().get(2).kind);
+        assertEquals(PlusRun.MONKEY, run.herd().get(3).kind);
+        run.place(30.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.JAR, run.petOffer());
+        assertTrue(run.swapPet());
+        assertEquals(4, run.herd().size());
+        assertEquals(PlusRun.CAT, run.herd().get(0).kind);
+        assertEquals(PlusRun.DUCK, run.herd().get(1).kind);
+        assertEquals(PlusRun.MONKEY, run.herd().get(2).kind);
+        assertEquals(PlusRun.JAR, run.herd().get(3).kind);
+        // What is chosen at the counter in the middle of a land is so there and then: one more of hers comes, one goes home.
+        PlusRun.Perks now = new PlusRun.Perks();
+        now.petWith = 1 << PlusRun.CAT | 1 << PlusRun.IMP;
+        now.tempSlots = 2;
+        run.grant(now);
+        assertEquals(4, run.herd().size());
+        assertEquals(PlusRun.CAT, run.herd().get(0).kind);
+        assertEquals(PlusRun.IMP, run.herd().get(1).kind);
+        assertTrue(run.herd().get(1).stays);
+        assertEquals(2, run.strays());
+
+        // Six of them, three of hers and three strays: each has a place of its own behind her, none on her and none on another; those
+        // that run stand on the ground and those that float hang in the air.
+        perks = new PlusRun.Perks();
+        perks.petWith = 1 << PlusRun.CAT | 1 << PlusRun.DUCK | 1 << PlusRun.TWIN;
+        perks.tempSlots = 3;
+        run = new PlusRun(flat(120), perks);
+        run.place(40, GROUND);
+        run.adopt(PlusRun.JAR);
+        run.adopt(PlusRun.DOG);
+        run.adopt(PlusRun.CHERUB);
+        assertEquals(6, run.herd().size());
+        hold(run, 3, false, true, false);
+        hold(run, 2, false, false, false);
+        float her = run.x() + PlusRun.WIDE / 2;
+        for (PlusRun.Pet one : run.herd()) {
+            assertTrue("pet " + one.kind + " at " + (one.x - her), one.x < her - .6f && one.x > her - 5);
+            if (PlusRun.floats(one.kind)) assertTrue("pet " + one.kind, one.y < FLOOR - .8f && one.y > FLOOR - 2.6f);
+            else assertEquals("pet " + one.kind, FLOOR, one.y, .05f);
+            for (PlusRun.Pet other : run.herd()) {
+                if (other != one) assertTrue("pets " + one.kind + " and " + other.kind, Math.hypot(one.x - other.x, one.y - other.y) > .5f);
+            }
+        }
+        // A seventh has no room; the oldest stray makes way for one adopted.
+        run.adopt(PlusRun.MONKEY);
+        assertEquals(6, run.herd().size());
+        assertEquals(3, run.strays());
+        assertEquals(PlusRun.MONKEY, run.herd().get(5).kind);
+        assertEquals(PlusRun.DOG, run.herd().get(3).kind);
+
+        // They take turns: with things all about her, no two of them begin on something in the same moment.
+        level = flat(120);
+        for (int column = 34; column <= 46; column += 2) level.foes.add(new int[]{RunLevels.MINUS, column, FLOOR - 1, 60});
+        perks = new PlusRun.Perks();
+        perks.petWith = 1 << PlusRun.CAT | 1 << PlusRun.IMP | 1 << PlusRun.MONKEY;
+        perks.tempSlots = 3;
+        run = new PlusRun(level, perks);
+        run.adopt(PlusRun.JAR);
+        run.adopt(PlusRun.DOG);
+        run.adopt(PlusRun.CHERUB);
+        int strikes = 0, steps = 0, last = -99;
+        for (int step = 0; step < 60 * 8; step++) {
+            for (PlusRun.Foe foe : run.foes()) foe.x = foe.home;
+            run.place(40, GROUND - 3);
+            run.step(STEP, false, false, false);
+            if (run.petStrikes() != strikes) {
+                assertEquals(strikes + 1, run.petStrikes());
+                assertTrue("only " + (step - last) + " steps apart", step - last >= 12);
+                strikes = run.petStrikes();
+                last = step;
+                steps++;
+            }
+        }
+        assertTrue("strikes " + steps, steps >= 12);
+
+        // The kennel: brisker pets wait less between one thing and the next; stronger ones count twice on a big one, and take a whole
+        // piece off a shield, which they still never break.
+        int[] done = new int[2];
+        for (int brisk = 0; brisk < 2; brisk++) {
+            level = flat(80);
+            level.foes.add(new int[]{RunLevels.MINUS, 24, FLOOR - 1, 99});
+            perks = new PlusRun.Perks();
+            perks.petBrisk = brisk == 0 ? 1 : .6f;
+            run = new PlusRun(level, perks);
+            run.place(20, GROUND);
+            run.adopt(PlusRun.JAR);
+            for (int step = 0; step < 60 * 10; step++) {
+                run.foes().get(0).x = run.foes().get(0).home;
+                run.place(20, GROUND);
+                run.step(STEP, false, false, false);
+            }
+            done[brisk] = run.petStrikes();
+        }
+        assertTrue("strikes " + done[0] + " and " + done[1], done[1] >= done[0] * 14 / 10);
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.MINUS, 20, FLOOR - 1, 9});
+        perks = new PlusRun.Perks();
+        perks.petStrong = 1;
+        run = new PlusRun(level, perks);
+        run.place(18.2f, GROUND);
+        run.adopt(PlusRun.IMP);
+        PlusRun.Foe big = run.foes().get(0);
+        for (int step = 0; step < 60 * 4 && run.petStrikes() < 1; step++) {
+            big.x = big.home;
+            run.place(18.2f, GROUND);
+            run.step(STEP, false, false, false);
+        }
+        for (int step = 0; step < 22; step++) {
+            big.x = big.home;
+            run.place(18.2f, GROUND);
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(0, run.hurts());
+        assertEquals(1, run.petStrikes());
+        assertEquals(7, big.left);
+        RunLevels.Level pen = flat(70);
+        pen.arena = 20;
+        pen.foes.add(new int[]{RunLevels.GUARD, 34, FLOOR - 1});
+        perks = new PlusRun.Perks();
+        perks.petStrong = 2;
+        PlusRun fight = shutIn(pen, true);
+        fight.grant(perks);
+        PlusRun.Foe guard = waiting(fight);
+        guard.shield = guard.shieldMost = 6;
+        fight.adopt(PlusRun.CAT);
+        float least = 6;
+        java.util.Set<Float> seen = new java.util.TreeSet<>();
+        for (int step = 0; step < 60 * 30; step++) {
+            fight.place(guard.x - 1.05f, floorOf(fight) - PlusRun.TALL - 1.8f);
+            fight.shots().removeIf(shot -> !shot.hers);
+            fight.step(STEP, false, false, false);
+            if (!fight.forming(guard) && !fight.open(guard)) {
+                least = Math.min(least, guard.shield);
+                seen.add(guard.shield);
+            }
+        }
+        assertEquals(0, fight.shatters());
+        assertEquals(.5f, least, .001f);
+        assertTrue("shield went " + seen, seen.contains(5f) && seen.contains(4f) && !seen.contains(5.5f));
+    }
+
     @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
         int tempted = 0, stashed = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
