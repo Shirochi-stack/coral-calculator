@@ -1486,6 +1486,55 @@ final class PlusRun {
     /** How many of her own colours she may wear at once. */
     int together() { return perks.together; }
 
+    /** The colours that are hers and could be called on now, were there room for them: neither on nor waiting. */
+    int ready() {
+        int ready = 0;
+        for (int colour = RED; colour <= BLACK; colour++) {
+            if ((perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0 && waits[colour] <= 0 && cursed <= 0) ready |= 1 << colour - 1;
+        }
+        return ready;
+    }
+
+    /** The colours a named mix is made of, as bits: none for the prism, which is any three. */
+    static int mixOf(int which) {
+        return which == STEAMS ? 1 | 2 : which == COMET ? 1 | 16 : which == TIDE ? 2 | 8 : which == MIRROR ? 4 | 32 : which == GALE ? 8 | 16 : which == EMBER ? 1 | 4
+                : which == WHITEN ? (1 << BLACK) - 1 : 0;
+    }
+
+    /** The name some colours would have, worn together: white for all seven, the prism for any three or more, one of the pairs, or -1 for none. */
+    static int naming(int colours) {
+        if (colours == (1 << BLACK) - 1) return WHITEN;
+        if (Integer.bitCount(colours) >= 3) return PRISM;
+        for (int which = STEAMS; which <= EMBER; which++) if (colours == mixOf(which)) return which;
+        return -1;
+    }
+
+    /** As many of the colours owned as may be worn at once: those that are ready before those that are not, each in its order. */
+    static int most(int owned, int ready, int limit) {
+        int chosen = 0;
+        for (int turn = 0; turn < 2; turn++) {
+            for (int colour = RED; colour <= BLACK; colour++) {
+                int bit = 1 << colour - 1;
+                if ((owned & bit) == 0 || (chosen & bit) != 0 || Integer.bitCount(chosen) >= limit) continue;
+                if (turn == 1 || (ready & bit) != 0) chosen |= bit;
+            }
+        }
+        return chosen;
+    }
+
+    /**
+     * She wears a mix: of the colours given, those that are on and not among them are let
+     * go of, and those among them that are ready are called on, for as far as she can
+     * hold them; those still waiting are passed over. Returns those called on, as bits.
+     */
+    int wear(int colours) {
+        for (int colour = RED; colour <= BLACK; colour++) {
+            int bit = 1 << colour - 1;
+            if (worn[colour] > 0 && (colours & bit) == 0 && (lent & bit) == 0) drop(colour);
+        }
+        return callAll(colours);
+    }
+
     /** A colour is given her there and then, to keep: it is in her hair at once, and it is hers to call on from now. */
     void gift(int colour) {
         perks.colours |= 1 << colour - 1;

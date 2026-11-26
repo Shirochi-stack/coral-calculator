@@ -703,8 +703,8 @@ final class RunStory {
                     PLAYER + "She is sizing up a boss who is protected by a glowing shield, and working out how to beat her. Sharp, coaching, confident." + FAST}};
     /** About wearing colours together: that the ribbon can be held to mix them; the first mix that has a name; and white. */
     static final String[][] MIX = {
-            {"mix1", "Two colours now. Hold the ribbon and I'll wear them together Sloppy~♡", "H",
-                    PLAYER + "She explains that holding a button lets her mix two of her hair colours at once. Helpful, bossy, pleased with herself." + FAST},
+            {"mix1", "Two colours now. Tap the palette and pick what I wear together Sloppy~♡", "H",
+                    PLAYER + "She explains that tapping a little palette button lets her choose which of her hair colours to wear at once. Helpful, bossy, pleased with herself." + FAST},
             {"mix2", "Mixed, they do something neither does alone. Try them all Sloppy~♡", "H",
                     PLAYER + "She has just combined two magic hair colours and found a new power. Surprised, delighted, eager." + FAST},
             {"white1", "All seven at once. White. Look at me glow Sloppy~♡", "H",
