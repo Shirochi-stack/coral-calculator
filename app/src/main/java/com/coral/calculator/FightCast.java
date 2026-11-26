@@ -31,6 +31,8 @@ final class FightCast {
             {"Ink flick", "Paper knife", "Ink tear", "Flood of tears"},
             {"Heart pop", "Pink magic", "Heart beam", "Grand compliment"},
     };
+    /** What each one's greater ultimate is called: the one she has for winning a clash. */
+    static final String[] GREATER = {"Whole novel translation", "Whole bakery drop", "Normal grand slam", "Ocean of tears", "Grandest compliment"};
     /** A word on how to play each, for the screen where one is picked. */
     static final String[] TIPS = {
             "Keys up close, the book from the middle. Her scan does not fly far.",

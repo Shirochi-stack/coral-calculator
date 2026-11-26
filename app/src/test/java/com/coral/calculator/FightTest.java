@@ -32,7 +32,8 @@ public class FightTest {
         Fight.Pad pad = new Fight.Pad();
         pad.light = move == Fight.LIGHT;
         pad.heavy = move == Fight.HEAVY;
-        pad.special = move == Fight.SPECIAL || move == Fight.ULTIMATE;
+        pad.special = move == Fight.SPECIAL;
+        pad.ultimate = move == Fight.ULTIMATE;
         fight.step(STEP, pad, null);
         rest(fight, after);
     }
@@ -99,9 +100,9 @@ public class FightTest {
         Fight fight = apart(Fight.RUNE, Fight.TSUBAKIEH, 6);
         fight.fighters[0].meter = Fight.METER;
         Fight.Pad flood = new Fight.Pad(), other = new Fight.Pad();
-        flood.special = true;
+        flood.ultimate = true;
         fight.step(STEP, flood, other);
-        flood.special = false;
+        flood.ultimate = false;
         // The flood rolls along the floor: she jumps as it reaches her and it passes under.
         for (int step = 0; step < 400; step++) {
             boolean near = false;
@@ -119,7 +120,11 @@ public class FightTest {
 
     @Test public void anUltimateNeedsAFullMeterAndHoldsTheFightWhileItIsAnnounced() {
         Fight fight = apart(Fight.HALGAKOS, Fight.ILLYA, 7);
-        // Without the meter the button is only her special.
+        // Without the meter its button does nothing, and her special is only her special, with or without it.
+        press(fight, Fight.ULTIMATE, .05f);
+        assertEquals(Fight.FIGHTING, fight.phase());
+        assertEquals(0, fight.moves());
+        fight.fighters[0].meter = Fight.METER;
         press(fight, Fight.SPECIAL, .05f);
         assertEquals(Fight.FIGHTING, fight.phase());
         assertEquals(Fight.SPECIAL, fight.fighters[0].move);
@@ -128,7 +133,7 @@ public class FightTest {
         fight.fighters[0].meter = Fight.METER;
         assertTrue(fight.fighters[0].charged());
         Fight.Pad pad = new Fight.Pad();
-        pad.special = true;
+        pad.ultimate = true;
         fight.step(STEP, pad, null);
         assertEquals(Fight.FLOURISH, fight.phase());
         assertEquals(0, fight.flourisher());
@@ -153,9 +158,9 @@ public class FightTest {
         fight.step(STEP, grand, scan);
         scan.special = false;
         hold(fight, .25f, grand, scan);
-        grand.special = true;
+        grand.ultimate = true;
         fight.step(STEP, grand, scan);
-        grand.special = false;
+        grand.ultimate = false;
         assertEquals(Fight.FLOURISH, fight.phase());
         hold(fight, 4, grand, scan);
         assertEquals(0, lost(fight, 0), .01f);
@@ -275,6 +280,517 @@ public class FightTest {
         assertTrue(fight.shots().isEmpty());
         assertEquals(0, lost(fight, 0), .01f);
         assertEquals(0, lost(fight, 1), .01f);
+    }
+
+    // Chains
+
+    /** Presses a button again and again, a tenth of a second apart, and says which moves the left side began, in order. */
+    private static java.util.List<Integer> mashed(Fight fight, String buttons, float seconds) {
+        java.util.List<Integer> begun = new java.util.ArrayList<>();
+        Fight.Pad pad = new Fight.Pad();
+        int seen = fight.moves();
+        for (int frame = 0; frame < seconds * 60; frame++) {
+            boolean down = frame % 6 < 3;
+            // The button for the move that comes next.
+            char which = buttons.charAt(Math.min(buttons.length() - 1, begun.size()));
+            pad.light = down && which == 'q';
+            pad.heavy = down && which == 'h';
+            fight.step(STEP, pad, null);
+            if (fight.moves() != seen) {
+                seen = fight.moves();
+                begun.add(fight.fighters[0].move);
+            }
+        }
+        return begun;
+    }
+
+    @Test public void aBlowPressedAgainInTimeGoesOnThroughAChainOfFiveDifferentBlows() {
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            Fight fight = apart(kind, Fight.CHIKUWA, 1.2f);
+            java.util.List<Integer> begun = mashed(fight, "q", 3);
+            assertEquals(FightCast.NAMES[kind] + " " + begun, java.util.Arrays.asList(Fight.LIGHT, Fight.QUICK2, Fight.QUICK2 + 1, Fight.QUICK2 + 2, Fight.QUICK5),
+                    begun.subList(0, 5));
+            // After the fifth it begins again from the first.
+            assertEquals(Fight.LIGHT, (int) begun.get(5));
+            // Each is its own move, and the fifth is the hardest and knocks down.
+            Fight.Move[] moves = Fight.MOVES[kind];
+            assertTrue(moves[Fight.QUICK5].floors);
+            assertTrue(moves[Fight.QUICK5].damage > moves[Fight.LIGHT].damage * 1.5f);
+            for (int step = Fight.QUICK2; step <= Fight.QUICK5; step++) assertFalse(moves[step - 1].floors && step - 1 != Fight.ULTIMATE);
+        }
+        // Up close every one of Halgakos's five lands, each taking off less than it would alone, and the last throws her down.
+        Fight fight = apart(Fight.HALGAKOS, Fight.CHIKUWA, 1.2f);
+        Fight.Pad pad = new Fight.Pad();
+        int most = 0;
+        for (int frame = 0; frame < 120 && fight.falls() == 0; frame++) {
+            pad.light = frame % 6 < 3;
+            fight.step(STEP, pad, null);
+            most = Math.max(most, fight.fighters[0].combo);
+        }
+        assertEquals(5, most);
+        assertEquals(1, fight.falls());
+        float alone = 0;
+        for (int move : new int[]{Fight.LIGHT, Fight.QUICK2, Fight.QUICK2 + 1, Fight.QUICK2 + 2, Fight.QUICK5}) alone += hurt(Fight.HALGAKOS, move);
+        assertEquals(fight.fighters[0].comboDamage, lost(fight, 1), .01f);
+        assertTrue("lost " + lost(fight, 1) + " of " + alone, lost(fight, 1) < alone * .8f && lost(fight, 1) > alone * .5f);
+    }
+
+    @Test public void quickAndHeavyBlowsMayBeMixedInAChainAndAPauseEndsIt() {
+        Fight fight = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 1.2f);
+        assertEquals(java.util.Arrays.asList(Fight.LIGHT, Fight.HEAVY2, Fight.QUICK2 + 1, Fight.HEAVY2 + 2, Fight.HEAVY5), mashed(fight, "qhqhh", 4).subList(0, 5));
+        Fight heavy = apart(Fight.CHIKUWA, Fight.HALGAKOS, 1.2f);
+        assertEquals(java.util.Arrays.asList(Fight.HEAVY, Fight.HEAVY2, Fight.HEAVY2 + 1, Fight.HEAVY2 + 2, Fight.HEAVY5), mashed(heavy, "h", 5).subList(0, 5));
+        // Left too long, the next press is the first blow again.
+        Fight slow = apart(Fight.HALGAKOS, Fight.CHIKUWA, 4);
+        press(slow, Fight.LIGHT, .25f + Fight.CHAIN_WINDOW + .1f);
+        press(slow, Fight.LIGHT, .05f);
+        assertEquals(Fight.LIGHT, slow.fighters[0].move);
+        // In time, it is the second.
+        Fight quick = apart(Fight.HALGAKOS, Fight.CHIKUWA, 4);
+        press(quick, Fight.LIGHT, .25f + Fight.CHAIN_WINDOW - .1f);
+        press(quick, Fight.LIGHT, .05f);
+        assertEquals(Fight.QUICK2, quick.fighters[0].move);
+        assertEquals(2, Fight.chainStep(Fight.QUICK2));
+        assertEquals(5, Fight.chainStep(Fight.HEAVY5));
+        assertEquals(0, Fight.chainStep(Fight.SPECIAL));
+    }
+
+    /** The frame a fighter shows in the middle of a move. */
+    private static int shown(int kind, int move, float clock, int landed, int specials) {
+        Fight fight = apart(kind, Fight.HALGAKOS, 3);
+        Fight.Fighter fighter = fight.fighters[0];
+        fighter.state = Fight.ATTACK;
+        fighter.move = move;
+        fighter.clock = clock;
+        fighter.landed = landed;
+        fighter.mark = clock;
+        fighter.specials = specials;
+        return FightPose.of(fight, fighter, 0, 0);
+    }
+
+    @Test public void everyFighterHasThirtyAttackFramesAndNoBlowOfAChainLooksLikeAnother() {
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            Fight.Move[] moves = Fight.MOVES[kind];
+            Set<Integer> frames = new HashSet<>(), chain = new HashSet<>();
+            for (int move = 0; move < Fight.MOVE_COUNT; move++) {
+                Fight.Move doing = moves[move];
+                int blow = shown(kind, move, doing.startup + .01f, 0, 1);
+                frames.add(blow);
+                if (Fight.chainStep(move) >= 1 && move != Fight.DASH_LIGHT) assertTrue("a blow of a chain shown twice: " + move, chain.add(blow));
+                frames.add(shown(kind, move, .01f, 0, 1));
+            }
+            assertEquals(10, chain.size());
+            // Her special goes through five; the smash comes down and lands; her ultimate and the greater one are gathered, let go and done.
+            for (int specials = 1; specials <= 12; specials++) frames.add(shown(kind, Fight.SPECIAL, moves[Fight.SPECIAL].startup + .01f, 1, specials));
+            frames.add(shown(kind, Fight.AIR_SPECIAL, 1, 1, 2));
+            frames.add(shown(kind, Fight.SMASH, 1, 1, 0));
+            for (int grand : new int[]{Fight.ULTIMATE, Fight.CLASH}) {
+                frames.add(shown(kind, grand, moves[grand].startup * .8f, 0, 0));
+                frames.add(shown(kind, grand, moves[grand].length() - .01f, moves[grand].times, 0));
+            }
+            assertTrue(FightCast.NAMES[kind] + " has " + frames.size(), frames.size() >= 30);
+            for (int frame : frames) assertTrue(frame >= FightFrames.QS && frame < FightFrames.COUNT);
+            if (!FightFrames.FULL[kind]) continue;
+            // And each of them is a picture of its own.
+            Set<String> places = new HashSet<>();
+            for (int frame : frames) {
+                short[] at = FightFrames.FRAMES[kind][frame];
+                assertTrue("two frames in one place: " + frame, places.add(at[0] + " " + at[1] + " " + at[2]));
+                assertTrue(at[3] > 40 && at[4] > 40);
+            }
+        }
+    }
+
+    @Test public void aChainPlayedOutShowsFiveBlowsOneAfterAnother() {
+        Fight fight = apart(Fight.HALGAKOS, Fight.CHIKUWA, 1.2f);
+        Fight.Pad pad = new Fight.Pad();
+        java.util.List<Integer> blows = new java.util.ArrayList<>();
+        for (int frame = 0; frame < 120 && fight.falls() == 0; frame++) {
+            pad.light = frame % 6 < 3;
+            fight.step(STEP, pad, null);
+            Fight.Fighter her = fight.fighters[0];
+            if (her.state != Fight.ATTACK || her.clock < her.doing().startup || her.clock > her.doing().startup + her.doing().active) continue;
+            int pose = FightPose.of(fight, her, 0, 0);
+            if (blows.isEmpty() || blows.get(blows.size() - 1) != pose) blows.add(pose);
+        }
+        assertEquals(java.util.Arrays.asList(FightFrames.Q1, FightFrames.Q2, FightFrames.Q3, FightFrames.Q4, FightFrames.Q5), blows);
+    }
+
+    // In the air
+
+    @Test public void threeQuickBlowsInTheAirAndNoMore() {
+        Fight fight = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 6);
+        Fight.Pad pad = new Fight.Pad();
+        pad.jump = true;
+        fight.step(STEP, pad, null);
+        pad.jump = false;
+        Set<Integer> begun = new HashSet<>();
+        for (int frame = 0; frame < 150; frame++) {
+            pad.light = frame > 6 && frame % 6 < 3;
+            fight.step(STEP, pad, null);
+            if (fight.fighters[0].state == Fight.ATTACK && fight.fighters[0].y > 0) begun.add(fight.fighters[0].move);
+            if (fight.fighters[0].y == 0 && frame > 20) break;
+        }
+        assertEquals(new HashSet<>(java.util.Arrays.asList(Fight.AIR1, Fight.AIR1 + 1, Fight.AIR3)), begun);
+    }
+
+    /** Jumps, and at the top of the jump comes down with a smash; then waits. */
+    private static void smash(Fight fight, float after) {
+        Fight.Pad pad = new Fight.Pad();
+        pad.jump = true;
+        fight.step(STEP, pad, null);
+        pad.jump = false;
+        hold(fight, .3f, pad, null);
+        pad.heavy = true;
+        fight.step(STEP, pad, null);
+        pad.heavy = false;
+        hold(fight, after, pad, null);
+    }
+
+    @Test public void aSmashComesStraightDownAndThrowsDownWhoeverIsNear() {
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            Fight fight = apart(kind, Fight.HALGAKOS, 1.4f);
+            smash(fight, .5f);
+            assertEquals(FightCast.NAMES[kind], 1, fight.quakes());
+            assertEquals(0, fight.fighters[0].y, 0);
+            assertEquals(Fight.SMASH, fight.fighters[0].move);
+            assertEquals(1, fight.fighters[0].landed);
+            assertEquals(hurt(kind, Fight.SMASH), lost(fight, 1), .01f);
+            assertEquals(Fight.DOWN, fight.fighters[1].state);
+            assertEquals(fight.fighters[0].x, fight.quakeX(), .001f);
+            assertTrue(hurt(kind, Fight.SMASH) >= 12);
+        }
+    }
+
+    @Test public void aSmashThatMissesLeavesHerOpenForLonger() {
+        Fight hit = apart(Fight.CHIKUWA, Fight.HALGAKOS, 1.4f), miss = apart(Fight.CHIKUWA, Fight.HALGAKOS, 7);
+        Fight.Pad guard = new Fight.Pad();
+        smash(hit, 0);
+        smash(miss, 0);
+        float gone = 0;
+        while (miss.quakes() == 0 || hit.quakes() == 0) {
+            hit.step(STEP, guard, null);
+            miss.step(STEP, guard, null);
+        }
+        assertEquals(2, miss.fighters[0].landed);
+        assertEquals(0, lost(miss, 1), 0);
+        float open = 0, openMissed = 0;
+        for (int frame = 0; frame < 120; frame++) {
+            hit.step(STEP, guard, null);
+            miss.step(STEP, guard, null);
+            if (hit.fighters[0].state == Fight.ATTACK) open += STEP;
+            if (miss.fighters[0].state == Fight.ATTACK) openMissed += STEP;
+        }
+        assertTrue(open + " and " + openMissed, openMissed > open + .1f && open > .3f);
+        // And while she is, she can be hit.
+        Fight punished = apart(Fight.CHIKUWA, Fight.HALGAKOS, 7);
+        smash(punished, 0);
+        while (punished.quakes() == 0) punished.step(STEP, guard, null);
+        punished.fighters[1].x = punished.fighters[0].x + 1.2f;
+        Fight.Pad strike = new Fight.Pad();
+        strike.light = true;
+        hold(punished, .2f, guard, strike);
+        assertEquals(hurt(Fight.HALGAKOS, Fight.LIGHT), lost(punished, 0), .01f);
+    }
+
+    @Test public void aBlowFromBehindHerGuardBreaksItAndALaunchThrowsHerUpToBeHitAgain() {
+        Fight fight = apart(Fight.HALGAKOS, Fight.RUNE, 1.3f);
+        Fight.Pad strike = new Fight.Pad(), guard = new Fight.Pad();
+        guard.block = true;
+        hold(fight, .1f, strike, guard);
+        // Heavy with the arrow that points away from her held.
+        strike.left = true;
+        strike.heavy = true;
+        fight.step(STEP, strike, guard);
+        assertEquals(Fight.BREAK, fight.fighters[0].move);
+        strike.left = false;
+        strike.heavy = false;
+        hold(fight, .7f, strike, guard);
+        assertEquals(0, fight.blocks());
+        assertEquals(hurt(Fight.HALGAKOS, Fight.BREAK), lost(fight, 1), .01f);
+        assertTrue(Fight.MOVES[Fight.HALGAKOS][Fight.BREAK].startup > Fight.MOVES[Fight.HALGAKOS][Fight.HEAVY].startup);
+
+        Fight up = apart(Fight.HALGAKOS, Fight.RUNE, 1.3f);
+        Fight.Pad launch = new Fight.Pad();
+        launch.block = true;
+        launch.heavy = true;
+        up.step(STEP, launch, null);
+        assertEquals(Fight.LAUNCH, up.fighters[0].move);
+        launch.block = false;
+        launch.heavy = false;
+        float highest = 0;
+        while (up.fighters[0].state == Fight.ATTACK) {
+            up.step(STEP, launch, null);
+            highest = Math.max(highest, up.fighters[1].y);
+        }
+        assertTrue("went up " + highest, highest > 1);
+        assertEquals(Fight.DOWN, up.fighters[1].state);
+        assertTrue(up.fighters[1].y > .25f);
+        // Still in the air, she is hit again; it counts as the second of the same run, and takes off less.
+        press(up, Fight.LIGHT, .2f);
+        assertEquals(2, up.hits());
+        assertEquals(2, up.fighters[0].combo);
+        assertEquals(hurt(Fight.HALGAKOS, Fight.LAUNCH) + hurt(Fight.HALGAKOS, Fight.LIGHT) * .83f, lost(up, 1), .01f);
+    }
+
+    @Test public void anArrowTwiceIsADashOrAHopBackAndABlowOutOfADashIsItsOwn() {
+        Fight fight = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 6);
+        Fight.Pad pad = new Fight.Pad();
+        float from = fight.fighters[0].x;
+        for (int tap = 0; tap < 2; tap++) {
+            pad.right = true;
+            fight.step(STEP, pad, null);
+            fight.step(STEP, pad, null);
+            pad.right = false;
+            if (tap == 0) fight.step(STEP, pad, null);
+        }
+        assertEquals(Fight.DASH, fight.fighters[0].state);
+        hold(fight, .1f, pad, null);
+        pad.light = true;
+        fight.step(STEP, pad, null);
+        assertEquals(Fight.DASH_LIGHT, fight.fighters[0].move);
+        pad.light = false;
+        assertTrue(fight.fighters[0].x - from > 1);
+        // Away from her it is a hop back.
+        Fight back = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 3);
+        from = back.fighters[0].x;
+        Fight.Pad away = new Fight.Pad();
+        for (int tap = 0; tap < 2; tap++) {
+            away.left = true;
+            back.step(STEP, away, null);
+            away.left = false;
+            back.step(STEP, away, null);
+        }
+        assertEquals(Fight.BACKSTEP, back.fighters[0].state);
+        rest(back, .4f);
+        assertEquals(Fight.IDLE, back.fighters[0].state);
+        assertTrue(from - back.fighters[0].x > 1.5f);
+    }
+
+    // The dodge
+
+    /** A heavy swing of Tsubakieh's at someone who dodges so long after it is begun; what it took off her. */
+    private static Fight swungAt(float dodgeAt, boolean left) {
+        Fight fight = apart(Fight.TSUBAKIEH, Fight.HALGAKOS, 1.3f);
+        Fight.Pad strike = new Fight.Pad(), slip = new Fight.Pad();
+        strike.heavy = true;
+        for (float gone = 0; gone < .8f; gone += STEP) {
+            slip.dodge = dodgeAt >= 0 && gone >= dodgeAt && gone < dodgeAt + .05f;
+            slip.left = slip.dodge && left;
+            fight.step(STEP, strike, slip);
+        }
+        return fight;
+    }
+
+    @Test public void aDodgeInTimeMakesABlowMissAndOneTooEarlyOrTooLateDoesNot() {
+        float swing = hurt(Fight.TSUBAKIEH, Fight.HEAVY);
+        Fight inTime = swungAt(.2f, false);
+        assertEquals(0, lost(inTime, 1), 0);
+        assertEquals(0, inTime.hits());
+        assertEquals(1, inTime.dodges());
+        // Too early: nothing can touch her for a moment, but the moment is over before she can move again.
+        Fight early = swungAt(0, false);
+        assertEquals(1, early.dodges());
+        assertEquals(swing, lost(early, 1), .01f);
+        // Too late: the blow is already on her.
+        Fight late = swungAt(.32f, false);
+        assertEquals(0, late.dodges());
+        assertEquals(swing, lost(late, 1), .01f);
+        assertEquals(swing, lost(swungAt(-1, false), 1), .01f);
+        assertTrue(Fight.DODGE_SAFE < Fight.DODGE_SECONDS);
+        // With an arrow held she slips that way, through the other and out behind her.
+        Fight through = swungAt(.2f, true);
+        assertEquals(0, lost(through, 1), 0);
+        assertTrue(through.fighters[1].x < through.fighters[0].x);
+    }
+
+    @Test public void aDodgeLetsAThingThrownPassAndMustRestBeforeTheNext() {
+        Fight fight = apart(Fight.ILLYA, Fight.CHIKUWA, 5);
+        Fight.Pad heart = new Fight.Pad(), slip = new Fight.Pad();
+        heart.special = true;
+        for (float gone = 0; gone < 1.2f; gone += STEP) {
+            slip.dodge = gone >= .34f && gone < .4f;
+            fight.step(STEP, heart, slip);
+        }
+        assertEquals(1, fight.throwsMade());
+        assertEquals(0, lost(fight, 1), 0);
+        assertTrue(fight.shots().isEmpty());
+        // Pressed again at once it does nothing; after its rest it does.
+        Fight again = apart(Fight.ILLYA, Fight.CHIKUWA, 5);
+        Fight.Pad none = new Fight.Pad();
+        for (float gone = 0; gone < 2; gone += STEP) {
+            slip.dodge = gone < .05f || gone >= .5f && gone < .55f;
+            again.step(STEP, none, slip);
+        }
+        assertEquals(1, again.dodges());
+        assertTrue(Fight.DODGE_REST > Fight.DODGE_SECONDS + .4f);
+        slip.dodge = true;
+        again.step(STEP, none, slip);
+        assertEquals(2, again.dodges());
+        assertEquals(Fight.DODGE, again.fighters[1].state);
+        // In the air too, once a jump.
+        Fight air = apart(Fight.ILLYA, Fight.CHIKUWA, 5);
+        Fight.Pad jump = new Fight.Pad();
+        jump.jump = true;
+        air.step(STEP, none, jump);
+        jump.jump = false;
+        hold(air, .2f, none, jump);
+        jump.dodge = true;
+        air.step(STEP, none, jump);
+        assertEquals(Fight.DODGE, air.fighters[1].state);
+        assertTrue(air.fighters[1].y > 0);
+    }
+
+    // The clash
+
+    /** Two played by hand with their meters full: the left goes for her ultimate, and the right for hers so long after. */
+    private static Fight answered(float after) {
+        Fight fight = apart(Fight.HALGAKOS, Fight.ILLYA, 5);
+        fight.fighters[0].meter = Fight.METER;
+        fight.fighters[1].meter = Fight.METER;
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        one.ultimate = true;
+        fight.step(STEP, one, two);
+        one.ultimate = false;
+        hold(fight, after, one, two);
+        two.ultimate = true;
+        fight.step(STEP, one, two);
+        return fight;
+    }
+
+    /** Taps a clash out: so many taps from each side, spread over it. */
+    private static void tapped(Fight fight, int left, int right) {
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        int frames = Math.round(Fight.CLASH_SECONDS * 60) - 4, had = fight.taps(0), hadToo = fight.taps(1);
+        for (int frame = 0; frame < frames; frame++) {
+            one.taps = (frame + 1) * left / frames - frame * left / frames;
+            two.taps = (frame + 1) * right / frames - frame * right / frames;
+            fight.step(STEP, one, two);
+        }
+        assertEquals(Fight.CLASHING, fight.phase());
+        assertEquals(had + left, fight.taps(0));
+        assertEquals(hadToo + right, fight.taps(1));
+        hold(fight, Fight.CLASH_GRACE + .1f, one, two);
+    }
+
+    @Test public void twoUltimatesAtOnceClashAndWhoeverTapsFasterHasTheGreaterOne() throws Exception {
+        Fight fight = answered(.5f);
+        assertEquals(Fight.CLASHING, fight.phase());
+        assertEquals(1, fight.clashes());
+        assertEquals(1, fight.clashSecond());
+        assertEquals(0, fight.fighters[0].meter, 0);
+        assertEquals(0, fight.fighters[1].meter, 0);
+        assertEquals(Fight.CLASH_SECONDS, fight.clashLeft(), .02f);
+        // It is all there for a device that is only shown the fight.
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        one.taps = 3;
+        two.taps = 1;
+        fight.step(STEP, one, two);
+        fight.write(new java.io.DataOutputStream(bytes));
+        Fight shown = new Fight(Fight.HALGAKOS, Fight.ILLYA, -1, -1, 0);
+        shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+        assertEquals(Fight.CLASHING, shown.phase());
+        assertEquals(3, shown.taps(0));
+        assertEquals(1, shown.taps(1));
+        assertEquals(1, shown.clashes());
+        assertEquals(1, shown.clashSecond());
+        assertEquals(fight.clashLeft(), shown.clashLeft(), 0);
+        // Nothing moves while they tap.
+        float clock = fight.left();
+        tapped(fight, 27, 19);
+        assertEquals(clock, fight.left(), 0);
+        // The left tapped more: hers is the greater ultimate, and the other can only take it.
+        assertEquals(Fight.FLOURISH, fight.phase());
+        assertEquals(0, fight.flourisher());
+        assertEquals(Fight.CLASH, fight.fighters[0].move);
+        rest(fight, 4);
+        Fight.Move greater = Fight.MOVES[Fight.HALGAKOS][Fight.CLASH], usual = Fight.MOVES[Fight.HALGAKOS][Fight.ULTIMATE];
+        assertEquals(greater.damage * greater.times, lost(fight, 1), .01f);
+        assertEquals(0, lost(fight, 0), 0);
+        assertEquals(1, fight.falls());
+        assertFalse(fight.fighters[1].charged());
+        assertEquals(1, fight.clashes());
+        // It is more than her usual one, and never the whole of anyone's health.
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            Fight.Move grand = Fight.MOVES[kind][Fight.CLASH];
+            float most = Fight.MOVES[kind][Fight.ULTIMATE].shot != Fight.NOTHING ? Fight.damageOf(Fight.FLOOD) * 3
+                    : Fight.MOVES[kind][Fight.ULTIMATE].damage * Fight.MOVES[kind][Fight.ULTIMATE].times;
+            assertTrue(FightCast.NAMES[kind], grand.damage * grand.times > most * 1.2f);
+            for (int other = 0; other < Fight.FIGHTERS; other++) assertTrue(grand.damage * grand.times < Fight.fullHealth(other) * .7f);
+        }
+        assertTrue(greater.times > usual.times);
+    }
+
+    @Test public void theOtherWinsAClashByTappingMoreAndLevelItGoesToWhoeverWentSecond() {
+        Fight fight = answered(.9f);
+        assertEquals(Fight.CLASHING, fight.phase());
+        tapped(fight, 12, 31);
+        assertEquals(1, fight.flourisher());
+        assertEquals(Fight.CLASH, fight.fighters[1].move);
+        rest(fight, 4);
+        assertEquals(0, lost(fight, 1), 0);
+        assertEquals(Fight.MOVES[Fight.ILLYA][Fight.CLASH].damage * 5, lost(fight, 0), .01f);
+        Fight level = answered(.3f);
+        tapped(level, 20, 20);
+        assertEquals(1, level.flourisher());
+        // A tap in the moment after the time is up still counts.
+        Fight last = answered(.3f);
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        hold(last, Fight.CLASH_SECONDS + .05f, one, two);
+        assertEquals(Fight.CLASHING, last.phase());
+        one.taps = 1;
+        last.step(STEP, one, two);
+        hold(last, Fight.CLASH_GRACE, one, two);
+        assertEquals(0, last.flourisher());
+    }
+
+    @Test public void anUltimateAnsweredTooLateIsNoClash() {
+        Fight fight = answered(Fight.FLOURISH_SECONDS + .1f);
+        assertEquals(0, fight.clashes());
+        // Hers was simply begun in its turn: the first is not stopped by it.
+        assertEquals(Fight.FLOURISH, fight.phase());
+        assertEquals(1, fight.flourisher());
+        rest(fight, 5);
+        assertEquals(0, fight.clashes());
+        // And nothing touches her in the middle of her own: most of both of them is wasted.
+        assertEquals(0, lost(fight, 1), 0);
+        assertTrue(lost(fight, 0) < hurt(Fight.ILLYA, Fight.ULTIMATE) * 4);
+    }
+
+    @Test public void oneWhoPlaysHerselfTapsFasterTheBetterSheIsAndCanBeOutTappedAtHerBest() {
+        int[] tapped = new int[Fight.LEVELS];
+        for (int level = 0; level < Fight.LEVELS; level++) {
+            // She is the one to go for her ultimate; the player answers.
+            Fight fight = new Fight(Fight.CHIKUWA, Fight.HALGAKOS, -1, level, 5);
+            fight.fighters[1].meter = Fight.METER;
+            Fight.Pad pad = new Fight.Pad();
+            for (int frame = 0; frame < 1200 && fight.phase() != Fight.FLOURISH; frame++) {
+                fight.fighters[0].health = Fight.fullHealth(Fight.CHIKUWA);
+                fight.step(STEP, pad, null);
+            }
+            assertEquals("at level " + level, Fight.FLOURISH, fight.phase());
+            assertEquals(1, fight.flourisher());
+            fight.fighters[0].meter = Fight.METER;
+            pad.ultimate = true;
+            fight.step(STEP, pad, null);
+            pad.ultimate = false;
+            assertEquals(Fight.CLASHING, fight.phase());
+            assertEquals(0, fight.clashSecond());
+            // Nine taps a second from the player, which two thumbs manage.
+            int frames = Math.round(Fight.CLASH_SECONDS * 60) - 2;
+            for (int frame = 0; frame < frames; frame++) {
+                pad.taps = (frame + 1) * 36 / frames - frame * 36 / frames;
+                fight.step(STEP, pad, null);
+            }
+            tapped[level] = fight.taps(1);
+            assertEquals(Fight.TAP_RATE[level] * Fight.CLASH_SECONDS, tapped[level], 2.5f);
+            hold(fight, Fight.CLASH_GRACE + .1f, pad, null);
+            assertEquals(0, fight.flourisher());
+            assertEquals(Fight.CLASH, fight.fighters[0].move);
+            if (level > 0) assertTrue(tapped[level] > tapped[level - 1]);
+        }
+        assertTrue(tapped[Fight.LEVELS - 1] < 30);
     }
 
     // Rounds
@@ -402,13 +918,21 @@ public class FightTest {
     // Two players
 
     @Test public void whatIsHeldDownSurvivesBeingSentAsANumber() {
-        for (int bits = 0; bits < 128; bits++) {
+        for (int bits = 0; bits < 512; bits++) {
             Fight.Pad pad = new Fight.Pad();
             pad.set(bits);
             assertEquals(bits, pad.bits());
             assertEquals((bits & 4) != 0, pad.jump);
             assertEquals((bits & 64) != 0, pad.special);
+            assertEquals((bits & 128) != 0, pad.dodge);
+            assertEquals((bits & 256) != 0, pad.ultimate);
         }
+        // It goes in two bytes, as the device that joins sends it.
+        Fight.Pad all = new Fight.Pad();
+        all.set(511);
+        Fight.Pad got = new Fight.Pad();
+        got.set((all.bits() & 0xFF) | ((all.bits() >> 8) & 0xFF) << 8);
+        assertTrue(got.dodge && got.ultimate && got.left && got.special);
     }
 
     @Test public void aFightWrittenDownAndReadBackIsTheSameFightToLookAt() throws Exception {
@@ -447,7 +971,23 @@ public class FightTest {
                 assertEquals(hers.wins, seen.wins);
                 assertEquals(hers.facingLeft, seen.facingLeft);
                 assertEquals(hers.unarmed, seen.unarmed);
+                assertEquals(hers.chain, seen.chain);
+                assertEquals(hers.combo, seen.combo);
+                assertEquals(hers.comboDamage, seen.comboDamage, 0);
+                assertEquals(hers.reel, seen.reel);
+                assertEquals(hers.backing, seen.backing);
+                assertEquals(hers.guarding, seen.guarding);
+                assertEquals(hers.dodgeRest, seen.dodgeRest, 0);
+                assertEquals(hers.mark, seen.mark, 0);
+                assertEquals(hers.landed, seen.landed);
+                // And so it is the same frame of her that both show.
+                assertEquals(FightPose.of(host, hers, 0, 0), FightPose.of(shown, seen, 0, 0));
             }
+            assertEquals(host.quakes(), shown.quakes());
+            assertEquals(host.dodges(), shown.dodges());
+            assertEquals(host.clashes(), shown.clashes());
+            assertEquals(host.quakeX(), shown.quakeX(), 0);
+            assertEquals(host.time(), shown.time(), 0);
         }
         assertTrue(host.hits() > 3);
         assertTrue(thrown > 0);
