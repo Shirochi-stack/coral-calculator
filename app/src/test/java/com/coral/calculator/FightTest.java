@@ -631,23 +631,40 @@ public class FightTest {
         for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
             String name = FightCast.NAMES[kind];
             Fight.Pad pad = new Fight.Pad();
-            // Standing: a breath of six frames, out and in.
+            // Standing she is one drawing and no other, however long: it is drawn breathing, not swapped for near-copies of itself.
             Set<Integer> frames = new HashSet<>();
             float held = longest(apart(kind, Fight.CHIKUWA, 6), pad, 3, Fight.IDLE, frames);
-            assertTrue(name + " stands on a frame for " + held, held <= .14f);
-            assertEquals(6, frames.size());
-            // Walking forward in twelve frames, and backward in eight.
+            assertEquals(java.util.Collections.singleton(FightFrames.IDLE1), frames);
+            // A walk is the frames that were drawn together as one stride and only those: six forward, four backward.
             frames.clear();
             pad.right = true;
             held = longest(apart(kind, Fight.CHIKUWA, 8), pad, .6f, Fight.WALK, frames);
-            assertTrue(name + " walks on a frame for " + held, held <= .06f);
-            assertEquals(12, frames.size());
+            assertTrue(name + " walks on a frame for " + held, held <= .1f);
+            Set<Integer> stride = new HashSet<>();
+            for (int frame = FightFrames.WALK1; frame <= FightFrames.WALK6; frame++) stride.add(frame);
+            assertEquals(stride, frames);
             frames.clear();
+            stride.clear();
             pad.right = false;
             pad.left = true;
             held = longest(apart(kind, Fight.CHIKUWA, 2), pad, .7f, Fight.WALK, frames);
-            assertTrue(name + " backs away on a frame for " + held, held <= .08f);
-            assertEquals(8, frames.size());
+            assertTrue(name + " backs away on a frame for " + held, held <= .14f);
+            for (int frame = FightFrames.BACK1; frame <= FightFrames.BACK4; frame++) stride.add(frame);
+            assertEquals(stride, frames);
+            // Held in her guard, and staggering from a hard blow, she is one drawing too.
+            frames.clear();
+            pad.left = false;
+            pad.block = true;
+            longest(apart(kind, Fight.CHIKUWA, 6), pad, 1.2f, Fight.BLOCK, frames);
+            frames.remove(FightFrames.GUARD_UP);
+            assertEquals(java.util.Collections.singleton(FightFrames.GUARD), frames);
+            pad.block = false;
+            Fight dizzy = apart(kind, Fight.CHIKUWA, 3);
+            Fight.Fighter reeling = dizzy.fighters[0];
+            reeling.state = Fight.HIT;
+            reeling.reel = 2;
+            reeling.stunned = 1;
+            for (reeling.clock = .15f; reeling.clock < 1; reeling.clock += .05f) assertEquals(FightFrames.STAGGER, FightPose.of(dizzy, reeling, 0, 0));
             // A jump: the crouch, the push, up, over the top, down, and the landing.
             frames.clear();
             pad.left = false;
@@ -685,9 +702,9 @@ public class FightTest {
             // Each of them a picture of its own, when she has them all.
             if (!FightFrames.SMOOTH[kind]) continue;
             Set<String> places = new HashSet<>();
-            int[] between = {FightFrames.BR1, FightFrames.BR6, FightFrames.WB1, FightFrames.WB6, FightFrames.BB1, FightFrames.BB4, FightFrames.GUARD_UP,
+            int[] between = {FightFrames.GUARD_UP,
                     FightFrames.TURN2, FightFrames.PUSH, FightFrames.RISE2, FightFrames.TOP2, FightFrames.FALL2, FightFrames.LAND2, FightFrames.HIT1R,
-                    FightFrames.HIT2R, FightFrames.STAGGER2, FightFrames.PROP, FightFrames.HALF_UP, FightFrames.QW1, FightFrames.QW5, FightFrames.QF1,
+                    FightFrames.HIT2R, FightFrames.PROP, FightFrames.HALF_UP, FightFrames.QW1, FightFrames.QW5, FightFrames.QF1,
                     FightFrames.QF5, FightFrames.HW1, FightFrames.HW5, FightFrames.HF1, FightFrames.HF5, FightFrames.AF1, FightFrames.AF3, FightFrames.AW,
                     FightFrames.SM_TIP, FightFrames.DASH_QW, FightFrames.SHOVE_W, FightFrames.SW1, FightFrames.SW5, FightFrames.U12, FightFrames.U4R,
                     FightFrames.SF, FightFrames.IDLE1, FightFrames.WALK1, FightFrames.Q1, FightFrames.H1, FightFrames.QS, FightFrames.HS};

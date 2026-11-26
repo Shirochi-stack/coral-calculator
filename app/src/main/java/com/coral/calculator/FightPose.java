@@ -7,9 +7,10 @@ import static com.coral.calculator.FightFrames.*;
  * has been doing it. It goes by the fight's own clocks and nothing else, so two devices
  * showing the same fight show the same frame.
  *
- * Nothing that moves holds a frame for much more than a tenth of a second: she breathes in
- * six steps as she stands, walks in twelve, jumps in ten, and every blow has a wind-up
- * before it and a follow-through after.
+ * A pose that is held is one drawing: standing she is a single frame, and it is whoever
+ * draws her that makes her breathe. A walk is the frames that were drawn together as one
+ * cycle. What happens once has frames between its poses: a jump goes through ten, and every
+ * blow has a wind-up before it and a follow-through after.
  */
 final class FightPose {
     private static final int[] RUNE_THROWS = {0, 2, 3, 4};
@@ -24,13 +25,9 @@ final class FightPose {
         float clock = fighter.clock;
         switch (fighter.state) {
             case Fight.WALK: {
-                // The frames that were drawn first and those that go between them, by turns: eight to a stride backward, twelve forward.
-                if (fighter.backing) {
-                    int step = (int) (clock / .06f) % 8;
-                    return (step % 2 == 0 ? BACK1 : BB1) + step / 2;
-                }
-                int step = (int) (clock / .0425f) % 12;
-                return (step % 2 == 0 ? WALK1 : WB1) + step / 2;
+                // The frames of a stride that were drawn together, and so agree with one another: four backward, six forward.
+                if (fighter.backing) return BACK1 + (int) (clock / .12f) % 4;
+                return WALK1 + (int) (clock / .085f) % 6;
             }
             case Fight.DASH:
                 return clock < .05f ? DASH1 : clock > Fight.DASH_SECONDS - .06f ? SKID : (int) (clock / .07f) % 2 == 0 ? DASH2 : DASH3;
@@ -61,9 +58,9 @@ final class FightPose {
             case Fight.BLOCK:
                 return fighter.blockAge < .18f ? GUARD_HIT : clock < .07f ? GUARD_UP : GUARD;
             case Fight.HIT: {
-                // A hard blow throws her back and leaves her staggering from foot to foot; a light one snaps her head back or doubles
+                // A hard blow throws her back and leaves her staggering; a light one snaps her head back or doubles
                 // her up, by turns, and she comes round from it.
-                if (fighter.reel == 2) return clock < .14f ? BLOWN : (int) ((clock - .14f) / .12f) % 2 == 0 ? STAGGER : STAGGER2;
+                if (fighter.reel == 2) return clock < .14f ? BLOWN : STAGGER;
                 boolean round = clock > fighter.stunned * .5f;
                 return fighter.reel == 1 ? (round ? HIT2R : HIT2) : (round ? HIT1R : HIT1);
             }
@@ -83,14 +80,8 @@ final class FightPose {
                 if (hold > .45f) return TAUNT;
                 if (fighter.turned < .05f) return TURN;
                 if (fighter.turned < .1f) return TURN2;
-                return breathing(fight.time() + fighter.side * .4f);
+                return IDLE1;
         }
-    }
-
-    /** The frame of her breath at a time: out to in through six frames, and back the same way. */
-    static int breathing(float time) {
-        int step = (int) (time / .13f) % 10;
-        return BR1 + (step < 6 ? step : 10 - step);
     }
 
     /** Which of the five ways she throws her special this is, from 0. Rune's third is her knife; the others go through their five in turn. */
