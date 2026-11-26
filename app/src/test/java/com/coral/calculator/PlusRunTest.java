@@ -793,7 +793,8 @@ public class PlusRunTest {
 
     // Those who wait at the end
 
-    private static final int[] WAITED_IN = {RunLevels.ILLYA_LAND, RunLevels.TSUBAKIEH_LAND, RunLevels.COUNT, 40, 50, 60, 70, 80};
+    private static final int[] WAITED_IN = {RunLevels.GUARD_LAND, RunLevels.BUTLER_LAND, RunLevels.ILLYA_LAND, RunLevels.TSUBAKIEH_LAND, RunLevels.COUNT,
+            35, 40, 45, 50, 55, 60, 65, 70, 75, 80};
 
     private static int floorOf(PlusRun run) { return RunLevels.top(run.level(), run.level().arena + 3); }
 
@@ -909,7 +910,7 @@ public class PlusRunTest {
                 most += foe.most;
                 assertEquals(PlusRun.health(foe.kind), foe.most);
             }
-            assertTrue("land " + land + " takes " + most, most >= 6 && most <= 10);
+            assertTrue("land " + land + " takes " + most, most >= 5 && most <= 10);
             java.util.List<Integer> changedAt = new java.util.ArrayList<>();
             int parried = 0, seen = 0;
             for (int step = 0; step < 60 * 600 && run.standing(); step++) {
@@ -1765,14 +1766,14 @@ public class PlusRunTest {
     }
 
     @Test public void theLandsOfTheSecondVolumeAreLongerAndHaveWhatTheirChaptersAreMadeOf() {
-        boolean[] ground = new boolean[128], signs = new boolean[20], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
+        boolean[] ground = new boolean[128], signs = new boolean[RunLevels.PARTY + 1], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
         int movers = 0, doors = 0, first = 0, total = 0, heights = 0, crowd = 0;
         for (int number = 1; number <= RunLevels.COUNT; number++) first += RunLevels.level(number).columns;
         for (int number = RunLevels.COUNT + 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
             int boss = RunLevels.bossOf(number);
             assertEquals(5 + (number - 31) / 10, level.chapter);
-            assertEquals("land " + number, number % 10 == 0, boss >= 0);
+            assertEquals("land " + number, number % 5 == 0, boss >= 0);
             assertEquals("land " + number, boss >= 0 ? 4 : 3, level.flags.size());
             assertEquals(boss >= 0, level.guarded);
             assertEquals(boss >= 0, level.arena >= 0);
@@ -1854,20 +1855,22 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.GAME + 1, RunStory.ROOMS.length);
         assertEquals(RunLevels.NURI - RunLevels.SOMI + 1, RunStory.MEET.length);
-        assertEquals(8, RunStory.ENTER.length);
-        assertEquals(16, RunStory.PHASES.length);
+        assertEquals(15, RunStory.ENTER.length);
+        assertEquals(30, RunStory.PHASES.length);
+        boolean[] theirs = new boolean[15];
         for (int kind : new int[]{RunLevels.ZERO, RunLevels.ILLYA, RunLevels.TSUBAKIEH, RunLevels.GOKHAE, RunLevels.MIRI, RunLevels.YEOBAEK, RunLevels.KING,
-                RunLevels.MAWANG}) {
-            assertTrue(RunStory.waiting(kind) >= 0 && RunStory.waiting(kind) < 8);
+                RunLevels.MAWANG, RunLevels.GUARD, RunLevels.BUTLER, RunLevels.BYEORU, RunLevels.JUPAN, RunLevels.SUMBI, RunLevels.PADS, RunLevels.PARTY}) {
+            assertFalse(theirs[RunStory.waiting(kind)]);
+            theirs[RunStory.waiting(kind)] = true;
         }
         assertEquals(RunLevels.ALL_CHAPTERS, RunStory.CHAPTERS.length);
         assertEquals(PlusRun.WHITE, RunStory.FORMS.length);
-        assertEquals(RunLevels.MAWANG - RunLevels.GOKHAE + 1, RunStory.BLOWS_LATER.length);
+        assertEquals(RunLevels.PARTY - RunLevels.GOKHAE + 1, RunStory.BLOWS_LATER.length);
         for (int land = RunLevels.COUNT + 1; land <= RunLevels.TOTAL; land++) {
             assertEquals("land " + land, RunLevels.bossOf(land) >= 0, RunStory.outro(land) != null);
             if (land % 10 == 0 || land % 10 == 1) assertTrue("land " + land, RunStory.intro(land) != null);
@@ -1878,6 +1881,7 @@ public class PlusRunTest {
         assertEquals(10, RunStory.SEE.length);
         // The story moves on where someone joins her and where someone waits for her.
         for (int land : new int[]{1, 3, 7, 9, 13, RunLevels.ILLYA_LAND, 19, RunLevels.TSUBAKIEH_LAND, 25, RunLevels.COUNT}) {
+            // (The Guild Guard and Penchok-jipsa wait where no part of the story begins.)
             assertTrue("land " + land, RunStory.intro(land) != null);
         }
         for (int land = 1; land <= RunLevels.COUNT; land++) {
@@ -2059,7 +2063,7 @@ public class PlusRunTest {
                     }
                 }
             }
-            boolean[] signs = new boolean[20];
+            boolean[] signs = new boolean[RunLevels.PARTY + 1];
             for (int[] foe : level.foes) {
                 if (foe[0] >= RunLevels.SLIME && foe[0] <= RunLevels.POGO && !signs[foe[0]]) {
                     signs[foe[0]] = true;

@@ -403,6 +403,10 @@ def places():
         small = piece.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
         fourth.alpha_composite(small, (index % 4 * PLACE_CELL + (PLACE_CELL - size[0]) // 2, index // 4 * PLACE_CELL + PLACE_CELL - size[1]))
     fourth.save(RES / "plus_run_art4.webp", quality=92, method=6)
+    # Seven more who wait at the ends of lands: four pictures of each, standing, at it, hit, and down.
+    for name, tall, box in (("guard", 190, (440, 300)), ("butler", 200, (440, 300)), ("byeoru", 188, (440, 300)), ("jupan", 188, (440, 300)),
+                            ("sumbi", 190, (440, 300)), ("pads", 176, (480, 300)), ("party", 204, (560, 320))):
+        strip_of(pieces(f"boss_{name}", 1, 4), tall, box, name)
     inside = Image.open(SOURCE / "room.png").convert("RGB")
     inside.resize((SKY_WIDTH, round(inside.size[1] * SKY_WIDTH / inside.size[0])), Image.LANCZOS).save(RES / "plus_run_room.webp", quality=82, method=6)
     return sheet, row

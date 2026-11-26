@@ -23,10 +23,11 @@ final class RunStory {
     /** The second volume, which falls on her head as the first did. */
     static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
-    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWL";
+    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVX";
     static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang", "Gokhae", "Miri", "Gari", "Yeobaek",
             "Nuri-yeowang",
-            "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul"};
+            "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul",
+            "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi"};
 
     private static final String PLAYER = "She is talking to the player who controls her in a platform game, whom she calls Sloppy. ";
 
@@ -181,6 +182,27 @@ final class RunStory {
     /** What is said after a land is cleared, the first time: where one of them has been dealt with, and at the end. */
     static String[][] outro(int land) {
         switch (land) {
+            case 6: return new String[][]{
+                    {"out6a", "Passed the guild exam. They gave me a heart for it. Not bad Sloppy~♡", "H",
+                            PLAYER + "She has just beaten the guild's guard in an entrance exam and been given an extra heart. Proud, pleased." + FAST}};
+            case 12: return new String[][]{
+                    {"out12a", "A butler who is a pen. He refilled my ink gun, eight shots bigger Sloppy~♡", "H",
+                            PLAYER + "She has just beaten a fountain-pen butler, who politely enlarged her ink gun. Amused, pleased." + FAST}};
+            case 35: return new String[][]{
+                    {"out35a", "The scribe wrote me back in. And my colours come quicker now Sloppy~♡", "H",
+                            PLAYER + "She has just beaten the court scribe, who has put her back in the record. Satisfied, bright." + FAST}};
+            case 45: return new String[][]{
+                    {"out45a", "She paid out. Two hundred pluses, straight to the bank Sloppy~♡", "H",
+                            PLAYER + "She has just beaten a toll-taking merchant and taken a big payout. Gleeful, greedy." + FAST}};
+            case 55: return new String[][]{
+                    {"out55a", "The diver brought me a heart from the bottom of the page Sloppy~♡", "H",
+                            PLAYER + "She has just beaten a diver who gives her an extra heart. Warm, pleased." + FAST}};
+            case 65: return new String[][]{
+                    {"out65a", "Worn out, both of them. They paid a bounty just to stop Sloppy~♡", "H",
+                            PLAYER + "She has just worn down two brake pads, who pay her to stop. Amused, smug." + FAST}};
+            case 75: return new String[][]{
+                    {"out75a", "They went straight home. And left me a bigger ink tank Sloppy~♡", "H",
+                            PLAYER + "She has just beaten the three adventurers who only go straight. Dry, pleased." + FAST}};
             case 18: return new String[][]{
                     {"out18a", "Oh my... Nobody has ever said no to me before♡ I will see you on the Last Page♡", "I",
                             "The idol has just lost for the first time. Shaken, a wobble in her voice, but keeping her composure and her smile."},
@@ -410,6 +432,13 @@ final class RunStory {
             {"blow6", "Mm? Ow. I'm up, I'm up.", "Y", "The sleepy swordswoman has just been hit while dozing. Startled awake, groggy, slow."},
             {"blow7", "One chunk off him. Keep cutting Sloppy~♡", "H", PLAYER + "She has just cut a piece off a giant slime. Fierce, pleased." + FAST},
             {"blow8", "...You hit like someone with friends.", "M", "The lonely other self has just been hit, and it stirs something in her. Quiet, surprised, a crack in her coldness."},
+            {"blow9", "Ow! That is a pass mark!", "D", "The little knight has just been hit and has to admit it was a good one. Earnest, startled, loud."},
+            {"blow10", "My nib! Most irregular.", "F", "The fountain-pen butler has just been hit. Affronted, prim, pained."},
+            {"blow11", "Oh... that will have to be written down.", "Q", "The quiet scribe has just been hit. Soft, surprised, a little dazed."},
+            {"blow12", "That one is going on your bill!", "V", "The merchant girl has just been hit. Indignant, quick, bright."},
+            {"blow13", "Bwah! Okay, that was a good one!", "X", "The diver girl has just been hit and laughs it off. Loud, sunny, winded."},
+            {"blow14", "That took some grip off them Sloppy~♡", "H", PLAYER + "She has just landed a hit on the two brake pads. Fierce, pleased." + FAST},
+            {"blow15", "Straight into that one Sloppy~♡", "H", PLAYER + "She has just landed a hit on the three adventurers who only go straight. Smug, pleased." + FAST},
     };
     /** What they say as they go at her; King Slime says nothing. */
     static final String[][] AIM_LATER = {
@@ -418,6 +447,11 @@ final class RunStory {
             {"aim5", "Censored.", "K", "The shy twin paints black bars across everything her opponent can see. A whisper, nervous."},
             {"aim6", "Excuse my cut. Mmm.", "Y", "The sleepy swordswoman steps out behind her opponent and swings, half asleep. Drowsy, polite, slow."},
             {"aim8", "Alone is easier.", "M", "The lonely other self throws black feathers at the friend who came for her. Cold, tired, hollow."},
+            {"aim9", "Thrusting. Please step back.", "D", "The little knight warns her opponent before she thrusts her halberd. Earnest, polite, loud."},
+            {"aim10", "A small correction, if I may.", "F", "The fountain-pen butler flicks ink at his opponent. Polite, dry."},
+            {"aim11", "Noted.", "Q", "The quiet scribe throws a scroll at her opponent. Soft, flat."},
+            {"aim12", "Catch! Exact change!", "V", "The merchant girl flings coins at her opponent. Bright, gleeful."},
+            {"aim13", "Coming up!", "X", "The diver girl bursts up out of the page under her opponent. Loud, sunny."},
     };
 
     /**
@@ -475,6 +509,21 @@ final class RunStory {
                     PLAYER + "A huge slime king has oozed down into the arena and eaten something. Disgusted, urgent." + FAST},
             {"enter8", "This is the villain's entrance. I know it by heart. I wrote it sixty years ago.", "M",
                     "The lonely other self descends on black wings and takes off her mask to begin the last fight. Tired, low, hollow, slow."},
+            // And the seven others, in the order they are numbered: for the Brake Pads and the Straight-Ahead Party she says it.
+            {"enter9", "Halt! Guild entrance exam. Three questions, and all of them are halberd.", "D",
+                    "A small knight in full armour blocks the way and announces an entrance exam, halberd in hand. Earnest, loud, young, a little muffled by her helmet."},
+            {"enter10", "Good evening. Kindly do not smudge the Archive. I should have to blot you.", "F",
+                    "A prim butler who is a living fountain pen bars the way with perfect manners and a faint threat. Polite, dry, unhurried."},
+            {"enter11", "The court record says you were never here. I am correcting the land to match.", "Q",
+                    "A quiet court scribe girl looks up from her book and says, softly, that she will write the heroine out. Soft, flat, precise, almost a whisper."},
+            {"enter12", "Toll! Every plus you carry, plus interest. I counted them on your way in.", "V",
+                    "A sly merchant girl with an abacus steps into the way and demands a toll. Bright, quick, grinning, sales patter."},
+            {"enter13", "Found you! I dive between the lines for a living. Want to see how deep it goes?", "X",
+                    "A cheerful diver girl pops up out of the blank page with a crowbar on her shoulder. Loud, sunny, daring, out of breath."},
+            {"enter14", "Two brake pads in hard hats. Jump when they stamp Sloppy~♡", "H",
+                    PLAYER + "Two living brake pads in hard hats have just clocked in to stop her. Amused, wary, coaching." + FAST},
+            {"enter15", "The Straight-Ahead Party. They only go one way. Don't be in it Sloppy~♡", "H",
+                    PLAYER + "Three adventurers who only ever go straight ahead line up against her. Dry, wary, coaching." + FAST},
     };
     /** What is said when each of them changes, at a third and at two thirds of the way: two lines each, in the same order; of the twins, Miri first and then Gari. */
     static final String[][] PHASES = {
@@ -507,6 +556,20 @@ final class RunStory {
                     "The lonely other self, wounded, starts using dark versions of her friend's own powers. Low, tired, bitter, slow."},
             {"phase8b", "Then be ordinary. See how long they stay.", "M",
                     "The lonely other self, nearly beaten, throws a black ribbon that makes her opponent an ordinary girl. Hollow, low, her voice wavering."},
+            {"phase9a", "Second question! It is also halberd, but lower!", "D", "The little knight, hit a few times, announces the next part of her exam. Earnest, loud, flustered."},
+            {"phase9b", "Final question! Forward, march!", "D", "The little knight, nearly beaten, orders herself to charge. Earnest, loud, determined."},
+            {"phase10a", "Permit me to underline that.", "F", "The fountain-pen butler, hit a few times, readies a dash on his nib. Polite, dry, a little sharper."},
+            {"phase10b", "This will require my signature.", "F", "The fountain-pen butler, nearly beaten, prepares his finest attack with wounded dignity. Polite, cold, clipped."},
+            {"phase11a", "Footnote. See below.", "Q", "The quiet scribe, hit a few times, makes ink fall from above. Soft, flat, precise."},
+            {"phase11b", "Struck from the record. In ink.", "Q", "The quiet scribe, nearly beaten, sends a black bar to strike the heroine out. Soft, cold, final."},
+            {"phase12a", "Prices just went up!", "V", "The merchant girl, hit a few times, slides in on her abacus. Bright, gleeful, quick."},
+            {"phase12b", "Final offer! Everything must go!", "V", "The merchant girl, nearly beaten, throws everything she has. Loud, desperate, still selling."},
+            {"phase13a", "Deep breath! Going under!", "X", "The diver girl, hit a few times, dives into the page to come up under her opponent. Loud, sunny, daring."},
+            {"phase13b", "Net's out! Don't wriggle!", "X", "The diver girl, nearly beaten, throws her net. Loud, breathless, laughing."},
+            {"phase14a", "They're skidding now. Get over them Sloppy~♡", "H", PLAYER + "The two brake pads have started skidding across the arena. Urgent, coaching." + FAST},
+            {"phase14b", "Sparks! They're worn right down Sloppy~♡", "H", PLAYER + "The two brake pads, nearly beaten, are throwing sparks. Fierce, pleased." + FAST},
+            {"phase15a", "Arrows, low and high. Read them Sloppy~♡", "H", PLAYER + "The three adventurers have started shooting arrows at two heights. Focused, coaching." + FAST},
+            {"phase15b", "All three at once. Straight ahead, of course Sloppy~♡", "H", PLAYER + "The three adventurers, nearly beaten, all charge together. Dry, fierce." + FAST},
     };
     /** As she goes through a door into a place off the land, by its kind: a stash, a passage, a cellar, a room where pluses fall. */
     static final String[][] ROOMS = {
@@ -581,6 +644,7 @@ final class RunStory {
 
     /** Where in {@link #ENTER}, and halved in {@link #PHASES}, the lines of one of those who wait are. */
     static int waiting(int kind) {
+        if (kind >= RunLevels.GUARD) return 8 + kind - RunLevels.GUARD;
         return kind == RunLevels.ZERO ? 0 : kind == RunLevels.ILLYA ? 1 : kind == RunLevels.TSUBAKIEH ? 2 : kind == RunLevels.GOKHAE ? 3
                 : kind == RunLevels.MIRI || kind == RunLevels.GARI ? 4 : kind == RunLevels.YEOBAEK ? 5 : kind == RunLevels.KING ? 6 : 7;
     }

@@ -49,11 +49,15 @@ final class RunLevels {
      * half as long again.
      */
     static final int RING = -1, NOTHING = 0;
+    /** And what the seven others give: a heart more in every land, eight more shots in an ink gun, her colours ready sooner, or a bounty of pluses. */
+    static final int HEART = -2, TANK = -3, QUICK = -4, BOUNTY = -5;
 
     static int prizeOf(int number) {
         int who = bossOf(number);
         return who == ILLYA ? PlusRun.RED : who == TSUBAKIEH ? PlusRun.BROWN : who == ZERO ? RING : who == GOKHAE ? PlusRun.PURPLE
-                : who == MIRI ? PlusRun.YELLOW : who == YEOBAEK ? PlusRun.GREEN : who == KING ? PlusRun.BLUE : who == MAWANG ? PlusRun.BLACK : NOTHING;
+                : who == MIRI ? PlusRun.YELLOW : who == YEOBAEK ? PlusRun.GREEN : who == KING ? PlusRun.BLUE : who == MAWANG ? PlusRun.BLACK
+                : who == GUARD || who == SUMBI ? HEART : who == BUTLER || who == PARTY ? TANK : who == BYEORU ? QUICK : who == JUPAN || who == PADS ? BOUNTY
+                : NOTHING;
     }
 
     /** What is asked in a land: nothing where someone waits at the end, or before the lands have places off them. */
@@ -89,13 +93,26 @@ final class RunLevels {
      */
     static final int SLIME = 8, DRAGON = 9, BAR = 10, FAN = 11, WORD = 12, POGO = 13;
     static final int GOKHAE = 14, MIRI = 15, GARI = 16, YEOBAEK = 17, KING = 18, MAWANG = 19;
+    /**
+     * And seven more who wait, so that no ten lands go by without someone: the Guild Guard
+     * at the end of the sixth land and Penchok-jipsa, the pen who is a butler, at the end of
+     * the twelfth; and in the middle of each chapter of the second volume Byeoru the scribe,
+     * Jupan with her abacus, Sumbi the diver, the Brake Pads, and the Straight-Ahead Party.
+     */
+    static final int GUARD = 20, BUTLER = 21, BYEORU = 22, JUPAN = 23, SUMBI = 24, PADS = 25, PARTY = 26;
+    static final int GUARD_LAND = 6, BUTLER_LAND = 12;
 
     static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE; }
 
     /** Who waits at the end of a land, or -1: for the twins, Miri. */
     static int bossOf(int number) {
-        if (number > COUNT) return number % IN_LATER_CHAPTER != 0 ? -1 : new int[]{GOKHAE, MIRI, YEOBAEK, KING, MAWANG}[(number - COUNT) / IN_LATER_CHAPTER - 1];
-        return number == ILLYA_LAND ? ILLYA : number == TSUBAKIEH_LAND ? TSUBAKIEH : number == COUNT ? ZERO : -1;
+        if (number > COUNT) {
+            // The middle of each chapter of the second volume, and its end.
+            if (number % IN_LATER_CHAPTER == 5) return BYEORU + (number - COUNT) / IN_LATER_CHAPTER;
+            return number % IN_LATER_CHAPTER != 0 ? -1 : new int[]{GOKHAE, MIRI, YEOBAEK, KING, MAWANG}[(number - COUNT) / IN_LATER_CHAPTER - 1];
+        }
+        return number == GUARD_LAND ? GUARD : number == BUTLER_LAND ? BUTLER : number == ILLYA_LAND ? ILLYA : number == TSUBAKIEH_LAND ? TSUBAKIEH
+                : number == COUNT ? ZERO : -1;
     }
 
     /**
@@ -109,13 +126,20 @@ final class RunLevels {
      */
     static final int SHAPED_FROM = 1, PLACES_FROM = 2, QUESTS_FROM = 4;
     private static final int ISLANDS = 40, ASCENT = 41, DESCENT = 42, TOWER = 43, SPLIT = 44, CAVE = 45, VILLAGE = 46;
+    /**
+     * And two that go round: a ring of ledges up over a middle and down again, with the
+     * ground under it as the other way and something hung in the middle of it; and a tower
+     * climbed by one side and come down by the other, from the top of which a high way leads
+     * back over where she came from, to something out of the way.
+     */
+    private static final int LOOP = 47, ROUNDABOUT = 48;
     /** The shapes each chapter of the second volume adds to what it is made of. */
     private static final int[][] LATER_SHAPES = {
-            {TOWER, TOWER, SPLIT, ASCENT, DESCENT, ISLANDS},
-            {CAVE, CAVE, SPLIT, ASCENT, DESCENT, TOWER},
-            {ISLANDS, ISLANDS, ISLANDS, ASCENT, DESCENT, SPLIT},
-            {CAVE, CAVE, ISLANDS, ASCENT, DESCENT, SPLIT},
-            {ISLANDS, TOWER, SPLIT, CAVE, ASCENT, DESCENT},
+            {TOWER, ROUNDABOUT, SPLIT, ASCENT, DESCENT, ISLANDS, LOOP},
+            {CAVE, CAVE, SPLIT, ASCENT, DESCENT, ROUNDABOUT, LOOP},
+            {ISLANDS, ISLANDS, LOOP, LOOP, ASCENT, DESCENT, SPLIT},
+            {CAVE, CAVE, ISLANDS, ASCENT, DESCENT, SPLIT, ROUNDABOUT},
+            {ISLANDS, TOWER, SPLIT, CAVE, ASCENT, DESCENT, LOOP, ROUNDABOUT},
     };
     /**
      * Who may be met in a village, as the number of who holds something out: after Chikuwa
@@ -138,8 +162,8 @@ final class RunLevels {
     };
     /** The numbers the lands of the second volume are made from, picked as those of the first were. */
     static final long[] LATER_SEEDS = {
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1,
     };
 
     private static final int PLAIN = 0, GAP = 1, STEPS = 2, WALL = 3, BRIDGE = 4, HIGH_ROAD = 5, SPIKES = 6, SPRING_WALL = 7,
@@ -157,10 +181,10 @@ final class RunLevels {
     private static final int[][] EARLY_POOLS = {
             {PLAIN, PLAIN, GAP, GAP, STEPS, WALL, PEN, HIGH_ROAD, ASCENT, DESCENT},
             {PLAIN, GAP, STEPS, SPIKES, SPIKES, BRIDGE, PEN, HIGH_ROAD, WALL, ASCENT, DESCENT, TOWER, CAVE},
-            {GAP, STEPS, SPIKES, SPRING_WALL, PATROL, HIGH_ROAD, BRIDGE, PEN, ASCENT, DESCENT, TOWER, SPLIT, ISLANDS, PACK},
+            {GAP, STEPS, SPIKES, SPRING_WALL, PATROL, HIGH_ROAD, BRIDGE, PEN, ASCENT, DESCENT, TOWER, SPLIT, ISLANDS, PACK, LOOP, ROUNDABOUT},
     };
     private static final int[] HIGH_POOL = {ISLANDS, ISLANDS, ASCENT, DESCENT, TOWER, SPLIT, CAVE, GAP, SPIKES, HOPPER, PILLARS, BRIDGE, SPRING_WALL, PATROL,
-            PACK, PACK, SWARM, SLOPE, TOUGH};
+            PACK, PACK, SWARM, SLOPE, TOUGH, LOOP, ROUNDABOUT};
     /** The stretches each chapter draws on; one that is named more than once comes up more often. */
     private static final int[][] POOLS = {
             {PLAIN, PLAIN, GAP, GAP, STEPS, WALL, PEN, HIGH_ROAD, BRIDGE},
@@ -175,8 +199,8 @@ final class RunLevels {
      * see the tests.
      */
     static final long[] SEEDS = {
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1,
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1,
     };
 
     /** One land: its squares, what is in it, and where it begins and ends. */
@@ -745,6 +769,37 @@ final class RunLevels {
                         ground(4);
                         pluses(from + 3, from + 5, floor - 3);
                     }
+                    break;
+                }
+                case LOOP: {
+                    // A ring: up by two ledges, over the top, and down by two more; or along the ground under it, where something walks. In its middle, something hung.
+                    ground(15);
+                    ledge(from + 1, floor - 2, 2);
+                    ledge(from + 3, floor - 4, 2);
+                    ledge(from + 6, floor - 6, 3);
+                    ledge(from + 10, floor - 4, 2);
+                    ledge(from + 12, floor - 2, 2);
+                    pluses(from + 1, from + 2, floor - 4);
+                    pluses(from + 3, from + 4, floor - 6);
+                    pluses(from + 6, from + 8, floor - 8);
+                    pluses(from + 10, from + 11, floor - 6);
+                    pluses(from + 12, from + 13, floor - 4);
+                    foe(MINUS, from + 8);
+                    level.nooks.add(new int[]{from + 7, floor - 4});
+                    break;
+                }
+                case ROUNDABOUT: {
+                    // A tower with ledges up one side and down the other; and from its top a high way back over where she came from, to something out of the way.
+                    ground(13);
+                    for (int column = from + 5; column <= from + 7; column++) pile(column, 5);
+                    ledge(from + 2, floor - 2, 3);
+                    ledge(from + 3, floor - 4, 2);
+                    ledge(from + 8, floor - 3, 2);
+                    ledge(from + 1, floor - 7, 3);
+                    pluses(from + 5, from + 7, floor - 7);
+                    pluses(from + 1, from + 3, floor - 9);
+                    pluses(from + 8, from + 9, floor - 5);
+                    level.nooks.add(new int[]{from + 1, floor - 8});
                     break;
                 }
                 case TOWER: {

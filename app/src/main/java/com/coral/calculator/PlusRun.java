@@ -123,9 +123,12 @@ final class PlusRun {
     private static final float LATE = .08f, EARLY = .1f;
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
-    private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3};
-    private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f};
-    private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f};
+    private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
+            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f};
+    private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
+            .9f, .8f, .8f, .9f, .9f, 1.6f, 2};
+    private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
+            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f};
     /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
     private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
@@ -718,6 +721,17 @@ final class PlusRun {
             case RunLevels.MIRI:
             case RunLevels.GARI:
                 return 4;
+            case RunLevels.GUARD:
+            case RunLevels.BUTLER:
+                return 5;
+            case RunLevels.BYEORU:
+            case RunLevels.JUPAN:
+                return 6;
+            case RunLevels.SUMBI:
+            case RunLevels.PADS:
+                return 7;
+            case RunLevels.PARTY:
+                return 8;
             case RunLevels.KING:
                 return 9;
             default:
@@ -1842,9 +1856,9 @@ final class PlusRun {
     }
 
     /** What each of those who wait does, in order, in each third of the fight: the later thirds bring in more. */
-    private static final int[][][] PATTERNS = new int[20][][];
+    private static final int[][][] PATTERNS = new int[27][][];
     /** How long each of them is spent after something they have done. */
-    private static final float[] WINDOW = new float[20];
+    private static final float[] WINDOW = new float[27];
     static {
         PATTERNS[RunLevels.ILLYA] = new int[][]{{1, 3}, {1, 2, 3}, {4, 2, 1, 3}};
         PATTERNS[RunLevels.TSUBAKIEH] = new int[][]{{1, 2}, {1, 3, 2}, {4, 1, 3, 2}};
@@ -1855,6 +1869,11 @@ final class PlusRun {
         PATTERNS[RunLevels.YEOBAEK] = new int[][]{{1, 2}, {1, 3, 2}, {4, 3, 2}};
         PATTERNS[RunLevels.KING] = new int[][]{{1, 2}, {1, 3, 2}, {4, 3, 1, 2}};
         PATTERNS[RunLevels.MAWANG] = new int[][]{{1, 3, 2}, {1, 5, 3, 4, 2}, {6, 5, 4, 1, 3, 2}};
+        // The seven others each do three things: two from the first, the third from the second third of the fight on.
+        for (int kind = RunLevels.GUARD; kind <= RunLevels.PARTY; kind++) {
+            PATTERNS[kind] = kind == RunLevels.SUMBI ? new int[][]{{2, 1}, {2, 3, 1}, {3, 1, 2, 1}} : new int[][]{{1, 2}, {1, 3, 2}, {3, 2, 1, 2}};
+            WINDOW[kind] = kind <= RunLevels.BUTLER ? 1.7f : 1.4f;
+        }
         WINDOW[RunLevels.ILLYA] = 1.5f;
         WINDOW[RunLevels.TSUBAKIEH] = .9f;
         WINDOW[RunLevels.ZERO] = 1.3f;
@@ -1943,7 +1962,12 @@ final class PlusRun {
                 foe.leftward = right;
             }
         }
+        // Sumbi dives: she is under the ground until she comes up.
+        if (what == 241) foe.unseen = true;
+        if (foe.kind == RunLevels.GUARD || foe.kind == RunLevels.BUTLER) return 1;
         switch (what) {
+            case 242:
+                return 1.6f;
             case 71:
                 return 1.8f;
             case 63:
@@ -2111,6 +2135,82 @@ final class PlusRun {
             case 191:
                 spread(FEATHER, middle, foe.y + .5f, phase == 2 ? 5 : 3, .32f, 6.5f, 2);
                 return .4f;
+            // The Guild Guard: a thrust of the halberd, a low sweep that runs along the ground, and a march the length of the place.
+            case 201:
+                cut(foe, 1.6f, STRUCK);
+                swings++;
+                return .3f;
+            case 202:
+                shoot(SHOCK, false, middle, floor - .3f, way * 6, 0, 3);
+                thrown++;
+                return .5f;
+            case 203:
+            case 212:
+            case 232:
+            case 252:
+            case 262:
+                foe.leftward = toLeft;
+                return what == 252 ? .7f : 2;
+            // Penchok-jipsa: three blots lobbed, a dash on his nib, and a signature of three drops in a fan.
+            case 211:
+            case 233:
+                for (int which = -1; which <= 1; which++) lob(GLOB, middle, foe.y + .3f, px + which * 2.5f);
+                thrown++;
+                return .5f;
+            case 213:
+                spread(DOT, middle, foe.y + .5f, 3, .24f, 6, 2.2f);
+                return .4f;
+            // Byeoru: two scrolls thrown ahead of her visitor, ink that falls where it is marked, and a censor bar.
+            case 221:
+                aim(SCROLL, middle, foe.y + .3f, 6.5f, 0, 2.2f);
+                aim(SCROLL, middle, foe.y + .3f, 6.5f, away / 6.5f, 2.2f);
+                return .4f;
+            case 222:
+                for (int which = -1; which <= 1; which++) shoot(DEBRIS, false, px + speedAcross * .6f + which * 2, Math.max(.5f, y - 7), 0, 0, 3);
+                thrown++;
+                return .4f;
+            case 223:
+                spawn(RunLevels.BAR, middle + way * 1.5f, floor);
+                return .4f;
+            // Jupan: five coins in a fan, a slide on her abacus, and beads lobbed.
+            case 231:
+                spread(DOT, middle, foe.y + .5f, 5, .22f, 6.5f, 2.2f);
+                return .4f;
+            // Sumbi: up from under her visitor, the crowbar, and a net that turns the arrows round.
+            case 241:
+                foe.x = Math.max(lo, Math.min(hi, px - foe.wide() / 2));
+                foe.y = foe.ground;
+                if (safe <= 0 && onGround && y + TALL > floor - .2f && Math.abs(px - foe.x - foe.wide() / 2) < 1.1f) {
+                    cause = TOUCHED;
+                    hurt(false);
+                }
+                quakes++;
+                return .4f;
+            case 242:
+                cut(foe, 1.7f, BATTED);
+                swings++;
+                return .3f;
+            case 243:
+                spread(HEART, middle, foe.y + .5f, 1, 0, 5.5f, 2.6f);
+                return .4f;
+            // The Brake Pads: brakes slammed on, which runs both ways along the ground; a skid; and sparks.
+            case 251:
+                shoot(SHOCK, false, middle, floor - .3f, -8, 0, 1.8f);
+                shoot(SHOCK, false, middle, floor - .3f, 8, 0, 1.8f);
+                quakes++;
+                thrown++;
+                return .5f;
+            case 253:
+                spread(BLADE, middle, foe.y + .5f, 5, .3f, 7, 2.2f);
+                return .4f;
+            // The Straight-Ahead Party: three arrows, low, high and low; the sword, the length of the place; and the shield, along the ground.
+            case 261:
+                foe.fromX = 0;
+                return 1;
+            case 263:
+                shoot(SHOCK, false, middle, floor - .3f, way * 9, 0, 2.6f);
+                thrown++;
+                return .5f;
             case 192:
                 foe.fromX = px;
                 foe.toX = Math.min(foe.ground, y + TALL - foe.tall());
@@ -2249,6 +2349,33 @@ final class PlusRun {
                 } else if (what == 184 && doing) {
                     foe.x += way * 10 * seconds;
                     if (foe.x <= lo || foe.x >= hi) foe.act = 0;
+                }
+                break;
+            }
+            case RunLevels.GUARD:
+            case RunLevels.BUTLER:
+            case RunLevels.BYEORU:
+            case RunLevels.JUPAN:
+            case RunLevels.SUMBI:
+            case RunLevels.PADS:
+            case RunLevels.PARTY: {
+                if (foe.step == 0) foe.leftward = toLeft;
+                // Each has a way of going the length of the place, at a pace of her own; Sumbi walks up before she swings.
+                float pace = what == 203 ? 4.5f : what == 212 ? 9 : what == 232 ? 10 : what == 252 || what == 262 ? 11 : 0;
+                if (pace > 0 && doing) {
+                    foe.x += way * pace * seconds;
+                    if (foe.x <= lo || foe.x >= hi) foe.act = 0;
+                } else if (what == 242 && foe.step == 0 && foe.act > .5f && away > 1.6f) {
+                    foe.x += (toLeft ? -1 : 1) * 3.2f * seconds;
+                } else if (what == 261 && doing && foe.fromX < 3 && (foe.wait -= seconds) <= 0) {
+                    foe.wait = .33f;
+                    shoot(BLADE, false, middle, floor - (foe.fromX == 1 ? 1.7f : .4f), toLeft ? -9 : 9, 0, 2.4f);
+                    thrown++;
+                    foe.fromX++;
+                } else if (foe.step == 0 && pace == 0 && foe.kind >= RunLevels.BYEORU && foe.kind != RunLevels.SUMBI && foe.kind != RunLevels.PADS) {
+                    // Those who throw keep their distance while they make ready.
+                    float keeps = px + (toLeft ? 5 : -5) - foe.wide() / 2;
+                    foe.x += Math.max(-1.6f * seconds, Math.min(1.6f * seconds, keeps - foe.x));
                 }
                 break;
             }
