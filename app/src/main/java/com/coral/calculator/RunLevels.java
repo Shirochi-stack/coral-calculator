@@ -21,6 +21,15 @@ final class RunLevels {
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
     /** And two that fight back from where they are: a minus that throws knives, and a divide that shoots its dots. */
     static final int THROWER = 4, GUNNER = 5;
+    /** And two who are not signs at all: Illya, who floats and fires hearts, and Tsubakieh with her bat. Like Zero, each keeps a gate shut. */
+    static final int ILLYA = 6, TSUBAKIEH = 7;
+    /** The lands at whose end one of them waits. */
+    static final int ILLYA_LAND = 18, TSUBAKIEH_LAND = 24;
+
+    static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH; }
+
+    /** Who waits at the end of a land, or -1. */
+    static int bossOf(int number) { return number == ILLYA_LAND ? ILLYA : number == TSUBAKIEH_LAND ? TSUBAKIEH : number == COUNT ? ZERO : -1; }
 
     private static final int PLAIN = 0, GAP = 1, STEPS = 2, WALL = 3, BRIDGE = 4, HIGH_ROAD = 5, SPIKES = 6, SPRING_WALL = 7,
             PEN = 8, HOPPER = 9, PILLARS = 10, PATROL = 11;
@@ -52,6 +61,8 @@ final class RunLevels {
         final List<int[]> foes = new ArrayList<>();
         /** The things to fight with that lie about: the kind, as {@link PlusRun} numbers them, the column and the row. */
         final List<int[]> weapons = new ArrayList<>();
+        /** What may be picked up to help: the kind, the column, the row, and who holds it out (0 no one, 1 Chikuwa, 2 Rune). */
+        final List<int[]> items = new ArrayList<>();
         /** The columns of the flags she comes back to, in order, and of the gate. */
         final List<Integer> flags = new ArrayList<>();
         int gate;
@@ -84,7 +95,8 @@ final class RunLevels {
         Level draft = new Level(number, 400);
         Builder builder = new Builder(draft, random, hard, chapter);
         builder.ground(6);
-        int stretches = number == COUNT ? 6 : 6 + number / 3;
+        int boss = bossOf(number);
+        int stretches = boss >= 0 ? 6 : 6 + number / 3;
         int last = -1;
         for (int stretch = 0; stretch < stretches; stretch++) {
             int[] pool = POOLS[chapter];
@@ -97,7 +109,7 @@ final class RunLevels {
             if (stretches >= 6 && (stretch == stretches / 3 || stretch == stretches * 2 / 3)) builder.flag();
             builder.rest();
         }
-        if (number == COUNT) builder.arena();
+        if (boss >= 0) builder.arena(boss);
         builder.ground(3);
         draft.gate = builder.at;
         builder.ground(6);
@@ -124,22 +136,53 @@ final class RunLevels {
         // From the second land on there is something by where she starts, a different thing each land;
         // and by each flag another, in the later chapters now and then an ink gun.
         if (number >= 2) level.weapons.add(new int[]{(number - 2) % PlusRun.GUN, 4, FLOOR - 1});
-        for (int index = 0; index < level.flags.size(); index++) {
-            boolean gun = chapter >= 1 && index == level.flags.size() - 1 && random.nextInt(chapter >= 3 ? 2 : 3) == 0;
+        for (int index = 0; index < Math.min(2, level.flags.size()); index++) {
+            boolean gun = chapter >= 1 && index == 1 && random.nextInt(chapter >= 3 ? 2 : 3) == 0;
             level.weapons.add(new int[]{gun ? PlusRun.GUN : (number + index) % PlusRun.GUN, level.flags.get(index) + 1, FLOOR - 1});
         }
-        int zero = -1;
+        int waits = -1, who = -1;
         for (int[] foe : level.foes) {
             if (foe[0] == MINUS && chapter >= 1 && random.nextInt(chapter >= 3 ? 2 : 3) == 0) {
                 foe[0] = THROWER;
             } else if (foe[0] == DIVIDE && random.nextBoolean()) {
                 foe[0] = GUNNER;
-            } else if (foe[0] == ZERO) {
-                zero = foe[1];
+            } else if (boss(foe[0])) {
+                who = foe[0];
+                waits = foe[1] - (who == ILLYA ? 13 : 11);
             }
         }
-        // Only something swung will do against Zero: a sword lies before the place where he waits.
-        if (zero >= 0) level.weapons.add(new int[]{PlusRun.SWORD, zero - 13, FLOOR - 1});
+        // Before the place where one of them waits lies what will do against them: something to throw at Illya, who
+        // keeps her distance, and something to swing at the other two, who send back or swallow what is thrown.
+        if (waits >= 0) level.weapons.add(new int[]{who == ILLYA ? PlusRun.PEN : PlusRun.SWORD, waits - 2, FLOOR - 1});
+        // And before Zero, the notes of the one who came this way alone.
+        if (who == ZERO) level.items.add(new int[]{PlusRun.NOTES, waits - 1, FLOOR - 1, 0});
+        // Her friends wait by the flags once they have joined her: Chikuwa with bread by the first, from the third land,
+        // and Rune with a ball of her ink by the second, from the ninth.
+        for (int index = 0; index < level.flags.size(); index++) {
+            if (index == 0 && number >= 3) level.items.add(new int[]{PlusRun.BREAD, level.flags.get(index) + 3, FLOOR - 1, 1});
+            if (index == 1 && number >= 9) level.items.add(new int[]{PlusRun.SHIELD, level.flags.get(index) + 3, FLOOR - 1, 2});
+        }
+        // Here and there on flat, empty ground lies something else to help: ice cream from the fourth land,
+        // and from the second chapter a magnet or, now and then, a page of notes.
+        List<Integer> free = new ArrayList<>();
+        for (int column = 12; column < (waits >= 0 ? waits - 4 : level.gate - 6); column++) {
+            boolean clear = true;
+            for (int beside = column - 1; beside <= column + 1 && clear; beside++) {
+                clear = level.land[FLOOR][beside] == BLOCK && level.land[FLOOR - 1][beside] == AIR && level.land[FLOOR - 2][beside] == AIR;
+            }
+            for (int[] foe : level.foes) if (Math.abs(foe[1] - column) < 4) clear = false;
+            for (int[] plus : level.pluses) if (plus[0] == column && plus[1] >= FLOOR - 2) clear = false;
+            for (int[] weapon : level.weapons) if (Math.abs(weapon[1] - column) < 2) clear = false;
+            for (int[] item : level.items) if (Math.abs(item[1] - column) < 2) clear = false;
+            if (clear) free.add(column);
+        }
+        int wanted = number < 4 ? 0 : chapter == 0 ? 1 : 2;
+        for (int count = 0; count < wanted && !free.isEmpty(); count++) {
+            int column = free.remove(random.nextInt(free.size()));
+            int kind = chapter == 0 || count == 0 && random.nextBoolean() ? PlusRun.ICE : random.nextInt(4) == 0 ? PlusRun.NOTES : PlusRun.MAGNET;
+            level.items.add(new int[]{kind, column, FLOOR - 1, 0});
+            for (int index = free.size() - 1; index >= 0; index--) if (Math.abs(free.get(index) - column) < 6) free.remove(index);
+        }
     }
 
     /** Lays a land down from left to right. */
@@ -313,13 +356,16 @@ final class RunLevels {
             }
         }
 
-        /** Where Zero waits: a long floor walled at both ends, and the gate beyond it shut until he is flat. */
-        void arena() {
+        /** Where Zero, Illya or Tsubakieh waits: a long floor walled at both ends, and the gate beyond it shut until they are dealt with. */
+        void arena(int who) {
             int from = at;
+            // A flag at its door, so that a hurt in there does not send her back through half the land.
+            level.land[FLOOR - 1][from - 3] = FLAG;
+            level.flags.add(from - 3);
             ground(18);
             pile(from, 2);
             pile(from + 17, 2);
-            level.foes.add(new int[]{ZERO, from + 11, FLOOR - 1});
+            level.foes.add(new int[]{who, from + (who == ILLYA ? 13 : 11), FLOOR - 1});
             level.guarded = true;
         }
     }

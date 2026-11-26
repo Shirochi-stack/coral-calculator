@@ -12,6 +12,12 @@ six frames of Halgakos jumping drawn from her own running frames. This cuts them
     turf, and what lies under it.
   * minus.png, items.png, things.png, foes.png, zero.png and weapons.png give the sprites.
   * jump.png gives her six jump frames, brought to the pink and the size of her other frames.
+  * buffs.png has the things that help her, and chikuwa.png,
+    rune.png, illya.png and tsubakieh.png are her friends and the two she has to get past,
+    drawn by the model from their own chibi pictures in the style of her game frames. The
+    pictures in faces/ are those chibi pictures themselves, made small for the story cards.
+  * arm_pen.png and the five like it each give eight frames of her carrying one of the things
+    she fights with: standing, four of running, rising, falling, and using it.
   * lose.png gives six more of her, for when she is hurt and when she has lost: hit, knocked
     into the air, falling, sitting dazed, sulking and crying. They are treated the same way.
 
@@ -41,6 +47,18 @@ KEEP, DROP = 40, 150
 # from which the size of her other frames is taken.
 JUMP_CELL = (256, 208)
 LOSE_CELL = (288, 224)
+ARM_CELL = (304, 248)
+ARMS = ("pen", "knife", "book", "brush", "sword", "gun")
+# The brush stands over her head and is taken for part of her horns, which would make her too small: on that sheet
+# she is given the size she has on the sheets drawn to the same layout.
+ARM_SCALE = {"arm3": .505}
+# Her friends and foes from the webtoon: how many rows and frames across each sheet has, and the cell each frame goes in.
+CAST = {"chikuwa": (1, 3), "rune": (1, 3), "illya": (1, 4), "tsubakieh": (2, 3)}
+CAST_CELL = (288, 248)
+# How tall the first frame of each is made, in the pixels her own frames are measured in: she stands 190 tall.
+CAST_TALL = {"chikuwa": 198, "rune": 190, "illya": 188, "tsubakieh": 190}
+FACES = ("chikuwa", "rune", "illya", "tsubakieh", "mawang")
+FACE_TALL = 520
 PET_GRID = (8, 9)
 
 
@@ -95,6 +113,10 @@ def sprites(sheet, expected):
     mask = solid(sheet)
     columns = [mask.crop((x, 0, x + 1, sheet.size[1])).getbbox() is not None for x in range(sheet.size[0])]
     found = runs(columns, 14, 30)
+    if len(found) > expected:
+        # Something small drawn apart from a sprite, a knife just thrown, say, is left out: the widest are the sprites.
+        widest = sorted(found, key=lambda run: run[0] - run[1])[:expected]
+        found = sorted(widest)
     if len(found) != expected:
         raise SystemExit(f"expected {expected} sprites, found {len(found)}: {found}")
     pieces = []
@@ -178,9 +200,59 @@ def skirt_middle(frame):
     return sum(across) / len(across) if across else (box[0] + box[2]) / 2
 
 
-def her_frames(name, box, gap, report):
-    """Six frames of her from a sheet of two rows of three, in a row, in the pink and at the size of her running frames."""
+def rows_of(sheet, gap):
+    """The rows of sprites of a sheet, from the top: where each begins and ends."""
+    mask = solid(sheet)
+    return runs([mask.crop((0, y, sheet.size[0], y + 1)).getbbox() is not None for y in range(sheet.size[1])], gap, 60)
+
+
+def cast_frames(name):
+    """The frames of one of the others, in a row of cells, standing on the bottom of each, at her size."""
+    down, across = CAST[name]
     sheet = cleared(Image.open(SOURCE / f"{name}.png"))
+    sheet.putalpha(sheet.getchannel("A").point(lambda value: 0 if value < 48 else value))
+    rows = rows_of(sheet, 30)
+    if len(rows) != down:
+        raise SystemExit(f"expected {down} rows of {name}, found {len(rows)}")
+    frames = []
+    for top, bottom in rows:
+        frames += sprites(sheet.crop((0, top, sheet.size[0], bottom)), across)
+    scale = CAST_TALL[name] / frames[0].size[1]
+    strip = Image.new("RGBA", (CAST_CELL[0] * len(frames), CAST_CELL[1]), (0, 0, 0, 0))
+    for index, frame in enumerate(frames):
+        size = (max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale)))
+        if size[0] > CAST_CELL[0] or size[1] > CAST_CELL[1]:
+            raise SystemExit(f"{name} frame {index} is {size}, larger than its cell {CAST_CELL}")
+        small = frame.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        # Her feet in the middle of the cell: the middle of what is drawn in the lowest fifth of her.
+        feet = solid(small).crop((0, size[1] * 4 // 5, size[0], size[1])).getbbox()
+        middle = (feet[0] + feet[2]) / 2 if feet else size[0] / 2
+        left = max(0, min(CAST_CELL[0] - size[0], round(CAST_CELL[0] / 2 - middle)))
+        strip.alpha_composite(small, (index * CAST_CELL[0] + left, CAST_CELL[1] - size[1]))
+    clear = Image.new("RGBA", strip.size, (0, 0, 0, 0))
+    strip = Image.composite(strip, clear, strip.getchannel("A").point(lambda value: 255 if value else 0))
+    strip.save(RES / f"run_{name}.webp", lossless=True, quality=100, method=6, exact=True)
+    return strip
+
+
+def face(name):
+    """One of the chibi pictures the webtoon's cast was drawn from, small, for the cards the story is told on."""
+    from PIL import ImageDraw
+
+    image = Image.open(SOURCE / "faces" / f"{name}.png").convert("RGBA")
+    if image.getchannel("A").getextrema()[0] == 255:
+        # On white: the white round her is made clear, from the corners in.
+        for corner in ((0, 0), (image.size[0] - 1, 0), (0, image.size[1] - 1), (image.size[0] - 1, image.size[1] - 1)):
+            ImageDraw.floodfill(image, corner, (255, 255, 255, 0), thresh=40)
+    image = image.crop(solid(image).getbbox())
+    image = image.convert("RGBa").resize((round(image.size[0] * FACE_TALL / image.size[1]), FACE_TALL), Image.LANCZOS).convert("RGBA")
+    image.save(RES / f"run_face_{name}.webp", quality=88, method=6)
+    return image
+
+
+def her_frames(name, source, box, gap, across, report):
+    """Frames of her from a sheet of two rows, in one row, in the pink and at the size of her running frames."""
+    sheet = cleared(Image.open(SOURCE / f"{source}.png"))
     # The faint haze the model leaves round her is taken off, so she has no glow about her in the game.
     sheet.putalpha(sheet.getchannel("A").point(lambda value: 0 if value < 48 else value))
     mask = solid(sheet)
@@ -191,7 +263,7 @@ def her_frames(name, box, gap, report):
     frames = []
     for top, bottom in rows:
         strip = sheet.crop((0, top, sheet.size[0], bottom))
-        frames += sprites(strip, 3)
+        frames += sprites(strip, across)
     pet = Image.open(RES / "halgakos_pet.webp").convert("RGBA")
     wide, tall = pet.size[0] // PET_GRID[0], pet.size[1] // PET_GRID[1]
     idle = [pet.crop((0, 0, wide, tall))]
@@ -217,6 +289,7 @@ def her_frames(name, box, gap, report):
         small = [frame.convert("RGBa").resize((max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale))),
                                               Image.LANCZOS).convert("RGBA") for frame in frames]
         scale *= usual / middle(horn_span(frame) for frame in small)
+    scale = ARM_SCALE.get(name, scale)
     report[name + "_horn_span_running"] = usual
     report[name + "_scale"] = round(scale, 4)
     strip = Image.new("RGBA", (box[0] * len(frames), box[1]), (0, 0, 0, 0))
@@ -258,7 +331,7 @@ def main():
         cells.append(ground.crop((side // 8, side * 3 // 8, side // 8 + side // 2, side * 7 // 8)).resize((CELL, CELL), Image.LANCZOS))
         wide += [1.0, 1.0]
         tall += [1.0, 1.0]
-    for name, count in (("minus", 3), ("items", 4), ("things", 4), ("foes", 4), ("zero", 3), ("weapons", 6)):
+    for name, count in (("minus", 3), ("items", 4), ("things", 4), ("foes", 4), ("zero", 3), ("weapons", 6), ("buffs", 6)):
         for sprite in sprites(cleared(Image.open(SOURCE / f"{name}.png")), count):
             square, across, up = cell(sprite)
             cells.append(square)
@@ -270,9 +343,13 @@ def main():
     atlas.save(RES / "plus_run_art.webp", lossless=True, quality=100, method=6)
 
     report = {}
-    jump, running = her_frames("jump", JUMP_CELL, 14, report)
-    lose, _ = her_frames("lose", LOSE_CELL, 40, report)
-    print("atlas", atlas.size, "cells", len(cells), "jump", jump.size, "lose", lose.size)
+    jump, running = her_frames("jump", "jump", JUMP_CELL, 14, 3, report)
+    lose, _ = her_frames("lose", "lose", LOSE_CELL, 40, 3, report)
+    armed = [her_frames(f"arm{index}", f"arm_{name}", ARM_CELL, 14, 4, report)[0] for index, name in enumerate(ARMS)]
+    others = [cast_frames(name) for name in CAST]
+    faces = [face(name) for name in FACES]
+    print("atlas", atlas.size, "cells", len(cells), "jump", jump.size, "lose", lose.size, "armed", armed[0].size,
+          "cast", [strip.size for strip in others], "faces", [image.size for image in faces])
     print("ART_WIDE = {" + ", ".join(f"{value:.3f}f" for value in wide) + "};")
     print("ART_TALL = {" + ", ".join(f"{value:.3f}f" for value in tall) + "};")
     for key, value in report.items():
@@ -280,13 +357,24 @@ def main():
     if args.preview:
         grey = (120, 120, 130, 255)
         half = atlas.resize((atlas.size[0] // 2, atlas.size[1] // 2), Image.LANCZOS)
-        board = Image.new("RGBA", (max(half.size[0], lose.size[0]), half.size[1] * 1 + JUMP_CELL[1] * 2 + LOSE_CELL[1] + 30), grey)
+        board = Image.new("RGBA", (max(half.size[0], lose.size[0], armed[0].size[0]),
+                                   half.size[1] + JUMP_CELL[1] * 2 + LOSE_CELL[1] + 30 + (ARM_CELL[1] + 4) * len(armed) + (CAST_CELL[1] + 4) * 2), grey)
         board.alpha_composite(half, (0, 0))
         board.alpha_composite(jump, (0, half.size[1] + 10))
         # Her running frames under her jump frames, at the same size, to see that they are one girl.
         for index, frame in enumerate(running[:6]):
             board.alpha_composite(frame, (index * JUMP_CELL[0] + (JUMP_CELL[0] - frame.size[0]) // 2, half.size[1] + 10 + JUMP_CELL[1] + (JUMP_CELL[1] - frame.size[1])))
         board.alpha_composite(lose, (0, half.size[1] + 20 + JUMP_CELL[1] * 2))
+        down = half.size[1] + 30 + JUMP_CELL[1] * 2 + LOSE_CELL[1]
+        for strip in armed:
+            board.alpha_composite(strip, (0, down))
+            down += ARM_CELL[1] + 4
+        across = 0
+        for index, strip in enumerate(others):
+            if index == 2:
+                across, down = 0, down + CAST_CELL[1] + 4
+            board.alpha_composite(strip, (across, down))
+            across += strip.size[0] + 8
         board.convert("RGB").save(args.preview)
 
 

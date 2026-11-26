@@ -108,6 +108,26 @@ SOUNDS = {
     "pick": after(note(784, .05), note(988, .05), note(1319, .14)),
     # Something of theirs sent back or wiped away: a ring of metal.
     "clang": fade(mix(tone(.26, 2100), .6 * tone(.26, 3150), .4 * tone(.26, 1270, shape="triangle")), .002),
+    # Something that helps picked up: four notes climbing.
+    "buff": after(note(660, .05), note(880, .05), note(1109, .05), note(1320, .16)),
+    # Bread from Chikuwa: two warm notes.
+    "bread": after(note(523, .09, "sine"), note(784, .2, "sine")),
+    # The ball of ink bursting: a wet pop.
+    "pop": mix(fade(tone(.12, 700, 120), .002), .5 * fade(soft(noise(.08), .2), .002)),
+    # Charmed: a wobbling, sugary slide.
+    "charm": fade(tone(.5, 900, 1500, "sine", .06, 9), .01),
+    # One sign after another: a quick run up.
+    "combo": after(note(988, .04), note(1175, .04), note(1480, .04), note(1976, .14)),
+    # Something bought at the counter: a till.
+    "buy": after(note(1568, .05), note(2093, .05), mix(note(2637, .3), .5 * note(3136, .3))),
+    # Not enough keys: two low notes.
+    "no": after(note(196, .1, "square"), note(165, .18, "square")),
+    # Her wings: a soft beat of air.
+    "flap": fade(soft(noise(.14), .08) * numpy.sin(numpy.linspace(0, numpy.pi, int(RATE * .14))), .01),
+    # Tsubakieh's bat: a crack.
+    "bat": mix(fade(tone(.1, 1800, 300, "square"), .001), fade(soft(noise(.16), .3), .001), .8 * fade(tone(.2, 150, 60), .002)),
+    # One of Illya's hearts: a little chime.
+    "heart": after(note(1760, .06, "sine"), note(2217, .14, "sine")),
     # A page of the story turning.
     "page": fade(soft(noise(.12), .12) * numpy.linspace(.2, 1, int(RATE * .12)), .01),
 }

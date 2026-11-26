@@ -370,6 +370,190 @@ public class PlusRunTest {
         assertEquals(1, run.hurts());
     }
 
+    // What helps her
+
+    /** Flat ground with something to help lying two columns from where she starts. */
+    private static RunLevels.Level helped(int kind) {
+        RunLevels.Level level = flat(60);
+        level.items.add(new int[]{kind, 4, FLOOR - 1, 0});
+        return level;
+    }
+
+    @Test public void breadGivesAHeartBackAndIceCreamMakesHerFaster() {
+        RunLevels.Level level = helped(PlusRun.BREAD);
+        hole(level, 16, 18);
+        PlusRun run = new PlusRun(level);
+        run.place(17, 6);
+        hold(run, 2, false, false, false);
+        assertEquals(PlusRun.HEARTS - 1, run.hearts());
+        hold(run, .5f, false, true, false);
+        assertEquals(PlusRun.HEARTS, run.hearts());
+        assertEquals(1, run.taken());
+        assertEquals(PlusRun.BREAD, run.lastTaken());
+        assertEquals(0, run.bonus());
+
+        PlusRun plain = new PlusRun(flat(60)), quick = new PlusRun(helped(PlusRun.ICE));
+        hold(plain, 2, false, true, false);
+        hold(quick, 2, false, true, false);
+        assertTrue(quick.rush() > 0);
+        assertTrue(quick.x() > plain.x() + 2);
+    }
+
+    @Test public void aBallOfInkTakesOneHurtForHer() {
+        RunLevels.Level level = helped(PlusRun.SHIELD);
+        level.foes.add(new int[]{RunLevels.TIMES, 9, FLOOR - 1});
+        level.land[FLOOR - 1][7] = RunLevels.SPIKE;
+        PlusRun run = new PlusRun(level);
+        for (int step = 0; step < 240 && run.spared() == 0; step++) run.step(STEP, false, true, false);
+        assertEquals(1, run.spared());
+        assertEquals(0, run.hurts());
+        assertEquals(PlusRun.HEARTS, run.hearts());
+        assertFalse(run.shield());
+        // She is not put back for it; and standing on in the spikes, the next one costs her.
+        assertTrue(run.x() > 5);
+        hold(run, 2, false, false, false);
+        assertEquals(1, run.hurts());
+        assertEquals(PlusRun.HEARTS - 1, run.hearts());
+    }
+
+    @Test public void aMagnetBringsPlusesAndTheNotesDealWithWhatSheTouches() {
+        RunLevels.Level level = helped(PlusRun.MAGNET);
+        for (int column = 6; column <= 12; column++) level.pluses.add(new int[]{column, FLOOR - 4});
+        PlusRun run = new PlusRun(level);
+        hold(run, 2, false, true, false);
+        assertEquals(7, run.collected());
+        PlusRun without = new PlusRun(flat(60));
+        hold(without, 2, false, true, false);
+        assertEquals(0, without.collected());
+
+        level = helped(PlusRun.NOTES);
+        level.foes.add(new int[]{RunLevels.TIMES, 9, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.MINUS, 13, FLOOR - 1});
+        level.land[FLOOR - 1][7] = RunLevels.SPIKE;
+        PlusRun other = new PlusRun(level);
+        hold(other, 3, false, true, false);
+        assertEquals(2, other.flattened());
+        assertEquals(0, other.hurts());
+    }
+
+    @Test public void landingOnOneSignAfterAnotherIsWorthMoreEachTime() {
+        RunLevels.Level level = flat(60);
+        level.foes.add(new int[]{RunLevels.THROWER, 20, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.THROWER, 22, FLOOR - 1});
+        PlusRun run = new PlusRun(level);
+        // Neither has a knife to throw for a while.
+        for (PlusRun.Foe foe : run.foes()) foe.wait = 9;
+        run.place(19.9f, FLOOR - 6);
+        // Straight down onto the first, and off it to the right onto the second, the jump held for the whole of the bounce.
+        for (int step = 0; step < 200 && run.flattened() < 2; step++) run.step(STEP, false, run.flattened() > 0, run.flattened() > 0);
+        assertEquals(2, run.flattened());
+        assertEquals(2, run.combo());
+        assertEquals(1, run.bonus());
+        hold(run, 1, false, false, false);
+        assertEquals(0, run.combo());
+    }
+
+    @Test public void whatSheHasBeenGivenToKeepChangesTheRun() {
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.hearts = 5;
+        perks.wings = true;
+        perks.reach = 2;
+        perks.shots = 32;
+        RunLevels.Level level = armed(PlusRun.GUN);
+        level.pluses.add(new int[]{8, FLOOR - 2});
+        PlusRun run = new PlusRun(level, perks), plain = new PlusRun(level);
+        assertEquals(5, run.hearts());
+        assertEquals(5, run.maxHearts());
+        hold(run, 1.2f, false, true, false);
+        hold(plain, 1.2f, false, true, false);
+        assertEquals(32, run.rounds());
+        assertEquals(1, run.collected());
+        assertEquals(0, plain.collected());
+        // A second jump in the air, once, and only with her wings.
+        float highest = run.y(), plainHighest = plain.y();
+        for (int step = 0; step < 80; step++) {
+            boolean press = step < 14 || step >= 18 && step < 32 || step >= 36 && step < 50;
+            run.step(STEP, false, false, press);
+            plain.step(STEP, false, false, press);
+            highest = Math.min(highest, run.y());
+            plainHighest = Math.min(plainHighest, plain.y());
+        }
+        assertEquals(1, run.flaps());
+        assertEquals(0, plain.flaps());
+        assertTrue("rose " + (GROUND - highest) + " against " + (GROUND - plainHighest), GROUND - highest > GROUND - plainHighest + 1.5f);
+    }
+
+    // Illya and Tsubakieh
+
+    @Test public void illyasHeartsTurnTheArrowsRoundAndWhatIsThrownDealsWithHer() {
+        RunLevels.Level level = armed(PlusRun.PEN);
+        level.foes.add(new int[]{RunLevels.ILLYA, 30, FLOOR - 1});
+        level.guarded = true;
+        level.gate = 50;
+        PlusRun run = new PlusRun(level);
+        assertFalse(run.gateOpen());
+        hold(run, .5f, false, true, false);
+        run.place(22, GROUND);
+        for (int step = 0; step < 600 && run.charms() == 0; step++) run.step(STEP, false, false, false);
+        assertEquals(1, run.charms());
+        assertEquals(PlusRun.HEARTS, run.hearts());
+        assertTrue(run.charmed() > 0);
+        float before = run.x();
+        hold(run, .5f, false, true, false);
+        assertTrue("went " + (run.x() - before), run.x() < before - 1);
+        hold(run, PlusRun.CHARM, false, false, false);
+        // Three pens, each thrown when she has come down low enough to be hit; after each she is somewhere else.
+        for (int blow = 1; blow <= PlusRun.ZERO_HITS; blow++) {
+            for (int step = 0; step < 1200 && run.blows() < blow; step++) {
+                PlusRun.Foe illya = run.foes().get(0);
+                run.place(24, GROUND);
+                boolean low = illya.dazed <= 0 && illya.y + illya.tall() > FLOOR - .5f;
+                // Her hearts are kept out of it: this is about what is thrown at her.
+                run.shots().removeIf(shot -> !shot.hers);
+                run.step(STEP, illya.x < run.x(), illya.x > run.x(), false, low && step % 30 == 0);
+            }
+            assertEquals(blow, run.blows());
+            if (blow == 1) {
+                // Shaken off, she is on the other side of whoever hit her, and keeps her distance from there.
+                boolean wasRight = run.foes().get(0).x > run.x();
+                hold(run, 1.3f, false, false, false);
+                run.shots().removeIf(shot -> !shot.hers);
+                assertTrue(wasRight != run.foes().get(0).x > run.x());
+                assertTrue(Math.abs(run.foes().get(0).x - run.x()) < 6);
+            }
+        }
+        assertTrue(run.foes().get(0).flat);
+        assertTrue(run.gateOpen());
+    }
+
+    @Test public void tsubakiehSwingsHerBatSendsBackWhatIsThrownAndCanBeLandedOn() {
+        RunLevels.Level level = armed(PlusRun.PEN);
+        level.foes.add(new int[]{RunLevels.TSUBAKIEH, 14, FLOOR - 1});
+        PlusRun run = new PlusRun(level);
+        hold(run, .5f, false, true, false);
+        // A pen comes straight back.
+        run.step(STEP, false, false, false, true);
+        for (int step = 0; step < 120 && run.turned() == 0; step++) run.step(STEP, false, false, false);
+        assertEquals(1, run.turned());
+        assertEquals(0, run.blows());
+        // Standing in front of her gets the bat.
+        PlusRun other = new PlusRun(level);
+        for (int step = 0; step < 900 && other.hurts() == 0; step++) other.step(STEP, false, false, false);
+        assertTrue(other.swings() >= 1);
+        assertEquals(1, other.hurts());
+        // Coming down on her counts, three times over.
+        PlusRun third = new PlusRun(level);
+        for (int blow = 1; blow <= PlusRun.ZERO_HITS; blow++) {
+            hold(third, 1.3f, false, false, false);
+            PlusRun.Foe she = third.foes().get(0);
+            third.place(she.x + .1f, she.y - PlusRun.TALL - .3f);
+            for (int step = 0; step < 120 && third.blows() < blow; step++) third.step(STEP, false, false, false);
+            assertEquals(blow, third.blows());
+            third.place(40, GROUND);
+        }
+        assertTrue(third.foes().get(0).flat);
+    }
+
     // Her lines
 
     @Test public void everyLineOfTheStoryEndsOnHerCatchphraseAndHasANameOfItsOwn() {
@@ -380,16 +564,33 @@ public class PlusRunTest {
                 lines++;
                 assertTrue("a name used twice: " + line[0], names.add(line[0]));
                 assertTrue(line[0], line[0].matches("[a-z0-9]+"));
+                // Its words, who says it, and the scene it is said in, which is what the voice is told.
+                assertEquals(line[0], 4, line.length);
+                assertTrue(line[0], RunStory.speaker(line) >= 0 && line[2].length() == 1);
+                assertTrue(line[0], line[3].length() > 20 && line[3].length() <= 600);
+                if (RunStory.speaker(line) != 0) {
+                    // Someone else's line: never her name for the player.
+                    assertFalse(line[1], line[1].contains("Sloppy"));
+                    continue;
+                }
                 assertTrue("does not end on Sloppy~♡: " + line[1], line[1].endsWith(" " + Chatter.SLOPPY));
                 assertFalse("a comma before her catchphrase: " + line[1], line[1].endsWith(", " + Chatter.SLOPPY));
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(73, lines);
-        assertEquals(RunLevels.COUNT, RunStory.LANDS.length);
-        assertEquals(RunLevels.CHAPTERS, RunStory.OPENINGS.length);
+        assertEquals(95, lines);
         assertEquals(RunLevels.CHAPTERS, RunStory.CHAPTERS.length);
+        assertEquals(RunStory.SPEAKERS.length(), RunStory.NAMES.length);
         assertEquals(PlusRun.GUN + 1, RunStory.ARMS.length);
+        assertEquals(PlusRun.NOTES + 1, RunStory.TOOK.length);
+        assertEquals(10, RunStory.SEE.length);
+        // The story moves on where someone joins her and where someone waits for her.
+        for (int land : new int[]{1, 3, 7, 9, 13, RunLevels.ILLYA_LAND, 19, RunLevels.TSUBAKIEH_LAND, 25, RunLevels.COUNT}) {
+            assertTrue("land " + land, RunStory.intro(land) != null);
+        }
+        for (int land = 1; land <= RunLevels.COUNT; land++) {
+            assertEquals("land " + land, RunLevels.bossOf(land) >= 0, RunStory.outro(land) != null);
+        }
     }
 
     // The thirty lands
@@ -481,10 +682,10 @@ public class PlusRunTest {
         return text.toString();
     }
 
-    /** A land without Zero in it: getting past him is a matter of skill, not of whether the land can be crossed. */
+    /** A land without Zero, Illya or Tsubakieh in it: getting past them is a matter of skill, not of whether the land can be crossed. */
     private static RunLevels.Level unguarded(RunLevels.Level level) {
         for (int index = level.foes.size() - 1; index >= 0; index--) {
-            if (level.foes.get(index)[0] == RunLevels.ZERO) level.foes.remove(index);
+            if (RunLevels.boss(level.foes.get(index)[0])) level.foes.remove(index);
         }
         level.guarded = false;
         return level;
@@ -506,13 +707,27 @@ public class PlusRunTest {
             assertEquals(number, level.number);
             assertEquals((number - 1) / 6, level.chapter);
             assertTrue("land " + number + " has " + level.pluses.size() + " pluses", level.pluses.size() >= 15);
-            assertEquals(2, level.flags.size());
+            // Two flags along the way, and one more at the door of whoever waits at the end.
+            assertEquals(RunLevels.bossOf(number) >= 0 ? 3 : 2, level.flags.size());
             assertEquals(RunLevels.GATE, level.land[FLOOR - 1][level.gate]);
             assertTrue(level.columns > 60 && level.columns < 400);
             // Made from the number kept for it, it is the same land every time.
             assertEquals(level.columns, RunLevels.level(number).columns);
             // Something to fight with by each flag, and from the second land on by where she starts; each lies on the ground.
-            assertEquals("land " + number, number == 1 ? 2 : number == RunLevels.COUNT ? 4 : 3, level.weapons.size());
+            assertEquals("land " + number, number == 1 ? 2 : RunLevels.bossOf(number) >= 0 ? 4 : 3, level.weapons.size());
+            // Chikuwa waits with bread from the third land and Rune with her ink from the ninth; ice cream and the rest from the fourth.
+            int bread = 0, ink = 0, loose = 0;
+            for (int[] item : level.items) {
+                assertEquals("land " + number + " column " + item[1], RunLevels.BLOCK, level.land[FLOOR][item[1]]);
+                assertFalse(PlusRun.solid(level.land[FLOOR - 1][item[1]]));
+                if (item[3] == 1) bread++;
+                else if (item[3] == 2) ink++;
+                else loose++;
+            }
+            assertEquals("land " + number, number >= 3 ? 1 : 0, bread);
+            assertEquals("land " + number, number >= 9 ? 1 : 0, ink);
+            if (number >= 4) assertTrue("land " + number + " has nothing lying about to help", loose >= 1);
+            assertEquals("land " + number, RunLevels.bossOf(number) >= 0, level.guarded);
             for (int[] weapon : level.weapons) {
                 assertTrue(weapon[0] >= PlusRun.PEN && weapon[0] <= PlusRun.GUN);
                 assertEquals("land " + number + " column " + weapon[1], RunLevels.BLOCK, level.land[FLOOR][weapon[1]]);

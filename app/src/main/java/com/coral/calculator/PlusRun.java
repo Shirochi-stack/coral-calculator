@@ -29,6 +29,33 @@ final class PlusRun {
      * held, until it is empty. The last of these numbers is the dot a divide shoots.
      */
     static final int UNARMED = -1, PEN = 0, KNIFE = 1, BOOK = 2, BRUSH = 3, SWORD = 4, GUN = 5, DOT = 6;
+    /** And the heart Illya fires: it does not hurt, it charms, and for a while the arrows work the wrong way round. */
+    static final int HEART = 7;
+    /**
+     * What may be picked up to help for a while: bread gives a heart back; ice cream makes
+     * her faster and her jump higher; a ball of Rune's ink takes the next hurt for her; a
+     * magnet brings the pluses near her to her; and the notes make her untouchable, so that
+     * whatever she touches is dealt with.
+     */
+    static final int BREAD = 0, ICE = 1, SHIELD = 2, MAGNET = 3, NOTES = 4;
+    private static final float[] LASTS = {0, 8, 0, 10, 6};
+    static final float MAGNET_REACH = 3.5f, CHARM = 2.5f;
+    /** What it was that last hurt her: a fall, a sign she touched, something thrown, spikes, or Tsubakieh's bat. */
+    static final int FELL = 0, TOUCHED = 1, STRUCK = 2, SPIKED = 3, BATTED = 4;
+
+    /** What she has been given to keep, from one land to the next: she starts with none of it. */
+    static final class Perks {
+        /** How many hearts she starts a land with. */
+        int hearts = HEARTS;
+        /** Her wings carry her a second jump in the air. */
+        boolean wings;
+        /** From how far a plus comes to her without being touched, in squares. */
+        float reach;
+        /** How many times as long what she picks up lasts. */
+        float lasting = 1;
+        /** How many shots an ink gun holds. */
+        int shots = GUN_SHOTS;
+    }
     static final int GUN_SHOTS = 16;
     /** How long a swing of the brush or the sword lasts. */
     static final float SWING = .18f;
@@ -41,9 +68,13 @@ final class PlusRun {
     private static final float LATE = .08f, EARLY = .1f;
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
-    private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0};
-    private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f};
-    private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f};
+    private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f};
+    private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f};
+    private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f};
+    /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
+    private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
+    /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
+    private static final float ILLYA_KEEPS = 4.2f, ILLYA_DRIFT = 2.4f, ILLYA_ROOM = 11.5f;
     private static final float HOP_HIGH = 1.9f, HOP_EVERY = 1.3f, STUNNED = 1.1f;
     /** How long each of her things must rest between one use and the next. */
     private static final float[] REST = {.42f, .24f, .75f, .42f, .3f, .15f};
@@ -72,6 +103,9 @@ final class PlusRun {
         int left;
         /** How long until it next throws something, if it is one that does. */
         float wait = 1;
+        /** Where it began; and for Tsubakieh what she is doing, walking (0), bat raised (1) or bat swung (2), and for how much longer. */
+        float home, act;
+        int mode;
 
         Foe(int kind) { this.kind = kind; }
 
@@ -87,6 +121,12 @@ final class PlusRun {
     private final List<int[]> arms = new ArrayList<>();
     private final List<Shot> shots = new ArrayList<>();
     private final int total;
+    private final Perks perks;
+    /** What may still be picked up to help: the kind, column and row of each, and who holds it out, if anyone. */
+    private final List<int[]> items = new ArrayList<>();
+    private float rush, magnet, notes, charmed;
+    private boolean shield;
+    private int combo, bonus, airJumps, flaps, taken, lastTaken = -1, spared, charms, swings, cause;
     private int weapon = UNARMED, rounds, swungWith = UNARMED;
     private float sinceStrike = 1, swing;
     private boolean strikeHeld;
@@ -104,21 +144,28 @@ final class PlusRun {
     /** Where the last plus was collected and the last sign flattened: across and down, in squares. */
     private float plusX, plusY, foeX, foeY;
 
-    PlusRun(RunLevels.Level level) {
+    PlusRun(RunLevels.Level level) { this(level, new Perks()); }
+
+    /** A run through a land with what she has been given to keep. */
+    PlusRun(RunLevels.Level level, Perks perks) {
         this.level = level;
+        this.perks = perks;
+        hearts = perks.hearts;
         columns = level.columns;
         pluses.addAll(level.pluses);
         arms.addAll(level.weapons);
+        items.addAll(level.items);
         total = pluses.size();
         for (int[] spec : level.foes) {
             Foe foe = new Foe(spec[0]);
             foe.x = spec[1] + (1 - foe.wide()) / 2;
             foe.ground = spec[2] + 1 - foe.tall();
             foe.y = foe.ground;
-            foe.left = spec[0] == RunLevels.ZERO ? ZERO_HITS : 1;
+            foe.home = foe.x;
+            foe.left = RunLevels.boss(spec[0]) ? ZERO_HITS : 1;
             // Each divide starts its hop at a different moment.
             foe.clock = spec[1] * .37f % HOP_EVERY;
-            if (spec[0] == RunLevels.ZERO) foe.wait = 2;
+            if (RunLevels.boss(spec[0])) foe.wait = 2;
             foes.add(foe);
         }
         startX = 2;
@@ -129,6 +176,23 @@ final class PlusRun {
 
     private PlusRun(PlusRun other) {
         level = other.level;
+        perks = other.perks;
+        items.addAll(other.items);
+        rush = other.rush;
+        magnet = other.magnet;
+        notes = other.notes;
+        charmed = other.charmed;
+        shield = other.shield;
+        combo = other.combo;
+        bonus = other.bonus;
+        airJumps = other.airJumps;
+        flaps = other.flaps;
+        taken = other.taken;
+        lastTaken = other.lastTaken;
+        spared = other.spared;
+        charms = other.charms;
+        swings = other.swings;
+        cause = other.cause;
         columns = other.columns;
         pluses.addAll(other.pluses);
         total = other.total;
@@ -143,6 +207,9 @@ final class PlusRun {
             foe.dazed = from.dazed;
             foe.left = from.left;
             foe.wait = from.wait;
+            foe.home = from.home;
+            foe.act = from.act;
+            foe.mode = from.mode;
             foes.add(foe);
         }
         arms.addAll(other.arms);
@@ -219,6 +286,29 @@ final class PlusRun {
     /** Everything in the air, hers and theirs. */
     List<Shot> shots() { return shots; }
 
+    /** What may still be picked up to help: the kind, column and row of each, and who holds it out (0 no one, 1 Chikuwa, 2 Rune). */
+    List<int[]> items() { return items; }
+
+    int maxHearts() { return perks.hearts; }
+    /** How much longer the ice cream, the magnet and the notes last; whether a ball of ink is about her; how much longer she is charmed. */
+    float rush() { return rush; }
+    float magnet() { return magnet; }
+    float notes() { return notes; }
+    boolean shield() { return shield; }
+    float charmed() { return charmed; }
+    /** How many signs she has landed on without touching the ground between, and the pluses that has won her over what she collected. */
+    int combo() { return combo; }
+    int bonus() { return bonus; }
+    /** Counts that only go up: second jumps on her wings, things picked up to help, hurts the ink took for her, times charmed, swings of Tsubakieh's bat. */
+    int flaps() { return flaps; }
+    int taken() { return taken; }
+    int lastTaken() { return lastTaken; }
+    int spared() { return spared; }
+    int charms() { return charms; }
+    int swings() { return swings; }
+    /** What last hurt her. */
+    int cause() { return cause; }
+
     /** What she carries, and how many shots an ink gun has left in it. */
     int weapon() { return weapon; }
     int rounds() { return rounds; }
@@ -264,7 +354,7 @@ final class PlusRun {
     /** Whether the gate will let her through: always, but for the land where Zero stands in front of it. */
     boolean gateOpen() {
         if (!level.guarded) return true;
-        for (Foe foe : foes) if (foe.kind == RunLevels.ZERO && !foe.flat) return false;
+        for (Foe foe : foes) if (RunLevels.boss(foe.kind) && !foe.flat) return false;
         return true;
     }
 
@@ -299,21 +389,44 @@ final class PlusRun {
         time += seconds;
         if (safe > 0) safe -= seconds;
         sinceGround = onGround ? 0 : sinceGround + seconds;
-        sinceJump = jump && !jumpHeld ? 0 : sinceJump + seconds;
+        boolean pressed = jump && !jumpHeld;
+        sinceJump = pressed ? 0 : sinceJump + seconds;
+        if (rush > 0) rush -= seconds;
+        if (magnet > 0) magnet -= seconds;
+        if (notes > 0) notes -= seconds;
+        if (onGround) {
+            combo = 0;
+            airJumps = 0;
+        }
+        // Charmed, she goes the way she did not mean to.
+        if (charmed > 0) {
+            charmed -= seconds;
+            boolean swap = left;
+            left = right;
+            right = swap;
+        }
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
-        float wanted = left == right ? 0 : left ? -RUN : RUN;
+        float fast = rush > 0 ? RUN * 1.3f : RUN, leap = rush > 0 ? LEAP * 1.1f : LEAP;
+        float wanted = left == right ? 0 : left ? -fast : fast;
         float push = (wanted == 0 ? DRAG : onGround ? PUSH : PUSH_IN_AIR) * seconds;
         speedAcross = speedAcross < wanted ? Math.min(wanted, speedAcross + push) : Math.max(wanted, speedAcross - push);
         if (wanted != 0) facingLeft = wanted < 0;
 
         // Up: a press of the button a moment early, or a moment after the edge, still jumps.
         if (sinceJump <= EARLY && sinceGround <= LATE) {
-            speedDown = -LEAP;
+            speedDown = -leap;
             sinceJump = 1;
             sinceGround = 1;
             onGround = false;
             jumps++;
+        } else if (pressed && perks.wings && !onGround && airJumps < 1) {
+            // With her wings, one more jump in the air.
+            speedDown = -LEAP * .88f;
+            sinceJump = 1;
+            sprung = false;
+            airJumps++;
+            flaps++;
         }
         // Letting go early makes for a lower jump, but not for a lower flight off a spring.
         if (!jump && !sprung && speedDown < -SHORT_LEAP) speedDown = -SHORT_LEAP;
@@ -325,7 +438,9 @@ final class PlusRun {
 
         for (int index = pluses.size() - 1; index >= 0; index--) {
             int[] plus = pluses.get(index);
-            if (x < plus[0] + .8f && x + WIDE > plus[0] + .2f && y < plus[1] + .8f && y + TALL > plus[1] + .2f) {
+            float far = Math.max(perks.reach, magnet > 0 ? MAGNET_REACH : 0);
+            boolean drawn = far > 0 && Math.hypot(plus[0] + .5f - x - WIDE / 2, plus[1] + .5f - y - TALL / 2) < far;
+            if (drawn || x < plus[0] + .8f && x + WIDE > plus[0] + .2f && y < plus[1] + .8f && y + TALL > plus[1] + .2f) {
                 pluses.remove(index);
                 collected++;
                 plusX = plus[0] + .5f;
@@ -338,8 +453,29 @@ final class PlusRun {
             if (x < arm[1] + .85f && x + WIDE > arm[1] + .15f && y < arm[2] + .9f && y + TALL > arm[2] + .1f) {
                 arms.remove(index);
                 weapon = arm[0];
-                rounds = weapon == GUN ? GUN_SHOTS : 0;
+                rounds = weapon == GUN ? perks.shots : 0;
                 picked++;
+            }
+        }
+        for (int index = items.size() - 1; index >= 0; index--) {
+            int[] item = items.get(index);
+            if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
+                items.remove(index);
+                taken++;
+                lastTaken = item[0];
+                if (item[0] == BREAD) {
+                    // Bread she has no need of is worth three pluses.
+                    if (hearts < perks.hearts) hearts++;
+                    else bonus += 3;
+                } else if (item[0] == SHIELD) {
+                    shield = true;
+                } else if (item[0] == ICE) {
+                    rush = LASTS[ICE] * perks.lasting;
+                } else if (item[0] == MAGNET) {
+                    magnet = LASTS[MAGNET] * perks.lasting;
+                } else {
+                    notes = LASTS[NOTES] * perks.lasting;
+                }
             }
         }
         // A press of the button uses it, once it has rested; the ink gun goes on for as long as the button is held.
@@ -355,10 +491,11 @@ final class PlusRun {
                 speedDown = -SPRING;
                 onGround = false;
                 sprung = true;
+                airJumps = 0;
                 springs++;
             } else if (here == RunLevels.SPIKE && y + TALL >= feetRow + .5f && safe <= 0) {
-                hurt();
-                return;
+                cause = SPIKED;
+                if (hurt(false)) return;
             }
         }
         for (Foe foe : foes) move(foe, seconds);
@@ -369,16 +506,23 @@ final class PlusRun {
             // Coming down onto a sign deals with it and sends her up again; any other touch knocks her back.
             // A times has a spike on every arm and cannot be landed on at all.
             boolean onto = speedDown > 0 && y + TALL - speedDown * seconds <= foe.y + foe.tall() * .6f;
-            if (onto && foe.kind != RunLevels.TIMES && foe.dazed <= 0) {
+            if (notes > 0) {
+                // With the notes about her, whatever she touches is dealt with.
+                if (foe.dazed <= 0) beat(foe);
+            } else if (onto && foe.kind != RunLevels.TIMES && foe.dazed <= 0) {
                 speedDown = -BOUNCE;
+                airJumps = 0;
                 beat(foe);
+                // One sign after another without touching the ground: each is worth one plus more than the last.
+                if (++combo > 1) bonus += combo - 1;
             } else if (safe <= 0 && foe.dazed <= 0) {
-                hurt();
-                return;
+                cause = TOUCHED;
+                if (hurt(false)) return;
             }
         }
         if (y > RunLevels.ROWS + 1) {
-            hurt();
+            cause = FELL;
+            hurt(true);
             return;
         }
         // A flag she has passed, at any height, is where she comes back to; passing the gate is the end.
@@ -403,7 +547,7 @@ final class PlusRun {
         } else {
             foe.dazed = STUNNED;
         }
-        if (foe.kind == RunLevels.ZERO) blows++;
+        if (RunLevels.boss(foe.kind)) blows++;
     }
 
     /** She uses what she carries: throws it, fires it, or begins a swing of it. */
@@ -483,6 +627,12 @@ final class PlusRun {
                     // Nothing thrown gets through Zero: anything times nothing is nothing.
                     if (foe.kind == RunLevels.ZERO) {
                         shots.remove(index);
+                    } else if (foe.kind == RunLevels.TSUBAKIEH && foe.mode != 2 && foe.dazed <= 0) {
+                        // Tsubakieh bats it straight back, unless she has just swung.
+                        shot.hers = false;
+                        shot.across = -shot.across;
+                        shot.left = 1.2f;
+                        turned++;
                     } else if (foe.dazed <= 0) {
                         beat(foe);
                         // A book goes on through.
@@ -492,27 +642,48 @@ final class PlusRun {
                 }
             } else if (safe <= 0 && shot.x > x - .15f && shot.x < x + WIDE + .15f && shot.y > y + .05f && shot.y < y + TALL) {
                 shots.remove(index);
-                hurt();
-                return true;
+                if (shot.kind == HEART && charmed <= 0) {
+                    charmed = CHARM;
+                    charms++;
+                } else {
+                    cause = STRUCK;
+                    if (hurt(false)) return true;
+                }
             }
         }
         return false;
     }
 
-    private void hurt() {
-        hurts++;
-        if (--hearts <= 0) {
-            state = LOST;
-            return;
+    /**
+     * She is hurt, by something or by a fall, and comes back at the last flag with a heart
+     * the fewer. The notes keep her from everything but a fall, and a ball of ink takes one
+     * hurt for her. Returns whether anything came of it.
+     */
+    private boolean hurt(boolean fell) {
+        if (!fell && notes > 0) return false;
+        if (shield) {
+            shield = false;
+            spared++;
+            safe = SAFE;
+            // From a fall she still has to be put back, but she keeps her heart.
+            if (!fell) return true;
+        } else {
+            hurts++;
+            if (--hearts <= 0) {
+                state = LOST;
+                return true;
+            }
         }
         // Whatever was in the air is gone by the time she is back.
         shots.clear();
         swing = 0;
+        charmed = 0;
         x = startX;
         y = startY;
         speedAcross = 0;
         speedDown = 0;
         safe = SAFE;
+        return true;
     }
 
     private void moveAcross(float by) {
@@ -595,11 +766,57 @@ final class PlusRun {
         if (foe.flat) return;
         foe.clock += seconds;
         if (foe.dazed > 0) {
-            foe.dazed -= seconds;
+            // Illya is somewhere else by the time she has shaken it off: on the other side of whoever hit her.
+            if ((foe.dazed -= seconds) <= 0 && foe.kind == RunLevels.ILLYA) {
+                float side = foe.x + foe.wide() / 2 < x + WIDE / 2 ? 1 : -1;
+                foe.x = Math.max(foe.home - ILLYA_ROOM, Math.min(foe.home + 2.5f, x + WIDE / 2 + side * ILLYA_KEEPS - foe.wide() / 2));
+            }
             return;
         }
         float middle = foe.x + foe.wide() / 2, away = Math.abs(x + WIDE / 2 - middle);
         boolean toLeft = x + WIDE / 2 < middle;
+        if (foe.kind == RunLevels.ILLYA) {
+            // She floats a little up and a little down, keeps her distance, within the place where she waits, and
+            // sends hearts at wherever her visitor stands.
+            foe.leftward = toLeft;
+            float keeps = Math.max(foe.home - ILLYA_ROOM, Math.min(foe.home + 2.5f, x + WIDE / 2 + (toLeft ? ILLYA_KEEPS : -ILLYA_KEEPS) - foe.wide() / 2));
+            if (away < 14) foe.x += Math.max(-ILLYA_DRIFT * seconds, Math.min(ILLYA_DRIFT * seconds, keeps - foe.x));
+            foe.y = foe.ground - .6f - (float) Math.sin(foe.clock * 2.2f) * .5f;
+            foe.wait -= seconds;
+            if (foe.wait <= 0 && away < 12) {
+                foe.wait = 2.2f - (ZERO_HITS - foe.left) * .45f;
+                float across = x + WIDE / 2 - middle, down = y + TALL / 2 - foe.y - foe.tall() * .4f;
+                float length = Math.max(.5f, (float) Math.hypot(across, down));
+                shoot(HEART, false, middle, foe.y + foe.tall() * .4f, across / length * 5.5f, down / length * 5.5f, 2.4f);
+                thrown++;
+            }
+            return;
+        }
+        if (foe.kind == RunLevels.TSUBAKIEH && foe.mode != 0) {
+            if ((foe.act -= seconds) > 0) return;
+            if (foe.mode == 2) {
+                foe.mode = 0;
+                return;
+            }
+            // The bat comes down: whoever stands in front of it, and no higher than she is, is hit.
+            foe.mode = 2;
+            foe.act = BAT_SPENT;
+            swings++;
+            float from = foe.leftward ? foe.x - BAT_REACH : foe.x + foe.wide();
+            if (safe <= 0 && x < from + BAT_REACH && x + WIDE > from && y + TALL > foe.y - .3f && y < foe.y + foe.tall()) {
+                cause = BATTED;
+                hurt(false);
+            }
+            return;
+        }
+        if (foe.kind == RunLevels.TSUBAKIEH) {
+            foe.leftward = toLeft;
+            if (away < BAT_NEAR && Math.abs(y + TALL - foe.y - foe.tall()) < 2) {
+                foe.mode = 1;
+                foe.act = BAT_RAISED;
+                return;
+            }
+        }
         if (foe.kind == RunLevels.DIVIDE || foe.kind == RunLevels.GUNNER) {
             float before = (foe.clock - seconds) % HOP_EVERY / HOP_EVERY, turn = foe.clock % HOP_EVERY / HOP_EVERY;
             foe.y = foe.ground - (float) Math.sin(turn * Math.PI) * HOP_HIGH;
@@ -631,12 +848,13 @@ final class PlusRun {
                 thrown++;
             }
         }
-        float speed = SPEED[foe.kind] * (foe.kind == RunLevels.ZERO ? 1 + (ZERO_HITS - foe.left) * .45f : 1);
+        float speed = SPEED[foe.kind] * (RunLevels.boss(foe.kind) ? 1 + (ZERO_HITS - foe.left) * (foe.kind == RunLevels.ZERO ? .45f : .3f) : 1);
         float ahead = foe.leftward ? foe.x - speed * seconds : foe.x + foe.wide() + speed * seconds;
         int column = (int) Math.floor(ahead), row = (int) Math.floor(foe.ground + foe.tall() - .001f);
         if (ahead < 0 || ahead > columns || solid(at(column, row)) || !solid(at(column, row + 1))
                 || at(column, row) == RunLevels.SPIKE) {
-            foe.leftward = !foe.leftward;
+            // Tsubakieh waits at whatever is in her way; the rest turn round.
+            if (foe.kind != RunLevels.TSUBAKIEH) foe.leftward = !foe.leftward;
         } else {
             foe.x += (foe.leftward ? -1 : 1) * speed * seconds;
         }
