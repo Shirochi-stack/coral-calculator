@@ -464,21 +464,75 @@ public final class CompanionSettingsActivity extends Activity {
         TextView note = text("", 15, muted());
         note.setPadding(0, dp(4), dp(56), dp(8));
         parent.addView(note);
-        Swatch[] swatches = new Swatch[Hair.NAMES.length];
+        // A colour of the user's own, and a light about her: both open once every colour is won.
+        LinearLayout mixer = new LinearLayout(this);
+        mixer.setOrientation(LinearLayout.VERTICAL);
+        parent.addView(mixer);
+        LinearLayout own = new LinearLayout(this);
+        own.setOrientation(LinearLayout.VERTICAL);
+        mixer.addView(own);
+        EditText hex = new EditText(this);
+        hex.setSingleLine(true);
+        hex.setTextSize(18);
+        hex.setTextColor(ink());
+        hex.setHintTextColor(muted());
+        hex.setHint("#F4A3BE");
+        hex.setFilters(new InputFilter[]{new InputFilter.LengthFilter(7)});
+        hex.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        hex.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        hex.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        hex.setContentDescription("Hair colour as a hex code");
+        hex.setMinHeight(dp(48));
+        TextView hexLabel = text("Hex code", 15, muted());
+        own.addView(hexLabel);
+        own.addView(hex, new LinearLayout.LayoutParams(dp(150), LinearLayout.LayoutParams.WRAP_CONTENT));
+        String[] parts = {"Hue", "Strength", "Brightness"};
+        int[] most = {360, 100, 100};
+        SeekBar[] bars = new SeekBar[3];
+        for (int part = 0; part < 3; part++) {
+            TextView name = text(parts[part], 15, muted());
+            name.setPadding(0, dp(6), 0, 0);
+            own.addView(name);
+            bars[part] = new SeekBar(this);
+            bars[part].setMax(most[part]);
+            bars[part].setContentDescription(parts[part] + " of the hair colour");
+            own.addView(bars[part], new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        }
+        Switch glow = toggle(mixer, "Glow", "A soft light about her in the colour of her hair, over your other apps.",
+                prefs.hairGlow(), checked -> { prefs.set(CompanionPrefs.HAIR_GLOW, checked); apply(); });
+        // Set while the fields are filled in from code, so that it is not taken for the user's mixing.
+        boolean[] filling = {false};
+        Runnable fill = () -> {
+            filling[0] = true;
+            int colour = 0xFF000000 | prefs.hairCustom();
+            float[] of = new float[3];
+            android.graphics.Color.colorToHSV(colour, of);
+            bars[0].setProgress(Math.round(of[0]));
+            bars[1].setProgress(Math.round(of[1] * 100));
+            bars[2].setProgress(Math.round(of[2] * 100));
+            String code = String.format(java.util.Locale.ROOT, "#%06X", colour & 0xFFFFFF);
+            if (!code.equalsIgnoreCase(hex.getText().toString())) hex.setText(code);
+            filling[0] = false;
+        };
+        Swatch[] swatches = new Swatch[Hair.CUSTOM + 1];
         // Which preview was asked for last: one made for an earlier choice is not shown over it.
         int[] asked = {-1};
         showHair = () -> {
             int owned = Hair.owned(this), worn = Hair.chosen(this), won = Integer.bitCount(owned & (1 << Hair.NAMES.length - 1) - 1);
-            boolean animated = prefs.animated();
+            boolean animated = prefs.animated(), all = Hair.all(this);
             for (Swatch swatch : swatches) {
-                swatch.owned = Hair.owns(owned, swatch.colour);
-                swatch.worn = swatch.colour == worn;
+                swatch.owned = swatch.colour == Hair.CUSTOM ? all : Hair.owns(owned, swatch.colour);
+                swatch.worn = swatch.colour == Hair.CUSTOM ? Hair.custom(worn) : swatch.colour == worn;
                 swatch.setAlpha(animated ? 1 : .45f);
-                swatch.setContentDescription(Hair.NAMES[swatch.colour] + " hair" + (swatch.worn ? ", chosen" : swatch.owned ? "" : ", not won yet"));
+                swatch.setContentDescription(hairName(swatch.colour) + (swatch.worn ? ", chosen" : swatch.owned ? "" : ", not won yet"));
                 swatch.invalidate();
             }
+            mixer.setVisibility(all && animated ? View.VISIBLE : View.GONE);
+            own.setVisibility(Hair.custom(worn) ? View.VISIBLE : View.GONE);
+            setChecked(glow, prefs.hairGlow());
             note.setText(!animated ? "The colours are for the animated Halgakos. The still one keeps her white hair."
-                    : won == Hair.NAMES.length - 1 ? "Every colour is won. She wears the one you choose, here and over your other apps."
+                    : all ? "Every colour is won. She wears the one you choose, here and over your other apps. The last round is a colour of "
+                    + "your own: mix it below, or type its hex code."
                     : "Pink is her own. The others are won in Plus run, from its bosses: " + won + " of " + (Hair.NAMES.length - 1)
                     + " won so far. One that is won can be worn here.");
             if (asked[0] == worn) return;
@@ -500,17 +554,54 @@ public final class CompanionSettingsActivity extends Activity {
             swatch.setOnClickListener(view -> {
                 if (!prefs.animated()) return;
                 if (!swatch.owned) {
-                    note.setText(Hair.NAMES[swatch.colour] + " is not won yet. It is one of the rewards of Plus run.");
+                    note.setText(swatch.colour == Hair.CUSTOM ? "A colour of your own, and a glow, open once all eight colours are won in Plus run."
+                            : Hair.NAMES[swatch.colour] + " is not won yet. It is one of the rewards of Plus run.");
                     return;
                 }
                 prefs.setHair(swatch.colour);
+                if (swatch.colour == Hair.CUSTOM) fill.run();
                 showHair.run();
                 apply();
             });
             ((LinearLayout) rows.getChildAt(rows.getChildCount() - 1)).addView(swatch, new LinearLayout.LayoutParams(dp(46), dp(48)));
         }
+        // Mixing: the bars change the code as they move, and she changes when they are let go; a whole code typed changes her at once.
+        SeekBar.OnSeekBarChangeListener mixed = new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean byUser) {
+                if (!byUser || filling[0]) return;
+                int colour = android.graphics.Color.HSVToColor(new float[]{bars[0].getProgress(), bars[1].getProgress() / 100f, bars[2].getProgress() / 100f});
+                prefs.setHairCustom(colour);
+                filling[0] = true;
+                hex.setText(String.format(java.util.Locale.ROOT, "#%06X", colour & 0xFFFFFF));
+                filling[0] = false;
+                swatches[Hair.CUSTOM].invalidate();
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                showHair.run();
+                apply();
+            }
+        };
+        for (SeekBar bar : bars) bar.setOnSeekBarChangeListener(mixed);
+        hex.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence text, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable text) {
+                if (filling[0]) return;
+                String code = text.toString().trim();
+                if (code.startsWith("#")) code = code.substring(1);
+                if (!code.matches("[0-9A-Fa-f]{6}")) return;
+                prefs.setHairCustom(Integer.parseInt(code, 16));
+                fill.run();
+                showHair.run();
+                apply();
+            }
+        });
+        fill.run();
         showHair.run();
     }
+
+    private static String hairName(int colour) { return colour == Hair.CUSTOM ? "A colour of your own" : Hair.NAMES[colour] + " hair"; }
 
     /** One hair colour to choose: a round of it, ringed when it is the one worn, and with a padlock over it until it is won. */
     private final class Swatch extends View {
@@ -528,9 +619,20 @@ public final class CompanionSettingsActivity extends Activity {
         @Override protected void onDraw(android.graphics.Canvas canvas) {
             float x = getWidth() / 2f, y = getHeight() / 2f, round = dp(15);
             paint.setStyle(android.graphics.Paint.Style.FILL);
-            paint.setColor(Hair.COLOURS[colour]);
-            paint.setAlpha(owned ? 255 : 80);
-            canvas.drawCircle(x, y, round, paint);
+            if (colour == Hair.CUSTOM) {
+                // The round for a colour of the user's own: every hue round its rim, and the colour mixed in its middle.
+                paint.setShader(new android.graphics.SweepGradient(x, y, new int[]{0xFFE0362F, 0xFFF2C230, 0xFF3FB56A, 0xFF3B7BE0, 0xFF9A4FD0, 0xFFE0362F}, null));
+                paint.setAlpha(owned ? 255 : 80);
+                canvas.drawCircle(x, y, round, paint);
+                paint.setShader(null);
+                paint.setColor(0xFF000000 | prefs.hairCustom());
+                paint.setAlpha(owned ? 255 : 0);
+                canvas.drawCircle(x, y, round * .62f, paint);
+            } else {
+                paint.setColor(Hair.COLOURS[colour]);
+                paint.setAlpha(owned ? 255 : 80);
+                canvas.drawCircle(x, y, round, paint);
+            }
             paint.setStyle(android.graphics.Paint.Style.STROKE);
             paint.setStrokeWidth(dp(1));
             paint.setColor(muted());

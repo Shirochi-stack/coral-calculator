@@ -135,6 +135,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** The colour of the hair in those frames, and whether frames in another colour are being made. */
     private int hair;
     private boolean dyeing;
+    /** Whether she glows, and in what colour: a light of her hair's colour about her. */
+    private boolean glowing;
+    private int glowTint;
     /** Room around the figure in its window, for her shadow. */
     private int pad;
 
@@ -526,6 +529,14 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
      */
     private void dye() {
         int wanted = Hair.chosen(app);
+        boolean glow = Hair.glows(app);
+        // The light about her is her hair's colour, paler.
+        int tint = Hair.colour(wanted), pale = Color.rgb((Color.red(tint) + 255) / 2, (Color.green(tint) + 255) / 2, (Color.blue(tint) + 255) / 2);
+        if (glow != glowing || pale != glowTint) {
+            glowing = glow;
+            glowTint = pale;
+            if (sprite != null) sprite.glow();
+        }
         if (pet == null || wanted == hair || dyeing) return;
         dyeing = true;
         new Thread(() -> {
@@ -1587,6 +1598,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         /** Draws a frame of the animated figure as its own shadow. */
         private final Paint silhouette = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        /** Draws a frame as a light about her, in the colour of her hair. */
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private int haloTint;
         private final Rect frameSource = new Rect();
         private final RectF frameTarget = new RectF();
         private final int[] shadowOffset = new int[2];
@@ -1671,11 +1685,38 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 frameTarget.set(pad, pad + pad * .3f, getWidth() - pad, getHeight() - pad + pad * .3f);
                 canvas.drawBitmap(sheet, frameSource, frameTarget, silhouette);
                 frameTarget.offset(0, -pad * .3f);
+                if (glowing) halo(canvas, sheet);
                 canvas.drawBitmap(sheet, frameSource, frameTarget, paint);
                 if (partyFrame >= 0) confetti(canvas);
             } else if (figure != null) {
                 canvas.drawBitmap(shadow, pad + shadowOffset[0], pad + shadowOffset[1] + pad * .3f, shadowPaint);
                 canvas.drawBitmap(figure, pad, pad, paint);
+            }
+        }
+
+        /** The light about her has been turned on or off, or has changed colour. */
+        void glow() { invalidate(); }
+
+        /**
+         * A light about her: the frame drawn again and again a little way off in every
+         * direction, in the colour of her hair, faint, so that it reads as a soft edge of light.
+         * It breathes a little from one frame to the next.
+         */
+        private void halo(Canvas canvas, Bitmap sheet) {
+            if (haloTint != glowTint) {
+                haloTint = glowTint;
+                halo.setColorFilter(new PorterDuffColorFilter(glowTint, PorterDuff.Mode.SRC_IN));
+            }
+            float breath = .82f + .18f * (float) Math.sin(SystemClock.uptimeMillis() / 420.0);
+            for (int ring = 0; ring < 3; ring++) {
+                float far = pad * (.95f - ring * .3f);
+                halo.setAlpha(Math.round((18 + ring * 14) * breath));
+                for (int turn = 0; turn < 16; turn++) {
+                    float x = (float) Math.cos(turn * Math.PI / 8) * far, y = (float) Math.sin(turn * Math.PI / 8) * far;
+                    frameTarget.offset(x, y);
+                    canvas.drawBitmap(sheet, frameSource, frameTarget, halo);
+                    frameTarget.offset(-x, -y);
+                }
             }
         }
 
