@@ -73,6 +73,10 @@ VOICES = {
     "Q": ("community-qj9kc2jtun4a", .88, 1.06),
     "V": ("community-mzyrf5zr14rb", 1.1, 1.12),
     "X": ("community-qdnchfkneudi", 1.12, 1.1),
+    # The Brake Pads, who speak as one; the Straight-Ahead Party, for whom its swordswoman speaks; and the Old Book.
+    "Z": ("community-2e7y7ype1d0u", .98, .92),
+    "a": ("community-qdnchfkneudi", 1.08, .98),
+    "b": ("Ambrose", .9, 1.0),
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
@@ -100,6 +104,9 @@ MANNER = {
     "Q": "Byeoru is a quiet young court scribe with a soft, high, flat anime voice, precise and unhurried. ",
     "V": "Jupan is a sly young merchant girl with a high, quick, bright anime voice, always bargaining. ",
     "X": "Sumbi is a cheerful diver girl with a high, loud, sunny anime voice, daring and out of breath. ",
+    "Z": "The Brake Pads are two hard-working little brake pads who speak as one: a tomboyish, gruff but young and cheerful anime voice. ",
+    "a": "The leader of the Straight-Ahead Party is a brash red-haired swordswoman with a loud, proud, hot-blooded anime voice. ",
+    "b": "The Old Book is a very old, sleepy, bearded book: a slow, warm, grumbling grandfather's voice. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
 
@@ -123,7 +130,7 @@ def story():
     text = STORY.read_text(encoding="utf-8")
     player = re.search(r'PLAYER = "([^"]+)"', text).group(1)
     fast = re.search(r'FAST = "([^"]+)"', text).group(1)
-    found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Z])",\s*(PLAYER \+ )?"([^"]+)"( \+ FAST)?\}', text)
+    found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Za-z0-9])",\s*(PLAYER \+ )?"([^"]+)"( \+ FAST)?\}', text)
     return [(name, words, who, MANNER.get(who, "") + (player if with_player else "") + scene + (fast if quick else ""))
             for name, words, who, with_player, scene, quick in found]
 
