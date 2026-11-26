@@ -125,6 +125,95 @@ final class PlusRun {
     static final int SMITH = 300;
     /** And whoever deals in the black market. */
     static final int DEALER = 400;
+    /** And the machine of the ribbon gacha. */
+    static final int MACHINE = 500;
+    /**
+     * A pot of black ink, which stands in the later lands and throws the black curse: how
+     * often, for how long it swells before it does, from how far off it throws, and how
+     * fast what it throws flies.
+     */
+    static final int INKPOT = 26;
+    static final float POT_EVERY = 4.5f, POT_SWELLS = .9f, POT_REACH = 9, POT_FAST = 6.5f;
+
+    /** How many times a pot has thrown: a count that only goes up. */
+    int potShots() { return potShots; }
+    private int potShots;
+
+    /** How far through its turn a pot of black ink is, from nothing to one: it swells through the last of it. */
+    float potTurn(int[] pot) { return (time + pot[4] * .37f) % POT_EVERY / POT_EVERY; }
+
+    /**
+     * The ribbon gacha. A roll gives, by chance, a ribbon of one of the colours the machine
+     * holds, or a black one. Inside its room every ribbon's time stands still, and runs
+     * again when she leaves. One she has had from the machine already in this land is not
+     * given again: she has pluses for it instead; and after two such, the next is always
+     * one she has not. Every colour the machine holds, in one land, is a white ribbon: all
+     * six at once, for a while, and not mastered. A black one blows the machine up: it is
+     * shut for the rest of the land, every ribbon she wears is gone, and black lies on her
+     * for twice a ribbon's time from the moment she leaves.
+     */
+    static final int GACHA_COLOUR = 10, GACHA_BLACK = 6, GACHA_FIRST = 20, GACHA_MORE = 10, GACHA_PITY = 2;
+    private int gachaHeld, gachaRolls, gachaDupes, gachaWhites;
+    private boolean gachaBlown;
+
+    /** Whether she is in the room of a ribbon gacha, where ribbons' times stand still. */
+    boolean frozen() { return room >= 0 && level.rooms.get(room)[0] == RunLevels.HOUSE && level.rooms.get(room)[14] == RunLevels.GACHA; }
+
+    /** What the next roll costs, which rises with every roll in a land; what she has had from the machine, as bits; how many she had already; whether it has blown up; and whether she has had all it holds. */
+    int gachaCost() { return GACHA_FIRST + GACHA_MORE * gachaRolls; }
+    int gachaHeld() { return gachaHeld; }
+    int gachaRolls() { return gachaRolls; }
+    int gachaDupes() { return gachaDupes; }
+    int gachaWhites() { return gachaWhites; }
+    boolean gachaBlown() { return gachaBlown; }
+    boolean gachaDone() {
+        for (int colour : RunLevels.machineOf(level.number)) if ((gachaHeld >> colour - 1 & 1) == 0) return false;
+        return true;
+    }
+
+    /** Whether the machine can be rolled: she stands at it, it is whole, it has something left that she has not had, and no black lies on her. */
+    boolean canRoll() { return spot == MACHINE && !gachaBlown && !gachaDone() && cursed <= 0 && state == PLAYING; }
+
+    /** How likely, in a hundred, a roll is to be black. */
+    static int blackOdds(int number) { return Math.round(100f * GACHA_BLACK / (GACHA_COLOUR * RunLevels.machineOf(number).length + GACHA_BLACK)); }
+
+    /**
+     * A roll of the machine, by a chance that whoever shows the game supplies. Returns
+     * the colour of the ribbon it gave, which is in her hair; less than nothing, a colour she
+     * had already, for which she is given pluses; black, if it blew up; or nothing, if it
+     * could not be rolled.
+     */
+    int roll(int chance) {
+        if (!canRoll()) return 0;
+        int[] holds = RunLevels.machineOf(level.number);
+        int pick = Math.floorMod(chance, GACHA_COLOUR * holds.length + GACHA_BLACK);
+        gachaRolls++;
+        if (pick >= GACHA_COLOUR * holds.length) {
+            gachaBlown = true;
+            gachaHeld = 0;
+            curse(blackened());
+            return BLACK;
+        }
+        int at = pick / GACHA_COLOUR, colour = holds[at];
+        boolean had = (gachaHeld >> colour - 1 & 1) != 0;
+        if (had && gachaDupes >= GACHA_PITY) {
+            // Two she had already are enough: this one is the next she has not.
+            while ((gachaHeld >> holds[at] - 1 & 1) != 0) at = (at + 1) % holds.length;
+            colour = holds[at];
+            had = false;
+        }
+        if (had) {
+            gachaDupes++;
+            return -colour;
+        }
+        gachaHeld |= 1 << colour - 1;
+        take(FORM + colour);
+        if (gachaDone()) {
+            take(FORM + WHITE);
+            gachaWhites++;
+        }
+        return colour;
+    }
     private int spot = -1;
 
     /** What she stands at in a building, or -1: a pet on show, by its kind; or a desk, a hundred and the tab of the counter it opens. */
@@ -2382,15 +2471,17 @@ final class PlusRun {
         time += seconds;
         if (safe > 0) safe -= seconds;
         // Each colour she wears has its own time; each that is gone waits its own wait, which begins when it goes.
+        // (In the room of a ribbon gacha a ribbon's time stands still, and so does black's: they run again when she leaves.)
+        boolean still = frozen();
         for (int colour = RED; colour <= BLACK; colour++) {
             if (worn[colour] > 0) {
-                if ((worn[colour] -= seconds) <= 0) end(colour, true);
+                if (!still && (worn[colour] -= seconds) <= 0) end(colour, true);
             } else if (waits[colour] > 0) {
                 waits[colour] = Math.max(0, waits[colour] - seconds);
             }
         }
-        if (cursed > 0) cursed -= seconds;
-        if (pale > 0) pale -= seconds;
+        if (cursed > 0 && !still) cursed -= seconds;
+        if (pale > 0 && !still) pale -= seconds;
         if (censored > 0) censored -= seconds;
         if (doorWait > 0) doorWait -= seconds;
         if (offIt > 0) offIt -= seconds;
@@ -2554,6 +2645,15 @@ final class PlusRun {
             if (item[0] == DROPOFF) {
                 if (quest == ASKED && level.quest == RunLevels.LETTER && x < item[1] + 2.4f && x + WIDE > item[1] - .4f && y < item[2] + .9f
                         && y + TALL > item[2] + .1f) done();
+                continue;
+            }
+            // A pot of black ink stays where it is: every so often, having swelled, it throws the black curse at her if she is near.
+            if (item[0] == INKPOT) {
+                float turn = time + item[4] * .37f;
+                if (room < 0 && (int) (turn / POT_EVERY) != (int) ((turn - seconds) / POT_EVERY) && Math.abs(item[1] + .5f - x - WIDE / 2) < POT_REACH && Math.abs(item[2] - y) < 5) {
+                    aim(CURSE, item[1] + .5f, item[2] + .2f, POT_FAST, 0, 2.6f);
+                    potShots++;
+                }
                 continue;
             }
             // What is in a building stays where it is: a desk is stood at anywhere along it, as a stall is; a pet on show, at it.
