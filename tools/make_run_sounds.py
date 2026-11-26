@@ -128,6 +128,24 @@ SOUNDS = {
     "bat": mix(fade(tone(.1, 1800, 300, "square"), .001), fade(soft(noise(.16), .3), .001), .8 * fade(tone(.2, 150, 60), .002)),
     # One of Illya's hearts: a little chime.
     "heart": after(note(1760, .06, "sine"), note(2217, .14, "sine")),
+    # A ribbon tied on: a shimmer going up.
+    "form": fade(mix(tone(.45, 500, 2000, "sine", .05, 14), .5 * tone(.45, 750, 3000)), .01),
+    # A bookmark door: a soft whoosh and a chime.
+    "door": after(fade(soft(noise(.14), .1) * numpy.linspace(.2, 1, int(RATE * .14)), .01), note(1175, .18, "sine")),
+    # King Slime coming down: a deep thud.
+    "quake": mix(fade(tone(.45, 90, 38), .002), .7 * fade(soft(noise(.3), .04), .002)),
+    # A ledge giving way: a dry crackle.
+    "crumble": fade(soft(noise(.3), .5) * (random.uniform(0, 1, int(RATE * .3)) > .7), .005),
+    # The censor's brush: a long wet stroke.
+    "censor": fade(soft(noise(.4), .06) * numpy.linspace(1, .3, int(RATE * .4)), .03),
+    # Fire thrown: a rush that rises.
+    "fire": fade(mix(soft(noise(.25), .2), .4 * tone(.25, 200, 520)), .01),
+    # Water thrown: a splash.
+    "splash": fade(mix(soft(noise(.22), .12) * numpy.linspace(1, .2, int(RATE * .22)), .4 * tone(.22, 900, 300)), .004),
+    # A blow turned aside: a dull knock.
+    "parry": mix(fade(tone(.12, 420, 300, "square"), .001), .5 * fade(tone(.16, 1500), .001)),
+    # The lock on a gate breaking open.
+    "unlock": after(mix(fade(tone(.08, 2400), .001), fade(tone(.08, 1700), .001)), note(784, .08), note(1175, .08), note(1568, .26)),
     # A page of the story turning.
     "page": fade(soft(noise(.12), .12) * numpy.linspace(.2, 1, int(RATE * .12)), .01),
 }

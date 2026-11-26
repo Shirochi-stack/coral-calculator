@@ -50,6 +50,45 @@ VOICES = {
     "I": ("community-blcuaurhzmvi", .95, 1.06),
     "T": ("community-pwotyqkmtlsi", .92, 1.1),
     "M": ("community-5fwhmdpiq45g", 1.0, .84),
+    # The second volume. Gokhae, who is up to no good, speaks lower than the rest on purpose. The twins share
+    # a voice: Miri quick and bright, Gari slow and hushed.
+    "G": ("community-mzyrf5zr14rb", .95, 1.06),
+    "J": ("community-2e7y7ype1d0u", 1.1, 1.0),
+    "K": ("community-2e7y7ype1d0u", .88, .97),
+    "Y": ("community-qdnchfkneudi", .82, 1.12),
+    "N": ("community-qj9kc2jtun4a", .95, 1.15),
+    # Those met in the villages: the same few voices, each said in her own manner, faster or slower, higher or lower.
+    "S": ("community-2e7y7ype1d0u", 1.0, 1.05),
+    "U": ("community-qdnchfkneudi", .98, 1.08),
+    "B": ("Eileen", .95, 1.0),
+    "O": ("community-mzyrf5zr14rb", 1.08, 1.14),
+    "P": ("community-qj9kc2jtun4a", .9, 1.1),
+    "E": ("community-mzyrf5zr14rb", .98, 1.08),
+    "A": ("community-2e7y7ype1d0u", 1.12, 1.1),
+    "W": ("community-qdnchfkneudi", .92, 1.0),
+    "L": ("community-qj9kc2jtun4a", 1.1, 1.2),
+}
+# Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
+MANNER = {
+    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels. ",
+    "R": "Rune is a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up. ",
+    "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
+    "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
+    "M": "The Mawang is Halgakos herself from another volume, after sixty years alone: the same girl's voice, but tired, low and gloomy. ",
+    "G": "Gokhae is a sly young court interpreter with a smooth, cool anime voice, smug and precise, never old or mature. ",
+    "J": "Miri is a bright, gossipy newspaper girl with a high, quick, chirpy anime voice. ",
+    "K": "Gari is Miri's shy twin sister, with the same high anime voice, hushed and timid, almost a whisper. ",
+    "Y": "Yeobaek is a sleepy young swordswoman with a soft, high, drowsy anime voice, drawling and yawning. ",
+    "N": "Nuri is a young queen with a clear, high, earnest anime voice, formal and brave. ",
+    "S": "Somi is a cheerful young adventurer with a high, bright, eager anime voice. ",
+    "U": "Inju is the guild's receptionist: a young woman with a light, polite, pleasant anime voice. ",
+    "B": "Boksun is a kind old baker granny with a warm, gentle, elderly voice. ",
+    "O": "Ttosun is a lively, sporty guild girl with a high, loud, cheerful anime voice. ",
+    "P": "Galpi is a quiet young witch with a soft, high, dreamy anime voice. ",
+    "E": "Yeseo is the careful young leader of an adventuring party, with a clear, high, earnest anime voice. ",
+    "A": "Nabi is a playful cat-eared girl with a high, giggly, mischievous anime voice. ",
+    "W": "Moru is a short-spoken smith girl with a flat, blunt but young and light anime voice. ",
+    "L": "Altteul is a thrifty young shopkeeper with a high, brisk, bright anime voice, always selling. ",
 }
 # How each of the others sounds, said to the voice before the scene of every line of hers, so that none of
 # them drifts into sounding grown up or dark, whatever the scene.
@@ -80,20 +119,29 @@ def story():
     """Every line of the story: its name, words, speaker and scene."""
     text = STORY.read_text(encoding="utf-8")
     player = re.search(r'PLAYER = "([^"]+)"', text).group(1)
-    found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Z])",\s*(PLAYER \+ )?"([^"]+)"\}', text)
-    return [(name, words, who, MANNER.get(who, "") + (player if with_player else "") + scene) for name, words, who, with_player, scene in found]
+    fast = re.search(r'FAST = "([^"]+)"', text).group(1)
+    found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Z])",\s*(PLAYER \+ )?"([^"]+)"( \+ FAST)?\}', text)
+    return [(name, words, who, MANNER.get(who, "") + (player if with_player else "") + scene + (fast if quick else ""))
+            for name, words, who, with_player, scene, quick in found]
+
+
+# A squeal, a yelp or a wail is said as it is in Japanese, whatever letters it is shown in.
+SOUNDS = (("Kyaa", "\u304d\u3083\u3042\u3063"), ("waaah", "\u3046\u308f\u3042\u3042\u3093"), ("Waaah", "\u3046\u308f\u3042\u3042\u3093"), ("Uu...", "\u3046\u3045..."),
+          ("Eep", "\u3072\u3083\u3063"))
 
 
 def spoken(text):
-    """A line as it is to be said: without the heart, which is not a word."""
-    # A squeal is said as it is squealed in Japanese, not read out as an English word.
-    return text.replace("♡", "").replace("Kyaa", "きゃあっ").strip()
+    """A line as it is to be said: without the heart, which is not a word, and with its squeals as they are squealed."""
+    text = text.replace("\u2661", "").strip()
+    for shown, said in SOUNDS:
+        text = text.replace(shown, said)
+    return text
 
 
 def speak(key, text, who, scene):
     voice, rate, _ = VOICES[who]
     said = spoken(text)
-    # Rune's lines are full of pauses, and a long one would take a quarter of a minute to say: most of them are said as short breaks.
+    # Rune's pauses, written out, made her longer lines take a quarter of a minute: in those they are only commas.
     if who == "R" and len(said) > 60:
         said = said.replace("... ", ", ")
     body = {"text": said, "voiceId": voice, "modelId": MODEL, "deliveryMode": "CREATIVE",

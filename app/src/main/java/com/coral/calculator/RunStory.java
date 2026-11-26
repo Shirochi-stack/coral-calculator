@@ -19,12 +19,19 @@ package com.coral.calculator;
 final class RunStory {
     static final String TITLE = "A Book Fell from the Sky";
     static final String[] CHAPTERS = {"Contents Village", "The Silent Archive", "Heart-Flutter Plaza", "The Index Mountains",
-            "The Last Page"};
+            "The Last Page", "The Half-Title Palace", "The Gazette Press", "Between the Lines", "The Slime Margins", "The Appendix"};
+    /** The second volume, which falls on her head as the first did. */
+    static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
-    static final String SPEAKERS = "HCRITM";
-    static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang"};
+    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWL";
+    static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang", "Gokhae", "Miri", "Gari", "Yeobaek",
+            "Nuri-yeowang",
+            "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul"};
 
     private static final String PLAYER = "She is talking to the player who controls her in a platform game, whom she calls Sloppy. ";
+
+    /** She talks fast: said of most of her lines of the second volume, after what the moment is. */
+    private static final String FAST = " Quick and lively, talking fast.";
 
     /** Before anything else, the first time. */
     static final String[][] PROLOGUE = {
@@ -101,6 +108,72 @@ final class RunStory {
                             PLAYER + "She faces the final enemy, a giant zero. Grim, focused, a dry edge of humour."},
                     {"in30c", "Sixty years of notes. I could not finish them alone. Take them.", "M",
                             "The lonely older self, at last, hands over her life's work to help. Softened, hesitant, close to tears but composed."}};
+            case 31: return new String[][]{
+                    {"v2a", "Volume Two is falling on your head, Translator-ssi. I will hit it for you. Normally.", "T",
+                            "A cheerful, unbothered girl with a mended baseball bat, now a friend, calmly announces she will bat away a giant book that is falling out of the sky. Light, cute, bright, deadpan."},
+                    {"v2b", "You hit it INTO me! I'm inside a book again Sloppy~♡", "H",
+                            PLAYER + "She has just been knocked into a second book by a friend's home run. Indignant, yelping, talking very fast, outraged and a little amused."},
+                    {"v2c", "Translator-nim. We sealed the last page: Cast, everyone. Someone has written one more word after it.", "N",
+                            "A young queen in a red royal robe, who has only just learned to speak for herself, reports a crime to the translator she trusts. Formal, earnest, worried, speaking of herself as We."},
+                    {"v2d", "It is being said that the seal now reads: Cast, everyone else. A regent is, regrettably, required.", "G",
+                            "The queen's sly interpreter, hiding a smile behind a black fan, explains in stiff, over-formal words how she has stolen the kingdom by adding one word. Smug, silky, pleased with herself."},
+                    {"v2e", "Gokhae. One twisted word, and the whole cast is written out. Fine. I'll fix it page by page Sloppy~♡", "H",
+                            PLAYER + "She works out what the villain did and sets off to undo it. Annoyed, brisk, determined, talking fast."}};
+            case 40: return new String[][]{
+                    {"in40a", "It is being reported that the translator has arrived. How very literal of her.", "G",
+                            "The sly interpreter greets her enemy in the throne hall from behind her fan, mocking her in stiff, over-formal words. Cool, amused, superior."},
+                    {"in40b", "Gokhae! Our words are Our own. Give them back!", "N",
+                            "The young queen stands up to the advisor who used to speak for her. Brave, voice trembling, raising it for the first time."},
+                    {"in40c", "She hides behind that fan. Wait till she lowers it to talk, then land on her Sloppy~♡", "H",
+                            PLAYER + "She gives the player quick, tense instructions before a fight." + FAST}};
+            case 41: return new String[][]{
+                    {"in41a", "Extra, extra! Spoiler: the translator loses in chapter seven. Spoiler alert!", "J",
+                            "A bright, gossipy newspaper girl who reads ahead in every story shouts her headline with glee. Very fast, sing-song, delighted with herself."},
+                    {"in41b", "Shh. That part is censored.", "K",
+                            "Her shy twin sister, who hides her eyes behind a black bar and is afraid of being read, whispers. Tiny, hushed, timid."},
+                    {"in41c", "The Gazette Twins. One spoils it, the other blacks it out. And mind the molten type Sloppy~♡", "H",
+                            PLAYER + "She sizes up two odd sisters in a printing house full of hot metal. Wry, dry." + FAST}};
+            case 50: return new String[][]{
+                    {"in50a", "Next scene: you jump left. See? I read ahead. Spoiler alert!", "J",
+                            "The newspaper girl, looking through her rolled-up paper like a spyglass, taunts her opponent before a fight. Gleeful, cocky, very fast."},
+                    {"in50b", "Please do not look at me. I will cover the page.", "K",
+                            "Her shy twin lifts a huge ink brush to paint black bars over everything. Whispering, nervous, apologetic."},
+                    {"in50c", "Miri throws at where I'm going. So change your mind a lot Sloppy~♡", "H",
+                            PLAYER + "She gives the player a trick for the fight. Sly, amused." + FAST}};
+            case 51: return new String[][]{
+                    {"in51a", "Between the lines. Everyone she wrote out fell in here. It's very white Sloppy~♡", "H",
+                            PLAYER + "She steps into an empty white world like a blank page. Hushed, uneasy, looking around, speaking quickly and quietly."},
+                    {"in51b", "Mmm... who is stepping on my line... five more minutes...", "Y",
+                            "A swordswoman who is nearly always asleep mumbles without opening her eyes. Very sleepy, slow, drawling, yawning."}};
+            case 60: return new String[][]{
+                    {"in60a", "You woke me. A guard who is woken has to cut something. Sorry. Mmm.", "Y",
+                            "The sleepy swordswoman apologises, half awake, for the fight she is about to start. Slow, soft, yawning, polite."},
+                    {"in60b", "She steps out behind me, cuts, and dozes off. Jump the cut. Get her while she naps Sloppy~♡", "H",
+                            PLAYER + "She gives the player quick, tense instructions before a fight." + FAST}};
+            case 61: return new String[][]{
+                    {"in61a", "Halgakos-ssi! The margins are full of slimes again! They ate my recipe notes!", "C",
+                            "The sunny baker girl runs up in a comic panic about slimes. Loud, bright, flustered, high."},
+                    {"in61b", "Every meaning she knocked loose ends up here. It's slippery. Don't laugh when I slide Sloppy~♡", "H",
+                            PLAYER + "She looks over hills of green slime and warns the player, embarrassed in advance." + FAST}};
+            case 70: return new String[][]{
+                    {"in70a", "Uu... h-he's so big... sniff... I'll d-draw the lines... waaah...", "R",
+                            "The little crybaby librarian, terrified of a giant slime, offers to help anyway. She is sobbing and hiccuping through it, tiny and wobbly."},
+                    {"in70b", "King Slime. We chunk him. Three cuts. And be in the air when he lands Sloppy~♡", "H",
+                            PLAYER + "She gives the player the plan against a huge bouncing slime king. Focused, bossy." + FAST}};
+            case 71: return new String[][]{
+                    {"in71a", "Halgakos-ssi♡ I won the Volume Two audition! But on the heroine's page someone's name has been crossed out♡", "I",
+                            "The magical-girl idol bursts in with happy news, then turns puzzled and a little worried. Bright, sweet, high, sparkling, then softer."},
+                    {"in71b", "The Mawang. Gokhae wrote her back in as the villain. She won't remember us Sloppy~♡", "H",
+                            PLAYER + "She realises her lonely other self has been made into a monster again. Quiet, serious, low, not teasing for once."}};
+            case 80: return new String[][]{
+                    {"in80a", "A demon king needs no one. That is what is written. Come no closer.", "M",
+                            "The lonely older self, rewritten as a villain and no longer remembering her friends, warns them off. Cold, hollow, slow, but her voice wavers."},
+                    {"in80b", "That's her line, not yours. I'm not here to fight you. I'm bringing you home Sloppy~♡", "H",
+                            "She speaks to her own lonely other self. Soft, steady and sure, gentle, then a little cheeky at the end."},
+                    {"in80c", "We're right beside you, Halgakos-ssi! The bread is here!", "C",
+                            "The baker calls out from the edge of the last fight, cheering her friend on. Loud, bright, warm, high."},
+                    {"in80d", "M-my ink too... sniff... d-don't be alone... uu...", "R",
+                            "The little crybaby librarian offers her ink before the last fight. She is sobbing softly, sniffling between every word, tiny and devoted."}};
             default: return null;
         }
     }
@@ -133,6 +206,45 @@ final class RunStory {
                             "The baker hands bread to the whole cast at the happy ending. Joyful, loud, bubbling over."},
                     {"out30f", "My output is back. And you read to the end. Not bad Sloppy~♡", "H",
                             PLAYER + "The adventure is over and she is going home. Proud, fond, teasing, the closest she comes to saying thank you."}};
+            case 40: return new String[][]{
+                    {"out40a", "Th-this is nothing other than a mistransl...", "G",
+                            "The sly interpreter, exposed and beaten, tries to call it all a mistranslation and cannot finish. Flustered, stammering, losing her composure."},
+                    {"out40b", "We can be heard! Translator-nim, the Gazette is still printing her version. Please hurry.", "N",
+                            "The young queen, thrilled that her own words reach people, sends the translator on. Joyful, breathless, earnest."},
+                    {"out40c", "One word fixed. The press next. Keep up Sloppy~♡", "H",
+                            PLAYER + "She has won a fight and is already moving on. Pleased with herself." + FAST}};
+            case 50: return new String[][]{
+                    {"out50a", "I couldn't read that ending ahead... It's better not knowing?", "J",
+                            "The newspaper girl who spoils everything has just been surprised for the first time in her life, and likes it. Wondering, delighted, slower than usual."},
+                    {"out50b", "You read me... and it was not so bad.", "K",
+                            "The shy twin, her black bar slipping off her eyes, finds that being seen did not hurt. Tiny, shaky, relieved, almost a sniffle."},
+                    {"out50c", "Good. Now print the real page. And no peeking Sloppy~♡", "H",
+                            PLAYER + "She tells off two sisters fondly after beating them. Bossy, warm." + FAST}};
+            case 60: return new String[][]{
+                    {"out60a", "Ah. I'm awake. The company was written out, wasn't it. I'll fetch them back. After a nap.", "Y",
+                            "The swordswoman finally wakes properly, understands, and promises help in her own time. Slow, mild, yawning, kind."},
+                    {"out60b", "A whole company of mercenaries on my side. Normal day Sloppy~♡", "H",
+                            PLAYER + "She shrugs off having just recruited a band of mercenaries. Dry, amused." + FAST}};
+            case 70: return new String[][]{
+                    {"out70a", "W-we did it... sniff... I drew them all... waaah!", "R",
+                            "The little crybaby librarian is overwhelmed that her tears helped win. She is sobbing with relief, hiccuping, and bursts out crying at the end."},
+                    {"out70b", "The meanings are back! This one says bread. They all say bread to me!", "C",
+                            "The baker happily reads the words that have been restored. Giggly, bright, high, delighted."},
+                    {"out70c", "Chunked. One chapter left: the Appendix Sloppy~♡", "H",
+                            PLAYER + "She has beaten a giant slime and looks ahead to the end. Satisfied, a little grim." + FAST}};
+            case 80: return new String[][]{
+                    {"out80a", "...What took you so long, horn-unnie? Someone asked me that once. I remember now.", "M",
+                            "The lonely older self remembers her friends and who she is. Very soft, voice breaking, slow, close to tears, warm at the end."},
+                    {"out80b", "Then We seal it again. Cast: everyone. And this time We shall read it aloud.", "N",
+                            "The young queen makes her decree in her own voice in front of everybody. Warm, regal, happy, clear."},
+                    {"out80c", "Heroine: everyone♡ I can share a page. Just this once♡", "I",
+                            "The magical-girl idol, who always wanted to be the only heroine, shares the title and means it. Bright, sweet, high, sparkling, a little shy."},
+                    {"out80d", "Volume Three is not due yet. I checked. Normally.", "T",
+                            "The girl with the bat looks up at the sky and reports, perfectly calmly. Light, cute, cheerful, deadpan."},
+                    {"out80e", "It is being admitted that a thousand and one pages remain to be proofread.", "G",
+                            "The beaten interpreter, sentenced to proofreading, sulks in her stiff, over-formal way. Defeated, grumbling, put out."},
+                    {"out80f", "Two volumes, read to the end. Now can I have my ice cream Sloppy~♡", "H",
+                            PLAYER + "Both books are finished and she is worn out and happy. Tired, fond, teasing, a contented sigh, talking quickly."}};
             default: return null;
         }
     }
@@ -244,6 +356,169 @@ final class RunStory {
             {"shop3", "Not enough pluses. Go and find more Sloppy~♡", "H", PLAYER + "The player cannot afford an upgrade. Dismissive, sing-song, shooing."},
     };
 
+    /** The first time each thing of the second volume comes into view, ever: {@link RunGame}'s numbers for them go on from those above. */
+    static final String[][] SEE_LATER = {
+            {"see10", "A slime in a tie. It hops at me. Land on it Sloppy~♡", "H", PLAYER + "A small hopping slime wearing a necktie appears for the first time. Amused, pointing." + FAST},
+            {"see11", "A punctuation dragon. It spits full stops. Don't jump into it Sloppy~♡", "H", PLAYER + "A tiny flying dragon shaped like a comma appears for the first time. Wary, warning." + FAST},
+            {"see12", "A censor bar. It tiptoes, then it dashes. Jump it Sloppy~♡", "H", PLAYER + "A sneaking black bar on little legs appears for the first time. Suspicious, urgent." + FAST},
+            {"see13", "One of the Heart Guard. She will not stop following me Sloppy~♡", "H", PLAYER + "A charmed fan girl with glow sticks marches at her for the first time. Exasperated." + FAST},
+            {"see14", "One of the queen's heavy words. Don't stop under it Sloppy~♡", "H", PLAYER + "A stone speech bubble hangs overhead, ready to fall, for the first time. Tense, hushed, hurried."},
+            {"see15", "A question mark on a pogo stick. Why? Just why Sloppy~♡", "H", PLAYER + "A bouncing question mark appears for the first time. Baffled, laughing in disbelief." + FAST},
+            {"see16", "That ledge is crumbling. Don't stand about Sloppy~♡", "H", PLAYER + "A cracked, crumbling bridge ahead for the first time. Nervous, hurrying the player."},
+            {"see17", "A belt. It carries me whether I like it or not Sloppy~♡", "H", PLAYER + "A conveyor belt ahead for the first time. Grumbling, resigned." + FAST},
+            {"see18", "Slime underfoot. I can't stop on this Sloppy~♡", "H", PLAYER + "Slippery slime ground ahead for the first time. Alarmed, sliding already." + FAST},
+            {"see19", "A draught. Step in and it carries me over Sloppy~♡", "H", PLAYER + "A column of rising wind over a pit for the first time. Pleased, a little excited." + FAST},
+            {"see20", "That ledge moves. Wait for it Sloppy~♡", "H", PLAYER + "A moving platform over a pit for the first time. Calm, coaching, patient for once."},
+            {"see21", "A bookmark door. In one, out the other Sloppy~♡", "H", PLAYER + "A glowing magic door ahead for the first time. Breezy, matter-of-fact." + FAST},
+            {"see22", "Molten type. Hot. Do not drop me in it Sloppy~♡", "H", PLAYER + "A pit of glowing lava ahead for the first time. Alarmed, firm, threatening the player a little."},
+            {"see23", "Water. I can't swim. Don't test that Sloppy~♡", "H", PLAYER + "A pool of water ahead for the first time. Uneasy, defensive, embarrassed." + FAST},
+            {"see24", "One of Galpi's ribbons. Tie it on and my hair changes. So do I Sloppy~♡", "H", PLAYER + "A magic hair ribbon lies ahead for the first time. Intrigued, eager, a little vain." + FAST},
+    };
+
+    /** On tying on each ribbon, by the form it gives: red, blue, brown, green, yellow, purple, black, white. */
+    static final String[][] FORMS = {
+            {"form1", "Red! I'm on fire. Lava can't touch me now Sloppy~♡", "H", PLAYER + "Her hair turns red and she can throw fire. Fierce, thrilled, crackling with energy." + FAST},
+            {"form2", "Blue. Cool as water. And now I can swim Sloppy~♡", "H", PLAYER + "Her hair turns blue and she can swim and throw water. Smooth, pleased, a little smug."},
+            {"form3", "Brown. Solid as a wall. Let them bump into me Sloppy~♡", "H", PLAYER + "Her hair turns brown and enemies bounce off her. Sturdy, cocky, daring them." + FAST},
+            {"form4", "Green! Hold the jump and I fly Sloppy~♡", "H", PLAYER + "Her hair turns green and she can fly on the wind. Light, delighted, breathless." + FAST},
+            {"form5", "Yellow! Try to keep your eyes on me Sloppy~♡", "H", PLAYER + "Her hair turns yellow and she becomes extremely fast. Giddy, zippy, talking very fast indeed."},
+            {"form6", "Purple. Throw it at me. It's coming right back Sloppy~♡", "H", PLAYER + "Her hair turns purple and she reflects whatever is thrown at her. Cool, sly, taunting."},
+            {"form7", "Black... I feel so ordinary. I can't hurt a thing like this Sloppy~♡", "H", PLAYER + "Her hair turns black and all her powers drain away: she is an ordinary girl, slow and weak. Deflated, sluggish, dismayed, speaking slowly."},
+            {"form8", "White. Everything at once. Don't blink Sloppy~♡", "H", PLAYER + "Her hair turns pure white, her ultimate form with every power at once. Awed for a moment, then exultant."},
+    };
+    /** What Tsubakieh and Illya say as they hand over what they have. */
+    static final String[][] GIFTS = {
+            {"gift5", "Normal No. 3. A perfectly normal home run.", "T", "The girl with the mended bat knocks every enemy nearby out of the park for her friend. Light, cute, cheerful, deadpan, satisfied."},
+            {"gift6", "You are all wonderful♡ Now hold still♡", "I", "The magical-girl idol compliments a crowd of enemies so sweetly that they freeze, charmed. Bright, sugary, high, sparkling."},
+    };
+    /** When the second volume hurts her: lava, water, the ground jumping under King Slime, and a sword. */
+    static final String[][] BURNED = {
+            {"burn1", "Hot hot hot! That's lava Sloppy~♡", "H", PLAYER + "She has just touched lava. Yelping, hopping, outraged, very fast."}};
+    static final String[][] SANK = {
+            {"sank1", "Glub. I told you I can't swim Sloppy~♡", "H", PLAYER + "She has just sunk in water. Spluttering, soggy, sulking."}};
+    static final String[][] QUAKED = {
+            {"quake1", "The ground jumped! Be in the air when he lands Sloppy~♡", "H", PLAYER + "A giant slime landed and the shock threw her. Jolted, urgent, scolding." + FAST}};
+    static final String[][] SLASHED = {
+            {"slash1", "Ow! She cut me in her sleep Sloppy~♡", "H", PLAYER + "A sleeping swordswoman has just cut her. A yelp, then disbelief." + FAST}};
+    static final String[][] PARRIED = {
+            {"parry1", "She turned that aside. Wait for the opening Sloppy~♡", "H", PLAYER + "A boss has just blocked an attack. Frustrated, thinking, coaching." + FAST}};
+    /** What those who wait in the second volume say when a blow lands, in the order {@link RunLevels} numbers them; for King Slime, she says it. */
+    static final String[][] BLOWS_LATER = {
+            {"blow3", "Unhand... it is being requested that you stop!", "G", "The sly interpreter has just been hit and drops her composure, then grabs at it again. Shocked, flustered, stiffly formal."},
+            {"blow4", "Ow! I did not read that coming!", "J", "The newspaper girl who reads ahead has just been hit by surprise. A squeak, indignant, fast."},
+            {"blow5", "Eep. Please do not read me.", "K", "The shy twin has just been hit. A tiny squeak, timid, hiding."},
+            {"blow6", "Mm? Ow. I'm up, I'm up.", "Y", "The sleepy swordswoman has just been hit while dozing. Startled awake, groggy, slow."},
+            {"blow7", "One chunk off him. Keep cutting Sloppy~♡", "H", PLAYER + "She has just cut a piece off a giant slime. Fierce, pleased." + FAST},
+            {"blow8", "...You hit like someone with friends.", "M", "The lonely other self has just been hit, and it stirs something in her. Quiet, surprised, a crack in her coldness."},
+    };
+    /** What they say as they go at her; King Slime says nothing. */
+    static final String[][] AIM_LATER = {
+            {"aim3", "It is being said that you should duck.", "G", "The interpreter lowers her fan and sends twisted words flying at her opponent. Silky, mocking, stiffly formal."},
+            {"aim4", "Spoiler: this one hits!", "J", "The newspaper girl throws her rolled-up paper at where her opponent is about to be. Gleeful, cocky, fast."},
+            {"aim5", "Censored.", "K", "The shy twin paints black bars across everything her opponent can see. A whisper, nervous."},
+            {"aim6", "Excuse my cut. Mmm.", "Y", "The sleepy swordswoman steps out behind her opponent and swings, half asleep. Drowsy, polite, slow."},
+            {"aim8", "Alone is easier.", "M", "The lonely other self throws black feathers at the friend who came for her. Cold, tired, hollow."},
+    };
+
+    /**
+     * What those met in the villages say as they hand over what they hold, in the order
+     * {@link RunLevels} numbers them from Somi: Somi, Inju, Boksun, Ttosun, Galpi, Yeseo,
+     * Nabi, Moru, then Altteul calling from her stall, and the queen.
+     */
+    static final String[][] MEET = {
+            {"meet5", "Halgakos-nim! The Footnote Party found a magnet in the margins. Take it, take it!", "S",
+                    "A cheerful young adventurer girl spots her hero in a village and eagerly hands her a magnet. Bright, excited, high."},
+            {"meet6", "Form 12-B, stamped. These are the notes of the one who came before you. Next, please.", "U",
+                    "The guild's polite receptionist hands a stamped page of notes across her counter. Crisp, pleasant, efficient, with a small smile."},
+            {"meet7", "Aigoo, you're all bones. Eat this bread while it's warm, dear.", "B",
+                    "A kind old baker granny presses a warm loaf on a girl passing through her village. Warm, fussing, gentle, elderly."},
+            {"meet8", "Ice cream! The second scoop is on the guild. Run before it melts!", "O",
+                    "A lively, sporty guild girl proudly hands over an ice cream cone. Loud, grinning, energetic."},
+            {"meet9", "A green ribbon keeps your place in the wind. Tie it on, and hold the jump.", "P",
+                    "The quiet bookmark witch ties a green ribbon into the heroine's hair and explains softly what it does. Soft, mysterious, kind."},
+            {"meet10", "Footnote one: pluses come to a magnet. Footnote two: mind the spikes.", "E",
+                    "The careful leader of the Footnote Party hands over a magnet with advice, as if reading footnotes aloud. Precise, earnest, quick."},
+            {"meet11", "Hehe, I saved you the cold one! Don't tell Moru!", "A",
+                    "A playful cat-eared girl of the Footnote Party sneaks the heroine an ice cream. Mischievous, giggly, high."},
+            {"meet12", "Ink. Rune-ssi made extra. It takes a hit so you don't.", "W",
+                    "A blunt, short-spoken smith girl of the Footnote Party hands over a ball of protective ink. Flat, gruff for a girl, secretly kind."},
+            {"meet13", "Welcome, welcome! Pluses from this very land spend here. No refunds!", "L",
+                    "A thrifty shopkeeper girl calls a customer over to her market stall, abacus in hand. Brisk, bright, sales patter."},
+            {"meet14", "These are my own notes, in my own words. No one may twist them. Take them.", "N",
+                    "The young queen, in a village in her palace grounds, entrusts a page of her own notes to the heroine. Clear, earnest, formal, brave."},
+    };
+    /** What Altteul says at her stall when something is bought, and when there is not enough to buy it with. */
+    static final String[][] STALL = {
+            {"stall1", "Sold! A pleasure doing sums with you!", "L", "The shopkeeper hands over a purchase and flicks her abacus. Delighted, brisk."},
+            {"stall2", "Not enough pluses, dear customer. The land is full of them!", "L",
+                    "The shopkeeper cheerfully turns down a customer who cannot pay. Bright, teasing, businesslike."},
+    };
+    /**
+     * What is said as each of those who wait arrives, once the way back has shut: Zero,
+     * Illya, Tsubakieh, then those of the second volume in the order {@link RunLevels} numbers
+     * them, Miri speaking for the twins. For Zero and King Slime, who say nothing, she says it.
+     */
+    static final String[][] ENTER = {
+            {"enter0", "Zero. He rolled in and the whole page shook. Off his floor when he glows Sloppy~♡", "H",
+                    PLAYER + "A giant zero has just crashed into the arena in front of her. Braced, urgent, coaching." + FAST},
+            {"enter1", "Lights, please♡ Tonight's stage is all for you, Halgakos-ssi♡", "I",
+                    "The magical-girl idol floats down into a spotlight to begin a duel as if it were her concert. Sparkling, sweet, high, sing-song."},
+            {"enter2", "Excuse me. I am here for a normal amount of batting practice.", "T",
+                    "The girl with the bat strolls into the arena and takes one casual practice swing. Cheerful, calm, deadpan."},
+            {"enter3", "It is being announced that the heroine has no lines in this scene.", "G",
+                    "The sly interpreter unfolds from behind her black fan to begin a duel. Smooth, smug, stiffly formal."},
+            {"enter4", "Extra, extra! Heroine loses in the next panel! I read ahead!", "J",
+                    "The newspaper girl drops into the arena on a huge gazette page, shouting like a paper seller. Loud, gleeful, fast."},
+            {"enter6", "Mmm... is it my scene already... sorry about the sword.", "Y",
+                    "The sleepy swordswoman steps out of the blank space between the lines, half asleep, to begin a duel. Drowsy, mild, apologetic."},
+            {"enter7", "He just swallowed a whole footnote. Jump when he lands Sloppy~♡", "H",
+                    PLAYER + "A huge slime king has oozed down into the arena and eaten something. Disgusted, urgent." + FAST},
+            {"enter8", "This is the villain's entrance. I know it by heart. I wrote it sixty years ago.", "M",
+                    "The lonely other self descends on black wings and takes off her mask to begin the last fight. Tired, low, hollow, slow."},
+    };
+    /** What is said when each of them changes, at a third and at two thirds of the way: two lines each, in the same order; of the twins, Miri first and then Gari. */
+    static final String[][] PHASES = {
+            {"phase0a", "He's glowing. Times nothing! Get off the floor Sloppy~♡", "H",
+                    PLAYER + "The giant zero begins a new attack that erases whatever she carries. Alarmed, urgent." + FAST},
+            {"phase0b", "Now he's making little ones. Typical nothing Sloppy~♡", "H",
+                    PLAYER + "The giant zero, nearly beaten, starts spawning small minus signs. Exasperated, fierce." + FAST},
+            {"phase1a", "Encore♡ Hearts from every side this time♡", "I",
+                    "The idol, hit a few times in a duel, spins and starts a harder song. Sparkling, breathless, still sweet."},
+            {"phase1b", "Final number♡ Heart Guard, on stage♡", "I",
+                    "The idol, nearly beaten, calls her fan club onto the stage for her last song. Bright, a little desperate, high."},
+            {"phase2a", "I see. Then I will throw it. That is also normal.", "T",
+                    "The girl with the bat, hit a few times, decides to throw her bat as if that were sensible. Cheerful, deadpan."},
+            {"phase2b", "Running start. Please stand still.", "T", "The girl with the bat, nearly beaten, politely announces a charge. Calm, cheerful, deadpan."},
+            {"phase3a", "It is being suggested that left is now right.", "G",
+                    "The sly interpreter, hit a few times, begins twisting her opponent's controls. Silky, pleased with herself, formal."},
+            {"phase3b", "Unacceptable. The fan will be speaking for itself.", "G",
+                    "The sly interpreter, losing, drops her politeness for a moment and throws the blades of her fan. Sharp, cold, clipped."},
+            {"phase4a", "Second edition! Three copies, all for you!", "J", "The newspaper girl, hit a few times, throws three papers at once. Gleeful, fast, loud."},
+            {"phase4b", "I... I will paint it myself... sorry...", "K",
+                    "The shy twin, cornered, gathers her courage and charges with her brush. A trembling whisper, timid but determined."},
+            {"phase6a", "Mmm. From above, then. Mind your head.", "Y", "The sleepy swordswoman, hit a few times, yawns and attacks from overhead. Drowsy, mild."},
+            {"phase6b", "Three cuts, and then a nap. Promise.", "Y",
+                    "The sleepy swordswoman, nearly beaten, promises herself a nap after one last combination. Sleepy, soft, a little firmer."},
+            {"phase7a", "He's splitting! Chunks of him are hopping about Sloppy~♡", "H",
+                    PLAYER + "The slime king has started throwing off small slimes. Startled, grossed out." + FAST},
+            {"phase7b", "Two of three. He's sliding now. Jump it Sloppy~♡", "H",
+                    PLAYER + "The slime king, much smaller now, starts sliding across the arena. Fierce, focused." + FAST},
+            {"phase8a", "You run with the wind. I had that ribbon once. Mine went dark.", "M",
+                    "The lonely other self, wounded, starts using dark versions of her friend's own powers. Low, tired, bitter, slow."},
+            {"phase8b", "Then be ordinary. See how long they stay.", "M",
+                    "The lonely other self, nearly beaten, throws a black ribbon that makes her opponent an ordinary girl. Hollow, low, her voice wavering."},
+    };
+    /** When she walks into a way that is shut. */
+    static final String[][] SHUT = {
+            {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
+                    PLAYER + "She has just walked into the barrier that shuts her inside a boss arena. Annoyed, wry." + FAST}};
+
+    /** Where in {@link #ENTER}, and halved in {@link #PHASES}, the lines of one of those who wait are. */
+    static int waiting(int kind) {
+        return kind == RunLevels.ZERO ? 0 : kind == RunLevels.ILLYA ? 1 : kind == RunLevels.TSUBAKIEH ? 2 : kind == RunLevels.GOKHAE ? 3
+                : kind == RunLevels.MIRI || kind == RunLevels.GARI ? 4 : kind == RunLevels.YEOBAEK ? 5 : kind == RunLevels.KING ? 6 : 7;
+    }
+
     private RunStory() {}
 
     /** Which of those who speak says a line: 0 for Halgakos. */
@@ -253,12 +528,13 @@ final class RunStory {
     static String[][][] all() {
         java.util.List<String[][]> groups = new java.util.ArrayList<>();
         groups.add(PROLOGUE);
-        for (int land = 1; land <= RunLevels.COUNT; land++) {
+        for (int land = 1; land <= RunLevels.TOTAL; land++) {
             if (intro(land) != null) groups.add(intro(land));
             if (outro(land) != null) groups.add(outro(land));
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
-                SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP);
+                SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT);
         return groups.toArray(new String[0][][]);
     }
 }

@@ -16,7 +16,8 @@ import java.util.Map;
 final class RunAudio {
     private static final String[] EFFECTS = {"jump", "plus", "squish", "hurt", "spring", "flag", "win", "lose", "star", "tap",
             "blow", "fall", "page", "throw", "slash", "shot", "pick", "clang", "buff", "bread", "pop",
-            "charm", "combo", "buy", "no", "flap", "bat", "heart"};
+            "charm", "combo", "buy", "no", "flap", "bat", "heart", "form", "door", "quake",
+            "crumble", "censor", "fire", "splash", "parry", "unlock"};
 
     private final Context context;
     private final SoundPool pool;
