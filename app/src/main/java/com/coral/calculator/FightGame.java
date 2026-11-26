@@ -109,7 +109,7 @@ final class FightGame {
     private float unit, groundY, cameraX, hold, shake;
     private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase, seenQuakes, seenDodges, seenClashes;
     /** How long her ultimate's button has been on show, for each side; how long ago the round ended; and where each was a moment ago, for what she leaves behind her as she dodges. */
-    private float grandAge = 9, sinceOver;
+    private float grandAge = 9, sinceOver, trailAge;
     private final float[][] trail = new float[2][6];
     private final int[] seenState = new int[2], seenLanded = new int[2];
     private final boolean[] seenCharged = new boolean[2];
@@ -632,12 +632,15 @@ final class FightGame {
         for (int index = slices.size() - 1; index >= 0; index--) if ((slices.get(index)[0] += seconds) > .5f) slices.remove(index);
         grandAge += seconds;
         sinceOver = fight.phase() == Fight.ROUND_OVER ? sinceOver + seconds : 0;
-        // Where each of them was a moment ago, and a moment before that.
-        for (int side = 0; side < 2; side++) {
-            float[] was = trail[side];
-            System.arraycopy(was, 0, was, 2, 4);
-            was[0] = fight.fighters[side].x;
-            was[1] = fight.fighters[side].y;
+        // Where each of them was a moment ago, and a moment before that: noted every so often, so that what she leaves behind her trails well back.
+        if ((trailAge += seconds) >= .045f) {
+            trailAge = 0;
+            for (int side = 0; side < 2; side++) {
+                float[] was = trail[side];
+                System.arraycopy(was, 0, was, 2, 4);
+                was[0] = fight.fighters[side].x;
+                was[1] = fight.fighters[side].y;
+            }
         }
         // A round is announced before it starts.
         if (fight.round() != seenRound) {
