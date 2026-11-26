@@ -431,13 +431,42 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private void speak() {
         wordsDue = false;
         if (idle()) {
-            lastWords = Chatter.idle(random, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY), lastWords);
+            // Some of the time it is one of the lines that playing has unlocked: more often the more there are, and most while new ones wait.
+            PlaySession session = PlaySession.get(app);
+            Unlocks.check(session, BuildConfig.DEBUG);
+            String line = random.nextFloat() >= Unlocks.share(session) ? null
+                    : Unlocks.fresh(session) ? Unlocks.freshLine(session, random) : Unlocks.anyLine(session, random);
+            if (line == null || line.equals(lastWords)) {
+                line = Chatter.idle(random, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY), lastWords);
+            }
+            lastWords = line;
             say(lastWords);
         }
         if (sprite != null && !sprite.away && prefs.chatter()) {
             wordsDue = true;
             handler.postDelayed(speak, NEXT_WORDS_MS + (long) (random.nextFloat() * NEXT_WORDS_SPREAD_MS));
         }
+    }
+
+    private final Runnable freshWords = this::freshWords;
+
+    /**
+     * Looks at what the games remember for anything that has come to be unlocked. Nothing says
+     * what it was; but if there is something new, and she is not waiting on a game that was
+     * left open, she soon says one of the new lines.
+     */
+    private void unlock() {
+        if (Unlocks.check(PlaySession.get(app), BuildConfig.DEBUG) == 0 || parked != null) return;
+        handler.removeCallbacks(freshWords);
+        handler.postDelayed(freshWords, 2600);
+    }
+
+    private void freshWords() {
+        if (!idle() || !prefs.chatter() || bubble != null) return;
+        String line = Unlocks.freshLine(PlaySession.get(app), random);
+        if (line == null) return;
+        lastWords = line;
+        say(line);
     }
 
     /** A prank she was not asked for: only while she is idle, and never over the app's own screens. */
@@ -542,6 +571,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             }
             ui = new ContextThemeWrapper(base, R.style.Theme_CoralCalculator);
             art = BitmapFactory.decodeResource(app.getResources(), R.drawable.halgakos);
+            // What was played while she was away, in the app's own screen of games, may have unlocked something.
+            Unlocks.check(PlaySession.get(app), BuildConfig.DEBUG);
             pad = dp(6);
             windows = (WindowManager) base.getSystemService(Context.WINDOW_SERVICE);
             return art != null && windows != null;
@@ -1039,6 +1070,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     private void closePanel() {
         if (panel == null) return;
+        // The card of games is put away: what was played on it may have unlocked something.
+        if (panelGames && stage == null) unlock();
         CalculatorSession.get(app).removeListener(this);
         remove(panel);
         panel = null;
@@ -1188,7 +1221,11 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         closeStage();
         if (sprite == null || sprite.away) return;
         if (settling != null) settling.cancel();
-        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random) : game;
+        PlaySession session = PlaySession.get(app);
+        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random, Unlocks.tricks(session)) : game;
+        // A trick newly unlocked is the next one played; but not while the player is away in a game that is waiting.
+        int fresh = game == PlaySession.PRANK && parked == null ? Unlocks.freshTrick(session) : 0;
+        if (fresh != 0) kind = fresh;
         // In a build made for testing, a number kept under this name is the prank she plays, to look at one in particular.
         int asked = BuildConfig.DEBUG ? PlaySession.get(app).tally("prank_next") : 0;
         if (game == PlaySession.PRANK && PlayStage.isPrank(asked)) kind = asked;
@@ -1288,12 +1325,16 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (parked == null) return;
         parked.discard();
         parked = null;
+        unlock();
     }
 
     private void closeStage() {
         if (stage == null) return;
+        boolean game = !PlayStage.isPrank(stage.game());
         remove(stage);
         stage = null;
+        // Whatever was played, done with or only left open, may have unlocked something.
+        if (game) unlock();
         if (sprite != null) {
             sprite.onStage = false;
             sprite.invalidate();
