@@ -1090,10 +1090,73 @@ final class PlusRun {
         return least;
     }
     /** Whether she has a power, by the colour it belongs to: each colour she wears keeps its own, however many she wears. */
-    boolean has(int power) { return power >= RED && power <= BLACK && worn[power] > 0; }
+    boolean has(int power) { return power >= RED && power <= BLACK && worn[power] > 0 || mastered && power >= RED && power < BLACK; }
+
+    /**
+     * The white that is truly hers: every colour at once, with no time to it, and more of
+     * its own: she runs faster than yellow runs, flies freely, and what she holds the
+     * strike for is the beam, which goes through ledges, walls and the ground and lands on
+     * everything along it, several times a second, for as long as it lasts. Black cannot be
+     * put on her. It is given by the story; nothing in a land gives it.
+     */
+    private boolean mastered, beamLeft;
+    private float beam, beamHeld, beamWait, beamTick;
+    private int beams;
+    static final float BEAM_CHARGE = .45f, BEAM_LASTS = 1.3f, BEAM_WAIT = 2.5f, BEAM_REACH = 16, BEAM_WIDE = .7f;
+
+    void master() {
+        mastered = true;
+        cursed = 0;
+        mingle();
+    }
+
+    boolean mastered() { return mastered; }
+    /** How much longer the beam lasts; which way it goes; how far it is gathered, from nothing to one; how long before it can be again; and how many there have been. */
+    float beam() { return beam; }
+    boolean beamLeft() { return beamLeft; }
+    float beamCharge() { return beam > 0 ? 0 : Math.min(1, beamHeld / BEAM_CHARGE); }
+    float beamWait() { return beamWait; }
+    int beams() { return beams; }
+
+    private void shine(float seconds, boolean strike) {
+        if (beamWait > 0) beamWait -= seconds;
+        if (beam > 0) {
+            beam -= seconds;
+            if ((beamTick -= seconds) <= 0) {
+                beamTick = .12f;
+                float middle = y + TALL * .5f, from = x + WIDE / 2;
+                for (Foe foe : foes) {
+                    float at = foe.x + foe.wide() / 2;
+                    if (foe.flat || absent(foe) || foe.dazed > 0 || (beamLeft ? at > from || at < from - BEAM_REACH : at < from || at > from + BEAM_REACH)
+                            || foe.y > middle + BEAM_WIDE || foe.y + foe.tall() < middle - BEAM_WIDE) continue;
+                    // Whoever waits behind her shield is not touched by it; whoever is spent is.
+                    if (RunLevels.boss(foe.kind) && !open(foe)) continue;
+                    beat(foe, SURE);
+                }
+                // And what is thrown at her along it is gone.
+                for (Shot shot : shots) {
+                    if (!shot.hers && Math.abs(shot.y - middle) < BEAM_WIDE && (beamLeft ? shot.x < from : shot.x > from) && Math.abs(shot.x - from) < BEAM_REACH) shot.left = 0;
+                }
+            }
+            if (beam <= 0) beamWait = BEAM_WAIT;
+            return;
+        }
+        if (strike && beamWait <= 0) {
+            if ((beamHeld += seconds) >= BEAM_CHARGE) {
+                beam = BEAM_LASTS;
+                beamHeld = 0;
+                beamTick = 0;
+                beamLeft = facingLeft;
+                beams++;
+            }
+        } else {
+            beamHeld = 0;
+        }
+    }
     /** The colours she wears, a bit for each, the first for red; and how much longer one of them is on, how long it was put on for, and how long it must still wait. */
     int mix() {
         int mix = 0;
+        if (mastered) return ALL;
         for (int colour = RED; colour <= BLACK; colour++) if (worn[colour] > 0) mix |= 1 << colour - 1;
         return mix;
     }
@@ -1405,7 +1468,7 @@ final class PlusRun {
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
         float fast = rush > 0 ? RUN * 1.3f : RUN, leap = rush > 0 ? LEAP * 1.1f : LEAP;
-        if (has(YELLOW)) fast = RUN * 1.7f;
+        if (has(YELLOW)) fast = RUN * (mastered ? 2.1f : 1.7f);
         float wanted = left == right ? 0 : left ? -fast : fast;
         // On slime there is little to push against, and little to stop her.
         float push = (wanted == 0 ? DRAG : onGround ? PUSH : PUSH_IN_AIR) * seconds * (under == RunLevels.SLICK ? .16f : 1);
@@ -1454,7 +1517,7 @@ final class PlusRun {
         char about = at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL * .6f));
         // A draught lifts her; and with the wind in her hair she flies for as long as the jump is held.
         if (about == RunLevels.DRAUGHT) speedDown = Math.max(-5, speedDown - (GRAVITY + 24) * seconds);
-        else if (has(GREEN) && jump && !down && !onGround && y > 1) speedDown = Math.max(named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * seconds);
+        else if (has(GREEN) && jump && !down && !onGround && y > 1) speedDown = Math.max(mastered ? -10 : named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * seconds);
         // On the tide she does not drop out of the air: let go of, the jump lets her down slowly.
         else if (named(TIDE) && !onGround && !down) speedDown = Math.min(speedDown, 2.6f);
         // Water she cannot swim in lets her down slowly, and out through the bottom.
@@ -1547,6 +1610,7 @@ final class PlusRun {
         // carries is used as well: the one is never lost to the other.
         sinceCast += seconds;
         sinceBrace += seconds;
+        if (mastered) shine(seconds, strike);
         {
             boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= REST[weapon];
             if (used) use();
@@ -1671,7 +1735,7 @@ final class PlusRun {
 
     /** Whether a colour could be called on now. */
     boolean callable(int colour) {
-        return state == PLAYING && cursed <= 0 && colour >= RED && colour < BLACK && (perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0
+        return state == PLAYING && !mastered && cursed <= 0 && colour >= RED && colour < BLACK && (perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0
                 && waits[colour] <= 0 && Integer.bitCount(mix() & ~lent) < perks.together;
     }
 
@@ -1843,6 +1907,8 @@ final class PlusRun {
      * It does not slow her, and what she carries still strikes.
      */
     private void curse(float lasts) {
+        // On the white that is truly hers black does not lie: it is one of her colours.
+        if (mastered) return;
         fade(false);
         cursed = lasts;
         cursedFor = lasts;
