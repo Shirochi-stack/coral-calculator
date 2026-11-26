@@ -522,7 +522,8 @@ final class RunGame {
     /** Says in a card of its own that something has been won: at once, or when the card that is on the screen has gone. */
     private void toast(String title, String words, int picture) {
         // One card at a time: behind the one that is up, or behind the card of a place off the land.
-        if (toastLeft > .4f || roomCardAge >= 0 || roomResultAge >= 0) {
+        boolean bannered = run != null && (run.wavePhase() == PlusRun.ANNOUNCED || run.wavePhase() == PlusRun.CLEARED);
+        if (toastLeft > .4f || roomCardAge >= 0 || roomResultAge >= 0 || bannered) {
             toasts.add(new Object[]{title, words, picture});
             return;
         }
@@ -1103,7 +1104,8 @@ final class RunGame {
         sinceStep += seconds;
         mixAge += seconds;
         if (screen == PLAY && ribbonFinger >= 0 && !fanOpen && (ribbonHeld += seconds) >= .3f && Integer.bitCount(perks.colours & 127) > 1) openPicker(false);
-        if (toastLeft <= 0 && !toasts.isEmpty() && roomCardAge < 0 && roomResultAge < 0) {
+        if (toastLeft <= 0 && !toasts.isEmpty() && roomCardAge < 0 && roomResultAge < 0
+                && (run == null || run.wavePhase() == 0 || run.wavePhase() == PlusRun.FOUGHT && sincePhase > 1)) {
             Object[] next = toasts.remove(0);
             toast((String) next[0], (String) next[1], (Integer) next[2]);
         }
@@ -1574,6 +1576,9 @@ final class RunGame {
             }
         }
         sincePhase += seconds;
+        // For looking at a cellar from end to end in a build made for testing: every so often the nearest of its wave is dealt with for her.
+        if (BuildConfig.DEBUG && session.tally("run_sweep") > 0 && run.wavePhase() == PlusRun.FOUGHT && sincePhase > 2.5f
+                && (int) (sincePhase / 1.2f) != (int) ((sincePhase - seconds) / 1.2f)) run.sweep();
         // A chest opened: ten pluses in it. The one by a passage's far door has a purse in it besides, the first time; a stash's is the
         // doing of the stash, and is told with that.
         if (run.chests() != seenChests) {
@@ -2331,6 +2336,8 @@ final class RunGame {
             // A moment in which something is won or handed over lies over the land, and under what is said and shown of how she stands.
             if (screen == PLAY && prizeAge >= 0) drawPrize(canvas);
             if (screen == PLAY && handAge >= 0) drawHandOver(canvas);
+            // With the lights out, the dark lies over the place and under everything that is said and shown of how she stands.
+            if (run.dark()) drawDark(canvas);
             drawHud(canvas);
             if (screen == PLAY && run.wavePhase() != 0) drawWave(canvas);
             if (screen == PLAY && (roomCardAge >= 0 || roomResultAge >= 0)) drawRoomCards(canvas);
@@ -3000,7 +3007,7 @@ final class RunGame {
     private void drawWave(Canvas canvas) {
         int phase = run.wavePhase();
         float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herY = (run.y() + PlusRun.TALL * .5f - cameraY) * tile;
-        if (run.dark()) {
+        if (false) {
             if (glow.getShader() == null) {
                 glow.setShader(new android.graphics.RadialGradient(0, 0, 1, new int[]{Color.BLACK, Color.BLACK, Color.TRANSPARENT}, new float[]{0, .55f, 1},
                         android.graphics.Shader.TileMode.CLAMP));
@@ -3101,6 +3108,27 @@ final class RunGame {
             fitted(canvas, under, safe.centerX(), y + high / 2 - dp(14), dp(14), safe.width() - dp(32));
             text.setAlpha(255);
         }
+    }
+
+    /** The lights are out: all is dark but for a light about her, a glimmer about each of those in there with her, and about whatever is in the air. */
+    private void drawDark(Canvas canvas) {
+        float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herY = (run.y() + PlusRun.TALL * .5f - cameraY) * tile;
+        if (glow.getShader() == null) {
+            glow.setShader(new android.graphics.RadialGradient(0, 0, 1, new int[]{Color.BLACK, Color.BLACK, Color.TRANSPARENT}, new float[]{0, .55f, 1},
+                    android.graphics.Shader.TileMode.CLAMP));
+            glow.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT));
+        }
+        float in = Math.min(1, sincePhase / .6f);
+        canvas.saveLayerAlpha(0, 0, width, height, Math.round(232 * in));
+        canvas.drawColor(0xFF0A0812);
+        lit(canvas, herX, herY, tile * (5.2f + .15f * (float) Math.sin(clock * 3)));
+        for (PlusRun.Foe foe : run.foes()) {
+            if (!foe.spawned || foe.flat) continue;
+            lit(canvas, (foe.x + foe.wide() / 2 - cameraX) * tile, (foe.y + foe.tall() / 2 - cameraY) * tile, tile * 1.7f);
+        }
+        for (float[] mark : run.pending()) lit(canvas, (mark[1] - cameraX) * tile, (mark[2] - .7f - cameraY) * tile, tile * 1.6f);
+        for (PlusRun.Shot shot : run.shots()) lit(canvas, (shot.x - cameraX) * tile, (shot.y - cameraY) * tile, tile * .9f);
+        canvas.restore();
     }
 
     /** A light in the dark: the dark is taken away about a place, most at its middle. */

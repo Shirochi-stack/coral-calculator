@@ -1264,6 +1264,21 @@ final class PlusRun {
         safe = 0;
     }
 
+    /** Deals with the nearest of a cellar's wave that is there, as if she had: for looking at a cellar from end to end in a build made for testing. */
+    void sweep() {
+        Foe nearest = null;
+        for (Foe foe : foes) {
+            if (!foe.spawned || foe.flat) continue;
+            if (nearest == null || Math.abs(foe.x - x) + Math.abs(foe.y - y) < Math.abs(nearest.x - x) + Math.abs(nearest.y - y)) nearest = foe;
+        }
+        if (nearest == null) return;
+        nearest.flat = true;
+        nearest.act = 0;
+        foeX = nearest.x + nearest.wide() / 2;
+        foeY = nearest.y + nearest.tall();
+        flattened++;
+    }
+
     /** Puts something in her hands: for checking the rules, and for looking at them. */
     void arm(int with) {
         weapon = with;
