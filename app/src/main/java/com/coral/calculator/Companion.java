@@ -876,7 +876,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private void tapHint() {
         if (sprite == null || panel != null || menu != null || stage != null) return;
         tapHints++;
-        say("Tap me twice for the calculator Sloppy~♡");
+        say(prefs.tapGames() ? "Tap me twice to play with me Sloppy~♡" : "Tap me twice for the calculator Sloppy~♡");
     }
 
     private void held() {
@@ -890,7 +890,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             if (panel != null) {
                 closePanel();
             } else {
-                openPanel(false);
+                // Her games, where they were chosen in place of the mini calculator.
+                openPanel(prefs.tapGames());
                 if (sprite != null) sprite.play(POSE_JUMP);
             }
         } else if (menu != null) {
@@ -1653,9 +1654,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         }
 
         void describe() {
+            String opens = prefs.tapGames() ? "to play with her" : "for the mini calculator";
             setContentDescription(prefs.tapCalculator()
-                    ? "Halgakos companion. " + (prefs.doubleTap() ? "Tap twice" : "Tap") + " for the mini calculator, hold for the menu, drag to move"
-                    : "Halgakos companion. Tap for the menu, hold for the mini calculator, drag to move");
+                    ? "Halgakos companion. " + (prefs.doubleTap() ? "Tap twice " : "Tap ") + opens + ", hold for the menu, drag to move"
+                    : "Halgakos companion. Tap for the menu, hold " + opens + ", drag to move");
         }
 
         @Override public CharSequence getAccessibilityClassName() { return Button.class.getName(); }

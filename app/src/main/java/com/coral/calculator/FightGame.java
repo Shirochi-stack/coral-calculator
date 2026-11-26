@@ -116,9 +116,6 @@ final class FightGame {
     private final boolean tight;
     private long drawNanos, drawnSince, painting;
     private final FightTally tally = new FightTally();
-    /** The frame each of them was last drawn in, and when it came: a change of frame is eased in. */
-    private final int[] shown = {-1, -1};
-    private final float[] shownSince = new float[2];
     private final int[] counted = new int[FightTally.COUNT];
     private int drawn;
     private int slipTest;
@@ -1089,35 +1086,6 @@ final class FightGame {
         canvas.restore();
     }
 
-    /**
-     * One of her frames drawn breathing. It is cut into bands from her feet up, and each is
-     * raised and let down a very little, by how high it is and a beat later the higher it is:
-     * so her body rises and falls from her feet, her head and wings following, while every
-     * line of the drawing stays the line it was.
-     */
-    private void breathing(Canvas canvas, int fighter, int which, float feetX, float feetY, float scale, boolean leftward, float phase) {
-        short[] at = FightFrames.FRAMES[fighter][which];
-        Bitmap sheet = atlas(fighter, at[0]);
-        float kept = sheet.getWidth() / (float) FightFrames.WIDE, wider = 1 - .006f * (float) Math.sin(phase);
-        canvas.save();
-        if (leftward) canvas.scale(-1, 1, feetX, feetY);
-        int bands = 14;
-        for (int band = 0; band < bands; band++) {
-            int top = Math.round(at[4] * band / (float) bands), bottom = Math.round(at[4] * (band + 1) / (float) bands);
-            source.set(Math.round(at[1] * kept), Math.round((at[2] + top) * kept), Math.round((at[1] + at[3]) * kept), Math.round((at[2] + bottom) * kept));
-            target.set(feetX - at[5] * scale * wider, breathed(at[6] - top, at[6], phase, scale, feetY),
-                    feetX + (at[3] - at[5]) * scale * wider, breathed(at[6] - bottom, at[6], phase, scale, feetY) + (band < bands - 1 ? .6f : 0));
-            canvas.drawBitmap(sheet, source, target, paint);
-        }
-        canvas.restore();
-    }
-
-    /** Where on the screen a point of her so high above her feet is as she breathes. */
-    private static float breathed(float high, float whole, float phase, float scale, float feetY) {
-        float part = Math.max(0, high / whole);
-        return feetY - high * scale * (1 + .014f * part * (float) Math.sin(phase - .9f * part));
-    }
-
     /** One of the things that fly and flash, its middle at a place, as wide as asked, turned and mirrored as asked. */
     private void thing(Canvas canvas, int which, float x, float y, float wide, float degrees, boolean mirrored) {
         int side = fx.getHeight();
@@ -1169,12 +1137,18 @@ final class FightGame {
         canvas.save();
         canvas.translate(jolt, 0);
         float scale = Fight.TALL * unit / STANDING;
-        // A soft shadow under each, smaller the higher she is.
+        // A soft shadow under each, smaller the higher she is. Under one who lies on the floor it is as wide as she lies, and under the middle of her.
         paint.setStyle(Paint.Style.FILL);
         for (Fight.Fighter fighter : two) {
-            float wide = unit * (.75f - Math.min(.4f, fighter.y * .12f));
+            float wide = unit * (.75f - Math.min(.4f, fighter.y * .12f)), middle = across(fighter.x);
+            boolean lying = fighter.y <= .05f && (fighter.state == Fight.DOWN || fighter.state == Fight.OUT);
+            if (lying) {
+                short[] at = FightFrames.FRAMES[fighter.kind][pose(fighter)];
+                wide = Math.max(wide, at[3] * scale * .5f);
+                middle += (at[3] / 2f - at[5]) * scale * (fighter.facingLeft ? -1 : 1);
+            }
             paint.setColor(0x33000000);
-            box.set(across(fighter.x) - wide, groundY - unit * .09f, across(fighter.x) + wide, groundY + unit * .09f);
+            box.set(middle - wide, groundY - unit * .09f, middle + wide, groundY + unit * .09f);
             canvas.drawOval(box, paint);
         }
         paint.setColor(Color.BLACK);
@@ -1207,7 +1181,6 @@ final class FightGame {
             Fight.Fighter fighter = two[turn == 0 ? 1 - front : front];
             float x = across(fighter.x), y = up(fighter.y);
             // She breathes as she stands, and leans into a blow as it goes out.
-            float breath = fighter.state == Fight.IDLE ? 1 + .012f * (float) Math.sin(clock * 3 + fighter.side * 2) : 1;
             // The lean goes out with the blow and comes back after it, smoothly: it used to step out and step back.
             float into = fighter.state == Fight.ATTACK && fighter.doing().shot == Fight.NOTHING
                     ? (fighter.clock - fighter.doing().startup * .5f) / (fighter.doing().startup * .5f + .2f) : 0;
@@ -1224,28 +1197,9 @@ final class FightGame {
             // Getting up, she cannot be hit, and flickers to show it.
             // It is a soft pulse: blinking on and off made her look as if the screen were dropping frames.
             paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK ? Math.round(190 + 65 * (float) Math.sin(clock * 34)) : 255);
-            int shows = pose(fighter);
-            if (shows != shown[fighter.side]) {
-                shown[fighter.side] = shows;
-                shownSince[fighter.side] = clock;
-            }
-            if (fighter.state == Fight.IDLE && shows == FightFrames.IDLE1) {
-                // Standing she is one drawing, and breathes: no picture is swapped for another.
-                breathing(canvas, fighter.kind, shows, x, y, scale, fighter.facingLeft, clock * 2.4f + fighter.side * 2);
-            } else {
-                // A new frame comes in a little squashed and settles, so that the change is carried by movement; a walk bobs in
-                // step; one who is dizzy sways.
-                float settle = Math.min(1, (clock - shownSince[fighter.side]) / .08f), soft = (1 - settle) * (1 - settle);
-                boolean once = fighter.state == Fight.ATTACK || fighter.state == Fight.JUMP || fighter.state == Fight.LAND || fighter.state == Fight.HIT
-                        || fighter.state == Fight.RISE || fighter.state == Fight.BLOCK;
-                float squash = once ? .028f * soft : 0;
-                float bob = fighter.state == Fight.WALK ? unit * .022f * (float) Math.abs(Math.sin(Math.PI * fighter.clock / (fighter.backing ? .24f : .255f))) : 0;
-                canvas.save();
-                if (fighter.state == Fight.HIT && fighter.reel == 2 && fighter.clock >= .14f) canvas.rotate(3.5f * (float) Math.sin(fighter.clock * 9), x, y);
-                canvas.scale(1 + squash, 1 - squash, x, y);
-                frame(canvas, fighter.kind, shows, x + lunge, y - bob, scale, fighter.facingLeft);
-                canvas.restore();
-            }
+            // She is drawn at the one size her frames are kept at: nothing stretches, squashes or scales her.
+            float bob = fighter.state == Fight.WALK ? unit * .022f * (float) Math.abs(Math.sin(Math.PI * fighter.clock / (fighter.backing ? .24f : .255f))) : 0;
+            frame(canvas, fighter.kind, pose(fighter), x + lunge, y - bob, scale, fighter.facingLeft);
             paint.setAlpha(255);
         }
         // What is in the air.
@@ -1923,8 +1877,7 @@ final class FightGame {
             canvas.drawOval(box, paint);
             paint.setColor(Color.BLACK);
             canvas.save();
-            canvas.scale(1, 1 + .012f * (float) Math.sin(clock * 3), x, bandBottom);
-            breathing(canvas, player, FightFrames.IDLE1, x, bandBottom, scale, false, clock * 2.4f);
+            frame(canvas, player, FightFrames.IDLE1 + (int) (clock / .3f) % 4, x, bandBottom, scale, false);
             canvas.restore();
         }
         box.set(cardLeft, cardTop, cardRight, cardBottom);

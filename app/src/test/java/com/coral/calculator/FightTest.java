@@ -631,10 +631,21 @@ public class FightTest {
         for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
             String name = FightCast.NAMES[kind];
             Fight.Pad pad = new Fight.Pad();
-            // Standing she is one drawing and no other, however long: it is drawn breathing, not swapped for near-copies of itself.
+            // Standing she goes through the four frames of her stance, as she did before any frames were added.
             Set<Integer> frames = new HashSet<>();
             float held = longest(apart(kind, Fight.CHIKUWA, 6), pad, 3, Fight.IDLE, frames);
-            assertEquals(java.util.Collections.singleton(FightFrames.IDLE1), frames);
+            assertTrue(name + " holds a frame of her stance for " + held, held <= .3f && held >= .25f);
+            Set<Integer> stance = new HashSet<>();
+            for (int frame = FightFrames.IDLE1; frame <= FightFrames.IDLE4; frame++) stance.add(frame);
+            assertEquals(stance, frames);
+            // The four are pictures of their own, all but the same height, and stand on the ground.
+            Set<String> where = new HashSet<>();
+            for (int frame = FightFrames.IDLE1; frame <= FightFrames.IDLE4; frame++) {
+                short[] at = FightFrames.FRAMES[kind][frame];
+                assertTrue(where.add(at[0] + " " + at[1] + " " + at[2]));
+                assertTrue(name + " stands " + at[6] + " in frame " + frame, at[6] <= FightFrames.STAND * 1.01f && at[6] >= FightFrames.STAND * .94f);
+                assertTrue(at[4] - at[6] <= 3);
+            }
             // A walk is the frames that were drawn together as one stride and only those: six forward, four backward.
             frames.clear();
             pad.right = true;
@@ -743,6 +754,34 @@ public class FightTest {
             assertEquals(FightFrames.U12, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .4f, 0, 0));
             assertEquals(FightFrames.U23, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .9f, 0, 0));
         }
+    }
+
+    // On the floor
+
+    @Test public void lyingOnTheFloorHerBodyRestsOnTheGroundAndDoesNotFloat() {
+        assertEquals(6, FightFrames.FLOOR.length);
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            for (int index = 0; index < FightFrames.FLOOR.length; index++) {
+                short[] at = FightFrames.FRAMES[kind][FightFrames.FLOOR[index]];
+                // The ground of the frame is the row the tool found her body to rest on, to within a pixel: not the foot of something that hangs lower.
+                assertTrue(FightCast.NAMES[kind] + " frame " + FightFrames.FLOOR[index] + ": ground " + at[6] + ", rests " + FightFrames.REST[kind][index],
+                        Math.abs(at[6] - FightFrames.REST[kind][index]) <= 1);
+                assertTrue(at[6] > 20 && at[6] <= at[4]);
+            }
+        }
+        // The frames she shows when she is down and has landed are among them, and she is on the ground then, not above it.
+        Fight fight = apart(Fight.CHIKUWA, Fight.HALGAKOS, 1.3f);
+        press(fight, Fight.HEAVY, 1.0f);
+        Fight.Fighter down = fight.fighters[1];
+        assertEquals(Fight.DOWN, down.state);
+        assertEquals(0, down.y, 0);
+        assertEquals(FightFrames.LYING, FightPose.of(fight, down, 0, 0));
+        Set<Integer> floor = new HashSet<>();
+        for (int frame : FightFrames.FLOOR) floor.add(frame);
+        // As she begins to get up she is still on it.
+        for (int frame = 0; frame < 120 && down.state != Fight.RISE; frame++) fight.step(STEP, new Fight.Pad(), null);
+        assertEquals(Fight.RISE, down.state);
+        assertTrue(floor.contains(FightPose.of(fight, down, 0, 0)));
     }
 
     // In the air

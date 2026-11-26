@@ -44,6 +44,12 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         if (state != null) engine.setCaret(state.getInt("caret", Integer.MAX_VALUE));
         layout = new CalculatorLayout(this, this);
         setContentView(layout);
+        // Opened from its icon, the app may start on the games, with the calculator one step back: a setting of hers.
+        Intent opened = getIntent();
+        if (state == null && opened != null && Intent.ACTION_MAIN.equals(opened.getAction()) && opened.hasCategory(Intent.CATEGORY_LAUNCHER)
+                && new CompanionPrefs(this).startGames()) {
+            startActivity(new Intent(this, PlayActivity.class));
+        }
         configureInsets();
         applyTheme();
         refresh();
@@ -163,6 +169,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         switch (tool) {
             case "settings": showSettings(); break;
             case "companion": startActivity(new Intent(this, CompanionSettingsActivity.class)); break;
+            case "games": startActivity(new Intent(this, PlayActivity.class)); break;
             case "history": showHistory(); break;
             case "units": ConverterDialogs.showUnits(this, currentValue(), this::useValue); break;
             case "currency": ConverterDialogs.showCurrency(this, currentValue(), this::useValue); break;

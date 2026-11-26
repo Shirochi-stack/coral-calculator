@@ -326,7 +326,7 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
                 int stars = 0;
                 for (int land = 1; land <= RunLevels.COUNT; land++) stars += session.tally("run_stars_" + land);
                 int open = Math.max(1, Math.min(RunLevels.COUNT, session.tally("run_open")));
-                return stars == 0 ? RunLevels.COUNT + " lands · a story"
+                return stars == 0 ? RunLevels.TOTAL + " lands · a story"
                         : "Land " + open + " of " + RunLevels.COUNT + " · " + stars + (stars == 1 ? " star" : " stars");
             }
             case PlaySession.PAIRS: return best("pairs_best", " turns", "On this card");
