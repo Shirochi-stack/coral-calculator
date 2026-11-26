@@ -107,6 +107,14 @@ public final class CompanionSettingsActivity extends Activity {
                     describeGestures();
                     apply();
                 });
+        toggle(content, "Two taps to open it", "Where a tap opens the mini calculator, it takes two taps close together, so a "
+                        + "stray touch on Halgakos does not bring it up. One tap still closes it. Switch this off to open it "
+                        + "with a single tap.",
+                prefs.doubleTap(), checked -> {
+                    prefs.set(CompanionPrefs.DOUBLE_TAP, checked);
+                    describeGestures();
+                    apply();
+                });
 
         section(content, "Play with Halgakos");
         content.addView(text("Small games to play with her: tic-tac-toe, rock paper scissors, pairs and quick sums "
@@ -413,7 +421,7 @@ public final class CompanionSettingsActivity extends Activity {
 
     private void describeGestures() {
         intro.setText("A mini Halgakos who floats over your other apps. " + (prefs.tapCalculator()
-                ? "Tap her for the mini calculator, hold her for her menu,"
+                ? (prefs.doubleTap() ? "Tap her twice" : "Tap her") + " for the mini calculator, hold her for her menu,"
                 : "Tap her for her menu, hold her for the mini calculator,")
                 + " and drag her wherever she is out of the way.");
     }

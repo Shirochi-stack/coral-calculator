@@ -188,7 +188,23 @@ final class PlayStage extends View {
     private float tile, landTop, camera;
     private final RectF leftButton = new RectF(), rightButton = new RectF(), jumpButton = new RectF();
     private boolean goLeft, goRight, goJump;
-    private int seenFlattened, seenHurts;
+    /**
+     * The art of Plus run: its painted sky, and nine pictures side by side, each standing on the
+     * bottom of a square of its own: the turf, the soil, a minus on one foot, on the other and
+     * flattened, a plus, a ledge, the flag and the gate. How much of its square each fills is
+     * what tools/make_run_art.py printed when it built them.
+     */
+    private Bitmap runSky, runArt;
+    private static final int TURF = 0, SOIL = 1, MINUS_ART = 2, MINUS_FLAT_ART = 4, PLUS_ART = 5, LEDGE_ART = 6, FLAG_ART = 7,
+            GATE_ART = 8;
+    private static final float[] RUN_ART_WIDE = {1.000f, 1.000f, 1.000f, 1.000f, 1.000f, 1.000f, 1.000f, 0.555f, 1.000f};
+    private static final float[] RUN_ART_TALL = {1.000f, 1.000f, 0.547f, 0.547f, 0.312f, 1.000f, 0.328f, 1.000f, 1.000f};
+    private int seenFlattened, seenHurts, seenLandings, seenCollected;
+    /** How long she stays flattened after a landing, and how much of that is left. */
+    private static final float SQUASH = .14f;
+    private float squash;
+    /** Sparks from a plus and dust from a landing: across, down, their speeds, how long each has left, and which it is. */
+    private final List<float[]> bits = new ArrayList<>();
 
     private Object backCallback;
 
@@ -227,6 +243,10 @@ final class PlayStage extends View {
             // Her frames are small: blown up to the size of the screen they would be a blur.
             large = android.graphics.BitmapFactory.decodeResource(context.getResources(),
                     pet != null ? R.drawable.halgakos_pet_large : R.drawable.halgakos_large);
+        }
+        if (game == PlaySession.RUN) {
+            runSky = android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_sky);
+            runArt = android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_art);
         }
         if (game == SNATCH || game == AVALANCHE) {
             pickApps(context, game == SNATCH ? 1 : SHAKEN);
@@ -883,13 +903,51 @@ final class PlayStage extends View {
 
     private void plusRun(float seconds) {
         run.step(seconds, goLeft, goRight, goJump);
-        // The window on the land keeps her a little left of its middle, so more of what is ahead shows.
+        // The window on the land shows more of what is ahead of her than behind, and follows her smoothly.
         float across = play.width() / tile;
-        camera = clamp(run.x() + PlusRun.WIDE / 2 - across * .42f, 0, Math.max(0, PlusRun.COLUMNS - across));
+        float goal = clamp(run.x() + PlusRun.WIDE / 2 - across * (run.facingLeft() ? .58f : .4f), 0, Math.max(0, PlusRun.COLUMNS - across));
+        camera += (goal - camera) * Math.min(1, seconds * 7);
         facingLeft = run.facingLeft();
-        keep(!run.onGround() ? PetArt.JUMP : run.running() ? (facingLeft ? PetArt.RUN_LEFT : PetArt.RUN_RIGHT) : PetArt.IDLE);
+        if (run.onGround()) {
+            keep(run.running() ? (facingLeft ? PetArt.RUN_LEFT : PetArt.RUN_RIGHT) : PetArt.IDLE);
+        } else {
+            // Her jump is shown by where she is in it, not by the clock: leaving the ground, rising, at the top, coming down.
+            float down = run.speedDown();
+            keep(PetArt.JUMP);
+            once = NONE;
+            frameIndex = down < -10 ? 1 : down < -3 ? 2 : down < 5 ? 3 : 4;
+            frameClock = 0;
+        }
         herX = play.left + (run.x() + PlusRun.WIDE / 2 - camera) * tile;
         herY = landTop + (run.y() + PlusRun.TALL) * tile;
+        if (squash > 0) squash -= seconds;
+        // A landing flattens her for a moment and kicks up dust; a plus bursts; a flattened minus puffs.
+        if (run.landings() != seenLandings) {
+            seenLandings = run.landings();
+            squash = SQUASH;
+            for (int puff = 0; puff < 5; puff++) {
+                bits.add(new float[]{run.x() + PlusRun.WIDE / 2, run.y() + PlusRun.TALL, (random.nextFloat() - .5f) * 5, -random.nextFloat() * 1.6f, .32f, 1});
+            }
+        }
+        if (run.collected() != seenCollected) {
+            seenCollected = run.collected();
+            for (int spark = 0; spark < 7; spark++) {
+                double way = random.nextFloat() * Math.PI * 2;
+                bits.add(new float[]{run.plusX(), run.plusY(), (float) Math.cos(way) * 4.5f, (float) Math.sin(way) * 4.5f - 2, .38f, 0});
+            }
+        }
+        if (run.flattened() != seenFlattened) {
+            for (int puff = 0; puff < 8; puff++) {
+                bits.add(new float[]{run.minusX(), run.minusY(), (random.nextFloat() - .5f) * 7, -random.nextFloat() * 3, .36f, 1});
+            }
+        }
+        for (int index = bits.size() - 1; index >= 0; index--) {
+            float[] bit = bits.get(index);
+            bit[0] += bit[2] * seconds;
+            bit[1] += bit[3] * seconds;
+            bit[3] += 9 * seconds;
+            if ((bit[4] -= seconds) <= 0) bits.remove(index);
+        }
         if (run.hurts() != seenHurts) {
             seenHurts = run.hurts();
             flash = .16f;
@@ -940,6 +998,21 @@ final class PlayStage extends View {
         canvas.drawRect(play.left, landTop, play.right, bottom, paint);
         canvas.save();
         canvas.clipRect(play.left, landTop, play.right, bottom);
+        if (runSky != null) {
+            // The painted sky, as tall as the window, drifting by at a quarter of the land's pace. Each
+            // copy is the mirror of the one before it, so their edges always meet.
+            float tall = bottom - landTop, wide = tall * runSky.getWidth() / runSky.getHeight(), drift = camera * tile * .25f;
+            for (int copy = (int) (drift / wide); play.left + copy * wide - drift < play.right; copy++) {
+                float left = play.left + copy * wide - drift;
+                target.set(left, landTop, left + wide + 1, bottom);
+                canvas.save();
+                if (copy % 2 != 0) canvas.scale(-1, 1, left + wide / 2, 0);
+                canvas.drawBitmap(runSky, null, target, paint);
+                canvas.restore();
+            }
+            // In the dark it is evening there.
+            if (dark) canvas.drawColor(0x8C0B1020);
+        }
         int first = Math.max(0, (int) camera), last = Math.min(PlusRun.COLUMNS - 1, (int) (camera + across) + 1);
         int earth = dark ? 0xFF46525F : 0xFF6E8093, turf = CalculatorLayout.CORAL;
         for (int column = first; column <= last; column++) {
@@ -948,6 +1021,31 @@ final class PlayStage extends View {
                 char here = run.at(column, row);
                 if (here == PlusRun.AIR) continue;
                 float top = landTop + row * tile;
+                if (runArt != null) {
+                    if (here == PlusRun.BLOCK) {
+                        // The top of a pile has the turf on it; the rest is soil. Every other one is turned
+                        // about, so the same picture side by side does not show as a pattern.
+                        boolean capped = run.at(column, row - 1) != PlusRun.BLOCK;
+                        int side = runArt.getHeight(), which = capped ? TURF : SOIL;
+                        source.set(which * side, 0, which * side + side, side);
+                        target.set(left, top, left + tile + 1, top + tile + 1);
+                        canvas.save();
+                        canvas.scale(column % 2 == 0 ? 1 : -1, capped || row % 2 == 0 ? 1 : -1, left + tile / 2, top + tile / 2);
+                        canvas.drawBitmap(runArt, source, target, paint);
+                        canvas.restore();
+                    } else if (here == PlusRun.LEDGE) {
+                        float tall = tile * RUN_ART_TALL[LEDGE_ART] / RUN_ART_WIDE[LEDGE_ART];
+                        art(canvas, LEDGE_ART, left + tile / 2, top + tall, tile + 1, column % 2 != 0);
+                    } else if (here == PlusRun.FLAG) {
+                        // Grey until she has passed it.
+                        paint.setAlpha(run.x() + PlusRun.WIDE / 2 >= column ? 255 : 120);
+                        art(canvas, FLAG_ART, left + tile / 2, top + tile, tile * 1.9f * RUN_ART_WIDE[FLAG_ART] / RUN_ART_TALL[FLAG_ART], false);
+                        paint.setAlpha(255);
+                    } else if (here == PlusRun.GATE && run.at(column, row + 1) == PlusRun.GATE) {
+                        art(canvas, GATE_ART, left + tile / 2, top + tile * 2, tile * 2.9f * RUN_ART_WIDE[GATE_ART] / RUN_ART_TALL[GATE_ART], false);
+                    }
+                    continue;
+                }
                 if (here == PlusRun.BLOCK) {
                     paint.setColor(earth);
                     canvas.drawRect(left, top, left + tile + 1, top + tile + 1, paint);
@@ -988,11 +1086,23 @@ final class PlayStage extends View {
             if (plus[0] < first - 1 || plus[0] > last + 1) continue;
             float x = play.left + (plus[0] + .5f - camera) * tile;
             float y = landTop + (plus[1] + .82f) * tile + (float) Math.sin(run.time() * 4 + plus[0]) * tile * .08f;
+            if (runArt != null) {
+                // It turns as it hangs there: its width comes and goes.
+                float turned = Math.max(.18f, Math.abs((float) Math.cos(run.time() * 3 + plus[0] * .7f)));
+                art(canvas, PLUS_ART, x, y + tile * .08f, tile * .78f * turned, false);
+                continue;
+            }
             canvas.drawText("+", x, y, text);
         }
         for (PlusRun.Minus minus : run.minuses()) {
             float left = play.left + (minus.x - camera) * tile, top = landTop + minus.y * tile;
             float wide = PlusRun.MINUS_WIDE * tile, tall = PlusRun.MINUS_TALL * tile;
+            if (runArt != null) {
+                // One foot and then the other as it walks; the picture faces left, and is turned about to go right.
+                int which = minus.flat ? MINUS_FLAT_ART : (int) (run.time() * 6 + minus.x) % 2 == 0 ? MINUS_ART : MINUS_ART + 1;
+                art(canvas, which, left + wide / 2, top + tall, wide * 1.3f, !minus.leftward && !minus.flat);
+                continue;
+            }
             paint.setColor(dark ? 0xFFDCE2E8 : 0xFF2A2F36);
             if (minus.flat) {
                 canvas.drawRoundRect(left, top + tall * .72f, left + wide, top + tall, tall * .14f, tall * .14f, paint);
@@ -1004,16 +1114,50 @@ final class PlayStage extends View {
             canvas.drawCircle(left + wide * .32f + look, top + tall * .52f, tall * .15f, paint);
             canvas.drawCircle(left + wide * .68f + look, top + tall * .52f, tall * .15f, paint);
         }
-        // Her, a square and a half tall, flickering while she cannot be hurt again.
+        // Sparks and dust.
+        paint.setStyle(Paint.Style.FILL);
+        for (float[] bit : bits) {
+            paint.setColor(bit[5] == 0 ? turf : dark ? 0xFF8A97A6 : 0xFFB9C4CF);
+            paint.setAlpha(Math.round(255 * Math.min(1, bit[4] / .2f)));
+            canvas.drawCircle(play.left + (bit[0] - camera) * tile, landTop + bit[1] * tile, tile * (bit[5] == 0 ? .09f : .13f), paint);
+        }
+        paint.setAlpha(255);
+        // Her, a square and a half tall: stretched as she rises and falls, flattened as she lands, leaning the way
+        // she is going, and flickering while she cannot be hurt again.
         float tall = tile * 1.6f, wide = tall * herWidth / herHeight;
-        target.set(herX - wide / 2, herY - tall, herX + wide / 2, herY);
+        float air = run.onGround() ? 0 : Math.min(1, Math.abs(run.speedDown()) / 15), flat = Math.max(0, squash) / SQUASH;
+        float taller = 1 + air * .11f - flat * .17f, wider = 1 - air * .07f + flat * .13f;
+        target.set(herX - wide * wider / 2, herY - tall * taller, herX + wide * wider / 2, herY);
+        canvas.save();
+        if (!run.onGround()) canvas.rotate(clamp(run.speedAcross() / 6.2f, -1, 1) * 7, herX, herY - tall / 2);
         paint.setAlpha(run.safe() && (int) (run.time() * 14) % 2 == 0 ? 90 : 255);
         drawFrame(canvas);
         paint.setAlpha(255);
         canvas.restore();
+        canvas.restore();
         button(canvas, leftButton, goLeft, 180);
         button(canvas, rightButton, goRight, 0);
         button(canvas, jumpButton, goJump, 270);
+    }
+
+    /**
+     * Draws one of the pictures of the run's art: standing on a line, its middle at a place, as
+     * wide as asked and as tall as that makes it, and turned about if it is to face the other way.
+     */
+    private void art(Canvas canvas, int which, float middle, float bottom, float wide, boolean turned) {
+        int side = runArt.getHeight();
+        float across = RUN_ART_WIDE[which], up = RUN_ART_TALL[which];
+        source.set(Math.round(which * side + side * (1 - across) / 2), Math.round(side * (1 - up)),
+                Math.round(which * side + side * (1 + across) / 2), side);
+        target.set(middle - wide / 2, bottom - wide * up / across, middle + wide / 2, bottom);
+        if (turned) {
+            canvas.save();
+            canvas.scale(-1, 1, middle, bottom);
+            canvas.drawBitmap(runArt, source, target, paint);
+            canvas.restore();
+        } else {
+            canvas.drawBitmap(runArt, source, target, paint);
+        }
     }
 
     /** A round button with an arrow in it pointing some way round, lit while it is held. */
@@ -1173,6 +1317,11 @@ final class PlayStage extends View {
             goJump = false;
             seenFlattened = 0;
             seenHurts = 0;
+            seenLandings = 0;
+            seenCollected = 0;
+            squash = 0;
+            camera = 0;
+            bits.clear();
             fitRun();
             say(1.6f, "Try to keep up Sloppy~♡", "Mind the gaps Sloppy~♡", "Don't make me fall Sloppy~♡");
         } else if (game == PlaySession.MINES) {

@@ -157,6 +157,11 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private ValueAnimator hopping;
     /** Her look round, as one of her small pranks. */
     private ValueAnimator looking;
+    /** When she was last tapped once, how long a second tap has to follow, and how often she has said so. */
+    private static final long DOUBLE_TAP_MS = 400;
+    private long lastTap;
+    private int tapHints;
+    private final Runnable tapHint = this::tapHint;
     private DismissTarget dismiss;
     private WindowManager.LayoutParams dismissParams;
     private ValueAnimator settling;
@@ -735,7 +740,26 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** A tap and a hold each open one of her two popups; which is which is a setting. */
     private void tapped() {
         wake();
+        // With the setting on, opening the calculator takes two taps close together: a stray touch does not bring it up.
+        // Whatever is open still closes at one.
+        if (prefs.tapCalculator() && prefs.doubleTap() && panel == null) {
+            long now = SystemClock.uptimeMillis();
+            boolean second = now - lastTap <= DOUBLE_TAP_MS;
+            lastTap = second ? 0 : now;
+            handler.removeCallbacks(tapHint);
+            if (!second) {
+                // A lone tap gets a word from her about it, the first couple of times.
+                if (tapHints < 2 && prefs.chatter()) handler.postDelayed(tapHint, DOUBLE_TAP_MS + 60);
+                return;
+            }
+        }
         toggle(prefs.tapCalculator());
+    }
+
+    private void tapHint() {
+        if (sprite == null || panel != null || menu != null || stage != null) return;
+        tapHints++;
+        say("Tap me twice for the calculator Sloppy~♡");
     }
 
     private void held() {
@@ -1415,7 +1439,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
         void describe() {
             setContentDescription(prefs.tapCalculator()
-                    ? "Halgakos companion. Tap for the mini calculator, hold for the menu, drag to move"
+                    ? "Halgakos companion. " + (prefs.doubleTap() ? "Tap twice" : "Tap") + " for the mini calculator, hold for the menu, drag to move"
                     : "Halgakos companion. Tap for the menu, hold for the mini calculator, drag to move");
         }
 

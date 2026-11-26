@@ -20,7 +20,7 @@ Formerly Coral Calculator.
 - **Memory and history:** store a value in memory or reuse any of your last 100 completed calculations.
 - **Unit conversion:** convert length, mass, and temperature without an internet connection.
 - **Currency conversion:** calculate amounts using an exchange rate you enter yourself.
-- **Halgakos companion:** a mini Halgakos who floats over other apps. Tap her for a compact calculator, hold her for her menu, and drag her anywhere. An animated, pink-haired Halgakos is there if you want her to move.
+- **Halgakos companion:** a mini Halgakos who floats over other apps. Tap her twice for a compact calculator, hold her for her menu, and drag her anywhere. An animated, pink-haired Halgakos is there if you want her to move.
 - **Your preferred view:** switch to dark appearance or fullscreen, rotate to landscape, and turn key vibration on or off.
 - **Convenient input:** labeled buttons, hardware keyboard support, and long-press result copying.
 
@@ -70,7 +70,7 @@ Use the **top-right settings icon** to change appearance or key vibration. The i
 
 The companion is switched on from the start. The first time you open the calculator it offers Android's permission to display over other apps: choose Halgakos Calculator in the list Android shows, allow it, and come back. She appears once you leave the calculator. If you chose **Not now**, switch on **Show Halgakos** in **Settings › Halgakos companion** to be asked again.
 
-- **Tap** her to open the mini calculator over the app you are in. Tap her again, tap anywhere outside it, or use the **✕** in its corner, to close it.
+- **Tap her twice** to open the mini calculator over the app you are in: two taps, so that a stray touch does not bring it up. Tap her once more, tap anywhere outside it, or use the **✕** in its corner, to close it.
 - **Hold** her for her menu: the mini calculator, **Play with Halgakos**, the full calculator, her settings, and **Close app**.
 - **Drag** her anywhere on the screen. She stays where you drop her.
 - The mini calculator and her menu always open to her left or her right, never over her. Where neither side has room, as in the middle of a phone's screen, she steps aside for them and steps back when they close.
@@ -84,6 +84,7 @@ Her settings open from her menu, or from Halgakos herself beside the full screen
 | --- | --- |
 | **Close it when you tap away** (mini calculator) | Touching anywhere outside the mini calculator closes it, and the same goes for the card of games. On by default; turn off to keep either open while you use the app underneath. |
 | **Open it with a tap** (mini calculator) | Turn off to swap the two: a tap opens her menu and a hold the mini calculator. |
+| **Two taps to open it** (mini calculator) | Where a tap opens the mini calculator, it takes two taps close together. On by default; switch it off to open it with one tap. One tap always closes it. |
 | **Speech bubbles** | Now and then she has something to say, in a bubble over her head. On by default; a tap on a bubble sends it away. |
 | **What she calls you** | The name her catchphrase is made of. Empty, she calls you Sloppy; type another and every line of hers ends with it instead. |
 | **Surprise pranks** | Left idle, she plays a prank every several minutes without being asked, and little ones where she stands in between. On by default. |

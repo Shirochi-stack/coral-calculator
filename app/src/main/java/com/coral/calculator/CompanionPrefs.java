@@ -23,6 +23,8 @@ final class CompanionPrefs {
     static final String ANIMATED = "animated";
     /** A tap opens the mini calculator and a hold the menu, rather than the other way round. */
     static final String TAP_CALCULATOR = "tap_calculator";
+    /** Where a tap opens the mini calculator, it takes two taps close together, so a stray touch does not. */
+    static final String DOUBLE_TAP = "double_tap";
     /** A touch anywhere else closes the mini calculator. */
     static final String CLOSE_OUTSIDE = "close_outside";
     /** Now and then she says something, in a bubble over her head. */
@@ -55,6 +57,7 @@ final class CompanionPrefs {
     }
     boolean animated() { return preferences.getBoolean(ANIMATED, true); }
     boolean tapCalculator() { return preferences.getBoolean(TAP_CALCULATOR, true); }
+    boolean doubleTap() { return preferences.getBoolean(DOUBLE_TAP, true); }
     boolean closeOutside() { return preferences.getBoolean(CLOSE_OUTSIDE, true); }
     boolean chatter() { return preferences.getBoolean(CHATTER, true); }
     boolean pranks() { return preferences.getBoolean(PRANKS, true); }

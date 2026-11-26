@@ -49,7 +49,9 @@ final class PlusRun {
     private int hearts = HEARTS, state = PLAYING;
     private float time;
     /** Counts that only go up, for whoever shows the game to tell what has just happened. */
-    private int collected, flattened, hurts;
+    private int collected, flattened, hurts, jumps, landings;
+    /** Where the last plus was collected and the last minus flattened: across and down, in squares. */
+    private float plusX, plusY, minusX, minusY;
 
     PlusRun() {
         for (char[] row : land) java.util.Arrays.fill(row, AIR);
@@ -170,6 +172,17 @@ final class PlusRun {
     int collected() { return collected; }
     int flattened() { return flattened; }
     int hurts() { return hurts; }
+    /** How many times she has left the ground by jumping, and come down onto it again. */
+    int jumps() { return jumps; }
+    int landings() { return landings; }
+    /** How fast she is moving down, in squares a second: below zero while she rises. */
+    float speedDown() { return speedDown; }
+    float speedAcross() { return speedAcross; }
+    /** The middle of the plus last collected, and of the minus last flattened. */
+    float plusX() { return plusX; }
+    float plusY() { return plusY; }
+    float minusX() { return minusX; }
+    float minusY() { return minusY; }
 
     /** Puts her somewhere, standing still: for checking the rules from a place of one's choosing. */
     void place(float across, float down) {
@@ -213,6 +226,7 @@ final class PlusRun {
             sinceJump = 1;
             sinceGround = 1;
             onGround = false;
+            jumps++;
         }
         // Letting go early makes for a lower jump.
         if (!jump && speedDown < -SHORT_LEAP) speedDown = -SHORT_LEAP;
@@ -227,6 +241,8 @@ final class PlusRun {
             if (x < plus[0] + .8f && x + WIDE > plus[0] + .2f && y < plus[1] + .8f && y + TALL > plus[1] + .2f) {
                 pluses.remove(index);
                 collected++;
+                plusX = plus[0] + .5f;
+                plusY = plus[1] + .5f;
             }
         }
         for (Minus minus : minuses) walk(minus, seconds);
@@ -237,6 +253,8 @@ final class PlusRun {
             if (speedDown > 0 && y + TALL - speedDown * seconds <= minus.y + MINUS_TALL * .6f) {
                 minus.flat = true;
                 flattened++;
+                minusX = minus.x + MINUS_WIDE / 2;
+                minusY = minus.y + MINUS_TALL;
                 speedDown = -BOUNCE;
             } else if (safe <= 0) {
                 hurt();
@@ -302,6 +320,8 @@ final class PlusRun {
 
     private void moveDown(float by) {
         y += by;
+        boolean wasOnGround = onGround;
+        float fell = speedDown;
         onGround = false;
         int left = (int) Math.floor(x), right = (int) Math.floor(x + WIDE - .001f);
         if (by > 0) {
@@ -311,6 +331,8 @@ final class PlusRun {
                     y = row - TALL;
                     speedDown = 0;
                     onGround = true;
+                    // Coming down from a height counts as a landing; standing on the ground does not.
+                    if (!wasOnGround && fell > 4) landings++;
                     break;
                 }
             }
