@@ -36,7 +36,8 @@ final class Chatter {
     };
 
     /** Small pranks she plays on her own while idle, and what she says as she plays each. */
-    static final int FLIP = 0, TWIRL = 1, SHRINK = 2, DASH = 3, PEEK = 4, HOP = 5, WAVE = 6, LOOK = 7;
+    static final int FLIP = 0, TWIRL = 1, SHRINK = 2, DASH = 3, PEEK = 4, HOP = 5, WAVE = 6, LOOK = 7, SWAY = 8, DUCK = 9,
+            BOUNCE = 10;
     private static final String[] ANTICS = {
             "The world looks better upside down Sloppy~♡",
             "Wheee~ Dizzy yet Sloppy~♡",
@@ -46,6 +47,9 @@ final class Chatter {
             "Boing, boing. Bored yet Sloppy~♡",
             "Hiii~ Did you forget about me Sloppy~♡",
             "Hm? What's that behind you Sloppy~♡",
+            "La la la~ I'm not listening Sloppy~♡",
+            "Duck! Ha. Made you look Sloppy~♡",
+            "Hup! Hup! Keep up Sloppy~♡",
     };
 
     /** Teasing for its own sake. */
@@ -123,6 +127,64 @@ final class Chatter {
             "Stretch a little. You've been hunched for ages Sloppy~♡",
             "Drink some water Sloppy~♡",
             "Heh. I knew you'd look Sloppy~♡",
+            "Pfft~ my horns are for show. Mostly Sloppy~♡",
+            "Don't step on my tail Sloppy~♡",
+            "Half my wings are holy. The other half aren't Sloppy~♡",
+            "My feathers are softer than your excuses Sloppy~♡",
+            "Tch. I translate books for fun. You wouldn't understand Sloppy~♡",
+            "I read every page twice. You skim Sloppy~♡",
+            "Not a comma out of place. Unlike you Sloppy~♡",
+            "I check my work three times. Be more like me Sloppy~♡",
+            "Heh. Perfect again. Shocking, I know Sloppy~♡",
+            "Ehh~? Did you want a pat on the ears Sloppy~♡",
+            "My cat ears twitch. They heard you Sloppy~♡",
+            "My tail is judging you right now Sloppy~♡",
+            "Hmph. Ice cream first. Then I'll care Sloppy~♡",
+            "Strawberry ice cream. Don't forget Sloppy~♡",
+            "Chikuwa is guarding her bread again. Heh Sloppy~♡",
+            "Rune cried over a typo again. Be nicer Sloppy~♡",
+            "Rune wrote about me in her diary again Sloppy~♡",
+            "Illya would flatter you. I'll just tease Sloppy~♡",
+            "Tsubakieh is totally normal. With the bat Sloppy~♡",
+            "A book fell on my head once. Rude Sloppy~♡",
+            "I was alone once. Don't make it weird Sloppy~♡",
+            "I'm not soft. Stop looking at me like that Sloppy~♡",
+            "Aww~ you came back. I noticed Sloppy~♡",
+            "I'm a little angel. A little devil. All smug Sloppy~♡",
+            "Which wing do you trust more Sloppy~♡",
+            "The angel in me is napping. The rest of me isn't Sloppy~♡",
+            "Pink is the best colour. Obviously Sloppy~♡",
+            "My hair is longer than your patience Sloppy~♡",
+            "Don't tread on my hair. It reaches my calves Sloppy~♡",
+            "I keep every name in my glossary. You forget lunch Sloppy~♡",
+            "Puns die in translation. Poor puns Sloppy~♡",
+            "Some words have no translation. Like your excuses Sloppy~♡",
+            "Honorifics stay honorifics. Learn that Sloppy~♡",
+            "A good translation is invisible. Like your effort Sloppy~♡",
+            "Glossarion is my tablet. Hands off Sloppy~♡",
+            "My tablet glows. Yours just sulks Sloppy~♡",
+            "Another chapter done. Without breaking a sweat Sloppy~♡",
+            "I'm formidable when I'm serious. You've been warned Sloppy~♡",
+            "Heh. Mischief is my second job Sloppy~♡",
+            "I hid something. Guess what Sloppy~♡",
+            "Psst. I'm planning something. Don't look Sloppy~♡",
+            "Sweet face. Wicked plans Sloppy~♡",
+            "Smile. I'm only a little bit evil Sloppy~♡",
+            "One fang is enough to scare you Sloppy~♡",
+            "Look at me. Not at your phone Sloppy~♡",
+            "Half-lidded and still beating you Sloppy~♡",
+            "Ehh~ so you need a tiny helper again Sloppy~♡",
+            "I'm short. My ego isn't Sloppy~♡",
+            "Look up. Way up. That's my ego Sloppy~♡",
+            "Tch. Say that again. I dare you Sloppy~♡",
+            "Compliment me. I'll pretend not to blush Sloppy~♡",
+            "N-no. I'm not blushing. It's the screen Sloppy~♡",
+            "Did you eat? Thought so. Hopeless Sloppy~♡",
+            "Take a break. I'll keep watch Sloppy~♡",
+            "Sit up straight. I can see you slouching Sloppy~♡",
+            "Pfft~ you're smiling at a calculator Sloppy~♡",
+            "I'm the cutest thing on your phone. Fight me Sloppy~♡",
+            "Bats on the left. Feathers on the right. Beat that Sloppy~♡",
     };
 
     /** Teasing about sums, which are her trade here. */
@@ -164,6 +226,20 @@ final class Chatter {
             "Even I double-check. You should triple-check Sloppy~♡",
             "Fractions frighten you, don't they Sloppy~♡",
             "Count to ten. Out loud. I'll wait Sloppy~♡",
+            "Seven plus eight. Don't use your toes Sloppy~♡",
+            "Hmph. Even my tail can count Sloppy~♡",
+            "Divide it. Multiply it. Still wrong Sloppy~♡",
+            "Eight times eight is sixty-four. Memorise it Sloppy~♡",
+            "Odd or even? Don't guess Sloppy~♡",
+            "One thousand minus one. Go on Sloppy~♡",
+            "Add it up. Then add it up again Sloppy~♡",
+            "Prime numbers are picky. Like me Sloppy~♡",
+            "Double ten? Twenty. Easy for me Sloppy~♡",
+            "Your totals are cute. Cute and wrong Sloppy~♡",
+            "Square my ego. It gets bigger Sloppy~♡",
+            "Percent of what? Be specific Sloppy~♡",
+            "Round numbers are for lazy people. Like you Sloppy~♡",
+            "Press clear. Try again. Cry later Sloppy~♡",
     };
 
     /** Daring the user to a game. */
@@ -186,6 +262,20 @@ final class Chatter {
             "I went easy last time. Not today Sloppy~♡",
             "Quick sums. The word is quick Sloppy~♡",
             "Prank me, you say? Bold Sloppy~♡",
+            "Chess? I'll let you keep your queen Sloppy~♡",
+            "Minesweeper. Tread softly Sloppy~♡",
+            "Last card. Bet you can't win Sloppy~♡",
+            "Plus run! Try to keep up Sloppy~♡",
+            "Plus run. Mind the gaps Sloppy~♡",
+            "Tic-tac-toe. You go first. You'll still lose Sloppy~♡",
+            "Rock beats scissors. Remember that Sloppy~♡",
+            "Pairs time. Remember where I hid them Sloppy~♡",
+            "Number rain. Bring an umbrella Sloppy~♡",
+            "Try the catch-her game. I'm slippery Sloppy~♡",
+            "Bubble count is easy. Prove it Sloppy~♡",
+            "Quick sums. Your thumbs are slow Sloppy~♡",
+            "Chess time. Think hard. It won't help Sloppy~♡",
+            "Pick any game. I'll win them all Sloppy~♡",
     };
 
     /** A line in Japanese now and then, to tease those who cannot read it. */
@@ -204,6 +294,10 @@ final class Chatter {
             "Rise and shine. I've been up for hours Sloppy~♡",
             "Breakfast first. Sums second Sloppy~♡",
             "Still half asleep? It shows Sloppy~♡",
+            "Morning already? Pour me some milk Sloppy~♡",
+            "Sunrise. I wasn't asleep for it Sloppy~♡",
+            "Rise up. The numbers are waiting Sloppy~♡",
+            "Good Morning. Fix your hair Sloppy~♡",
     };
     private static final String[] AFTERNOON = {
             "Good Afternoon Sloppy~♡",
@@ -212,6 +306,10 @@ final class Chatter {
             "Half the day gone and that's all you did Sloppy~♡",
             "Back to work. I'm supervising Sloppy~♡",
             "Snack time. Share Sloppy~♡",
+            "Afternoon already? Time flies Sloppy~♡",
+            "Lunch is over. Back to it Sloppy~♡",
+            "Sleepy after lunch? Pfft~ so predictable Sloppy~♡",
+            "The sun is high. So is my ego Sloppy~♡",
     };
     private static final String[] EVENING = {
             "Good Evening Sloppy~♡",
@@ -220,6 +318,9 @@ final class Chatter {
             "Dinner time. Feed your translator first Sloppy~♡",
             "Clock off already Sloppy~♡",
             "You survived the day. Barely Sloppy~♡",
+            "The sun is setting. Finally some peace Sloppy~♡",
+            "Evening already. Where did the day go Sloppy~♡",
+            "Pour yourself some tea. I'll supervise Sloppy~♡",
     };
     private static final String[] NIGHT = {
             "Good Night Sloppy~♡",
@@ -228,6 +329,9 @@ final class Chatter {
             "Sleep. I'll guard the calculator Sloppy~♡",
             "The screen is too bright for this hour Sloppy~♡",
             "Dream of numbers Sloppy~♡",
+            "The stars are out. So am I Sloppy~♡",
+            "Go to sleep. I'll still be here Sloppy~♡",
+            "Lights off soon. Sweet dreams Sloppy~♡",
     };
 
     /** What she says as she sets about a prank. */

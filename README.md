@@ -108,6 +108,7 @@ On the card:
 - **Rock paper scissors.** First to three points takes the match.
 - **Pairs.** Sixteen cards hide eight pairs of a calculator's signs. Find them in as few turns as you can.
 - **Quick sums.** Thirty seconds of small calculations, each with four answers to choose from.
+- **Last card.** Seven cards each, in a calculator's four signs. Put down a card with the same sign or the same number as the last one; a skip or a take two costs her a turn, and an any sign goes on anything and lets you name the sign to follow. No card that fits? Draw one from the pile. First to put down their last card wins.
 - **Chess.** You have white and move first; she has black. Tap a piece, then tap where it goes: the squares it may move to are marked. Every rule is played, castling and capturing in passing included, and a pawn that reaches the last row becomes a queen. She looks three moves ahead.
 
 All over the screen, on top of whatever app you are in:
@@ -115,6 +116,7 @@ All over the screen, on top of whatever app you are in:
 - **Catch Halgakos.** She runs about the whole screen, faster each time she is caught. Tap her as often as you can in thirty seconds.
 - **Number rain.** Drag anywhere to move her along the bottom. Catch each **+** and keep clear of each **−**; three bumps end the round.
 - **Bubble count.** Ten numbered bubbles drift about. Pop them from the smallest to the largest; a wrong one costs two seconds.
+- **Plus run.** A run and jump across a land of signs, from one end to a gate at the other. Hold an arrow to run and the round button to jump; hold it longer to jump higher. Collect the pluses, land on the minuses that walk about, and mind the gaps. Three hearts, two flags to come back to, and your best time is kept.
 - **Minesweeper.** A minefield as large as the screen allows, with about one mine to every six or seven squares. Tap a square to open it, hold one to flag a mine, or switch the flag button on to flag with a tap. The first square you open is never a mine, and tapping an open number that has all its flags opens the rest round it. Your best time is kept.
 
 The **✕** in the corner, or Back, leaves one of these. They dim the app underneath and take its touches only while they are up.
@@ -135,8 +137,12 @@ The **✕** in the corner, or Back, leaves one of these. They dim the app undern
 - She takes a bite out of its corner.
 - She brings her sisters: a row of her comes up along the bottom, every one waving.
 - She draws a bug that crawls across it, and watches it go by as if it were nothing to do with her.
+- She spills paint that runs down it.
+- She makes it snow, until the snow lies deep along the bottom.
+- She leaves the tap running, and it fills with water.
+- She lets cobwebs grow in its corners, with a spider on a thread.
 
-Every one is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. Idle is prank time as well: left to herself she plays one every several minutes, announced with a "Watch this Sloppy~♡". In between she plays little ones where she stands, a few seconds each: she turns upside down, twirls, shrinks, hops, dashes to the far side of the screen, slips most of the way off its edge, waves at you, or looks all the way round her as if something were behind you (the last two only as the animated Halgakos). A touch ends one of those. Switch **Surprise pranks** off in her settings to stop both kinds and keep pranks to when you ask.
+Every one is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. Idle is prank time as well: left to herself she plays one every several minutes, announced with a "Watch this Sloppy~♡". In between she plays little ones where she stands, a few seconds each: she turns upside down, twirls, shrinks, hops, dashes to the far side of the screen, slips most of the way off its edge, waves at you, looks all the way round her as if something were behind you, rocks from side to side, ducks flat, or jumps three times on the spot (the wave, the look and the jumps only as the animated Halgakos). A touch ends one of those. Switch **Surprise pranks** off in her settings to stop both kinds and keep pranks to when you ask.
 
 Her bubble points at her with a little tail, follows her when she is dragged, and stays up while you tap or hold her; it moves aside for her menu and the mini calculator, never over them or her. She talks as she plays, and while she is idle, and what she says is teasing: smug, cheeky and fond underneath. You are her Sloppy, and her catchphrase closes her sentences: "Play with me Sloppy~♡", "Good Morning Sloppy~♡", "Counting on your fingers again Sloppy~♡". She has over a hundred and seventy such lines, and **What she calls you** in her settings swaps Sloppy for a name of your choosing. When a calculation in the mini calculator ends with no answer, and only then, she cries "Where did my output go?!"
 

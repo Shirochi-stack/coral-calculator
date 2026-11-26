@@ -29,15 +29,22 @@ final class PlaySession {
             "Catch Halgakos", "Number rain", "Bubble count", "Prank me"};
     /** Chess is played on the card and minesweeper all over the screen; they are numbered on from her pranks. */
     static final int CHESS = 23, MINES = 24;
+    /** Last card is played on the card too, and Plus run all over the screen. */
+    static final int LAST_CARD = 25, RUN = 26;
     static final int NO_SQUARE = -1;
     /** How many moves ahead she looks at chess, counting each side's. */
     private static final int CHESS_AHEAD = 3;
 
     /** What a game is called. */
-    static String name(int game) { return game == CHESS ? "Chess" : game == MINES ? "Minesweeper" : NAMES[game]; }
+    static String name(int game) {
+        return game == CHESS ? "Chess" : game == MINES ? "Minesweeper" : game == LAST_CARD ? "Last card"
+                : game == RUN ? "Plus run" : NAMES[game];
+    }
 
     /** Whether a game is played on the card, and not all over the screen. */
-    static boolean onCard(int game) { return game == TIC || game == RPS || game == PAIRS || game == SUMS || game == CHESS; }
+    static boolean onCard(int game) {
+        return game == TIC || game == RPS || game == PAIRS || game == SUMS || game == CHESS || game == LAST_CARD;
+    }
     /** Points that win a match of rock paper scissors. */
     static final int RPS_TARGET = 3;
     static final int SUMS_MS = 30_000;
@@ -84,6 +91,11 @@ final class PlaySession {
     private int chessPicked = NO_SQUARE;
     /** Which game of chess this is: a move she thought of for an earlier one is dropped. */
     private int chessGame;
+
+    private LastCard cards;
+    /** The place in the player's hand of an any-sign card that is waiting for its sign to be named, or none. */
+    private int cardsNaming = LastCard.NONE;
+    private final Runnable herCard = this::herCard;
 
     static PlaySession get(Context context) {
         if (instance == null) instance = new PlaySession(context.getApplicationContext());
@@ -173,6 +185,11 @@ final class PlaySession {
                 if (chess == null) startChess();
                 else if (chess.result() != Chess.ONGOING) say("Another game? You like losing Sloppy~♡", "Set them up again Sloppy~♡");
                 else say(chessHerTurn ? "Shh. I'm thinking Sloppy~♡" : "Still your move Sloppy~♡");
+                break;
+            case LAST_CARD:
+                if (cards == null) startCards();
+                else if (cards.winner() != LastCard.NOBODY) say("Shall I deal again? You'll lose again Sloppy~♡", "Another hand Sloppy~♡");
+                else say(cards.turn() == LastCard.HALGAKOS ? "My turn. Hands off Sloppy~♡" : "Still your turn Sloppy~♡");
                 break;
             default:
                 say("What will you lose at today Sloppy~♡", "Pick one. I'm good at all of them Sloppy~♡", "Play with me Sloppy~♡",
@@ -399,6 +416,128 @@ final class PlaySession {
                 : sumsScore == 0 ? " Where did your output go Sloppy~♡" : sumsScore < 5 ? " So slow Sloppy~♡" : " Not bad Sloppy~♡");
         if (sumsScore > 0) mood(true);
         changed();
+    }
+
+    // Last card
+
+    LastCard cards() { return cards; }
+
+    /** Whether the player has put down an any-sign card and has yet to name the sign that follows. */
+    boolean cardsNaming() { return cardsNaming != LastCard.NONE; }
+
+    private void startCards() {
+        handler.removeCallbacks(herCard);
+        cards = new LastCard(random);
+        cardsNaming = LastCard.NONE;
+        say("Seven cards each. Match the sign or the number Sloppy~♡", "First one out of cards wins. So, me Sloppy~♡");
+    }
+
+    void cardsAgain() {
+        startCards();
+        changed();
+    }
+
+    /** A touch on a card in the player's hand: it goes down if it fits. */
+    void cardsTap(int place) {
+        if (cards == null || cards.winner() != LastCard.NOBODY || !cards.playable(LastCard.PLAYER, place)) return;
+        cardsNaming = LastCard.NONE;
+        if (LastCard.isAny(cards.hand(LastCard.PLAYER).get(place))) {
+            cardsNaming = place;
+            say("Any sign. Which will it be Sloppy~♡");
+            changed();
+            return;
+        }
+        int what = LastCard.what(cards.hand(LastCard.PLAYER).get(place));
+        cards.play(LastCard.PLAYER, place, 0);
+        afterPlayerCard(what);
+    }
+
+    /** The player names the sign to follow their any-sign card. */
+    void cardsName(int sign) {
+        if (cards == null || cardsNaming == LastCard.NONE) return;
+        int place = cardsNaming;
+        cardsNaming = LastCard.NONE;
+        if (cards.play(LastCard.PLAYER, place, sign)) afterPlayerCard(LastCard.ANY);
+        else changed();
+    }
+
+    private void afterPlayerCard(int what) {
+        if (cards.winner() != LastCard.NOBODY) {
+            finishCards();
+        } else if (what == LastCard.TAKE_TWO) {
+            say("Two more for me?! Rude Sloppy~♡", "Tch. Fine. Two cards Sloppy~♡");
+        } else if (what == LastCard.SKIP) {
+            say("Hey! I wanted that turn Sloppy~♡", "Skipping me? Bold Sloppy~♡");
+        } else if (cards.hand(LastCard.PLAYER).size() == 1) {
+            say("One card left?! Not so fast Sloppy~♡");
+        } else {
+            say("Hmm~ let me see Sloppy~♡", "Ehh~? That one Sloppy~♡", "My turn Sloppy~♡");
+        }
+        herCardSoon();
+        changed();
+    }
+
+    /** A touch on the pile: the player draws a card, or keeps the one just drawn and lets the turn go. */
+    void cardsDraw() {
+        if (cards == null || cards.winner() != LastCard.NOBODY || cards.turn() != LastCard.PLAYER || cardsNaming()) return;
+        if (cards.drawn() != LastCard.NONE) {
+            cards.pass();
+            say("Keeping it? My turn then Sloppy~♡");
+        } else {
+            int card = cards.draw(LastCard.PLAYER);
+            if (cards.winner() != LastCard.NOBODY) finishCards();
+            else if (card == LastCard.NONE) say("No cards left to draw. My turn Sloppy~♡");
+            else if (cards.drawn() != LastCard.NONE) say("That one fits. Put it down or keep it Sloppy~♡");
+            else say("Pfft~ nothing useful? My turn Sloppy~♡", "Aww~ no luck. My turn Sloppy~♡");
+        }
+        herCardSoon();
+        changed();
+    }
+
+    private void herCardSoon() {
+        handler.removeCallbacks(herCard);
+        if (cards != null && cards.winner() == LastCard.NOBODY && cards.turn() == LastCard.HALGAKOS) {
+            handler.postDelayed(herCard, HER_MOVE_MS + 260);
+        }
+    }
+
+    private void herCard() {
+        if (cards == null || cards.winner() != LastCard.NOBODY || cards.turn() != LastCard.HALGAKOS) return;
+        int place = cards.choice();
+        if (place == LastCard.NONE) {
+            int card = cards.draw(LastCard.HALGAKOS);
+            if (cards.winner() != LastCard.NOBODY) finishCards();
+            else if (card == LastCard.NONE) say("Nothing to draw. Your turn Sloppy~♡");
+            else if (cards.turn() == LastCard.HALGAKOS) say("Ooh. This one will do Sloppy~♡");
+            else say("Tch. Nothing. Your turn Sloppy~♡", "I'm drawing. Don't look Sloppy~♡");
+        } else {
+            int what = LastCard.what(cards.hand(LastCard.HALGAKOS).get(place));
+            cards.play(LastCard.HALGAKOS, place, cards.named());
+            if (cards.winner() != LastCard.NOBODY) finishCards();
+            else if (cards.hand(LastCard.HALGAKOS).size() == 1) say("Last card Sloppy~♡");
+            else if (what == LastCard.TAKE_TWO) say("Take two. You're welcome Sloppy~♡", "Two more for you Sloppy~♡");
+            else if (what == LastCard.SKIP) say("Skip! I go again Sloppy~♡", "You miss a turn Sloppy~♡");
+            else if (what == LastCard.ANY) say("Any sign. I pick this one Sloppy~♡");
+            else say("Your turn Sloppy~♡", "There. Top that Sloppy~♡", "Match that Sloppy~♡");
+        }
+        herCardSoon();
+        changed();
+    }
+
+    private void finishCards() {
+        handler.removeCallbacks(herCard);
+        cardsNaming = LastCard.NONE;
+        if (cards.winner() == LastCard.PLAYER) {
+            count("cards_won");
+            say("Out of cards?! No way Sloppy~♡", "You win. Don't get used to it Sloppy~♡", "Hmph. Lucky deal Sloppy~♡");
+            mood(false);
+        } else if (cards.winner() == LastCard.HALGAKOS) {
+            count("cards_lost");
+            say("No cards left. I win Sloppy~♡", "All gone. Too easy Sloppy~♡", "Out first. Obviously Sloppy~♡");
+            mood(true);
+        } else {
+            say("Nobody could move. Call it even Sloppy~♡");
+        }
     }
 
     // Chess: the player has white and moves first; she has black

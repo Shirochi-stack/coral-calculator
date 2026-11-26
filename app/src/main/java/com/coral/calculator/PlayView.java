@@ -19,6 +19,8 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.util.List;
+
 /**
  * The small games played with Halgakos. The companion opens this where the mini calculator
  * opens, at the same size, and the app shows it larger on a screen of its own. Both show the
@@ -44,10 +46,14 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
     private static final String[] HANDS = {CompanionIcon.ROCK, CompanionIcon.PAPER, CompanionIcon.SCISSORS};
     /** The menu's tiles, two to a row: the games they open, and their pictures. */
     private static final int[] TILE_GAMES = {PlaySession.TIC, PlaySession.RPS, PlaySession.PAIRS, PlaySession.SUMS,
-            PlaySession.CHESS, PlaySession.MINES, PlaySession.TAG, PlaySession.RAIN, PlaySession.ORDER, PlaySession.PRANK};
+            PlaySession.CHESS, PlaySession.LAST_CARD, PlaySession.MINES, PlaySession.RUN, PlaySession.TAG, PlaySession.RAIN,
+            PlaySession.ORDER, PlaySession.PRANK};
     private static final String[] TILE_ICONS = {CompanionIcon.GRID, CompanionIcon.SCISSORS, CompanionIcon.CARDS,
-            CompanionIcon.SUMS, CompanionIcon.PAWN, CompanionIcon.MINE, CompanionIcon.TARGET, CompanionIcon.RAIN,
-            CompanionIcon.BUBBLES, CompanionIcon.SPARK};
+            CompanionIcon.SUMS, CompanionIcon.PAWN, CompanionIcon.FAN, CompanionIcon.MINE, CompanionIcon.LEAP,
+            CompanionIcon.TARGET, CompanionIcon.RAIN, CompanionIcon.BUBBLES, CompanionIcon.SPARK};
+    /** The four signs of Last card, as they are written and the colour each is drawn in. */
+    private static final String[] SIGNS = {"+", "−", "×", "÷"};
+    private static final int[] SIGN_COLOURS = {0xFFFF393F, 0xFF1E9AA6, 0xFF8257D8, 0xFFE0921A};
     /** The chess pieces from pawn to king, as the solid figures of the chess symbols, kept from turning into emoji. */
     private static final String[] CHESSMEN = {"", "♟︎", "♞︎", "♝︎", "♜︎", "♛︎", "♚︎"};
     private static final String[] CHESSMEN_NAMES = {"", "pawn", "knight", "bishop", "rook", "queen", "king"};
@@ -162,7 +168,7 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
             body.removeAllViews();
             View content = game == PlaySession.TIC ? ticTacToe() : game == PlaySession.RPS ? rockPaperScissors()
                     : game == PlaySession.PAIRS ? pairs() : game == PlaySession.SUMS ? sums()
-                    : game == PlaySession.CHESS ? chess() : menu();
+                    : game == PlaySession.CHESS ? chess() : game == PlaySession.LAST_CARD ? lastCard() : menu();
             body.addView(content, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             title.setText(PlaySession.name(game));
             back.setVisibility(game == PlaySession.MENU ? GONE : VISIBLE);
@@ -182,7 +188,7 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
 
     // The menu of games
 
-    /** Ten tiles: five games played on this card, four all over the screen, and her pranks. */
+    /** Twelve tiles: six games played on this card, five all over the screen, and her pranks. */
     private View menu() {
         LinearLayout grid = new LinearLayout(getContext());
         grid.setOrientation(VERTICAL);
@@ -197,7 +203,7 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
                 tile.setPadding(px(9), 0, px(6), 0);
                 tile.setBackground(tile(key, 13));
                 tile.addView(new CompanionIcon(getContext(), TILE_ICONS[index], CalculatorLayout.CORAL, 1f),
-                        new LayoutParams(px(20), px(20)));
+                        new LayoutParams(px(18), px(18)));
                 LinearLayout words = column();
                 TextView name = text(PlaySession.name(game), 11.5f, ink, true);
                 name.setMaxLines(1);
@@ -224,7 +230,7 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
                 line.addView(tile, params);
             }
             LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1);
-            if (row > 0) params.topMargin = px(GAP);
+            if (row > 0) params.topMargin = px(5);
             grid.addView(line, params);
         }
         updater = () -> {
@@ -243,6 +249,11 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
             case PlaySession.TIC: return record(session.tally("tic_won"), session.tally("tic_lost"), session.tally("tic_drawn"));
             case PlaySession.RPS: return record(session.tally("rps_won"), session.tally("rps_lost"), 0);
             case PlaySession.CHESS: return record(session.tally("chess_won"), session.tally("chess_lost"), session.tally("chess_drawn"));
+            case PlaySession.LAST_CARD: return record(session.tally("cards_won"), session.tally("cards_lost"), 0);
+            case PlaySession.RUN: {
+                int seconds = session.tally("run_best");
+                return seconds == 0 ? "Whole screen" : "Best: " + PlayStage.clock(seconds);
+            }
             case PlaySession.PAIRS: return best("pairs_best", " turns", "On this card");
             case PlaySession.SUMS: return best("sums_best", " right", "On this card");
             case PlaySession.TAG: return best("tag_best", " caught", "Whole screen");
@@ -261,6 +272,219 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
 
     private static String record(int won, int lost, int drawn) {
         return won + lost + drawn == 0 ? "On this card" : "Won " + won + " · Lost " + lost;
+    }
+
+    // Last card
+
+    private View lastCard() {
+        LinearLayout root = column();
+        CardTable table = new CardTable(getContext());
+        root.addView(table, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1));
+        TextView note = footnote();
+        note.setMaxLines(1);
+        TextView again = button("");
+        tap(again, session::cardsAgain);
+        LinearLayout footer = new LinearLayout(getContext());
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        footer.addView(note, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
+        footer.addView(again, new LayoutParams(LayoutParams.WRAP_CONTENT, px(26)));
+        LayoutParams footerParams = new LayoutParams(LayoutParams.MATCH_PARENT, px(28));
+        footerParams.topMargin = px(4);
+        root.addView(footer, footerParams);
+        updater = () -> {
+            LastCard game = session.cards();
+            if (game == null) return;
+            boolean over = game.winner() != LastCard.NOBODY;
+            table.invalidate();
+            table.setContentDescription("Last card. You hold " + game.hand(LastCard.PLAYER).size() + " cards, Halgakos "
+                    + game.hand(LastCard.HALGAKOS).size() + ". " + (over ? "The game is over."
+                    : game.turn() == LastCard.PLAYER ? "Your turn." : "Her turn."));
+            note.setText("Won " + session.tally("cards_won") + " · Lost " + session.tally("cards_lost"));
+            style(again, over ? "Play again" : "Deal again", over);
+        };
+        return root;
+    }
+
+    /**
+     * The table of Last card: her cards face down along the top, the pile to draw from and
+     * the card last put down in the middle, and the player's hand along the bottom. A touch
+     * on a card of the player's that fits puts it down; a touch on the pile draws.
+     */
+    private final class CardTable extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint words = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF box = new RectF(), pile = new RectF();
+        private final RectF[] choices = {new RectF(), new RectF(), new RectF(), new RectF()};
+        /** Where each card of the player's hand was last drawn: its left edge. */
+        private float[] lefts = {};
+        private float handTop, cardWide, cardTall;
+
+        CardTable(Context context) {
+            super(context);
+            words.setTextAlign(Paint.Align.CENTER);
+            words.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            setFocusable(true);
+        }
+
+        @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+            lefts = new float[64];
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            LastCard game = session.cards();
+            if (game == null || lefts.length == 0) return;
+            float width = getWidth(), height = getHeight();
+            boolean mine = game.turn() == LastCard.PLAYER && game.winner() == LastCard.NOBODY;
+
+            // Her hand: backs, overlapping, with how many she holds.
+            float small = px(22), smallTall = px(31);
+            int hers = game.hand(LastCard.HALGAKOS).size();
+            float spread = hers <= 1 ? 0 : Math.min(small * .55f, (width * .62f - small) / (hers - 1));
+            float start = (width - (small + spread * (hers - 1))) / 2;
+            for (int card = 0; card < hers; card++) back(canvas, start + spread * card, 0, small, smallTall);
+            words.setColor(muted);
+            words.setTextSize(px(10.5f));
+            canvas.drawText(hers == 1 ? "Halgakos: last card" : "Halgakos: " + hers + " cards", width / 2, smallTall + px(13), words);
+
+            // The middle: the pile to draw from, and the card last put down.
+            cardWide = px(44);
+            cardTall = px(62);
+            float middle = smallTall + px(22) + (height - smallTall - px(22) - cardTall - px(18) - cardTall) / 2;
+            pile.set(width / 2 - cardWide - px(9), middle, width / 2 - px(9), middle + cardTall);
+            back(canvas, pile.left, pile.top, cardWide, cardTall);
+            words.setColor(Color.WHITE);
+            words.setTextSize(px(10));
+            canvas.drawText(mine && game.drawn() != LastCard.NONE ? "Keep" : "Draw", pile.centerX(), pile.centerY() + px(3.5f), words);
+            face(canvas, game.top(), width / 2 + px(9), middle, cardWide, cardTall, 1);
+            // The sign to follow, when the card last put down has none of its own.
+            if (LastCard.isAny(game.top())) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(SIGN_COLOURS[game.wanted()]);
+                float x = width / 2 + px(9) + cardWide + px(16), y = middle + cardTall / 2;
+                canvas.drawCircle(x, y, px(11), paint);
+                words.setColor(Color.WHITE);
+                words.setTextSize(px(15));
+                canvas.drawText(SIGNS[game.wanted()], x, y + px(5.2f), words);
+            }
+
+            // The player's hand, or the four signs to choose from after an any-sign card.
+            handTop = height - cardTall - px(2);
+            if (session.cardsNaming()) {
+                float each = (width - px(8) * 3) / 4;
+                for (int sign = 0; sign < LastCard.SIGNS; sign++) {
+                    choices[sign].set((each + px(8)) * sign, handTop + px(8), (each + px(8)) * sign + each, handTop + cardTall - px(8));
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(SIGN_COLOURS[sign]);
+                    canvas.drawRoundRect(choices[sign], px(10), px(10), paint);
+                    words.setColor(Color.WHITE);
+                    words.setTextSize(px(24));
+                    canvas.drawText(SIGNS[sign], choices[sign].centerX(), choices[sign].centerY() + px(8.5f), words);
+                }
+                return;
+            }
+            List<Integer> hand = game.hand(LastCard.PLAYER);
+            int held = Math.min(hand.size(), lefts.length);
+            float step = held <= 1 ? 0 : Math.min(cardWide + px(3), (width - cardWide) / (held - 1));
+            float from = (width - (cardWide + step * (held - 1))) / 2;
+            for (int place = 0; place < held; place++) {
+                boolean fits = mine && game.playable(LastCard.PLAYER, place);
+                lefts[place] = from + step * place;
+                // A card that may go down stands a little proud of the rest.
+                face(canvas, hand.get(place), lefts[place], handTop - (fits ? px(7) : 0), cardWide, cardTall, fits || !mine ? 1 : .45f);
+            }
+        }
+
+        /** The back of a card. */
+        private void back(Canvas canvas, float left, float top, float wide, float tall) {
+            box.set(left, top, left + wide, top + tall);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(CalculatorLayout.CORAL);
+            canvas.drawRoundRect(box, wide * .16f, wide * .16f, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(1, wide * .05f));
+            paint.setColor(dark ? 0xFF1D2023 : Color.WHITE);
+            canvas.drawRoundRect(box, wide * .16f, wide * .16f, paint);
+        }
+
+        /** The face of a card: its sign in a corner, and its number or what it does in the middle. */
+        private void face(Canvas canvas, int card, float left, float top, float wide, float tall, float strength) {
+            int alpha = Math.round(255 * strength);
+            boolean any = LastCard.isAny(card);
+            int colour = any ? ink : SIGN_COLOURS[LastCard.sign(card)], what = LastCard.what(card);
+            box.set(left, top, left + wide, top + tall);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(dark ? 0xFF2F3438 : Color.WHITE);
+            canvas.drawRoundRect(box, wide * .16f, wide * .16f, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(1.5f, wide * .06f));
+            paint.setColor(any ? muted : colour);
+            paint.setAlpha(alpha);
+            canvas.drawRoundRect(box, wide * .16f, wide * .16f, paint);
+            paint.setAlpha(255);
+            if (any) {
+                // All four signs, one to a corner of the middle.
+                words.setTextSize(wide * .36f);
+                for (int sign = 0; sign < LastCard.SIGNS; sign++) {
+                    words.setColor(SIGN_COLOURS[sign]);
+                    words.setAlpha(alpha);
+                    canvas.drawText(SIGNS[sign], left + wide * (sign % 2 == 0 ? .32f : .68f), top + tall * (sign < 2 ? .42f : .72f), words);
+                }
+                words.setAlpha(255);
+                return;
+            }
+            words.setColor(colour);
+            words.setAlpha(alpha);
+            words.setTextSize(wide * .3f);
+            canvas.drawText(SIGNS[LastCard.sign(card)], left + wide * .22f, top + wide * .34f, words);
+            if (what <= 9) {
+                words.setTextSize(wide * .62f);
+                canvas.drawText(String.valueOf(what), left + wide / 2, top + tall * .72f, words);
+            } else {
+                // What it does to the other side, in words, over how many.
+                words.setTextSize(wide * .22f);
+                canvas.drawText(what == LastCard.SKIP ? "skip" : "take", left + wide / 2, top + tall * .52f, words);
+                words.setTextSize(wide * .4f);
+                canvas.drawText(what == LastCard.SKIP ? "→" : "2", left + wide / 2, top + tall * .84f, words);
+            }
+            words.setAlpha(255);
+        }
+
+        @Override public boolean onTouchEvent(android.view.MotionEvent event) {
+            LastCard game = session.cards();
+            if (event.getActionMasked() != android.view.MotionEvent.ACTION_UP || game == null) return true;
+            float x = event.getX(), y = event.getY();
+            if (session.cardsNaming()) {
+                for (int sign = 0; sign < LastCard.SIGNS; sign++) {
+                    if (choices[sign].contains(x, y)) {
+                        touched();
+                        session.cardsName(sign);
+                        return true;
+                    }
+                }
+            }
+            if (pile.contains(x, y)) {
+                touched();
+                session.cardsDraw();
+            } else if (y >= handTop - px(8) && !session.cardsNaming()) {
+                // The card on top where the finger came down: the last one that begins to its left.
+                int held = Math.min(game.hand(LastCard.PLAYER).size(), lefts.length);
+                for (int place = held - 1; place >= 0; place--) {
+                    if (x >= lefts[place] && x <= lefts[place] + cardWide) {
+                        touched();
+                        session.cardsTap(place);
+                        break;
+                    }
+                }
+            }
+            return true;
+        }
+
+        private void touched() {
+            if (haptics) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            performClick();
+        }
+
+        @Override public boolean performClick() { return super.performClick(); }
     }
 
     // Chess

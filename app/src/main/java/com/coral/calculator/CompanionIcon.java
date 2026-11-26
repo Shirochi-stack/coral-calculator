@@ -34,6 +34,8 @@ final class CompanionIcon extends View {
     static final String SPEECH = "speech";
     static final String PAWN = "pawn";
     static final String MINE = "mine";
+    static final String FAN = "fan";
+    static final String LEAP = "leap";
     static final String NONE = "";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -192,6 +194,23 @@ final class CompanionIcon extends View {
                 path.moveTo(9.5f, 11); path.lineTo(14.5f, 11); path.lineTo(16.5f, 18); path.lineTo(7.5f, 18); path.close();
                 canvas.drawPath(path, paint);
                 canvas.drawLine(5.5f, 21, 18.5f, 21, paint);
+                break;
+            case FAN:
+                // Two cards held in a fan.
+                canvas.save();
+                canvas.rotate(-14, 9, 20);
+                bounds.set(4, 5, 13, 19); canvas.drawRoundRect(bounds, 2, 2, paint);
+                canvas.restore();
+                canvas.save();
+                canvas.rotate(14, 15, 20);
+                bounds.set(11, 5, 20, 19); canvas.drawRoundRect(bounds, 2, 2, paint);
+                canvas.restore();
+                break;
+            case LEAP:
+                // A leap from one block to the next, over the gap between them.
+                canvas.drawLine(2.5f, 20, 9, 20, paint); canvas.drawLine(15, 20, 21.5f, 20, paint);
+                bounds.set(4, 5, 20, 29); canvas.drawArc(bounds, 200, 140, false, paint);
+                canvas.drawLine(19.3f, 12.2f, 15.8f, 12.6f, paint); canvas.drawLine(19.3f, 12.2f, 18.7f, 8.7f, paint);
                 break;
             case MINE:
                 // A mine: a ball with spikes all round it.

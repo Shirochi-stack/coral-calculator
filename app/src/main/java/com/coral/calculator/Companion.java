@@ -247,8 +247,12 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         // Not while she is still sliding somewhere: where she stands now is where she goes back to.
         boolean still = settling == null || !settling.isRunning();
         // Waving and looking round are drawn only for the animated Halgakos: the still one keeps to the rest.
-        if (idle() && playing == NO_ANTIC && bubble == null && still)
-            play(random.nextInt(pet != null ? Chatter.antics() : Chatter.WAVE));
+        if (idle() && playing == NO_ANTIC && bubble == null && still) {
+            int which;
+            do which = random.nextInt(Chatter.antics());
+            while (pet == null && (which == Chatter.WAVE || which == Chatter.LOOK || which == Chatter.BOUNCE));
+            play(which);
+        }
         schedule();
     }
 
@@ -259,6 +263,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         // She says what she is up to, unless she has been asked to keep quiet.
         if (prefs.chatter()) say(Chatter.antic(which));
         Rect room = room();
+        // Every turn and change of size is about her middle, unless the prank says otherwise.
+        sprite.setPivotX(sprite.getWidth() / 2f);
+        sprite.setPivotY(sprite.getHeight() / 2f);
         switch (which) {
             case Chatter.FLIP:
                 // Head over heels, and she stays that way a while.
@@ -298,6 +305,24 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 });
                 looking.start();
                 break;
+            case Chatter.SWAY:
+                // Rocking from side to side, as if to a tune only she can hear.
+                looking = ValueAnimator.ofFloat(0, (float) (Math.PI * 6));
+                looking.setInterpolator(null);
+                looking.setDuration(ANTIC_MS - 400);
+                looking.addUpdateListener(animation -> {
+                    if (sprite != null) sprite.setRotation((float) Math.sin((float) animation.getAnimatedValue()) * 12);
+                });
+                looking.start();
+                break;
+            case Chatter.DUCK:
+                // Down flat against the ground, as if something had been thrown at her.
+                sprite.setPivotY(sprite.getHeight());
+                sprite.animate().scaleY(.45f).setDuration(140);
+                break;
+            case Chatter.BOUNCE:
+                sprite.play(POSE_JUMP, 3);
+                break;
             default:
                 // Three hops on the spot. Her window is no taller than she is, so it hops with her.
                 hopping = ValueAnimator.ofFloat(0, (float) (Math.PI * 3));
@@ -311,7 +336,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 hopping.start();
                 break;
         }
-        handler.postDelayed(endAntic, which == Chatter.TWIRL || which == Chatter.HOP ? BRIEF_ANTIC_MS
+        handler.postDelayed(endAntic, which == Chatter.TWIRL || which == Chatter.HOP || which == Chatter.BOUNCE
+                || which == Chatter.DUCK ? BRIEF_ANTIC_MS
                 : which == Chatter.WAVE ? WAVE_ANTIC_MS : which == Chatter.LOOK ? LOOK_ANTIC_MS : ANTIC_MS);
     }
 
@@ -326,6 +352,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         looking = null;
         if (sprite == null || which == NO_ANTIC) return;
         sprite.look(PetArt.NOWHERE);
+        sprite.setRotation(0);
         // Two turns are no turn: she is facing front again, so there is nothing to unwind.
         sprite.setRotationY(0);
         sprite.animate().rotationX(0).scaleX(1).scaleY(1).setDuration(260).setInterpolator(new OvershootInterpolator(2f));

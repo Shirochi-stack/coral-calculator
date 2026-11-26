@@ -40,8 +40,10 @@ final class PlayStage extends View {
     /** The pranks, numbered on from the games of {@link PlaySession}. */
     static final int SNATCH = 9, CRACK = 10, SCRIBBLE = 11, LIGHTS = 12, SPLAT = 13, PAWS = 14, AVALANCHE = 15, GIANT = 16,
             NOTES = 17, CONFETTI = 18, CURTAIN = 19, BITE = 20, CROWD = 21, BUG = 22;
+    /** More pranks, numbered on from the games that come after the first of them in {@link PlaySession}. */
+    static final int DRIP = 27, SNOW = 28, FLOOD = 29, WEBS = 30;
     private static final int[] PRANKS = {SNATCH, CRACK, SCRIBBLE, LIGHTS, SPLAT, PAWS, AVALANCHE, GIANT, NOTES, CONFETTI,
-            CURTAIN, BITE, CROWD, BUG};
+            CURTAIN, BITE, CROWD, BUG, DRIP, SNOW, FLOOD, WEBS};
     /** What she writes on the notes she sticks to the screen, the paper they are on, and her confetti. */
     private static final String[] NOTES_SAY = {"Sloppy was here", "IOU one ice cream", "7 × 8 = 56", "Feed Halgakos", "Do your sums", "Property of Halgakos", "Tap me"};
     private static final int[] PAPER = {0xFFFFF3A0, 0xFFFFC9D6, 0xFFC9F2DD, 0xFFCFE4FF};
@@ -175,6 +177,18 @@ final class PlayStage extends View {
     private float bugX, bugY, bugTurn;
     /** The way she is looking, in place of any pose, or {@link PetArt#NOWHERE}. */
     private int gaze = PetArt.NOWHERE;
+    /** Paint running down the screen: x, width, speed, when it starts, and how far it runs. */
+    private final List<float[]> drips = new ArrayList<>();
+    /** Snowflakes coming down, or bubbles going up: x, y, speed, size, and where in its sway each is. */
+    private final List<float[]> specks = new ArrayList<>();
+    private float sinceSpeck;
+
+    // Plus run: the land, the size of a square of it on screen, where its window is, and how far it has scrolled.
+    private PlusRun run;
+    private float tile, landTop, camera;
+    private final RectF leftButton = new RectF(), rightButton = new RectF(), jumpButton = new RectF();
+    private boolean goLeft, goRight, goJump;
+    private int seenFlattened, seenHurts;
 
     private Object backCallback;
 
@@ -258,7 +272,7 @@ final class PlayStage extends View {
         }
     }
 
-    static boolean isPrank(int game) { return game >= SNATCH && game <= BUG; }
+    static boolean isPrank(int game) { return (game >= SNATCH && game <= BUG) || (game >= DRIP && game <= WEBS); }
 
     /** The pranks she has yet to play this time round, in the order she will play them. */
     private static final List<Integer> NEXT_PRANKS = new ArrayList<>();
@@ -321,6 +335,7 @@ final class PlayStage extends View {
             begin();
         } else {
             fitField();
+            fitRun();
             herX = clamp(herX, play.left + herWidth / 2, play.right - herWidth / 2);
             herY = clamp(herY, play.top + herHeight, play.bottom);
             if (game == PlaySession.RAIN) {
@@ -429,6 +444,15 @@ final class PlayStage extends View {
                         play.top + dp(60) + random.nextFloat() * Math.max(1, play.height() - dp(160))});
             }
             marksAlpha = 1;
+        } else if (game == DRIP) {
+            float apart = dp(34);
+            for (float x = play.left + apart / 2; x < play.right; x += apart) {
+                drips.add(new float[]{x + (random.nextFloat() - .5f) * dp(12), dp(12) + random.nextFloat() * dp(11),
+                        dp(130) + random.nextFloat() * dp(150), random.nextFloat() * .6f, play.height() * (.18f + random.nextFloat() * .55f)});
+            }
+            marksAlpha = 1;
+        } else if (game == SNOW || game == FLOOD || game == WEBS) {
+            marksAlpha = 1;
         }
         if (isPrank(game)) {
             opening = 1.1f;
@@ -509,6 +533,7 @@ final class PlayStage extends View {
         } else if (phase == PLAYING) {
             if (game == PlaySession.TAG) tag(seconds);
             else if (game == PlaySession.MINES) mines(seconds);
+            else if (game == PlaySession.RUN) plusRun(seconds);
             else if (game == PlaySession.RAIN) rain(seconds);
             else bubbles(seconds);
         } else if (card.isEmpty() || runTo(clamp(card.left + herWidth * .65f, play.left + herWidth / 2, play.right - herWidth / 2),
@@ -842,6 +867,179 @@ final class PlayStage extends View {
     /** A length of time in minutes and seconds, as a clock shows it. */
     static String clock(int seconds) { return seconds / 60 + ":" + (seconds % 60 < 10 ? "0" : "") + seconds % 60; }
 
+    // Plus run
+
+    /** Fits the land to the screen: its squares a size that shows ten or so across, over the buttons along the bottom. */
+    private void fitRun() {
+        if (game != PlaySession.RUN) return;
+        float buttons = dp(108), room = play.height() - dp(64) - buttons;
+        tile = Math.max(dp(14), Math.min(dp(40), Math.min(play.width() / 10f, room / PlusRun.ROWS)));
+        landTop = play.bottom - buttons - tile * PlusRun.ROWS;
+        float size = dp(70), y = play.bottom - dp(20) - size, edge = dp(18);
+        leftButton.set(play.left + edge, y, play.left + edge + size, y + size);
+        rightButton.set(leftButton.right + dp(14), y, leftButton.right + dp(14) + size, y + size);
+        jumpButton.set(play.right - edge - size, y, play.right - edge, y + size);
+    }
+
+    private void plusRun(float seconds) {
+        run.step(seconds, goLeft, goRight, goJump);
+        // The window on the land keeps her a little left of its middle, so more of what is ahead shows.
+        float across = play.width() / tile;
+        camera = clamp(run.x() + PlusRun.WIDE / 2 - across * .42f, 0, Math.max(0, PlusRun.COLUMNS - across));
+        facingLeft = run.facingLeft();
+        keep(!run.onGround() ? PetArt.JUMP : run.running() ? (facingLeft ? PetArt.RUN_LEFT : PetArt.RUN_RIGHT) : PetArt.IDLE);
+        herX = play.left + (run.x() + PlusRun.WIDE / 2 - camera) * tile;
+        herY = landTop + (run.y() + PlusRun.TALL) * tile;
+        if (run.hurts() != seenHurts) {
+            seenHurts = run.hurts();
+            flash = .16f;
+            if (haptics) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            if (run.state() == PlusRun.PLAYING) say(1.2f, "Ow! Watch it Sloppy~♡", "Hey! That hurt Sloppy~♡", "Careful with me Sloppy~♡");
+        }
+        if (run.flattened() != seenFlattened) {
+            seenFlattened = run.flattened();
+            buzz();
+            say(1f, "Squish Sloppy~♡", "Flat as a minus Sloppy~♡", "Got one Sloppy~♡");
+        }
+        int time = Math.max(1, Math.round(run.time()));
+        if (run.state() == PlusRun.WON) {
+            boolean record = session.keepBest("run_best", time, true);
+            finish("You made it!", run.collected() + " of " + run.total() + " pluses, in " + clock(time) + (record ? ". A new best!" : "."));
+        } else if (run.state() == PlusRun.LOST) {
+            finish("Out of hearts", "You collected " + run.collected() + " of " + run.total() + " pluses. The gate is further on.");
+        }
+    }
+
+    /** Which buttons are held, by however many fingers are down: one may hold an arrow while another jumps. */
+    private void runTouch(MotionEvent event) {
+        int action = event.getActionMasked();
+        boolean left = false, right = false, jump = false;
+        if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
+            float low = landTop + tile * PlusRun.ROWS * .55f, between = (leftButton.right + rightButton.left) / 2;
+            for (int finger = 0; finger < event.getPointerCount(); finger++) {
+                if (action == MotionEvent.ACTION_POINTER_UP && finger == event.getActionIndex()) continue;
+                float x = event.getX(finger), y = event.getY(finger);
+                // The buttons are easy to hit: the whole lower part of the screen belongs to one or another of them.
+                if (y < low) continue;
+                if (x < between) left = true;
+                else if (x < rightButton.right + dp(26)) right = true;
+                else jump = true;
+            }
+        }
+        goLeft = left;
+        goRight = right;
+        goJump = jump;
+    }
+
+    /** The land as far as the window shows it, her in it, and the three buttons under it. */
+    private void drawRun(Canvas canvas) {
+        float across = play.width() / tile, bottom = landTop + tile * PlusRun.ROWS;
+        // A sky of its own behind the land: whatever is on the screen must not show through it.
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(dark ? 0xFF10161E : 0xFFDCEBFA);
+        canvas.drawRect(play.left, landTop, play.right, bottom, paint);
+        canvas.save();
+        canvas.clipRect(play.left, landTop, play.right, bottom);
+        int first = Math.max(0, (int) camera), last = Math.min(PlusRun.COLUMNS - 1, (int) (camera + across) + 1);
+        int earth = dark ? 0xFF46525F : 0xFF6E8093, turf = CalculatorLayout.CORAL;
+        for (int column = first; column <= last; column++) {
+            float left = play.left + (column - camera) * tile;
+            for (int row = 0; row < PlusRun.ROWS; row++) {
+                char here = run.at(column, row);
+                if (here == PlusRun.AIR) continue;
+                float top = landTop + row * tile;
+                if (here == PlusRun.BLOCK) {
+                    paint.setColor(earth);
+                    canvas.drawRect(left, top, left + tile + 1, top + tile + 1, paint);
+                    // The top of a pile of blocks is capped in her colour.
+                    if (run.at(column, row - 1) != PlusRun.BLOCK) {
+                        paint.setColor(turf);
+                        canvas.drawRect(left, top, left + tile + 1, top + tile * .2f, paint);
+                    }
+                } else if (here == PlusRun.LEDGE) {
+                    paint.setColor(dark ? 0xFFE9A0A6 : 0xFFF28D95);
+                    canvas.drawRoundRect(left + 1, top, left + tile - 1, top + tile * .55f, tile * .14f, tile * .14f, paint);
+                } else if (here == PlusRun.FLAG) {
+                    stroke.setColor(ink);
+                    stroke.setStrokeWidth(Math.max(1.5f, tile * .07f));
+                    canvas.drawLine(left + tile * .3f, top - tile * .6f, left + tile * .3f, top + tile, stroke);
+                    path.reset();
+                    path.moveTo(left + tile * .3f, top - tile * .6f);
+                    path.lineTo(left + tile * .95f, top - tile * .32f);
+                    path.lineTo(left + tile * .3f, top - tile * .04f);
+                    path.close();
+                    paint.setColor(run.x() + PlusRun.WIDE / 2 >= column ? turf : cardEdge);
+                    canvas.drawPath(path, paint);
+                } else if (here == PlusRun.GATE && run.at(column, row + 1) == PlusRun.GATE) {
+                    // The gate at the end: an equals sign, the answer to it all, in a frame two squares high.
+                    paint.setColor(0xFFF2B63C);
+                    canvas.drawRoundRect(left - tile * .35f, top - tile * .5f, left + tile * 1.35f, top + tile * 2, tile * .3f, tile * .3f, paint);
+                    paint.setColor(Color.WHITE);
+                    canvas.drawRoundRect(left - tile * .08f, top + tile * .28f, left + tile * 1.08f, top + tile * .62f, tile * .12f, tile * .12f, paint);
+                    canvas.drawRoundRect(left - tile * .08f, top + tile * .98f, left + tile * 1.08f, top + tile * 1.32f, tile * .12f, tile * .12f, paint);
+                }
+            }
+        }
+        // The pluses, each bobbing a little, and the minuses with their eyes.
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTextSize(tile * .95f);
+        text.setColor(turf);
+        for (int[] plus : run.pluses()) {
+            if (plus[0] < first - 1 || plus[0] > last + 1) continue;
+            float x = play.left + (plus[0] + .5f - camera) * tile;
+            float y = landTop + (plus[1] + .82f) * tile + (float) Math.sin(run.time() * 4 + plus[0]) * tile * .08f;
+            canvas.drawText("+", x, y, text);
+        }
+        for (PlusRun.Minus minus : run.minuses()) {
+            float left = play.left + (minus.x - camera) * tile, top = landTop + minus.y * tile;
+            float wide = PlusRun.MINUS_WIDE * tile, tall = PlusRun.MINUS_TALL * tile;
+            paint.setColor(dark ? 0xFFDCE2E8 : 0xFF2A2F36);
+            if (minus.flat) {
+                canvas.drawRoundRect(left, top + tall * .72f, left + wide, top + tall, tall * .14f, tall * .14f, paint);
+                continue;
+            }
+            canvas.drawRoundRect(left, top + tall * .12f, left + wide, top + tall, tall * .3f, tall * .3f, paint);
+            paint.setColor(dark ? 0xFF10161E : Color.WHITE);
+            float look = minus.leftward ? -wide * .08f : wide * .08f;
+            canvas.drawCircle(left + wide * .32f + look, top + tall * .52f, tall * .15f, paint);
+            canvas.drawCircle(left + wide * .68f + look, top + tall * .52f, tall * .15f, paint);
+        }
+        // Her, a square and a half tall, flickering while she cannot be hurt again.
+        float tall = tile * 1.6f, wide = tall * herWidth / herHeight;
+        target.set(herX - wide / 2, herY - tall, herX + wide / 2, herY);
+        paint.setAlpha(run.safe() && (int) (run.time() * 14) % 2 == 0 ? 90 : 255);
+        drawFrame(canvas);
+        paint.setAlpha(255);
+        canvas.restore();
+        button(canvas, leftButton, goLeft, 180);
+        button(canvas, rightButton, goRight, 0);
+        button(canvas, jumpButton, goJump, 270);
+    }
+
+    /** A round button with an arrow in it pointing some way round, lit while it is held. */
+    private void button(Canvas canvas, RectF where, boolean held, float turn) {
+        if (held) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(CalculatorLayout.CORAL);
+            canvas.drawOval(where, paint);
+        } else {
+            plate(canvas, where, where.width() / 2);
+        }
+        float reach = where.width() * .2f;
+        path.reset();
+        path.moveTo(reach, 0);
+        path.lineTo(-reach * .7f, -reach);
+        path.lineTo(-reach * .7f, reach);
+        path.close();
+        canvas.save();
+        canvas.translate(where.centerX(), where.centerY());
+        canvas.rotate(turn);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(held ? Color.WHITE : ink);
+        canvas.drawPath(path, paint);
+        canvas.restore();
+    }
+
     // Minesweeper
 
     /** Lays out a new field: as many squares as fit the screen at a size a finger can hit, between the bar on top and her below. */
@@ -968,6 +1166,15 @@ final class PlayStage extends View {
             dash = 0;
             pickGoal();
             say(1.4f, "Catch me if you can Sloppy~♡", "You'll never catch me Sloppy~♡", "Too slow already Sloppy~♡");
+        } else if (game == PlaySession.RUN) {
+            run = new PlusRun();
+            goLeft = false;
+            goRight = false;
+            goJump = false;
+            seenFlattened = 0;
+            seenHurts = 0;
+            fitRun();
+            say(1.6f, "Try to keep up Sloppy~♡", "Mind the gaps Sloppy~♡", "Don't make me fall Sloppy~♡");
         } else if (game == PlaySession.MINES) {
             newField();
             say(1.6f, "Mind the mines Sloppy~♡", "One wrong tap and boom Sloppy~♡", "I know where they all are Sloppy~♡");
@@ -1044,7 +1251,51 @@ final class PlayStage extends View {
             case BITE: bite(seconds); break;
             case CROWD: crowd(seconds); break;
             case BUG: bug(seconds); break;
+            case DRIP: show(seconds, 1.5f, "Oops~ I spilled paint on your screen Sloppy~♡"); break;
+            case SNOW: specks(seconds, true); show(seconds, 1.6f, "It's snowing in your phone Sloppy~♡"); break;
+            case FLOOD: specks(seconds, false); show(seconds, 1.8f, "Oops~ I left the tap running Sloppy~♡"); break;
+            case WEBS: show(seconds, 1.4f, "Nobody has dusted in here for ages Sloppy~♡"); break;
             default: giant(seconds); break;
+        }
+    }
+
+    /** A prank that only has to be seen: it comes on, she says what she has done, and it goes when she owns up. */
+    private void show(float seconds, float comesOn, String words) {
+        switch (step) {
+            case 0:
+                if (stepClock < seconds * 1.5f) perform(PetArt.JUMP);
+                if (stepClock > comesOn) {
+                    buzz();
+                    say(words, 2.6f);
+                    next();
+                }
+                break;
+            case 1:
+                if (stepClock > 2.8f) reveal();
+                break;
+            case 2:
+                marksAlpha = Math.max(0, Math.min(marksAlpha, 1 - stepClock / .6f));
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
+        }
+    }
+
+    /** Snowflakes drift down from the top, or bubbles rise from the bottom, a few at a time. */
+    private void specks(float seconds, boolean falling) {
+        sinceSpeck += seconds;
+        while (step < 2 && sinceSpeck > .035f && specks.size() < 160) {
+            sinceSpeck -= .035f;
+            specks.add(new float[]{play.left + random.nextFloat() * play.width(), falling ? play.top - dp(8) : play.bottom + dp(8),
+                    dp(70) + random.nextFloat() * dp(90), dp(2.5f) + random.nextFloat() * dp(4), random.nextFloat() * 6.28f});
+        }
+        for (int index = specks.size() - 1; index >= 0; index--) {
+            float[] speck = specks.get(index);
+            speck[1] += (falling ? 1 : -1) * speck[2] * seconds;
+            speck[4] += seconds * 2.2f;
+            if (speck[1] > play.bottom + dp(12) || speck[1] < play.top - dp(12)) specks.remove(index);
         }
     }
 
@@ -1618,6 +1869,10 @@ final class PlayStage extends View {
                     : game == BITE ? "Just kidding! Still in one piece Sloppy~♡"
                     : game == CROWD ? "Just kidding! There's only one of me Sloppy~♡"
                     : game == BUG ? "Just kidding! I drew it myself Sloppy~♡"
+                    : game == DRIP ? "Just kidding! Not a drop on it Sloppy~♡"
+                    : game == SNOW ? "Just kidding! All melted Sloppy~♡"
+                    : game == FLOOD ? "Just kidding! Dry as a bone Sloppy~♡"
+                    : game == WEBS ? "Just kidding! Spick and span Sloppy~♡"
                     : "Just kidding! Back to pocket size Sloppy~♡", 2.2f);
         }
         stepClock = 0;
@@ -1646,6 +1901,8 @@ final class PlayStage extends View {
         if (phase == PLAYING) {
             if (game == PlaySession.MINES) {
                 minesTouch(action, x, y);
+            } else if (game == PlaySession.RUN) {
+                runTouch(event);
             } else if (game == PlaySession.RAIN) {
                 if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE)
                     wantedX = clamp(x, fieldLeft + herWidth / 2, fieldRight - herWidth / 2);
@@ -1698,8 +1955,11 @@ final class PlayStage extends View {
         // The signs fall behind her; the bubbles drift in front, so she never hides one.
         if (phase == PLAYING && game == PlaySession.RAIN) drawRain(canvas);
         if (game == PlaySession.MINES && field != null && phase != INTRO) drawField(canvas);
+        boolean running = game == PlaySession.RUN && run != null && phase == PLAYING;
+        if (running) drawRun(canvas);
         if (flash > 0) canvas.drawColor(Color.argb(Math.round(150 * Math.min(1, flash / .12f)), 255, 255, 255));
-        drawHer(canvas);
+        // In Plus run she is drawn with the land, at its size.
+        if (!running) drawHer(canvas);
         if (phase == PLAYING && game == PlaySession.ORDER) drawBubbles(canvas);
         for (float[] ring : rings) {
             float age = ring[2] / .45f;
@@ -1712,7 +1972,9 @@ final class PlayStage extends View {
         drawSaying(canvas);
         drawHud(canvas);
         if (phase == INTRO) {
-            drawCard(canvas, PlaySession.name(game), game == PlaySession.MINES
+            drawCard(canvas, PlaySession.name(game), game == PlaySession.RUN
+                    ? "Run and jump to the gate at the far end. Hold an arrow to run and the round button to jump: hold it longer to jump higher. Collect the pluses, land on the minuses, and mind the gaps. Three hearts."
+                    : game == PlaySession.MINES
                     ? "Tap a square to open it: its number is how many mines touch it. Hold a square to flag a mine, or tap the flag button to flag with a tap. Open every square that has no mine."
                     : game == PlaySession.TAG
                     ? "She runs all over your screen. Tap her as many times as you can in 30 seconds."
@@ -1737,20 +1999,23 @@ final class PlayStage extends View {
         if (phase != PLAYING) return;
         String status = game == PlaySession.TAG ? "Caught " + caught + "  ·  " + (int) Math.ceil(timeLeft) + "s"
                 : game == PlaySession.MINES ? clock(Math.round(elapsed)) + "  ·  " + (field == null ? 0 : field.left()) + " mines"
+                : game == PlaySession.RUN ? "+ " + (run == null ? 0 : run.collected()) + " of " + (run == null ? 0 : run.total())
                 : game == PlaySession.RAIN ? "Caught " + score
                 : seconds(Math.round(elapsed * 10)) + "s  ·  " + bubbles.size() + " to go";
         text.setTextSize(dp(15));
         text.setTextAlign(Paint.Align.LEFT);
-        float width = text.measureText(status) + dp(28) + (game == PlaySession.RAIN ? dp(22) * HEARTS + dp(6) : 0);
+        boolean hearted = game == PlaySession.RAIN || game == PlaySession.RUN;
+        float width = text.measureText(status) + dp(28) + (hearted ? dp(22) * HEARTS + dp(6) : 0);
         box.set(play.left + margin, play.top + margin, play.left + margin + width, play.top + margin + size);
         plate(canvas, box, size / 2);
         text.setColor(ink);
         canvas.drawText(status, box.left + dp(14), box.centerY() + dp(5.5f), text);
-        if (game == PlaySession.RAIN) {
+        if (hearted) {
             // A dot for each bump she can still take.
+            int left = game == PlaySession.RUN ? (run == null ? 0 : run.hearts()) : hearts;
             paint.setStyle(Paint.Style.FILL);
             for (int heart = 0; heart < HEARTS; heart++) {
-                paint.setColor(heart < hearts ? CalculatorLayout.CORAL : cardEdge);
+                paint.setColor(heart < left ? CalculatorLayout.CORAL : cardEdge);
                 canvas.drawCircle(box.right - dp(20) - dp(22) * (HEARTS - 1 - heart), box.centerY(), dp(7), paint);
             }
         }
@@ -1986,8 +2251,125 @@ final class PlayStage extends View {
         }
         if (game == CROWD) drawCrowd(canvas);
         if (game == BUG && marksAlpha > 0) drawBug(canvas);
+        if (marksAlpha > 0) {
+            if (game == DRIP) drawDrips(canvas);
+            else if (game == SNOW) drawSnow(canvas);
+            else if (game == FLOOD) drawFlood(canvas);
+            else if (game == WEBS) drawWebs(canvas);
+        }
         drawHer(canvas);
         drawSaying(canvas);
+    }
+
+    /** Paint along the top of the screen, running down it in drips of different lengths. */
+    private void drawDrips(Canvas canvas) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(CalculatorLayout.CORAL);
+        paint.setAlpha(Math.round(245 * marksAlpha));
+        canvas.drawRect(play.left, 0, play.right, play.top + dp(12), paint);
+        for (float[] drip : drips) {
+            float length = clamp((clock - drip[3]) * drip[2], 0, drip[4]), half = drip[1] / 2;
+            if (length <= 0) continue;
+            canvas.drawRoundRect(drip[0] - half, play.top, drip[0] + half, play.top + dp(12) + length, half, half, paint);
+            canvas.drawCircle(drip[0], play.top + dp(12) + length, half * 1.25f, paint);
+        }
+        paint.setAlpha(255);
+    }
+
+    /** Snow coming down, and lying deeper along the bottom of the screen the longer it falls. */
+    private void drawSnow(Canvas canvas) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        paint.setAlpha(Math.round(235 * marksAlpha));
+        for (float[] flake : specks) {
+            canvas.drawCircle(flake[0] + (float) Math.sin(flake[4]) * dp(9), flake[1], flake[3], paint);
+        }
+        float deep = Math.min(dp(84), clock * dp(20));
+        path.reset();
+        path.moveTo(play.left, getHeight());
+        path.lineTo(play.left, play.bottom - deep);
+        for (float x = play.left; x <= play.right + dp(24); x += dp(24)) {
+            path.lineTo(x, play.bottom - deep - (float) Math.sin(x / dp(46)) * dp(9) - (float) Math.sin(x / dp(17)) * dp(3));
+        }
+        path.lineTo(play.right, getHeight());
+        path.close();
+        canvas.drawPath(path, paint);
+        paint.setAlpha(255);
+    }
+
+    /** Water rising up the screen, its top rolling, with bubbles coming up through it. */
+    private void drawFlood(Canvas canvas) {
+        float level = play.bottom - Math.min(.78f, clock / 3.4f) * play.height();
+        path.reset();
+        path.moveTo(play.left, getHeight());
+        path.lineTo(play.left, level);
+        for (float x = play.left; x <= play.right + dp(20); x += dp(20)) {
+            path.lineTo(x, level + (float) Math.sin(x / dp(38) + clock * 2.4f) * dp(6));
+        }
+        path.lineTo(play.right, getHeight());
+        path.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF3B9BE8);
+        paint.setAlpha(Math.round(150 * marksAlpha));
+        canvas.drawPath(path, paint);
+        stroke.setColor(Color.WHITE);
+        stroke.setAlpha(Math.round(200 * marksAlpha));
+        stroke.setStrokeWidth(dp(1.4f));
+        for (float[] bubble : specks) {
+            if (bubble[1] > level + dp(10)) canvas.drawCircle(bubble[0] + (float) Math.sin(bubble[4]) * dp(6), bubble[1], bubble[3] * 1.4f, stroke);
+        }
+        stroke.setAlpha(255);
+        paint.setAlpha(255);
+    }
+
+    /** A cobweb in each corner of the screen, spun out from it, and a spider let down on a thread. */
+    private void drawWebs(Canvas canvas) {
+        float spun = Math.min(1, clock / 1.2f), reach = Math.min(play.width(), play.height()) * .34f * spun;
+        stroke.setColor(Color.WHITE);
+        stroke.setAlpha(Math.round(215 * marksAlpha));
+        stroke.setStrokeWidth(dp(1.2f));
+        for (int corner = 0; corner < 4; corner++) {
+            float x = corner % 2 == 0 ? play.left : play.right, y = corner < 2 ? play.top : play.bottom;
+            float across = corner % 2 == 0 ? 1 : -1, down = corner < 2 ? 1 : -1;
+            for (int ray = 0; ray <= 4; ray++) {
+                double turn = Math.PI / 2 * ray / 4;
+                canvas.drawLine(x, y, x + across * (float) Math.cos(turn) * reach, y + down * (float) Math.sin(turn) * reach, stroke);
+            }
+            for (int ring = 1; ring <= 3; ring++) {
+                float far = reach * ring / 3.4f;
+                path.reset();
+                for (int ray = 0; ray <= 4; ray++) {
+                    double turn = Math.PI / 2 * ray / 4;
+                    // Each strand sags toward the corner between the rays it hangs from.
+                    float px = x + across * (float) Math.cos(turn) * far, py = y + down * (float) Math.sin(turn) * far;
+                    if (ray == 0) {
+                        path.moveTo(px, py);
+                    } else {
+                        double before = Math.PI / 2 * (ray - .5f) / 4;
+                        path.quadTo(x + across * (float) Math.cos(before) * far * .84f, y + down * (float) Math.sin(before) * far * .84f, px, py);
+                    }
+                }
+                canvas.drawPath(path, stroke);
+            }
+        }
+        // The spider, bobbing on its thread.
+        float x = play.left + play.width() * .62f, hang = (dp(130) + (float) Math.sin(clock * 2) * dp(16)) * spun, y = play.top + hang;
+        canvas.drawLine(x, 0, x, y, stroke);
+        stroke.setColor(0xFF2A2326);
+        stroke.setAlpha(Math.round(255 * marksAlpha));
+        stroke.setStrokeWidth(dp(1.6f));
+        for (int leg = 0; leg < 4; leg++) {
+            float lift = dp(3) + leg * dp(3.4f), out = dp(15) - Math.abs(leg - 1.5f) * dp(2);
+            canvas.drawLine(x, y + dp(4), x - out, y - dp(6) + lift, stroke);
+            canvas.drawLine(x, y + dp(4), x + out, y - dp(6) + lift, stroke);
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF2A2326);
+        paint.setAlpha(Math.round(255 * marksAlpha));
+        canvas.drawCircle(x, y + dp(5), dp(8), paint);
+        canvas.drawCircle(x, y - dp(4), dp(4.5f), paint);
+        paint.setAlpha(255);
+        stroke.setAlpha(255);
     }
 
     /** Her sisters, each as far up from below the screen as she has come, each at her own point in the wave. */
