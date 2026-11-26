@@ -1416,6 +1416,44 @@ public class PlusRunTest {
         assertTrue(fire && book);
     }
 
+    @Test public void whatIsBoughtWhileSheIsInALandIsHersThereAndThen() {
+        PlusRun run = new PlusRun(flat(60));
+        // With no wings, a second press in the air does nothing.
+        run.step(STEP, false, false, true);
+        hold(run, .25f, false, false, false);
+        float before = run.speedDown();
+        run.step(STEP, false, false, true);
+        assertEquals(0, run.flaps());
+        assertFalse(run.winged());
+        hold(run, 1.5f, false, false, false);
+        assertTrue(run.onGround());
+        // Wings bought, at the counter by a stall, while she is in the land: the next jump has its second.
+        PlusRun.Perks more = new PlusRun.Perks();
+        more.wings = true;
+        more.hearts = PlusRun.HEARTS + 1;
+        more.lives = PlusRun.LIVES + 1;
+        more.together = 3;
+        more.shots = PlusRun.GUN_SHOTS + 8;
+        more.colours = 1;
+        run.grant(more);
+        assertTrue(run.winged());
+        run.step(STEP, false, false, true);
+        hold(run, .25f, false, false, false);
+        run.step(STEP, false, false, true);
+        assertEquals(1, run.flaps());
+        assertTrue(run.speedDown() < before);
+        // And a heart more and a life more are there at once; and a colour, and how many she may wear.
+        assertEquals(PlusRun.HEARTS + 1, run.hearts());
+        assertEquals(PlusRun.LIVES + 1, run.lives());
+        assertEquals(3, run.together());
+        hold(run, 1.5f, false, false, false);
+        assertTrue(run.call(PlusRun.RED));
+        // Given again, nothing is given twice.
+        run.grant(more);
+        assertEquals(PlusRun.HEARTS + 1, run.hearts());
+        assertEquals(PlusRun.LIVES + 1, run.lives());
+    }
+
     @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
         int tempted = 0, stashed = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
@@ -4155,7 +4193,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);

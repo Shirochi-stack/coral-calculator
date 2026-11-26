@@ -1174,6 +1174,33 @@ final class PlusRun {
     }
 
     boolean mastered() { return mastered; }
+
+    /**
+     * What she has to keep has changed while she is in a land: bought at the counter by a
+     * stall, or won. It is hers there and then: a heart more is a heart more now, a life
+     * more a life more now, and the rest holds from the next time it matters, the second
+     * jump in the air from her next jump.
+     */
+    void grant(Perks now) {
+        if (now.hearts > perks.hearts) halves = Math.min(now.hearts * 2, halves + (now.hearts - perks.hearts) * 2);
+        if (now.lives > perks.lives) lives += now.lives - perks.lives;
+        perks.hearts = now.hearts;
+        perks.lives = now.lives;
+        perks.wings = now.wings;
+        perks.reach = now.reach;
+        perks.lasting = now.lasting;
+        perks.shots = now.shots;
+        perks.flagHeart = now.flagHeart;
+        perks.inkHurts = now.inkHurts;
+        perks.colours |= now.colours;
+        perks.recharge = now.recharge;
+        perks.formLonger = now.formLonger;
+        perks.together = now.together;
+        perks.resists |= now.resists;
+    }
+
+    /** Whether she has a second jump in the air to her name. */
+    boolean winged() { return perks.wings; }
     /** How much longer the beam lasts; which way it goes; how far it is gathered, from nothing to one; how long before it can be again; and how many there have been. */
     float beam() { return beam; }
     boolean beamLeft() { return beamLeft; }

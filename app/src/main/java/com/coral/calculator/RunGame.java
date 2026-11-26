@@ -109,7 +109,7 @@ final class RunGame {
      * What her pluses buy at the counter, to keep: its name, what each step of it gives, what
      * each step costs, and the picture beside it (-1 for her own, with her wings out).
      */
-    private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings", "Glossary magnet", "Longer treats", "Bigger ink tank",
+    private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings: a second jump", "Glossary magnet", "Longer treats", "Bigger ink tank",
             "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons"};
     private static final String[][] UP_GIVES = {
             {"A fourth heart in every land", "A fifth heart in every land"},
@@ -120,7 +120,7 @@ final class RunGame {
             {"Every flag she passes gives a heart back"},
             {"A ball of Rune's ink takes two hurts"},
             {"A fourth life in every land", "A fifth life in every land", "A sixth life in every land"},
-            {"Three colours worn at once", "Four colours worn at once", "Five colours worn at once", "All seven at once: white"},
+            {"Three colours worn at once", "Four colours worn at once", "Five colours worn at once", "Every colour at once: white, not yet mastered"},
             {"A colour is ready a second sooner", "A colour is ready two seconds sooner", "A colour is ready three seconds sooner"}};
     private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}, {200, 350, 500, 900},
             {120, 240, 400}};
@@ -298,7 +298,14 @@ final class RunGame {
     private final boolean[] saidForm = new boolean[PlusRun.WHITE + 1];
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
     private float formLasts = 1, shake, sinceBump = 9, sinceShut = 9, sinceOpened = 9, sinceParry = 9, flash;
-    private int seenGreetings, seenEntered, seenReveals, seenWins, seenCurses, seenDrops, seenBeams;
+    private int seenGreetings, seenEntered, seenReveals, seenWins, seenCurses, seenDrops, seenBeams, seenBlasts, jumpsAtFall;
+    /** In a build made for testing: frames drawn since a moment, to find how many are drawn a second. */
+    private long framesFrom;
+    private int frames;
+    /** Where a book last burst, in squares, and how long ago. */
+    private float blastX, blastY, blastAge = 9;
+    /** How long since she last said where a second jump is to be had. */
+    private float sinceWings = 999;
     /**
      * What of the story is still to be told in this land, a line after another, in the
      * bubble at the top, while she plays; whether it is being told; whether the line being
@@ -485,6 +492,16 @@ final class RunGame {
     private int bank() { return session.tally("run_bank"); }
 
     private int bought(int which) { return Math.min(UP_COSTS[which].length, session.tally("run_up_" + which)); }
+
+    /**
+     * What she has to keep is read again, and given to the land she is in: so that what is
+     * bought at the counter by a stall, or won, is hers there and then and not only in the
+     * next land.
+     */
+    private void regrant() {
+        perks = kept();
+        if (run != null) run.grant(perks);
+    }
 
     /** What she takes into a land of what she has bought. */
     private PlusRun.Perks kept() {
@@ -920,6 +937,7 @@ final class RunGame {
         } else if (screen == STALL) {
             screen = PLAY;
         } else if (screen == SHOP && counterFrom == STALL) {
+            regrant();
             screen = STALL;
         } else if (screen == RESULT || screen == SHOP) {
             toMap();
@@ -1040,7 +1058,7 @@ final class RunGame {
         talk.clear();
         talking = told = false;
         hintMoved = hintJumped = false;
-        seenDrops = seenBeams = 0;
+        seenDrops = seenBeams = seenBlasts = jumpsAtFall = 0;
         goDown = false;
         perks = kept();
         // For looking at what losing looks like in a build made for testing: one heart and one life.
@@ -1064,6 +1082,7 @@ final class RunGame {
         if (BuildConfig.DEBUG && session.tally("run_wear") > 0) run.lend(session.tally("run_wear"));
         // And the white that is truly hers, which the story has yet to give.
         if (BuildConfig.DEBUG && session.tally("run_true") > 0) run.master();
+        PlusRun.ceiling = BuildConfig.DEBUG && session.tally("run_ceiling") > 0 ? session.tally("run_ceiling") : PlusRun.CEILING;
         if (BuildConfig.DEBUG && session.tally("run_arm") > 0) run.arm(session.tally("run_arm") - 1);
         idle();
         seenJumps = seenLandings = seenCollected = seenFlattened = seenHurts = seenSprings = seenFlags = seenBlows = 0;
@@ -1389,7 +1408,9 @@ final class RunGame {
             seenWhitened = run.whitened();
             flash = .3f;
             audio.play("star", .8f);
-            if (session.tally("run_hint_white") == 0) {
+            if (run.mastered()) {
+                speak(RunStory.TRUE_WHITE[0], true);
+            } else if (session.tally("run_hint_white") == 0) {
                 session.keep("run_hint_white", 1);
                 speak(RunStory.MIX[2], true);
             }
@@ -1612,6 +1633,22 @@ final class RunGame {
             audio.play("parry", .4f);
             pop(run.foeX(), run.foeY() - 1.4f, run.fizzledAt() == RunLevels.WISP ? "Only water!" : "Only fire!");
         }
+        sinceWings += seconds;
+        if (run.blasts() != seenBlasts) {
+            seenBlasts = run.blasts();
+            audio.play("quake", .7f);
+            audio.play("page", .9f);
+            buzz(true);
+            shake = Math.max(shake, .25f);
+            blastAge = 0;
+            blastX = run.blastX();
+            blastY = run.blastY();
+            for (int page = 0; page < 22; page++) {
+                double way = random.nextFloat() * Math.PI * 2;
+                bits.add(new float[]{blastX, blastY, (float) Math.cos(way) * (3 + random.nextFloat() * 6), (float) Math.sin(way) * 6 - 4, .9f, 1});
+            }
+        }
+        blastAge += seconds;
         if (run.beams() != seenBeams) {
             seenBeams = run.beams();
             audio.play("form", .9f);
@@ -1905,7 +1942,7 @@ final class RunGame {
                         roomGave += (roomGave.isEmpty() ? "" : ", ") + "+ " + more + " to keep";
                     }
                 }
-                if (rank < PlusRun.RANK_S) roomGave += (roomGave.isEmpty() ? "" : ". ") + "Rank S: no hurt, under " + PlayStage.clock(Math.round(PlusRun.PAR));
+                if (rank < PlusRun.RANK_S) roomGave += (roomGave.isEmpty() ? "" : ". ") + "Rank S: two hurts at most, under " + PlayStage.clock(Math.round(PlusRun.PAR));
             } else if (kind == RunLevels.STASH) {
                 roomResult = "The chest is open";
                 roomScore = "+ 10 in it";
@@ -1934,7 +1971,7 @@ final class RunGame {
             idle();
             speak(RunStory.ROOM_WON[kind == RunLevels.ARENA ? 0 : kind == RunLevels.RANGE ? 2 : kind == RunLevels.TRAMPLE ? 3 : kind == RunLevels.STASH ? 4 : 1], true);
             session.keep("run_roomsdone_" + number, session.tally("run_roomsdone_" + number) | run.roomsDone());
-            perks = kept();
+            regrant();
         }
         // The last seconds of a game tick.
         if (run.room() >= 0 && run.sealed() && run.gameLeft() > 0 && run.gameLeft() <= 3 && (int) Math.ceil(run.gameLeft()) != tickedAt) {
@@ -1997,7 +2034,7 @@ final class RunGame {
                     handPicture = -given[0];
                 }
                 medal(chapter, true);
-                perks = kept();
+                regrant();
             } else {
                 handTitle = "Done again: + 15";
                 handWords = "And a heart, if she was short of one";
@@ -2109,7 +2146,7 @@ final class RunGame {
                             if (herMix == 0) herMix = 1 << given - 1;
                         }
                     } else {
-                        perks = kept();
+                        regrant();
                     }
                 }
             }
@@ -2158,10 +2195,18 @@ final class RunGame {
                     saidLast = true;
                     speakAny(RunStory.LAST_HEART);
                 } else {
-                    speakAny(cause == PlusRun.FELL ? RunStory.FELL : cause == PlusRun.STRUCK ? RunStory.SHOT
-                            : cause == PlusRun.SPIKED ? RunStory.SPIKED : cause == PlusRun.BATTED ? RunStory.BATTED : cause == PlusRun.BURNED ? RunStory.BURNED
-                            : cause == PlusRun.SANK ? RunStory.SANK : cause == PlusRun.QUAKED ? RunStory.QUAKED : cause == PlusRun.SLASHED ? RunStory.SLASHED
-                            : RunStory.BITTEN);
+                    boolean short_ = cause == PlusRun.FELL && !run.winged() && run.jumps() != jumpsAtFall;
+                    jumpsAtFall = run.jumps();
+                    if (short_ && (session.tally("run_hint_wings") == 0 || sinceWings > 90 && random.nextInt(3) == 0)) {
+                        speak(RunStory.WINGS[session.tally("run_hint_wings") == 0 ? 0 : 1], true);
+                        session.keep("run_hint_wings", session.tally("run_hint_wings") + 1);
+                        sinceWings = 0;
+                    } else {
+                        speakAny(cause == PlusRun.FELL ? RunStory.FELL : cause == PlusRun.STRUCK ? RunStory.SHOT
+                                : cause == PlusRun.SPIKED ? RunStory.SPIKED : cause == PlusRun.BATTED ? RunStory.BATTED : cause == PlusRun.BURNED ? RunStory.BURNED
+                                : cause == PlusRun.SANK ? RunStory.SANK : cause == PlusRun.QUAKED ? RunStory.QUAKED : cause == PlusRun.SLASHED ? RunStory.SLASHED
+                                : RunStory.BITTEN);
+                    }
                 }
             }
         } else if (run.halves() > heartsBefore) {
@@ -2327,8 +2372,12 @@ final class RunGame {
         } else if (screen == SHOP) {
             if (closeButton.contains(x, y)) {
                 audio.play("tap", .5f);
-                if (counterFrom == STALL) screen = STALL;
-                else toMap();
+                if (counterFrom == STALL) {
+                    regrant();
+                    screen = STALL;
+                } else {
+                    toMap();
+                }
                 return;
             }
             for (int index = 0; index < wares.length; index++) if (wares[index].contains(x, y)) buy(UP_ORDER[index]);
@@ -2592,6 +2641,17 @@ final class RunGame {
 
     void draw(Canvas canvas) {
         if (width == 0) return;
+        if (BuildConfig.DEBUG && run != null && screen == PLAY) {
+            long now = System.nanoTime();
+            frames++;
+            if (now - framesFrom > 2_000_000_000L) {
+                int there = 0;
+                for (PlusRun.Foe foe : run.foes()) if (foe.spawned && !foe.flat) there++;
+                if (framesFrom != 0) android.util.Log.i("RunFps", "fps " + Math.round(frames * 1e9f / (now - framesFrom)) + " there " + there + " foes " + run.foes().size() + " left " + run.waveLeft());
+                framesFrom = now;
+                frames = 0;
+            }
+        }
         if (screen == MAP) {
             drawMap(canvas);
         } else if (screen == SHOP) {
@@ -2609,6 +2669,24 @@ final class RunGame {
             drawLand(canvas);
             // A moment in which something is won or handed over lies over the land, and under what is said and shown of how she stands.
             if (run.beam() > 0) drawBeam(canvas);
+            if (blastAge < .45f) {
+                // A book has burst: a ring of light out to as far as it reaches, and a white heart to it.
+                float out = blastAge / .45f, at = (blastX - cameraX) * tile, high = (blastY - cameraY) * tile;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFFFF3C4);
+                paint.setAlpha(Math.round(170 * (1 - out)));
+                canvas.drawCircle(at, high, tile * PlusRun.BLAST * (.35f + .65f * out), paint);
+                paint.setColor(Color.WHITE);
+                paint.setAlpha(Math.round(230 * (1 - out)));
+                canvas.drawCircle(at, high, tile * PlusRun.BLAST * .4f * (1 - out * .5f), paint);
+                stroke.setColor(0xFFE0A21A);
+                stroke.setAlpha(Math.round(255 * (1 - out)));
+                stroke.setStrokeWidth(tile * .1f);
+                canvas.drawCircle(at, high, tile * PlusRun.BLAST * out, stroke);
+                stroke.setAlpha(255);
+                paint.setColor(Color.BLACK);
+                paint.setAlpha(255);
+            }
             if (screen == PLAY && prizeAge >= 0) drawPrize(canvas);
             if (screen == PLAY && handAge >= 0) drawHandOver(canvas);
             // With the lights out, the dark lies over the place and under everything that is said and shown of how she stands.
@@ -5967,7 +6045,13 @@ final class RunGame {
             paint.setAlpha(255);
             drawHer(canvas, middle, feet, tall, STAND, false);
             int waiting = RunLevels.bossOf(open);
-            String words = names.named(starsOf(RunLevels.TOTAL) > 0 ? "We read both volumes to the end. Again Sloppy~♡"
+            String afford = null;
+            for (int which : UP_ORDER) {
+                if (afford == null && bought(which) < UP_COSTS[which].length && locked(which) == null && bank() >= UP_COSTS[which][bought(which)]) afford = UP_NAMES[which];
+            }
+            if (bought(1) == 0 && bank() >= UP_COSTS[1][0]) afford = UP_NAMES[1];
+            String words = names.named(afford != null && open > 1 ? "Pluses enough for " + afford.toLowerCase(java.util.Locale.ROOT).replace("chikuwa", "Chikuwa") + ". The counter Sloppy~♡"
+                    : starsOf(RunLevels.TOTAL) > 0 ? "We read both volumes to the end. Again Sloppy~♡"
                     : open == 1 ? "Pick the first land. Go on Sloppy~♡" : open == RunLevels.COUNT + 1 ? "Volume Two fell on us. Land 31 Sloppy~♡"
                     : waiting == RunLevels.TSUBAKIEH ? "Tsubakieh and her bat are in land " + open + " Sloppy~♡"
                     : waiting == RunLevels.ZERO ? "The Last Page. Zero is waiting Sloppy~♡"
