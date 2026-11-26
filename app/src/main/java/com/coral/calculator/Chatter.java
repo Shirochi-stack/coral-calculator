@@ -289,6 +289,13 @@ final class Chatter {
             "The minus signs throw knives now. Play Plus run Sloppy~♡",
             "Play Plus run with the sound on. You'll hear me Sloppy~♡",
             "Zero is waiting in land thirty. Are you Sloppy~♡",
+            // And Page brawl, where she fights her friends.
+            "Page brawl. Pick me. I've got plenty of keys Sloppy~♡",
+            "Chikuwa hits like a brick. Try Page brawl Sloppy~♡",
+            "Five fighters in Page brawl. I'm the best one Sloppy~♡",
+            "Fill my meter in Page brawl. Then watch Sloppy~♡",
+            "Tsubakieh's bat comes back. Mind your head Sloppy~♡",
+            "Top the ladder in Page brawl. With me Sloppy~♡",
     };
 
     /** A line in Japanese now and then, to tease those who cannot read it. */

@@ -185,6 +185,8 @@ final class PlayStage extends View {
 
     /** Plus run is a game of its own, with its own lands, pictures and sounds: it takes the stage over whole. */
     private RunGame runGame;
+    /** Page brawl likewise. */
+    private FightGame fightGame;
 
     private Object backCallback;
 
@@ -225,6 +227,7 @@ final class PlayStage extends View {
                     pet != null ? R.drawable.halgakos_pet_large : R.drawable.halgakos_large);
         }
         if (game == PlaySession.RUN) runGame = new RunGame(this, context, dark, haptics, art, pet);
+        if (game == PlaySession.FIGHT) fightGame = new FightGame(this, context, dark, haptics, art, pet);
         if (game == SNATCH || game == AVALANCHE) {
             pickApps(context, game == SNATCH ? 1 : SHAKEN);
             loot = icons.get(0);
@@ -312,6 +315,11 @@ final class PlayStage extends View {
     private void layout() {
         play.set(insetLeft, insetTop, getWidth() - insetRight, getHeight() - insetBottom);
         if (play.width() <= 0 || play.height() <= 0) return;
+        if (fightGame != null) {
+            fightGame.layout(getWidth(), getHeight(), play);
+            started = true;
+            return;
+        }
         if (runGame != null) {
             // Plus run fits itself to the whole screen, and to what the system bars leave of it.
             runGame.layout(getWidth(), getHeight(), play);
@@ -479,6 +487,7 @@ final class PlayStage extends View {
         running = false;
         removeCallbacks(frame);
         if (runGame != null) runGame.close();
+        if (fightGame != null) fightGame.close();
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
             OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
             if (dispatcher != null) dispatcher.unregisterOnBackInvokedCallback((OnBackInvokedCallback) backCallback);
@@ -518,6 +527,10 @@ final class PlayStage extends View {
     private void advance(float seconds) {
         if (runGame != null) {
             runGame.advance(seconds);
+            return;
+        }
+        if (fightGame != null) {
+            fightGame.advance(seconds);
             return;
         }
         int row = once != NONE ? once : pose;
@@ -1046,7 +1059,7 @@ final class PlayStage extends View {
 
     /** The Back key or gesture: Plus run may only go back a screen of its own; anything else leaves. */
     private void back() {
-        if (runGame == null || !runGame.back()) leave();
+        if (fightGame != null ? !fightGame.back() : runGame == null || !runGame.back()) leave();
     }
 
     /** The stage is to come down: for a game on it that is done with. */
@@ -1723,6 +1736,10 @@ final class PlayStage extends View {
             runGame.touch(event);
             return true;
         }
+        if (fightGame != null) {
+            fightGame.touch(event);
+            return true;
+        }
         float x = event.getX(), y = event.getY();
         int action = event.getActionMasked();
         if (isPrank(game)) {
@@ -1783,6 +1800,10 @@ final class PlayStage extends View {
         if (!started) return;
         if (runGame != null) {
             runGame.draw(canvas);
+            return;
+        }
+        if (fightGame != null) {
+            fightGame.draw(canvas);
             return;
         }
         if (isPrank(game)) {

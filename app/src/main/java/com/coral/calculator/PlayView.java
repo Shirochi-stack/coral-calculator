@@ -218,7 +218,12 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
         featured.addView(badge, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         featured.setFocusable(true);
         tap(featured, () -> host.onStage(PlaySession.RUN));
-        grid.addView(featured, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.45f));
+        grid.addView(featured, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.25f));
+        // Page brawl under it, recommended as well.
+        TextView fightNote = text("", 9.5f, 0xFFFFE9EA, false);
+        LayoutParams fightParams = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.25f);
+        fightParams.topMargin = px(4);
+        grid.addView(recommended(CompanionIcon.CLASH, PlaySession.FIGHT, fightNote), fightParams);
         TextView[] notes = new TextView[TILE_ICONS.length];
         for (int row = 0; row < (TILE_ICONS.length + 1) / 2; row++) {
             LinearLayout line = new LinearLayout(getContext());
@@ -258,10 +263,12 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
                 line.addView(tile, params);
             }
             LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1);
-            params.topMargin = px(5);
+            params.topMargin = px(4);
             grid.addView(line, params);
         }
         updater = () -> {
+            fightNote.setText(note(PlaySession.FIGHT));
+            ((View) fightNote.getParent().getParent()).setContentDescription(PlaySession.name(PlaySession.FIGHT) + ", recommended. " + fightNote.getText());
             featuredNote.setText(note(PlaySession.RUN));
             featured.setContentDescription(PlaySession.name(PlaySession.RUN) + ", recommended. " + featuredNote.getText());
             for (int index = 0; index < notes.length; index++) {
@@ -273,9 +280,43 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
         return grid;
     }
 
+    /** A game she recommends, across the whole card: its picture, its name over a line about it, and the word for it. */
+    private View recommended(String icon, int game, TextView note) {
+        LinearLayout banner = new LinearLayout(getContext());
+        banner.setGravity(Gravity.CENTER_VERTICAL);
+        banner.setPadding(px(11), 0, px(9), 0);
+        banner.setBackground(tile(CalculatorLayout.CORAL, 13));
+        banner.addView(new CompanionIcon(getContext(), icon, Color.WHITE, 1f), new LayoutParams(px(22), px(22)));
+        LinearLayout words = column();
+        TextView name = text(PlaySession.name(game), 13, Color.WHITE, true);
+        name.setMaxLines(1);
+        words.addView(name, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        note.setMaxLines(1);
+        note.setEllipsize(TextUtils.TruncateAt.END);
+        words.addView(note, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        LayoutParams wordsParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
+        wordsParams.leftMargin = px(9);
+        banner.addView(words, wordsParams);
+        TextView badge = text("Recommended", 8.5f, CalculatorLayout.CORAL, true);
+        badge.setMaxLines(1);
+        badge.setPadding(px(7), px(2.5f), px(7), px(2.5f));
+        badge.setBackground(round(Color.WHITE, 9));
+        banner.addView(badge, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        banner.setFocusable(true);
+        tap(banner, () -> host.onStage(game));
+        return banner;
+    }
+
     /** The line under a game's name on its tile: how the player has done at it, or where it is played. */
     private String note(int game) {
         switch (game) {
+            case PlaySession.FIGHT: {
+                // How many fights have been won, and with how many of the five the ladder has been topped.
+                int cleared = 0;
+                for (int fighter = 0; fighter < Fight.FIGHTERS; fighter++) if (session.tally("fight_cleared_" + fighter) > 0) cleared++;
+                int won = session.tally("fight_won");
+                return won == 0 ? "Five fighters · a ladder" : "Won " + won + " · Topped with " + cleared + " of " + Fight.FIGHTERS;
+            }
             case PlaySession.TIC: return record(session.tally("tic_won"), session.tally("tic_lost"), session.tally("tic_drawn"));
             case PlaySession.RPS: return record(session.tally("rps_won"), session.tally("rps_lost"), 0);
             case PlaySession.CHESS: return record(session.tally("chess_won"), session.tally("chess_lost"), session.tally("chess_drawn"));
