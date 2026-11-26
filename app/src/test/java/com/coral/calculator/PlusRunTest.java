@@ -7420,7 +7420,10 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 4 + 12, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4, lines);
+        assertEquals(14, RunStory.REVEAL.length);
+        assertEquals(4, RunStory.READ.length);
+        assertEquals("f", RunStory.READ[0][2]);
         assertEquals(12, RunStory.LUCY.length);
         assertEquals("e", RunStory.LUCY[0][2]);
         assertEquals(RunLevels.FRIENDS, RunStory.PLEDGES.length);
@@ -7444,7 +7447,7 @@ public class PlusRunTest {
         assertEquals(PlusRun.WHITE, RunStory.FORMS.length);
         assertEquals(RunLevels.OLD_BOOK - RunLevels.GOKHAE + 1, RunStory.BLOWS_LATER.length);
         for (int land = RunLevels.COUNT + 1; land <= RunLevels.TOTAL; land++) {
-            assertEquals("land " + land, RunLevels.bossOf(land) >= 0, RunStory.outro(land) != null);
+            assertEquals("land " + land, RunLevels.bossOf(land) >= 0 && land != RunLevels.TOTAL, RunStory.outro(land) != null);
             if (land % 10 == 0 || land % 10 == 1) assertTrue("land " + land, RunStory.intro(land) != null);
         }
         assertEquals(RunStory.SPEAKERS.length(), RunStory.NAMES.length);
@@ -7457,7 +7460,7 @@ public class PlusRunTest {
             assertTrue("land " + land, RunStory.intro(land) != null);
         }
         for (int land = 1; land <= RunLevels.COUNT; land++) {
-            assertEquals("land " + land, RunLevels.bossOf(land) >= 0, RunStory.outro(land) != null);
+            assertEquals("land " + land, RunLevels.bossOf(land) >= 0 && land != RunLevels.TOTAL, RunStory.outro(land) != null);
         }
     }
 

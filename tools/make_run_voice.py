@@ -82,6 +82,8 @@ VOICES = {
     "d": ("Camille", .95, 1.06),
     # Lucy, the Dragon of Lost Words: a library voice of a young girl for now, until one is chosen for her.
     "e": ("Piper", 1.06, 1.08),
+    # The Mother Tongue.
+    "f": ("upbeat-bee-0979__design-voice-53058b3d", 1.0, 1.0),  # a voice designed as a cold, regal queen, the user's pick of seventeen
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
@@ -114,6 +116,7 @@ MANNER = {
     "b": "The Old Book is a very old, sleepy, bearded book: a slow, warm, grumbling grandfather's voice. ",
     "c": "Pulmu is a young dwarf armourer, Moru's sister: a loud, sunny, warm young woman's voice, laughing easily, big-hearted, in clear American English. ",
     "e": "Lucy is a small dragon child, a bratty little-sister type, voiced like a Japanese anime voice actress playing a cheeky, spoiled little girl: high, loud and sing-song, taunting, quick to pout and quick to cry, in clear American English. ",
+    "f": "The Mother Tongue is a vast, ancient elder dragon and a mother: a grand, cold, regal woman's voice, low and unhurried, perfectly composed, certain that she knows best, never shouting, in clear English. ",
     "d": "Sutdol is a young dwarf jeweller-smith, Moru's sister: a calm, level, exact young woman's voice, quiet and dry, never old or deep, in clear American English. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
