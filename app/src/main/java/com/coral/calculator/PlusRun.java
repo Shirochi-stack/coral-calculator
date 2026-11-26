@@ -118,12 +118,36 @@ final class PlusRun {
      * a pet deals with counts as hers. Nothing hurts a pet. Against one of those who wait
      * a pet only helps: it takes half a piece off a shield and never the last of it, it
      * lands a blow on one whose shield is broken, and it never lands the last blow.
+     *
+     * And five that are small stuffed copies of people she knows. A mini Chikuwa runs,
+     * throws bread rolls, and now and then, while she is short of a heart, hands her a roll
+     * that gives half of one back. A mini Rune runs, cries ink: a puddle where she has been
+     * that slows whatever walks through it, and a flick of ink at what is close; with one of
+     * those who wait near, she keeps on the far side of Halgakos from her, and flicks all
+     * the same. A mini Halgakos with two black wings flies, and swoops at the nearest again
+     * and again, from close. One with two white wings flies, sends a small ray of light a
+     * long way on a slow beat, and every so often has a ring of light ready that turns
+     * aside one thing thrown at Halgakos. And one with no wings runs and copies her: when
+     * she uses what she holds, it uses a small one of the same, and it does nothing else.
      */
-    static final int PET = 30, JAR = 0, CAT = 1, DOG = 2, DUCK = 3, MONKEY = 4, PETS = 5;
-    /** What a pet throws: a blot of ink, and a nut. */
-    static final int BLOT_SHOT = 23, NUT = 24;
-    private static final float[] PET_EVERY = {1.6f, 1, 2.2f, 1.5f, 1.8f}, PET_NEAR = {7, 3.2f, 6, 7, 6};
-    private int pet = -1, petKills, petJoined, petStrikes, petDrops;
+    static final int PET = 30, JAR = 0, CAT = 1, DOG = 2, DUCK = 3, MONKEY = 4;
+    static final int MINI_CHIKUWA = 5, MINI_RUNE = 6, IMP = 7, CHERUB = 8, TWIN = 9, PETS = 10;
+    /** What a pet throws: a blot of ink, a nut, a bread roll, and a ray of light. */
+    static final int BLOT_SHOT = 23, NUT = 24, ROLL = 25, RAY = 26;
+    /** How often a mini Chikuwa has a roll for her, how long a puddle of ink lies, how much it slows, and how often the ring of light is ready. */
+    static final float GIFT_EVERY = 18, PUDDLE_LASTS = 5, PUDDLE_SLOWS = .45f, WARD_EVERY = 9;
+    private static final float[] PET_EVERY = {1.6f, 1, 2.2f, 1.5f, 1.8f, 1.7f, 1.3f, .7f, 2.4f, .35f}, PET_NEAR = {7, 3.2f, 6, 7, 6, 6.5f, 3.5f, 3.6f, 9, 0};
+    private int pet = -1, petKills, petJoined, petStrikes, petDrops, petGifts, petWards, petCopies;
+    private float petGift = GIFT_EVERY, petWard = WARD_EVERY, petPuddle;
+    /** The puddles a mini Rune has left: where each lies, the row its top is in, and how much longer it lies. */
+    private final List<float[]> puddles = new ArrayList<>();
+
+    List<float[]> puddles() { return puddles; }
+    int petGifts() { return petGifts; }
+    int petWards() { return petWards; }
+    int petCopies() { return petCopies; }
+    /** Whether the ring of light is ready. */
+    boolean warded() { return pet == CHERUB && petWard <= 0; }
     private float petX, petY, petWait, petBusy, petFromX, petFromY, petToX, petToY, petDown;
     private boolean petLeft;
     private Foe petAt;
@@ -142,7 +166,7 @@ final class PlusRun {
     int petKills() { return petKills; }
     int petJoined() { return petJoined; }
     int petStrikes() { return petStrikes; }
-    static boolean floats(int pet) { return pet == JAR || pet == DUCK; }
+    static boolean floats(int pet) { return pet == JAR || pet == DUCK || pet == IMP || pet == CHERUB; }
 
     /** A pet is hers, there and then: for looking at one, and for the tests. */
     void adopt(int kind) {
@@ -153,6 +177,41 @@ final class PlusRun {
         petBusy = 0;
         petAt = null;
         petJoined++;
+        petGift = GIFT_EVERY;
+        petWard = WARD_EVERY;
+        puddles.clear();
+    }
+
+    /** Whether something stands in a puddle of ink: it does everything at less than half its pace while it does. */
+    boolean mired(Foe foe) {
+        if (puddles.isEmpty() || RunLevels.boss(foe.kind) || RunLevels.flier(foe.kind)) return false;
+        float middle = foe.x + foe.wide() / 2, feet = foe.y + foe.tall();
+        for (float[] puddle : puddles) if (Math.abs(puddle[0] - middle) < .9f && Math.abs(puddle[1] - feet) < .4f) return true;
+        return false;
+    }
+
+    /** The one with no wings does as she does: a small one of what she throws, from where it is; or a swing at what is in front of it. */
+    private void copied() {
+        if (pet != TWIN || petWait > 0 || weapon == UNARMED) return;
+        petWait = PET_EVERY[TWIN];
+        petCopies++;
+        petStrikes++;
+        petLeft = facingLeft;
+        float way = facingLeft ? -1 : 1;
+        if (weapon == PEN || weapon == KNIFE || weapon == GUN || weapon == BOOK) {
+            Shot shot = weapon == BOOK ? shoot(BOOK, true, petX + way * .3f, petY - .7f, way * 6, -9, 2.5f) : shoot(weapon, true, petX + way * .3f, petY - .45f, way * 14, 0, .55f);
+            shot.pets = true;
+            return;
+        }
+        petBusy = .18f;
+        petFromX = petToX = petX;
+        petFromY = petToY = petY;
+        petAt = null;
+        for (int index = 0; index < foes.size(); index++) {
+            Foe foe = foes.get(index);
+            float across = (foe.x + foe.wide() / 2 - petX) * way;
+            if (across > -.3f && across < 1.4f && Math.abs(foe.y + foe.tall() - petY) < 1.3f) petted(foe);
+        }
     }
 
     /** What a pet does to something: it deals with a sign as a blow would; one of those who wait it only helps against. Returns whether anything came of it. */
@@ -188,6 +247,29 @@ final class PlusRun {
             petBusy = 0;
             petAt = null;
             petDown = 0;
+        }
+        // A puddle dries; a mini Rune on the ground leaves one where she is, every so often.
+        for (int index = puddles.size() - 1; index >= 0; index--) if ((puddles.get(index)[2] -= seconds) <= 0) puddles.remove(index);
+        if (pet == MINI_RUNE && (petPuddle -= seconds) <= 0 && petBusy <= 0 && solid(at((int) Math.floor(petX), (int) Math.floor(petY + .05f)))) {
+            petPuddle = 1.1f;
+            puddles.add(new float[]{petX, petY, PUDDLE_LASTS});
+        }
+        // A mini Chikuwa has a roll for her every so often while she is short of a heart: half of one back.
+        if (pet == MINI_CHIKUWA && halves < perks.hearts * 2 && state == PLAYING && (petGift -= seconds) <= 0) {
+            petGift = GIFT_EVERY;
+            halves++;
+            petGifts++;
+        }
+        // The ring of light: when it is ready, the first thing thrown at her that comes near is turned aside.
+        if (pet == CHERUB && (petWard -= seconds) <= 0) {
+            for (int index = shots.size() - 1; index >= 0; index--) {
+                Shot shot = shots.get(index);
+                if (shot.hers || shot.kind == PLUSDROP || Math.hypot(shot.x - herX, shot.y - y - TALL / 2) > 1.5f) continue;
+                shots.remove(index);
+                petWard = WARD_EVERY;
+                petWards++;
+                break;
+            }
         }
         if (petBusy > 0) {
             // On its way to what it is going at; and there, it deals with it.
@@ -239,6 +321,12 @@ final class PlusRun {
                 }
             }
         }
+        if (pet == MINI_RUNE) {
+            for (Foe foe : foes) {
+                if (!RunLevels.boss(foe.kind) || foe.flat || absent(foe) || Math.abs(foe.x + foe.wide() / 2 - herX) > 10) continue;
+                wantX = herX + (foe.x + foe.wide() / 2 < herX ? 1.1f : -1.1f);
+            }
+        }
         float gap = wantX - petX;
         petX += Math.signum(gap) * Math.min(Math.abs(gap), (Math.abs(gap) > 3 ? 13 : 8) * seconds);
         if (Math.abs(gap) > .1f) petLeft = gap < 0;
@@ -285,7 +373,7 @@ final class PlusRun {
                 take(item[0]);
             }
         }
-        if ((petWait -= seconds) > 0) return;
+        if ((petWait -= seconds) > 0 || pet == TWIN) return;
         // Rested, it looks for something near her to go at: a duck, what is in the air first; the rest, whatever is nearest it.
         Foe best = null;
         float nearest = PET_NEAR[pet];
@@ -293,7 +381,8 @@ final class PlusRun {
         for (Foe foe : foes) {
             if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) continue;
             if (RunLevels.boss(foe.kind) && (open(foe) ? foe.left <= 1 || foe.dazed > 0 : foe.forming > 0 || foe.shield <= .5f)) continue;
-            float across = foe.x + foe.wide() / 2 - (pet == CAT || pet == DOG ? petX : herX), down = foe.y + foe.tall() - (pet == CAT || pet == DOG ? petY : herFeet);
+            boolean own = pet == CAT || pet == DOG || pet == MINI_RUNE;
+            float across = foe.x + foe.wide() / 2 - (own ? petX : herX), down = foe.y + foe.tall() - (own ? petY : herFeet);
             float away = (float) Math.hypot(across, down);
             boolean air = RunLevels.flier(foe.kind) || foe.kind == RunLevels.DRAGON || foe.y + foe.tall() < foe.ground + foe.tall() - 1;
             if (pet == DOG && Math.abs(down) > 1.5f) continue;
@@ -308,15 +397,15 @@ final class PlusRun {
         petWait = PET_EVERY[pet];
         petStrikes++;
         petLeft = best.x + best.wide() / 2 < petX;
-        if (pet == JAR || pet == MONKEY) {
-            // From where it is: a blot, straight; a nut, lobbed.
+        if (pet == JAR || pet == MONKEY || pet == MINI_CHIKUWA || pet == MINI_RUNE || pet == CHERUB) {
+            // From where it is: a blot or a flick of ink, straight; a nut or a roll, lobbed; a ray, straight and fast.
             float toX = best.x + best.wide() / 2, toY = best.y + best.tall() / 2;
             Shot shot;
-            if (pet == JAR) {
-                float length = Math.max(.5f, (float) Math.hypot(toX - petX, toY - petY + .5f));
-                shot = shoot(BLOT_SHOT, true, petX, petY - .5f, (toX - petX) / length * 11, (toY - petY + .5f) / length * 11, 1.2f);
+            if (pet == JAR || pet == MINI_RUNE || pet == CHERUB) {
+                float length = Math.max(.5f, (float) Math.hypot(toX - petX, toY - petY + .5f)), speed = pet == CHERUB ? 17 : 11;
+                shot = shoot(pet == CHERUB ? RAY : BLOT_SHOT, true, petX, petY - .5f, (toX - petX) / length * speed, (toY - petY + .5f) / length * speed, pet == JAR ? 1.2f : pet == CHERUB ? .7f : .45f);
             } else {
-                shot = shoot(NUT, true, petX, petY - .6f, Math.max(-10, Math.min(10, (toX - petX) / .7f)), -9, 2.5f);
+                shot = shoot(pet == MONKEY ? NUT : ROLL, true, petX, petY - .6f, Math.max(-10, Math.min(10, (toX - petX) / .7f)), -9, 2.5f);
             }
             shot.pets = true;
             return;
@@ -1844,6 +1933,9 @@ final class PlusRun {
         flattened++;
     }
 
+    /** Takes a heart from her, and never her last: for checking what gives one back. */
+    void wound() { halves = Math.max(1, halves - 2); }
+
     /** Puts something in her hands: for checking the rules, and for looking at them. */
     void arm(int with) {
         weapon = with;
@@ -2791,6 +2883,7 @@ final class PlusRun {
     private void use() {
         sinceStrike = 0;
         strikes++;
+        copied();
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
         if (weapon == PEN) {
             shoot(PEN, true, fromX, fromY, way * 13, 0, 1);
@@ -2949,7 +3042,7 @@ final class PlusRun {
             shot.x += shot.across * seconds;
             shot.y += shot.down * seconds;
             shot.age += seconds;
-            if (shot.kind == BOOK || shot.kind == NUT) shot.down += BOOK_WEIGHT * seconds;
+            if (shot.kind == BOOK || shot.kind == NUT || shot.kind == ROLL) shot.down += BOOK_WEIGHT * seconds;
             else if (shot.kind == WATER) shot.down += 6 * seconds;
             else if (shot.kind == SAYING) shot.down = (float) Math.cos(shot.age * 7) * 3.2f;
             else if (shot.kind == GLOB) shot.down += BOOK_WEIGHT * seconds;
@@ -2960,7 +3053,7 @@ final class PlusRun {
             if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > (room >= 0 ? level.land.length : RunLevels.ROWS)
                     || (in == RunLevels.LEDGE ? shot.down > Math.abs(shot.across) : solid(in))) {
                 // A book of hers bursts where it lands, on the ground, a ledge or a wall, or where it falls out of the air.
-                if (shot.kind == BOOK && shot.hers) blast(shot.x, shot.y);
+                if (shot.kind == BOOK && shot.hers && !shot.pets) blast(shot.x, shot.y);
                 shots.remove(index);
             } else if (shot.kind == PLUSDROP) {
                 // A falling plus is hers if she is under it.
@@ -3324,6 +3417,7 @@ final class PlusRun {
         }
         if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
         if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > WAKES)) return;
+        if (pet == MINI_RUNE && mired(foe)) seconds *= PUDDLE_SLOWS;
         foe.clock += seconds;
         if (foe.broken > 0 && !absent(foe)) {
             if ((foe.broken -= seconds) <= 0 || foe.taken >= 2 && foe.dazed <= seconds) {

@@ -66,10 +66,18 @@ final class RunGame {
     private static final int[] FLIER_COLOURS = {0xFF3A3340, 0xFF7FA8E0, 0xFF8E86A6, 0xFFE0A21A, 0xFF3A3340, 0xFFF08A2C, 0xFF7FC4EC};
     private final Bitmap[] flierCast = new Bitmap[FLIER_CAST.length];
     /** The pets, as they are drawn: six pictures of each; and what each is called. */
-    private static final int[] PET_CAST = {R.drawable.run_pet_jar, R.drawable.run_pet_cat, R.drawable.run_pet_dog, R.drawable.run_pet_duck, R.drawable.run_pet_monkey};
-    private static final String[] PET_NAMES = {"The ink jar", "The kitten", "The puppy", "The duckling", "The monkey"};
+    private static final int[] PET_CAST = {R.drawable.run_pet_jar, R.drawable.run_pet_cat, R.drawable.run_pet_dog, R.drawable.run_pet_duck, R.drawable.run_pet_monkey,
+            R.drawable.run_pet_chikuwa, R.drawable.run_pet_rune, R.drawable.run_pet_dark, R.drawable.run_pet_light, R.drawable.run_pet_mini};
+    private static final String[] PET_NAMES = {"The ink jar", "The kitten", "The puppy", "The duckling", "The monkey",
+            "Mini Chikuwa", "Mini Rune", "Mini Halgakos, black wings", "Mini Halgakos, white wings", "Mini Halgakos"};
     private static final String[] PET_DOES = {"spits ink at what comes near", "pounces on what is close", "charges through them along the ground",
-            "drops on what flies, and quacks", "throws nuts, and fetches"};
+            "drops on what flies, and quacks", "throws nuts, and fetches", "throws bread rolls, and has one for her now and then",
+            "cries ink that slows them, and flicks it", "swoops at the nearest, again and again", "sends rays of light, and turns one thing aside",
+            "does what she does, smaller"};
+    /** What one of the small stuffed ones says, written in a tiny bubble over it: they do not speak aloud. */
+    private String petWord = "";
+    private float petWordLeft, sincePetWord;
+    private int seenPetGifts, seenPetWards, seenPetCopies;
     private final Bitmap[] petCast = new Bitmap[PET_CAST.length];
     /** Of the pet: where it was a frame ago, how long since it joined her or last dealt with something, and what of it has been seen. */
     private float petWasX, petWasY, petGlad = 9;
@@ -1081,6 +1089,9 @@ final class RunGame {
         hintMoved = hintJumped = false;
         seenDrops = seenBeams = seenBlasts = jumpsAtFall = seenCracks = seenShatters = seenThrownBack = 0;
         seenPetJoined = seenPetStrikes = seenPetKills = 0;
+        seenPetGifts = seenPetWards = seenPetCopies = 0;
+        petWordLeft = 0;
+        wardAge = 9;
         flights.clear();
         chestAge = 9;
         petGlad = 9;
@@ -1690,12 +1701,37 @@ final class RunGame {
         }
         if (run.petStrikes() != seenPetStrikes) {
             seenPetStrikes = run.petStrikes();
-            audio.play(run.pet() == PlusRun.DUCK ? "flap" : run.pet() == PlusRun.JAR ? "splash" : "throw", .35f);
+            audio.play(run.pet() == PlusRun.DUCK || run.pet() == PlusRun.IMP ? "flap" : run.pet() == PlusRun.JAR || run.pet() == PlusRun.MINI_RUNE ? "splash"
+                    : run.pet() == PlusRun.CHERUB ? "ding" : "throw", .35f);
         }
         if (run.petKills() != seenPetKills) {
             seenPetKills = run.petKills();
             petGlad = 0;
         }
+        // The small stuffed ones: a roll handed over, the ring of light used, and a word in a tiny bubble now and then.
+        petWordLeft -= seconds;
+        sincePetWord += seconds;
+        if (run.petGifts() != seenPetGifts) {
+            seenPetGifts = run.petGifts();
+            petGlad = 0;
+            audio.play("star", .7f);
+            flyTo((run.petX() - cameraX) * tile, (run.petY() - 1 - cameraY) * tile, true, 1);
+            pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "Half a heart");
+            petSays("Here!");
+        }
+        if (run.petWards() != seenPetWards) {
+            seenPetWards = run.petWards();
+            audio.play("ding", .6f);
+            pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "Turned aside");
+            wardAge = 0;
+        }
+        wardAge += seconds;
+        if (run.petCopies() != seenPetCopies) {
+            seenPetCopies = run.petCopies();
+            if (sincePetWord > 9) petSays("Me too!");
+        }
+        if (run.pet() == PlusRun.IMP && sincePetWord > 13 && run.petBusy() > 0) petSays(IMP_SAYS[(int) (clock * 7) % IMP_SAYS.length]);
+        if (run.pet() == PlusRun.MINI_RUNE && sincePetWord > 11 && boss != null) petSays("Uu...");
         if (run.cracks() != seenCracks) {
             // A piece off a shield: it rings, higher the less of it is left, and shards fly.
             seenCracks = run.cracks();
@@ -3275,7 +3311,46 @@ final class RunGame {
                     paint.setAlpha(255);
                 }
             }
+            if (shot.pets && shot.kind <= PlusRun.GUN) {
+                // A small one of what she holds, from the one that copies her.
+                if (shot.kind == PlusRun.GUN) {
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(0xFF2A3FC8);
+                    canvas.drawCircle(x, y, tile * .08f, paint);
+                    paint.setColor(Color.BLACK);
+                } else {
+                    thing(canvas, shot.kind, x, y, tile * .34f, shot.kind == PlusRun.BOOK ? spin : 0, leftward, false);
+                }
+                continue;
+            }
             switch (shot.kind) {
+                case PlusRun.ROLL: {
+                    canvas.save();
+                    canvas.rotate(spin, x, y);
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(0xFFD9962F);
+                    canvas.drawOval(x - tile * .2f, y - tile * .14f, x + tile * .2f, y + tile * .14f, paint);
+                    paint.setColor(0xFFF3C56B);
+                    canvas.drawOval(x - tile * .12f, y - tile * .1f, x + tile * .06f, y, paint);
+                    stroke.setColor(0xFF8A5A1E);
+                    stroke.setStrokeWidth(tile * .03f);
+                    canvas.drawOval(x - tile * .2f, y - tile * .14f, x + tile * .2f, y + tile * .14f, stroke);
+                    paint.setColor(Color.BLACK);
+                    canvas.restore();
+                    break;
+                }
+                case PlusRun.RAY: {
+                    float length = (float) Math.hypot(shot.across, shot.down), ax = shot.across / length, ay = shot.down / length;
+                    stroke.setColor(0xFFFFE9A0);
+                    stroke.setStrokeWidth(tile * .2f);
+                    stroke.setAlpha(120);
+                    canvas.drawLine(x - ax * tile * .7f, y - ay * tile * .7f, x + ax * tile * .2f, y + ay * tile * .2f, stroke);
+                    stroke.setColor(Color.WHITE);
+                    stroke.setStrokeWidth(tile * .08f);
+                    stroke.setAlpha(255);
+                    canvas.drawLine(x - ax * tile * .6f, y - ay * tile * .6f, x + ax * tile * .2f, y + ay * tile * .2f, stroke);
+                    break;
+                }
                 case PlusRun.HEART: {
                     float beat = 1 + .12f * (float) Math.sin(clock * 14);
                     paint.setStyle(Paint.Style.FILL);
@@ -3419,6 +3494,7 @@ final class RunGame {
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);
         drawChest(canvas);
+        drawPetThings(canvas);
         drawPet(canvas);
         drawHer(canvas);
         // What has just been won, rising from where it was won.
@@ -4843,6 +4919,25 @@ final class RunGame {
         float tall = tile * .95f * 170 / 100, hop = petGlad < .7f ? Math.abs((float) Math.sin(petGlad / .7f * Math.PI * 2)) * tile * .25f : 0;
         // A soft shadow under one that floats, so that it is seen to be in the air.
         cell(canvas, petArt(kind), pose, 6, x, y + tile * .04f - hop, tall, !run.petLeftward());
+        if (petWordLeft > 0) {
+            float show = Math.min(1, Math.min(petWordLeft, 1.8f - petWordLeft) / .2f), size = tile * .26f, over = y - tile * 1.25f - hop;
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setTextSize(size);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            float wide = text.measureText(petWord) + size * 1.1f;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(235 * show));
+            box.set(x - wide / 2, over - size * .9f, x + wide / 2, over + size * .55f);
+            canvas.drawRoundRect(box, size * .6f, size * .6f, paint);
+            text.setColor(0xFF2B2440);
+            text.setAlpha(Math.round(255 * show));
+            canvas.drawText(petWord, x, over + size * .2f, text);
+            text.setAlpha(255);
+            text.setTypeface(Typeface.DEFAULT);
+            paint.setColor(Color.BLACK);
+            paint.setAlpha(255);
+        }
     }
 
     /** The mark under a thin ledge that says she can be let down through it: a small arrowhead, pointing down. */
@@ -4927,6 +5022,40 @@ final class RunGame {
         canvas.restore();
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);
+    }
+
+    private static final String[] IMP_SAYS = {"Too slow~", "Hehe~", "Mine~", "Sloppy~"};
+    private float wardAge = 9;
+
+    private void petSays(String word) {
+        petWord = word;
+        petWordLeft = 1.8f;
+        sincePetWord = 0;
+    }
+
+    /** What lies about a pet and is its doing: the puddles of ink a mini Rune has left, and the ring of light when it is ready or has just been used. */
+    private void drawPetThings(Canvas canvas) {
+        paint.setStyle(Paint.Style.FILL);
+        for (float[] puddle : run.puddles()) {
+            float x = (puddle[0] - cameraX) * tile, y = (puddle[1] - cameraY) * tile, show = Math.min(1, puddle[2] / .8f);
+            paint.setColor(0xFF27338F);
+            paint.setAlpha(Math.round(200 * show));
+            canvas.drawOval(x - tile * .8f * show, y - tile * .07f, x + tile * .8f * show, y + tile * .09f, paint);
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(90 * show));
+            canvas.drawOval(x - tile * .45f * show, y - tile * .04f, x - tile * .1f * show, y + tile * .01f, paint);
+        }
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herY = (run.y() + PlusRun.TALL / 2 - cameraY) * tile;
+        if (run.warded() || wardAge < .4f) {
+            float burst = wardAge < .4f ? wardAge / .4f : 0, round = tile * (.95f + .05f * (float) Math.sin(clock * 5) + burst * .8f);
+            stroke.setColor(0xFFFFF1B8);
+            stroke.setStrokeWidth(tile * (.07f + .05f * burst));
+            stroke.setAlpha(Math.round((wardAge < .4f ? 255 * (1 - burst) : 120 + 60 * (float) Math.sin(clock * 5))));
+            canvas.drawCircle(herX, herY, round, stroke);
+            stroke.setAlpha(255);
+        }
     }
 
     /** A ring of light that beats about a button: here is the thing that was just spoken of. */

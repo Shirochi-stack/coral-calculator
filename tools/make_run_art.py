@@ -413,7 +413,8 @@ def places():
         strip_of(pieces(f"boss_{name}", 1, 4), tall, box, name)
     # Pets: six pictures of each. One that runs: standing, two of running, jumping, at it, and pleased. One that floats: two of hovering,
     # looking, darting, at it, and pleased.
-    for name in ("jar", "cat", "dog", "duck", "monkey"):
+    # (And the five that are small stuffed copies of people she knows: Chikuwa, Rune, and three of Halgakos, with black wings, white wings and none.)
+    for name in ("jar", "cat", "dog", "duck", "monkey", "chikuwa", "rune", "dark", "light", "mini"):
         strip_of(pieces(f"pet_{name}", 1, 6), 100, (220, 170), f"pet_{name}")
     # A times, beaten: knocked into the air, and flat on its back.
     strip_of(pieces("times_down", 1, 2), 110, (160, 124), "times_down")
