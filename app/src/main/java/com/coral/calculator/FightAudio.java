@@ -15,7 +15,7 @@ import java.util.Map;
  */
 final class FightAudio {
     private static final String[] EFFECTS = {"hit", "heavy", "block", "swing", "throw", "scan", "slice", "bat", "bread", "ink", "heart",
-            "magic", "jump", "fall", "ko", "bell", "meter", "ultimate", "tap", "pick", "win", "lose", "whoosh", "dodge", "smash", "clash", "tick", "homer"};
+            "magic", "jump", "fall", "ko", "bell", "meter", "ultimate", "tap", "pick", "win", "lose", "whoosh", "dodge", "smash", "clash", "tick", "homer", "drop"};
 
     private final Context context;
     private final SoundPool pool;

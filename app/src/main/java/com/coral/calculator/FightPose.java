@@ -76,6 +76,10 @@ final class FightPose {
                 if (fighter.kind == Fight.TSUBAKIEH && fighter.move == Fight.ULTIMATE && fight.phase() == Fight.FLOURISH && fight.flourisher() == fighter.side) {
                     return fight.flourish() < .5f ? HR1 : HR2;
                 }
+                // While her brick bread drop is announced she hugs the great loaf, staggering under it, and heaves it over her head.
+                if (fighter.kind == Fight.CHIKUWA && fighter.move == Fight.ULTIMATE && fight.phase() == Fight.FLOURISH && fight.flourisher() == fighter.side) {
+                    return fight.flourish() < .5f ? DR1 : DR2;
+                }
                 return striking(fighter);
             default:
                 // Beaten on time she sinks to her knees; before a round she has something to say for herself.
@@ -123,6 +127,19 @@ final class FightPose {
         if (which == Fight.BREAK) return clock < move.startup * .3f ? MS : out ? BREAK : BREAK_W;
         if (which == Fight.LAUNCH) return out ? LAUNCH : LAUNCH_W;
         if (which == Fight.SHOVE) return out ? SHOVE : SHOVE_W;
+        if (which == Fight.ULTIMATE && fighter.kind == Fight.CHIKUWA) {
+            // Up with it, down with it, landed on it, and then a bite of a roll.
+            if (!out) return clock < move.startup * .7f ? DR3 : DR4;
+            if (!struck) return DR5;
+            return clock > move.length() - .3f ? DR6 : DR5;
+        }
+        if (which == Fight.CLASH && fighter.kind == Fight.TSUBAKIEH) {
+            // Her greater home run is swung with the frames of her home run: wound up, a swing for each time it lands, and watching it go.
+            float last = move.startup + move.every * (move.times - 1) + .15f;
+            if (!out) return HR2;
+            if (clock < last) return fighter.landed % 2 == 1 ? HR4 : HR3;
+            return clock > move.length() - .25f ? HR6 : HR5;
+        }
         if (which == Fight.ULTIMATE && fighter.kind == Fight.TSUBAKIEH) {
             // Wound up as she rushes in; the swing; the bat meeting; then the follow-through held, and watching it go.
             if (!out) return clock < move.startup * .7f ? HR2 : HR3;

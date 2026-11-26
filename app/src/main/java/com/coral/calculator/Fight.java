@@ -54,7 +54,7 @@ final class Fight {
     static final float CHAIN_WINDOW = .3f, DODGE_SECONDS = .34f, DODGE_SAFE = .22f, DODGE_REST = .9f;
     static final float DASH_SECONDS = .26f, BACKSTEP_SECONDS = .24f, LAND_SECONDS = .09f;
     /** How fast Tsubakieh's home run sends them upward, and how long the fight stops as the bat lands. */
-    static final float HOMER_UP = 21, HOMER_STOP = .2f;
+    static final float HOMER_UP = 21, HOMER_STOP = .2f, DROP_UP = 11.6f;
     /** The hardest the other side plays, from 0. */
     static final int LEVELS = 4;
 
@@ -1198,10 +1198,12 @@ final class Fight {
         boolean guarded = (her.state == BLOCK || her.state == JUMP && her.guarding) && her.facingLeft == (from < her.x);
         // Tsubakieh's home run, and the greater one she has for winning a clash: it sends them like a ball.
         boolean homer = by.kind == TSUBAKIEH && move != null && (by.move == ULTIMATE || by.move == CLASH);
+        // Chikuwa's brick bread drop, and her greater one: it comes down on them out of the sky.
+        boolean drop = by.kind == CHIKUWA && move != null && (by.move == ULTIMATE || by.move == CLASH);
         if (guarded && !(move != null && move.breaks)) {
             her.health = Math.max(1, her.health - damage * .2f);
             // On a guard a home run still drives her most of the way across the stage.
-            her.across = push * knock * (homer ? 2.2f : .6f);
+            her.across = push * knock * (homer ? 2.2f : drop ? 1.5f : .6f);
             her.meter = Math.min(METER, her.meter + 5);
             by.meter = Math.min(METER, by.meter + damage * .5f);
             her.blockAge = 0;
@@ -1224,7 +1226,7 @@ final class Fight {
         hitGrand = grand;
         if (!grand) stop = Math.max(stop, hard ? .09f : .04f);
         // The bat meets her, and everything stops on it for a moment.
-        else if (homer && floors) stop = HOMER_STOP;
+        else if ((homer || drop) && floors) stop = HOMER_STOP;
         her.move = -1;
         her.clock = 0;
         her.across = push * knock;
@@ -1249,6 +1251,11 @@ final class Fight {
             her.up = juggle ? 5 : 6.5f;
             her.lain = 0;
             her.across = push * (juggle ? 2 : Math.max(4, knock * .7f));
+            if (drop && floors) {
+                // Bounced off the ground by it, about as high as anything but a home run throws anyone.
+                her.up = DROP_UP;
+                her.across = push * 1.5f;
+            }
             if (homer && floors) {
                 // Up and away, high over the stage, and down again a good while later and a long way off.
                 her.up = by.move == CLASH ? HOMER_UP + 3 : HOMER_UP;
