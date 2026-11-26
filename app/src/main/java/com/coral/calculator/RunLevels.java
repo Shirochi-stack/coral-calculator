@@ -1221,7 +1221,7 @@ final class RunLevels {
         /**
          * The inside of a building of a village. A pet shop: the ten pets, five along its
          * floor and five on a shelf over them, each to be walked up to; and Nabi, who keeps
-         * it, at its far end. The guild hall: Inju at the counter. A home: someone in, with
+         * it, at its far end. The guild hall: Inju at the counter, and her board of hunts. A home: someone in, with
          * something for her, and a few pluses on the floor.
          */
         void house(int[] want) {
@@ -1238,6 +1238,8 @@ final class RunLevels {
                 level.items.add(new int[]{PlusRun.SPOT, from + 15, FLOOR - 1, NABI, 100 + 4});
             } else if (sort == GUILD_HALL) {
                 level.items.add(new int[]{PlusRun.SPOT, from + 11, FLOOR - 1, INJU, 100});
+                // And her board of hunts, between the door and her desk.
+                level.items.add(new int[]{PlusRun.SPOT, from + 7, FLOOR - 1, 0, PlusRun.BOARD});
                 pluses(from + 4, from + 6, FLOOR - 1);
             } else {
                 // (Not whoever has something to ask of her in this land: she is out in the village.)

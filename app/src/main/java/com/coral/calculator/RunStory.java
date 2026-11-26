@@ -647,6 +647,23 @@ final class RunStory {
             {"done5", "You found the hidden page. Every book keeps one.", "P",
                     "The bookmark witch is quietly pleased that the hidden room has been found. Soft, dreamy, content."},
     };
+    /**
+     * At the guild hall's board of hunts. Inju: the first time the board is looked at; when
+     * a hunt is taken on; when one is handed in; and when her rank in the guild rises. And
+     * Halgakos, the first time she looks at it.
+     */
+    static final String[][] HUNTS = {
+            {"hunt1", "The hunts board. Three at a time, by guild rule. Bring them back done, and I stamp them.", "U",
+                    "The guild's receptionist explains the board of monster-hunting jobs to a newcomer. Crisp, pleasant, efficient, with a small smile."},
+            {"hunt2", "Hunt registered. Form 7-H. Do come back in one piece.", "U",
+                    "The guild's receptionist registers a job the heroine has just taken on. Crisp, pleasant, a touch of dry warmth at the end."},
+            {"hunt3", "Hunt closed. Counted twice, paid in full. Stamped.", "U",
+                    "The guild's receptionist pays out a finished monster hunt and stamps the form with satisfaction. Crisp, pleased, efficient."},
+            {"hunt4", "A new guild rank. The badge is yours to keep. The paperwork is mine.", "U",
+                    "The guild's receptionist awards the heroine a higher guild rank and its badge. Crisp, proud, a small smile in the voice."},
+            {"hunt5", "Hunting for pay. I like the pay part Sloppy~♡", "H",
+                    PLAYER + "She looks over a noticeboard of paid monster hunts for the first time. Greedy, amused, pleased." + FAST},
+    };
     /** When what was asked cannot be done this time: a letter creased, a count run out. */
     static final String[][] UNDONE = {
             {"undone1", "Ugh. That one's off for this run. Next time Sloppy~♡", "H",
@@ -806,7 +823,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS);
         return groups.toArray(new String[0][][]);
     }
 }

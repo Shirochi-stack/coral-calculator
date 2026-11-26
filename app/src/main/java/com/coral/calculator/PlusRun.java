@@ -119,6 +119,8 @@ final class PlusRun {
      * desk at which the counter is opened, at one of its tabs.
      */
     static final int SPOT = 25;
+    /** What the board of hunts in the guild hall is, as something to be walked up to. */
+    static final int BOARD = 200;
     private int spot = -1;
 
     /** What she stands at in a building, or -1: a pet on show, by its kind; or a desk, a hundred and the tab of the counter it opens. */
@@ -2627,7 +2629,7 @@ final class PlusRun {
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
                 offIt = .3f;
                 if (plunged && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
-                beat(foe, plunged ? PLUNGED : PLAIN);
+                beat(foe, plunged ? PLUNGED : LANDED);
                 // One sign after another without touching the ground: each is worth one plus more than the last.
                 if (foe.flat && ++combo > 1) bonus += Math.min(4, combo - 1);
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
@@ -2881,6 +2883,7 @@ final class PlusRun {
             foe.y = foe.ground;
             foe.act = 0;
             flattened++;
+            fell(foe, SURE);
         }
         for (Shot shot : shots) if (!shot.hers && Math.abs(shot.x - middle) < 6) shot.left = 0;
     }
@@ -3037,7 +3040,25 @@ final class PlusRun {
 
     /** What the blow being dealt is made with: nothing in particular; something nothing stands against; or the kind of thing thrown. */
     private static final int PLAIN = -1, SURE = -2, BLASTED = -3, BEAMED = -4, SWORDED = -5, PLUNGED = -6;
+    /** And a blow that is her coming down on something: as plain as a blow can be, but told from a swing. */
+    private static final int LANDED = -8;
     private int with = PLAIN;
+
+    /**
+     * Everything she has dealt with, in order, for the hunts she has taken on: the kind of
+     * each, and the way of it as {@link RunHunts} counts ways: landed on, nought; with a
+     * thing she holds or throws, its number and one; anything else, a colour of hers, a pet,
+     * the notes, -1.
+     */
+    private final List<int[]> fells = new ArrayList<>();
+
+    List<int[]> fells() { return fells; }
+
+    private void fell(Foe foe, int by) {
+        int way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : by == PLAIN ? BRUSH + 1 : by == SWORDED ? SWORD + 1 : by == BLASTED || by == BOOK ? BOOK + 1
+                : by == PEN || by == KNIFE || by == GUN ? by + 1 : by == PAGE || by == PANELLED ? TABLET + 1 : by == THROWN_KEY ? KEYS + 1 : -1;
+        fells.add(new int[]{foe.kind, way});
+    }
 
     private void beat(Foe foe) {
         if (!open(foe)) {
@@ -3068,6 +3089,7 @@ final class PlusRun {
             foe.y = foe.ground;
             foe.act = 0;
             flattened++;
+            fell(foe, with);
             if (RunLevels.flier(foe.kind)) fliers++;
             // A paper target is only hit: two pluses for it. And where signs keep coming, each one dealt with counts, and is a plus.
             if (foe.kind == RunLevels.TARGET) {

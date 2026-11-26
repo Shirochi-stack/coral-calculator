@@ -4538,9 +4538,11 @@ public class PlusRunTest {
                     }
                 } else if (sort == RunLevels.GUILD_HALL) {
                     halls++;
-                    assertEquals(1, spots.size());
+                    // Inju at her desk, and her board of hunts.
+                    assertEquals(2, spots.size());
                     assertEquals(RunLevels.INJU, spots.get(0)[3]);
                     assertEquals(100, spots.get(0)[4]);
+                    assertEquals(PlusRun.BOARD, spots.get(1)[4]);
                     if (inHall == null) {
                         inHall = new PlusRun(level);
                         hall = one;
@@ -4605,6 +4607,173 @@ public class PlusRunTest {
         run.place(hall[3] + 12, GROUND);
         run.step(STEP, false, false, false);
         assertEquals(100, run.spot());
+        run.place(hall[3] + 7.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.BOARD, run.spot());
+    }
+
+    // The hunts of the guild hall
+
+    @Test public void whatSheDealsWithIsWrittenDownWithTheWayOfItForTheHunts() {
+        // A pen thrown: the kind of what it dealt with, and the pen's way.
+        RunLevels.Level level = armed(PlusRun.PEN);
+        level.foes.add(new int[]{RunLevels.TIMES, 12, FLOOR - 1});
+        PlusRun run = new PlusRun(level);
+        assertTrue(run.fells().isEmpty());
+        hold(run, .5f, false, true, false);
+        run.step(STEP, false, false, false, true);
+        hold(run, 1, false, false, false);
+        assertEquals(1, run.fells().size());
+        org.junit.Assert.assertArrayEquals(new int[]{RunLevels.TIMES, PlusRun.PEN + 1}, run.fells().get(0));
+        // Landed on: the way of landing.
+        run = flown(RunLevels.MINUS, 20, 0);
+        assertTrue(stomp(run, run.foes().get(0)));
+        assertEquals(1, run.fells().size());
+        org.junit.Assert.assertArrayEquals(new int[]{RunLevels.MINUS, RunHunts.LANDING}, run.fells().get(0));
+        // A sword swung: the sword's way.
+        level = armed(PlusRun.SWORD);
+        level.foes.add(new int[]{RunLevels.MINUS, 30, FLOOR - 1});
+        run = new PlusRun(level);
+        hold(run, .5f, false, true, false);
+        assertEquals(PlusRun.SWORD, run.weapon());
+        PlusRun.Foe foe = run.foes().get(0);
+        run.place(foe.x - PlusRun.WIDE - .3f, GROUND);
+        strike(run);
+        hold(run, .3f, false, false, false);
+        assertTrue(foe.flat);
+        org.junit.Assert.assertArrayEquals(new int[]{RunLevels.MINUS, PlusRun.SWORD + 1}, run.fells().get(0));
+        // And each counts for the hunts it is of: by its kind, or by the way of it; a paper target for none.
+        int minuses = RunHunts.of(RunHunts.OF_KIND, 0, 16, 0, false), moths = RunHunts.of(RunHunts.OF_KIND, 7, 30, 4, false);
+        int landing = RunHunts.of(RunHunts.BY_WAY, RunHunts.LANDING, 12, 0, false), books = RunHunts.of(RunHunts.BY_WAY, PlusRun.BOOK + 1, 9, 2, true);
+        assertTrue(RunHunts.counts(minuses, RunLevels.MINUS, PlusRun.SWORD + 1));
+        assertTrue(RunHunts.counts(minuses, RunLevels.THROWER, -1));
+        assertFalse(RunHunts.counts(minuses, RunLevels.TIMES, RunHunts.LANDING));
+        assertTrue(RunHunts.counts(moths, RunLevels.DRIFTER, -1));
+        assertFalse(RunHunts.counts(moths, RunLevels.SWOOPER, -1));
+        assertTrue(RunHunts.counts(landing, RunLevels.SLIME, RunHunts.LANDING));
+        assertFalse(RunHunts.counts(landing, RunLevels.SLIME, PlusRun.PEN + 1));
+        assertFalse(RunHunts.counts(landing, RunLevels.TARGET, RunHunts.LANDING));
+        assertFalse(RunHunts.counts(landing, RunLevels.ZERO, RunHunts.LANDING));
+        assertTrue(RunHunts.counts(books, RunLevels.MINUS, PlusRun.BOOK + 1));
+        assertFalse(RunHunts.counts(books, RunLevels.MINUS, -1));
+        int blot = RunHunts.of(RunHunts.ROVER, RunLevels.BLOT - RunLevels.WYRM, 1, 0, false), cellar = RunHunts.of(RunHunts.CELLAR, PlusRun.RANK_A, 1, 0, false);
+        assertTrue(RunHunts.countsRover(blot, RunLevels.BLOT));
+        assertFalse(RunHunts.countsRover(blot, RunLevels.GECKO));
+        assertFalse(RunHunts.counts(blot, RunLevels.BLOT, -1));
+        assertTrue(RunHunts.countsCellar(cellar, PlusRun.RANK_A) && RunHunts.countsCellar(cellar, PlusRun.RANK_S));
+        assertFalse(RunHunts.countsCellar(cellar, PlusRun.RANK_B));
+        assertFalse(RunHunts.countsCellar(RunHunts.of(RunHunts.CELLAR, PlusRun.RANK_S, 1, 3, false), PlusRun.RANK_A));
+        // What each asks, in words.
+        assertEquals("Beat 30 comma moths", RunHunts.words(moths));
+        assertEquals("Beat Blot", RunHunts.words(blot));
+        assertEquals("Clear a cellar at rank A or better", RunHunts.words(cellar));
+        assertEquals("Beat 9 creatures with a thrown book", RunHunts.words(books));
+        assertEquals("Beat 12 creatures by landing on them", RunHunts.words(landing));
+        assertEquals("Comma moths", RunHunts.brief(moths));
+        assertTrue(RunHunts.pays(books).contains("a treat") && !RunHunts.pays(moths).contains("treat"));
+    }
+
+    @Test public void theBoardHasThreeHuntsNoTwoTheSameThatSheCanDoAndThatAskAndPayMoreTheMoreSheHasHandedIn() {
+        // The kinds a hunt may be for are first met where the board takes them to be; and the three met in the middle of a land, and the cellars.
+        int[] first = new int[RunHunts.GROUPS.length], rovers = new int[3];
+        int cellars = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            boolean cellar = false;
+            for (int[] room : level.rooms) cellar |= room[0] == RunLevels.ARENA;
+            if (cellar && cellars == 0) cellars = number;
+            for (int group = 0; group < first.length; group++) {
+                int hunt = RunHunts.of(RunHunts.OF_KIND, group, 1, 0, false);
+                boolean met = false;
+                for (int[] foe : level.foes) met |= foe[1] < level.main && RunHunts.counts(hunt, foe[0] % RunLevels.GIANT, -1);
+                if (met && first[group] == 0) first[group] = number;
+                if (met) assertTrue(RunHunts.here(hunt, level));
+            }
+            for (int rover = 0; rover < 3; rover++) {
+                int hunt = RunHunts.of(RunHunts.ROVER, rover, 1, 0, false);
+                if (RunHunts.here(hunt, level) && rovers[rover] == 0) rovers[rover] = number;
+            }
+            assertEquals(cellar, RunHunts.here(RunHunts.of(RunHunts.CELLAR, PlusRun.RANK_A, 1, 0, false), level));
+            assertTrue(RunHunts.here(RunHunts.of(RunHunts.BY_WAY, RunHunts.LANDING, 12, 0, false), level));
+        }
+        org.junit.Assert.assertArrayEquals(RunHunts.GROUP_FROM, first);
+        org.junit.Assert.assertArrayEquals(RunHunts.ROVER_FROM, rovers);
+        assertEquals(RunHunts.CELLAR_FROM, cellars);
+
+        // The board, kept full as hunts are handed in: whatever the furthest land open to her and whatever she has to fight with.
+        int all = (1 << RunArms.COUNT) - 1, tablet = 1 << PlusRun.TABLET;
+        for (int open : new int[]{1, 5, 9, 15, 22, 30, 41, 80}) {
+            for (int owned : new int[]{tablet, tablet | 1 << PlusRun.KNIFE, all}) {
+                int[] on = new int[RunHunts.SLOTS];
+                boolean[] sorts = new boolean[4];
+                for (int serial = 0; serial < 90; serial++) {
+                    int slot = serial < RunHunts.SLOTS ? serial : (serial * 7 + 1) % RunHunts.SLOTS, done = Math.max(0, serial - RunHunts.SLOTS);
+                    on[slot] = 0;
+                    int hunt = RunHunts.offer(serial, open, owned, done, on);
+                    String where = "open " + open + " owned " + owned + " serial " + serial;
+                    assertTrue(where, hunt != 0);
+                    int sort = RunHunts.sort(hunt), what = RunHunts.what(hunt), many = RunHunts.many(hunt);
+                    sorts[sort] = true;
+                    for (int other : on) assertFalse(where, other != 0 && RunHunts.sort(other) == sort && RunHunts.what(other) == what);
+                    on[slot] = hunt;
+                    assertEquals(where, RunHunts.tierOf(done), RunHunts.tier(hunt));
+                    assertEquals(where, serial % 3 == 2, RunHunts.treat(hunt));
+                    assertTrue(where, many >= 1 && RunHunts.pluses(hunt) >= 30 && RunHunts.pluses(hunt) % 5 == 0);
+                    if (sort == RunHunts.OF_KIND) assertTrue(where, RunHunts.GROUP_FROM[what] <= open && many >= 3);
+                    else if (sort == RunHunts.ROVER) assertTrue(where, RunHunts.ROVER_FROM[what] <= open && many == 1);
+                    else if (sort == RunHunts.CELLAR) assertTrue(where, open >= RunHunts.CELLAR_FROM && many == 1 && what == (RunHunts.tier(hunt) >= 3 ? PlusRun.RANK_S : PlusRun.RANK_A));
+                    else assertTrue(where, what == RunHunts.LANDING || (owned >> what - 1 & 1) != 0);
+                    assertTrue(where, RunHunts.materials(hunt)[0] >= 1);
+                    assertFalse(where, RunHunts.words(hunt).isEmpty() || RunHunts.brief(hunt).isEmpty());
+                }
+                // Every sort there can be comes up.
+                assertTrue(sorts[RunHunts.OF_KIND] && sorts[RunHunts.BY_WAY]);
+                assertEquals(open >= RunHunts.CELLAR_FROM, sorts[RunHunts.CELLAR]);
+                assertEquals(open >= 15, sorts[RunHunts.ROVER]);
+            }
+        }
+        // The same hunt, later: it asks more, and pays more.
+        for (int serial = 0; serial < 12; serial++) {
+            int early = RunHunts.offer(serial, 80, all, 0, new int[RunHunts.SLOTS]), late = RunHunts.offer(serial, 80, all, 40, new int[RunHunts.SLOTS]);
+            assertEquals(0, RunHunts.tier(early));
+            assertEquals(RunHunts.TIERS - 1, RunHunts.tier(late));
+            assertEquals(RunHunts.sort(early), RunHunts.sort(late));
+            assertTrue(RunHunts.pluses(late) > RunHunts.pluses(early));
+            assertTrue(RunHunts.many(late) >= RunHunts.many(early));
+            if (RunHunts.sort(early) == RunHunts.OF_KIND || RunHunts.sort(early) == RunHunts.BY_WAY) assertEquals(RunHunts.many(early) * 3, RunHunts.many(late));
+            int[] less = RunHunts.materials(early), more = RunHunts.materials(late);
+            assertTrue(more[0] + more[1] + more[2] > less[0] + less[1] + less[2]);
+        }
+        assertEquals(30, RunHunts.many(RunHunts.offer(0, 21, tablet, 40, new int[]{RunHunts.of(RunHunts.OF_KIND, 0, 1, 0, false), RunHunts.of(RunHunts.OF_KIND, 1, 1, 0, false),
+                RunHunts.of(RunHunts.OF_KIND, 2, 1, 0, false)})));
+
+        // Her rank in the guild, and what comes with so many handed in.
+        assertEquals(0, RunHunts.rank(0));
+        for (int rank = 1; rank <= RunHunts.RANK_AT.length; rank++) {
+            assertEquals(rank, RunHunts.rank(RunHunts.RANK_AT[rank - 1]));
+            assertEquals(rank - 1, RunHunts.rank(RunHunts.RANK_AT[rank - 1] - 1));
+        }
+        assertEquals(RunHunts.RANK_AT.length, RunHunts.RANK_NAMES.length);
+        int pets = 0, places = 0, strays = 0;
+        for (int done = 1; done <= 60; done++) {
+            int brings = RunHunts.brings(done);
+            if (brings == RunHunts.A_PET) pets++;
+            else if (brings == RunHunts.A_PLACE) places++;
+            else if (brings == RunHunts.A_STRAY) strays++;
+            // What is said to come next is what does.
+            int next = RunHunts.nextAt(done - 1);
+            assertTrue(next >= done);
+            assertTrue(RunHunts.brings(next) != RunHunts.NOTHING || RunHunts.rank(next) > RunHunts.rank(next - 1));
+            for (int between = done; between < next; between++) assertTrue(RunHunts.brings(between) == RunHunts.NOTHING && RunHunts.rank(between) == RunHunts.rank(between - 1));
+            assertFalse(RunHunts.nextIs(done - 1).isEmpty());
+        }
+        assertEquals(10, pets);
+        assertEquals(2, places);
+        assertEquals(2, strays);
+        assertEquals(1, RunHunts.nextAt(0));
+        assertEquals("the Paper badge", RunHunts.nextIs(0));
+        assertEquals("a pet of her own", RunHunts.nextIs(1));
+        assertEquals(3, RunHunts.nextAt(1));
     }
 
     // What is asked of her
@@ -5935,7 +6104,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);
