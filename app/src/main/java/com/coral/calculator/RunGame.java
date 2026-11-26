@@ -4942,7 +4942,8 @@ final class RunGame {
                 String[] says = who == RunLevels.ILLYA ? RunStory.AIM[0] : who == RunLevels.TSUBAKIEH ? RunStory.AIM[1] : who == RunLevels.GOKHAE ? RunStory.AIM_LATER[0]
                         : who == RunLevels.MIRI ? RunStory.AIM_LATER[1] : who == RunLevels.GARI ? RunStory.AIM_LATER[2] : who == RunLevels.YEOBAEK ? RunStory.AIM_LATER[3]
                         : who == RunLevels.MAWANG ? RunStory.AIM_LATER[4] : who >= RunLevels.GUARD && who <= RunLevels.OLD_BOOK ? RunStory.AIM_LATER[5 + who - RunLevels.GUARD]
-                        : who == RunLevels.LUCY ? RunStory.LUCY[1] : null;
+                        // (Lucy's word is for her water: it is said as she squirts, lobs or rains it, which is when the splash is heard.)
+                        : who == RunLevels.LUCY && (what == 391 || what == 393 || what == 394) ? RunStory.LUCY[1] : null;
                 if (says != null) remark(new String[][]{says});
             }
         }
@@ -10245,6 +10246,20 @@ final class RunGame {
                 lasts = Math.max(.1f, run.lasted(each));
             }
             if (run.on(each) <= 0) until = Math.min(until, run.untilCall(each));
+        }
+        if (run.mastered()) {
+            // The white that is truly hers has no clock: the ribbon wears white and gold, with its star, and says nothing of seconds.
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0x33000000);
+            canvas.drawCircle(x, y + dp(2), round, paint);
+            paint.setColor(Color.WHITE);
+            canvas.drawCircle(x, y, round, paint);
+            paint.setColor(Color.BLACK);
+            stroke.setColor(0xFFE9C96A);
+            stroke.setStrokeWidth(dp(4));
+            canvas.drawCircle(x, y, round - dp(3), stroke);
+            artIn(canvas, STAR_ART, x, y, round * .9f);
+            return;
         }
         int made = blend(mix);
         boolean parts = count > 1 && count < 6 && made == 0;

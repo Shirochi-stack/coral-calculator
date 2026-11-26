@@ -80,8 +80,8 @@ VOICES = {
     # Moru's two sisters, who keep the smithy with her: library voices of young women, each raised a little toward the others' register.
     "c": ("Zoe", 1.05, 1.08),
     "d": ("Camille", .95, 1.06),
-    # Lucy, the Dragon of Lost Words: a library voice of a young girl for now, until one is chosen for her.
-    "e": ("Piper", 1.06, 1.08),
+    # Lucy, the Dragon of Lost Words.
+    "e": ("upbeat-bee-0979__design-voice-ac8b681f", 1.0, 1.0),  # a voice designed as a bratty little sister ("Lucy 02"), the user's pick of twelve
     # The Mother Tongue.
     "f": ("upbeat-bee-0979__design-voice-53058b3d", 1.0, 1.0),  # a voice designed as a cold, regal queen, the user's pick of seventeen
 }
@@ -115,7 +115,7 @@ MANNER = {
     "a": "The leader of the Straight-Ahead Party is a brash red-haired swordswoman with a loud, proud, hot-blooded anime voice. ",
     "b": "The Old Book is a very old, sleepy, bearded book: a slow, warm, grumbling grandfather's voice. ",
     "c": "Pulmu is a young dwarf armourer, Moru's sister: a loud, sunny, warm young woman's voice, laughing easily, big-hearted, in clear American English. ",
-    "e": "Lucy is a small dragon child, a bratty little-sister type, voiced like a Japanese anime voice actress playing a cheeky, spoiled little girl: high, loud and sing-song, taunting, quick to pout and quick to cry, in clear American English. ",
+    "e": "Lucy is a small dragon child, a bratty little-sister type, voiced like a Japanese anime voice actress playing a cheeky, spoiled little girl: high, loud and sing-song, taunting, quick to pout and quick to cry, in clear American English. Sounds written in her lines are performed, never read out as words: 'Bleh!' is her sticking her tongue out with a short, rude raspberry; 'Ow!' is a real yelp of pain; 'Hmph!' is a huffy snort; 'Nyeh-nyeh' is a sing-song taunt. ",
     "f": "The Mother Tongue is a vast, ancient elder dragon and a mother: a grand, cold, regal woman's voice, low and unhurried, perfectly composed, certain that she knows best, never shouting, in clear English. ",
     "d": "Sutdol is a young dwarf jeweller-smith, Moru's sister: a calm, level, exact young woman's voice, quiet and dry, never old or deep, in clear American English. ",
 }
@@ -168,9 +168,23 @@ def spoken(text):
     return text
 
 
+def lucy(said):
+    """
+    A line of Lucy's as it is said, which is not quite as it is shown. Her sounds are spelled the way they are made, so that she makes
+    them and does not read them: "Bleh" is drawn out, and so is "Ow". And "Splash!" is not said at all: it is the sound of her water
+    gun, which the game plays with the line.
+    """
+    said = re.sub(r"^Splash!\s*", "", said)
+    said = re.sub(r"\bBleh\b", "Bleeeh~", said)
+    said = re.sub(r"\bOw!", "Owww!", said)
+    return said
+
+
 def speak(key, text, who, scene):
     voice, rate, _ = VOICES[who]
     said = spoken(text)
+    if who == "e":
+        said = lucy(said)
     # Rune's pauses, written out, made her longer lines take a quarter of a minute: in those they are only commas.
     if who == "R" and len(said) > 60:
         said = said.replace("... ", ", ")
