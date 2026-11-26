@@ -542,6 +542,18 @@ def main():
     jump, running = her_frames("jump", "jump", JUMP_CELL, 14, 3, report)
     lose, _ = her_frames("lose", "lose", LOSE_CELL, 40, 3, report)
     armed = [her_frames(f"arm{index}", f"arm_{name}", ARM_CELL, 14, 4, report)[0] for index, name in enumerate(ARMS)]
+    # And with the two that are hers to begin a land with, her tablet-book and her ring of keys: twelve frames of each, in two rows of six:
+    # standing, four of running, rising; falling, drawing back, letting go, gathering, the heavy thing, and settling.
+    for index, name in enumerate(("tablet", "keys")):
+        her_frames(f"arm{6 + index}", f"arm_{name}", (336, 248), 14, 6, report)
+    # Their pictures, for the button and the backpack: the tablet-book shut and open, the ring of keys, and one key; each in a square of its own.
+    row = Image.new("RGBA", (256 * 4, 256), (0, 0, 0, 0))
+    for index, thing in enumerate(pieces("weapons2", 1, 4)):
+        scale = 240 / max(thing.size)
+        size = (max(1, round(thing.size[0] * scale)), max(1, round(thing.size[1] * scale)))
+        row.alpha_composite(thing.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * 256 + (256 - size[0]) // 2, (256 - size[1]) // 2))
+    clear = Image.new("RGBA", row.size, (0, 0, 0, 0))
+    Image.composite(row, clear, row.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_arms2.webp", lossless=True, quality=100, method=6, exact=True)
     her_frames("party", "party", PARTY_CELL, 14, 3, report)
     others = [cast_frames(name) for name in CAST]
     faces = [face(name) for name in FACES]
