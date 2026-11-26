@@ -477,7 +477,7 @@ final class RunStory {
                     "The quiet bookmark witch ties a green ribbon into the heroine's hair and explains softly what it does. Soft, mysterious, kind."},
             {"meet10", "Footnote one: pluses come to a magnet. Footnote two: mind the spikes.", "E",
                     "The careful leader of the Footnote Party hands over a magnet with advice, as if reading footnotes aloud. Precise, earnest, quick."},
-            {"meet11", "Hehe, I saved you the cold one! Don't tell Moru!", "A",
+            {"meet11", "Nyahaha, I saved you the cold one! Don't tell Moru, nya!", "A",
                     "A playful cat-eared girl of the Footnote Party sneaks the heroine an ice cream. Mischievous, giggly, high."},
             {"meet12", "Ink. Rune-ssi made extra. It takes a hit so you don't.", "W",
                     "A blunt, short-spoken smith girl of the Footnote Party hands over a ball of protective ink. Flat, gruff for a girl, secretly kind."},
@@ -681,7 +681,7 @@ final class RunStory {
                     "The quiet bookmark witch says, sadly, that stories are stopping. Soft, dreamy, mournful."},
             {"rumour10", "Footnote: every series she stops, stops at a name. Somebody's name. I do not know why.", "E",
                     "The careful leader of the Footnote Party shares a strange detail about the stopped translations. Precise, earnest, uneasy."},
-            {"rumour11", "We heard wings last night! Big ones! And in the morning the bookshop had nothing new.", "A",
+            {"rumour11", "We heard wings last night, nya! Big ones! And in the morning the bookshop had nothing new.", "A",
                     "A playful cat-eared girl reports something frightening as if it were gossip. High, quick, wide-eyed."},
             {"rumour12", "Stopped books. Whole shelves of them. Whoever she is, she is angry at something.", "W",
                     "A blunt, short-spoken smith girl remarks on the stopped translations. Flat, gruff for a girl, thoughtful."},
@@ -748,7 +748,7 @@ final class RunStory {
                     PLAYER + "She has just fallen into a pit she nearly cleared, and remembers that a shop sells an upgrade for a second jump in mid-air. Rueful, pointed, a little bossy." + FAST},
             {"wings2", "Short again. Wings, at the guild counter: a jump in the air Sloppy~♡", "H",
                     PLAYER + "She has fallen short of a jump once more and reminds her helper to buy the double jump upgrade. Exasperated, dry." + FAST}};
-    /** The first time each kind of pet goes with her: the ink jar, the cat, the dog, the duck and the monkey. */
+    /** The first time each kind of pet goes with her: the ink jar, the cat, the dog, the duck and the monkey; and the five small stuffed copies of people she knows. */
     static final String[][] PETS = {
             {"pet1", "A floating ink jar. It spits at whatever comes close. It's with me now Sloppy~♡", "H",
                     PLAYER + "A little living ink jar has just floated up to join her as a pet that fights beside her. Delighted, proprietary." + FAST},
@@ -759,7 +759,17 @@ final class RunStory {
             {"pet4", "A duckling in a sailor cap. It goes for the fliers, and its quack stuns Sloppy~♡", "H",
                     PLAYER + "A duckling in a sailor cap has just joined her as a pet that attacks flying enemies. Amused, approving." + FAST},
             {"pet5", "A monkey! It throws nuts and fetches my pluses. Hired Sloppy~♡", "H",
-                    PLAYER + "A baby monkey has just joined her as a pet that throws nuts and collects things for her. Gleeful, businesslike." + FAST}};
+                    PLAYER + "A baby monkey has just joined her as a pet that throws nuts and collects things for her. Gleeful, businesslike." + FAST},
+            {"pet6", "A stuffed Chikuwa? It throws bread rolls. Even the toy feeds people Sloppy~♡", "H",
+                    PLAYER + "A tiny plush doll of her friend Chikuwa has just joined her as a pet that throws bread rolls. Amused, fond, teasing." + FAST},
+            {"pet7", "A stuffed Rune, and it's crying ink already. Fine, hide behind me Sloppy~♡", "H",
+                    PLAYER + "A tiny plush doll of her crybaby friend Rune has just joined her as a pet; it cries puddles of ink. Amused, mock-weary, fond." + FAST},
+            {"pet8", "A stuffed me, with two black wings? I am not that smug. Stop grinning Sloppy~♡", "H",
+                    PLAYER + "A tiny plush doll of herself with two black bat wings and a smug grin has just joined her as a pet. A little offended, amused despite herself." + FAST},
+            {"pet9", "A stuffed me with white wings. Who made me look that well-behaved Sloppy~♡", "H",
+                    PLAYER + "A tiny plush doll of herself with two white angel wings and a gentle smile has just joined her as a pet. A little offended, dry, secretly pleased." + FAST},
+            {"pet10", "A stuffed me that copies everything I do. Get your own moves Sloppy~♡", "H",
+                    PLAYER + "A tiny plush doll of herself has just joined her as a pet that copies her attacks. A little offended, amused, bossy." + FAST}};
     /** The white that is truly hers, when it is first had. */
     static final String[][] TRUE_WHITE = {
             {"true1", "White. All of me, and no clock on it. This is the real one Sloppy~♡", "H",

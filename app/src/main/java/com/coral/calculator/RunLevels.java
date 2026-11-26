@@ -353,7 +353,11 @@ final class RunLevels {
      * From the third land on a pet lies waiting in every land, a different kind from land
      * to land, a little past the first flag, on flat ground where nothing else lies.
      */
-    static int petOf(int number) { return number < 3 ? -1 : (number * 3 + 1) % PlusRun.PETS; }
+    static int petOf(int number) { return number < 3 ? -1 : PET_ROUND[number % PET_ROUND.length]; }
+
+    /** The round of them: the five animals come twice in it, and the five small copies of people she knows once each. */
+    private static final int[] PET_ROUND = {PlusRun.CAT, PlusRun.JAR, PlusRun.MINI_CHIKUWA, PlusRun.DOG, PlusRun.DUCK, PlusRun.MINI_RUNE, PlusRun.MONKEY, PlusRun.JAR,
+            PlusRun.IMP, PlusRun.CAT, PlusRun.DOG, PlusRun.CHERUB, PlusRun.DUCK, PlusRun.MONKEY, PlusRun.TWIN};
 
     private static void kennel(Level level) {
         int pet = petOf(level.number);

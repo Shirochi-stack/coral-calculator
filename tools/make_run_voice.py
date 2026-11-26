@@ -58,13 +58,13 @@ VOICES = {
     "Y": ("community-qdnchfkneudi", .82, 1.12),
     "N": ("community-qj9kc2jtun4a", .95, 1.15),
     # Those met in the villages: the same few voices, each said in her own manner, faster or slower, higher or lower.
-    "S": ("community-2e7y7ype1d0u", 1.0, 1.05),
+    "S": ("upbeat-bee-0979__design-voice-9365ced4", 1.0, 1.0),  # a voice designed as a genki little sister, the user's pick of thirty
     "U": ("community-qdnchfkneudi", .98, 1.08),
     "B": ("Eileen", .95, 1.0),
     "O": ("community-mzyrf5zr14rb", 1.08, 1.14),
     "P": ("community-qj9kc2jtun4a", .9, 1.1),
     "E": ("community-mzyrf5zr14rb", .98, 1.08),
-    "A": ("community-2e7y7ype1d0u", 1.12, 1.1),
+    "A": ("upbeat-bee-0979__design-voice-c4643f36", 1.0, 1.0),  # a voice designed as a squeaky kitten, the user's pick of thirty
     "W": ("community-qdnchfkneudi", .92, 1.0),
     "L": ("community-qj9kc2jtun4a", 1.1, 1.2),
     # Five more who wait at the ends of lands: the Guild Guard, Penchok-jipsa, Byeoru, Jupan and Sumbi.
@@ -90,13 +90,13 @@ MANNER = {
     "K": "Gari is Miri's shy twin sister, with the same high anime voice, hushed and timid, almost a whisper. ",
     "Y": "Yeobaek is a sleepy young swordswoman with a soft, high, drowsy anime voice, drawling and yawning. ",
     "N": "Nuri is a young queen with a clear, high, earnest anime voice, formal and brave. ",
-    "S": "Somi is a cheerful young adventurer with a high, bright, eager anime voice. ",
+    "S": "Somi is a tiny, hyper little-sister of an adventurer, voiced like a Japanese anime voice actress playing the genki little girl: very high and squeaky-cute, loud with excitement, words tumbling out, giggling, in clear American English. ",
     "U": "Inju is the guild's receptionist: a young woman with a light, polite, pleasant anime voice. ",
     "B": "Boksun is a kind old baker granny with a warm, gentle, elderly voice. ",
     "O": "Ttosun is a lively, sporty guild girl with a high, loud, cheerful anime voice. ",
     "P": "Galpi is a quiet young witch with a soft, high, dreamy anime voice. ",
     "E": "Yeseo is the careful young leader of an adventuring party, with a clear, high, earnest anime voice. ",
-    "A": "Nabi is a playful cat-eared girl with a high, giggly, mischievous anime voice. ",
+    "A": "Nabi is a very small, squeaky cat girl, voiced like a Japanese anime voice actress playing a kitten: extremely high and cute, bouncy and impatient, mewing 'nya' between words and bursting into giggles, in clear American English. ",
     "W": "Moru is a short-spoken smith girl with a flat, blunt but young and light anime voice. ",
     "L": "Altteul is a thrifty young shopkeeper with a high, brisk, bright anime voice, always selling. ",
     "D": "The Guild Guard is a lady knight in full armour who guards the guild's door and takes its entrance exam very seriously: a low, firm, dutiful voice, stern and formal, barking orders with total conviction, in clear American English. ",
@@ -151,6 +151,9 @@ def spoken(text):
     text = re.sub(r"\b[Hh]ic\b[.! ]*", "[breathe] ", text)
     for shown, said in SOUNDS:
         text = text.replace(shown, said)
+    # Nabi is a cat: her laugh and her "nya" are said as they are in Japanese.
+    text = re.sub(r"\bNyahaha\b", "\u306b\u3083\u306f\u306f", text)
+    text = re.sub(r"\b[Nn]ya\b", "\u306b\u3083", text)
     return text
 
 

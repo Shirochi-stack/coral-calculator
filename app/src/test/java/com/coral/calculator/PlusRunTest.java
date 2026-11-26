@@ -1923,10 +1923,12 @@ public class PlusRunTest {
             PlusRun fight = shutIn(pen, true);
             PlusRun.Foe guard = waiting(fight);
             fight.adopt(kind);
+            // (The one that copies her does nothing unless she does: she throws pens, over his head, and it throws small ones along the ground.)
+            if (kind == PlusRun.TWIN) fight.arm(PlusRun.PEN);
             for (int step = 0; step < 60 * 30; step++) {
-                fight.place(guard.x - 1.05f, floorOf(fight) - PlusRun.TALL - 1.8f);
+                fight.place(guard.x - 1.05f, floorOf(fight) - PlusRun.TALL - (kind == PlusRun.TWIN ? 1 : 1.8f));
                 fight.shots().removeIf(shot -> !shot.hers);
-                fight.step(STEP, false, false, false);
+                fight.step(STEP, false, false, false, kind == PlusRun.TWIN && step % 40 == 0);
             }
             assertTrue("pet " + kind + " cracks " + fight.cracks() + " strikes " + fight.petStrikes() + " pet at " + fight.petX() + "," + fight.petY() + " her " + fight.x() + "," + fight.y()
                     + " guard " + guard.x + "," + guard.y + " away " + guard.away + " shield " + fight.shield(guard) + " forming " + fight.forming(guard), fight.cracks() >= 1);
@@ -1970,6 +1972,197 @@ public class PlusRunTest {
         }
         assertEquals(blows + 1, fight.blows());
         assertEquals(2, guard.left);
+    }
+
+    @Test public void theFiveSmallCopiesOfPeopleSheKnowsEachHelpInTheirOwnWay() {
+        assertEquals(10, PlusRun.PETS);
+        assertTrue(PlusRun.floats(PlusRun.IMP) && PlusRun.floats(PlusRun.CHERUB));
+        assertFalse(PlusRun.floats(PlusRun.MINI_CHIKUWA) || PlusRun.floats(PlusRun.MINI_RUNE) || PlusRun.floats(PlusRun.TWIN));
+        // A mini Chikuwa: a roll, lobbed, at the nearest; and while she is short of a heart, half of one back every so often, and never more than she can have.
+        RunLevels.Level level = flat(80);
+        level.foes.add(new int[]{RunLevels.TIMES, 26, FLOOR - 1});
+        PlusRun run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(22, GROUND);
+        run.adopt(PlusRun.MINI_CHIKUWA);
+        boolean roll = false;
+        for (int step = 0; step < 60 * 4 && run.flattened() == 0; step++) {
+            run.step(STEP, false, false, false);
+            for (PlusRun.Shot shot : run.shots()) roll |= shot.kind == PlusRun.ROLL && shot.pets && shot.down < 0;
+        }
+        assertTrue(roll);
+        assertEquals(1, run.petKills());
+        hold(run, PlusRun.GIFT_EVERY + 2, false, false, false);
+        assertEquals(0, run.petGifts());
+        run.wound();
+        int halves = run.halves();
+        assertEquals(PlusRun.HEARTS * 2 - 2, halves);
+        hold(run, PlusRun.GIFT_EVERY - 1, false, false, false);
+        assertEquals(0, run.petGifts());
+        hold(run, 1.5f, false, false, false);
+        assertEquals(1, run.petGifts());
+        assertEquals(halves + 1, run.halves());
+        hold(run, PlusRun.GIFT_EVERY * 3, false, false, false);
+        assertEquals(2, run.petGifts());
+        assertEquals(PlusRun.HEARTS * 2, run.halves());
+
+        // A mini Rune: a puddle where she has been, in which a sign goes at less than half its pace; a flick of ink at what is close, which
+        // leaves what it does not deal with dazed; and with one of those who wait near, she keeps on the far side of Halgakos.
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.MINUS, 40, FLOOR - 1});
+        run = new PlusRun(level);
+        run.place(20, GROUND);
+        run.adopt(PlusRun.MINI_RUNE);
+        hold(run, 1.5f, false, false, false);
+        assertFalse(run.puddles().isEmpty());
+        for (float[] puddle : run.puddles()) assertTrue(Math.abs(puddle[0] - run.petX()) < 1.5f && puddle[1] == FLOOR && puddle[2] <= PlusRun.PUDDLE_LASTS);
+        PlusRun.Foe minus = run.foes().get(0);
+        float was = minus.x;
+        hold(run, 1, false, false, false);
+        float free = Math.abs(minus.x - was);
+        assertFalse(run.mired(minus));
+        run.puddles().clear();
+        run.puddles().add(new float[]{minus.x + minus.wide() / 2 - .3f, FLOOR, 9});
+        run.puddles().add(new float[]{minus.x + minus.wide() / 2 - 1, FLOOR, 9});
+        assertTrue(run.mired(minus));
+        was = minus.x;
+        hold(run, .5f, false, false, false);
+        assertEquals(free * .5f * PlusRun.PUDDLE_SLOWS, Math.abs(minus.x - was), .05f);
+        hold(run, 12, false, false, false);
+        assertTrue(run.puddles().size() <= 6);
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.TIMES, 21, FLOOR - 1, 3});
+        run = new PlusRun(level);
+        run.place(20, GROUND);
+        run.adopt(PlusRun.MINI_RUNE);
+        PlusRun.Foe tough = run.foes().get(0);
+        for (int step = 0; step < 60 * 4 && tough.left == 3; step++) {
+            tough.x = tough.home;
+            run.place(20, GROUND);
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(0, run.hurts());
+        assertEquals(2, tough.left);
+        assertTrue(tough.dazed > 1);
+        RunLevels.Level pen = flat(70);
+        pen.arena = 20;
+        pen.foes.add(new int[]{RunLevels.GUARD, 34, FLOOR - 1});
+        PlusRun fight = shutIn(pen, true);
+        PlusRun.Foe guard = waiting(fight);
+        fight.adopt(PlusRun.MINI_RUNE);
+        for (int side = 0; side < 2; side++) {
+            for (int step = 0; step < 60 * 2; step++) {
+                fight.place(guard.x + (side == 0 ? -3 : 3.5f), floorOf(fight) - PlusRun.TALL - 1.8f);
+                fight.shots().removeIf(shot -> !shot.hers);
+                fight.step(STEP, false, false, false);
+            }
+            assertEquals("side " + side, side == 0, fight.petX() < fight.x());
+        }
+
+        // The one with black wings: at the nearest, from close, again and again: more than twice as often as the duck.
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.MINUS, 22, FLOOR - 1, 30});
+        level.foes.add(new int[]{RunLevels.MINUS, 30, FLOOR - 1});
+        run = new PlusRun(level);
+        run.place(20, GROUND);
+        run.adopt(PlusRun.IMP);
+        for (int step = 0; step < 60 * 5; step++) {
+            for (PlusRun.Foe foe : run.foes()) foe.x = foe.home;
+            run.place(20, GROUND);
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(0, run.hurts());
+        assertTrue("strikes " + run.petStrikes(), run.petStrikes() >= 5);
+        assertEquals(30 - run.petStrikes(), run.foes().get(0).left, 1);
+        assertFalse(run.foes().get(1).flat);
+
+        // The one with white wings: a ray, from a long way off, slowly; and a ring of light that turns aside one thing thrown at her, and
+        // is then a while in coming back.
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.TIMES, 28, FLOOR - 1});
+        run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(20, GROUND);
+        run.adopt(PlusRun.CHERUB);
+        boolean ray = false;
+        for (int step = 0; step < 60 * 5 && run.flattened() == 0; step++) {
+            run.step(STEP, false, false, false);
+            for (PlusRun.Shot shot : run.shots()) ray |= shot.kind == PlusRun.RAY && shot.pets && shot.hers;
+        }
+        assertTrue(ray);
+        assertEquals(1, run.petKills());
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.THROWER, 24, FLOOR - 1});
+        run = new PlusRun(level);
+        run.place(20, GROUND);
+        run.adopt(PlusRun.CHERUB);
+        PlusRun.Foe thrower = run.foes().get(0);
+        assertFalse(run.warded());
+        // (The one who throws holds back until the ring is ready.)
+        for (int step = 0; step < 60 * 40 && run.petWards() < 2; step++) {
+            boolean coming = false;
+            for (PlusRun.Shot shot : run.shots()) coming |= !shot.hers;
+            thrower.wait = run.warded() && !coming ? Math.min(thrower.wait, .3f) : 99;
+            run.place(20, GROUND);
+            run.step(STEP, false, false, false);
+            run.shots().removeIf(shot -> shot.pets);
+        }
+        assertEquals(2, run.petWards());
+        assertEquals(0, run.hurts());
+        assertFalse(run.warded());
+        // With the ring not ready, the next thing thrown is not turned aside.
+        thrower.wait = .1f;
+        for (int step = 0; step < 60 * 3 && run.hurts() == 0; step++) {
+            run.place(20, GROUND);
+            run.step(STEP, false, false, false);
+            run.shots().removeIf(shot -> shot.pets);
+        }
+        assertEquals(1, run.hurts());
+        assertEquals(2, run.petWards());
+
+        // The one with no wings: nothing by itself; when she uses what she holds, a small one of the same from where it is; and with
+        // nothing in her hands, nothing.
+        // (She stands on a ledge of her own, three squares up, so that what she does goes over what is on the ground and what it does does not.)
+        level = flat(80);
+        level.land[FLOOR - 3][20] = RunLevels.LEDGE;
+        level.land[FLOOR - 3][21] = RunLevels.LEDGE;
+        level.foes.add(new int[]{RunLevels.TIMES, 23, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.TIMES, 17, FLOOR - 1});
+        run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(20.2f, GROUND - 3);
+        run.adopt(PlusRun.TWIN);
+        for (int step = 0; step < 60 * 3; step++) run.step(STEP, false, false, false, step % 30 == 0);
+        assertEquals(FLOOR, run.petY(), .05f);
+        assertEquals(0, run.petStrikes());
+        assertEquals(0, run.petCopies());
+        run.arm(PlusRun.PEN);
+        boolean small = false;
+        for (int step = 0; step < 60 * 3 && run.flattened() == 0; step++) {
+            run.step(STEP, false, false, false, step % 30 == 0);
+            for (PlusRun.Shot shot : run.shots()) small |= shot.kind == PlusRun.PEN && shot.pets;
+        }
+        assertTrue(small);
+        assertTrue(run.petCopies() >= 1);
+        // (Her own pen went over its head: the one in front of her on the ground was the small one's.)
+        assertTrue(run.foes().get(0).flat);
+        assertEquals(1, run.petKills());
+        // A swing: at what is in front of it.
+        level = flat(80);
+        level.land[FLOOR - 3][20] = RunLevels.LEDGE;
+        level.land[FLOOR - 3][21] = RunLevels.LEDGE;
+        level.foes.add(new int[]{RunLevels.TIMES, 20, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.TIMES, 17, FLOOR - 1});
+        run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(20.2f, GROUND - 3);
+        run.adopt(PlusRun.TWIN);
+        run.arm(PlusRun.SWORD);
+        for (int step = 0; step < 60 * 3 && run.flattened() == 0; step++) run.step(STEP, false, false, false, step % 30 == 0);
+        assertEquals(1, run.flattened());
+        assertEquals(1, run.petKills());
+        assertTrue(run.foes().get(0).flat);
+        assertFalse(run.foes().get(1).flat);
     }
 
     @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
@@ -4751,7 +4944,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 5, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);
