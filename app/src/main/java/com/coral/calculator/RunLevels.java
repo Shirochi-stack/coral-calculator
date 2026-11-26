@@ -92,6 +92,49 @@ final class RunLevels {
     static final int TRAMPLE = 5;
     /** How tall a place off the land is, from its floor to its ceiling. */
     static final int ROOM_TALL = 13;
+    /**
+     * A cellar is no room but an arena: a hundred and twenty squares across and forty-three
+     * from floor to ceiling, which is more than two screens either way. A land that has one
+     * is that many rows deep where it lies, beyond the end of the land; the land itself is
+     * in the top eighteen of them, as every land is.
+     */
+    static final int DEEP = 48, ARENA_WIDE = 120, ARENA_FLOOR = DEEP - 3, STOREY = 4, STOREYS = 8;
+    /** Where in an arena something may come in: on its floor, on a platform, on a high perch, or in the open air. */
+    static final int ON_FLOOR = 0, ON_PLATFORM = 1, ON_PERCH = 2, IN_AIR = 3;
+    /** One of the last wave that is outsized is its kind and this much more. */
+    static final int GIANT = 100;
+
+    /**
+     * Who comes in a wave of a land's cellar, by kind: three waves, no two alike, each
+     * with more in it than the last, made of what walks in that land's chapter. The first
+     * is of those that walk; the second brings those that hop, throw, shoot and fly, onto
+     * the platforms and into the air; and the last is some of everything, and ends on
+     * something particular: an outsized one, or, where he sleeps, the Old Book. After the
+     * first chapter no wave is all of one kind.
+     */
+    static int[] wave(int number, int wave, boolean den) {
+        int chapter = chapterOf(number);
+        int[][] waves;
+        if (chapter == 0) {
+            waves = new int[][]{{MINUS, MINUS, MINUS, MINUS}, {MINUS, MINUS, MINUS, DIVIDE, DIVIDE}, {MINUS, MINUS, DIVIDE, DIVIDE, TIMES, TIMES, MINUS + GIANT}};
+        } else if (chapter == 1) {
+            waves = new int[][]{{MINUS, MINUS, MINUS, TIMES, TIMES}, {THROWER, THROWER, DIVIDE, DIVIDE, TIMES, TIMES},
+                    {TIMES, TIMES, TIMES, THROWER, THROWER, GUNNER, MINUS, TIMES + GIANT}};
+        } else if (chapter < CHAPTERS) {
+            waves = new int[][]{{MINUS, MINUS, MINUS, TIMES, TIMES, TIMES}, {THROWER, THROWER, THROWER, GUNNER, GUNNER, DIVIDE, DIVIDE},
+                    {TIMES, TIMES, TIMES, THROWER, THROWER, GUNNER, GUNNER, MINUS, MINUS, TIMES + GIANT}};
+        } else {
+            // The second volume: each chapter has a walker, a bounder, and one that comes after her, of its own; and its dragons fly.
+            int[] walker = {SLIME, POGO, BAR, FAN, BAR}, bounder = {POGO, BAR, SLIME, POGO, FAN}, hunter = {BAR, SLIME, FAN, SLIME, SLIME};
+            int which = chapter - CHAPTERS, one = walker[which], two = bounder[which], three = hunter[which];
+            waves = new int[][]{{one, one, one, MINUS, MINUS, TIMES}, {DRAGON, DRAGON, two, two, two, THROWER, THROWER, GUNNER},
+                    {three, three, three, one, one, DRAGON, DRAGON, DRAGON, THROWER, GUNNER, three + GIANT}};
+        }
+        int[] made = waves[wave - 1].clone();
+        // Where the Old Book sleeps, he is what the last wave ends on, in place of the outsized one.
+        if (den && wave == 3) made[made.length - 1] = OLD_BOOK;
+        return made;
+    }
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
@@ -254,6 +297,13 @@ final class RunLevels {
         final List<int[]> rooms = new ArrayList<>();
         /** The signs that walk in the places off the land, kept apart while the land itself is put together. */
         final List<int[]> lodgers = new ArrayList<>();
+        /**
+         * Where in the land's arenas something may come in: which place, whether on its floor,
+         * a platform, a perch or in the air, the column, and the row it would stand on. And the
+         * lofts: a platform apart from the rest of an arena, across a gap too wide to jump, with
+         * a chest on it for whoever can fly: which place, from which column to which, and its row.
+         */
+        final List<int[]> spawns = new ArrayList<>(), lofts = new ArrayList<>();
         /** How many columns the land proper has: what lies beyond is the places its doors lead to. */
         int main;
         /** What is asked of her in it, or 0; and the out-of-the-way places in it where something may be hidden: the column and row of each. */
@@ -265,13 +315,16 @@ final class RunLevels {
         /** Whether the gate stays shut until Zero has been dealt with. */
         boolean guarded;
 
-        Level(int number, int columns) {
+        Level(int number, int columns) { this(number, columns, ROWS); }
+
+        /** A land so many rows deep: as deep as every land is, or, with an arena beyond its end, as deep as that. */
+        Level(int number, int columns, int rows) {
             this.number = number;
             this.quest = questOf(number);
             this.chapter = chapterOf(number);
             this.columns = columns;
             this.main = columns;
-            land = new char[ROWS][columns];
+            land = new char[rows][columns];
             for (char[] row : land) java.util.Arrays.fill(row, AIR);
         }
     }
@@ -291,7 +344,7 @@ final class RunLevels {
     private static Level later(int number, long seed) {
         Random random = new Random(seed * 6151 + number);
         int chapter = chapterOf(number), boss = bossOf(number);
-        Level draft = new Level(number, 900);
+        Level draft = new Level(number, 1200, DEEP);
         Builder builder = new Builder(draft, random, 1, chapter);
         builder.ground(6);
         int stretches = boss >= 0 ? 12 : 16 + (number - COUNT - 1) / 7, last = -1;
@@ -329,10 +382,14 @@ final class RunLevels {
         draft.main = builder.at;
         builder.rooms();
         builder.asked(draft.gate, gateFloor);
-        Level level = new Level(number, builder.at);
+        boolean deep = false;
+        for (int[] room : draft.rooms) deep |= room[0] == ARENA;
+        Level level = new Level(number, builder.at, deep ? DEEP : ROWS);
         level.main = draft.main;
         level.rooms.addAll(draft.rooms);
-        for (int row = 0; row < ROWS; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
+        level.spawns.addAll(draft.spawns);
+        level.lofts.addAll(draft.lofts);
+        for (int row = 0; row < level.land.length; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
         level.land[gateFloor - 1][draft.gate] = GATE;
         level.land[gateFloor - 2][draft.gate] = GATE;
         level.pluses.addAll(draft.pluses);
@@ -444,7 +501,7 @@ final class RunLevels {
         int chapter = chapterOf(number);
         float hard = (number - 1) / (float) (COUNT - 1);
         // Worked out on a strip longer than any land needs, then cut to length.
-        Level draft = new Level(number, 700);
+        Level draft = new Level(number, 1000, DEEP);
         Builder builder = new Builder(draft, random, hard, chapter);
         builder.ground(6);
         int boss = bossOf(number);
@@ -484,10 +541,14 @@ final class RunLevels {
         draft.main = builder.at;
         builder.rooms();
         builder.asked(draft.gate, gateFloor);
-        Level level = new Level(number, builder.at);
+        boolean deep = false;
+        for (int[] room : draft.rooms) deep |= room[0] == ARENA;
+        Level level = new Level(number, builder.at, deep ? DEEP : ROWS);
         level.main = draft.main;
         level.rooms.addAll(draft.rooms);
-        for (int row = 0; row < ROWS; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
+        level.spawns.addAll(draft.spawns);
+        level.lofts.addAll(draft.lofts);
+        for (int row = 0; row < level.land.length; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
         level.land[gateFloor - 1][draft.gate] = GATE;
         level.land[gateFloor - 2][draft.gate] = GATE;
         level.pluses.addAll(draft.pluses);
@@ -496,6 +557,7 @@ final class RunLevels {
         level.items.addAll(draft.items);
         level.decor.addAll(draft.decor);
         level.weapons.addAll(draft.weapons);
+        level.movers.addAll(draft.movers);
         level.gate = draft.gate;
         level.arena = draft.arena;
         level.guarded = draft.guarded;
@@ -646,7 +708,7 @@ final class RunLevels {
             if (level.quest == CAKES) {
                 List<int[]> nooks = new ArrayList<>(level.nooks);
                 // Short of three such places, the rest are up on the ledges of the places off the land.
-                for (int[] room : level.rooms) nooks.add(new int[]{room[3] + 5, FLOOR - 3});
+                for (int[] room : level.rooms) nooks.add(new int[]{room[3] + 5, room[11] - 3});
                 for (int which : new int[]{0, nooks.size() / 2, nooks.size() - 1}) {
                     level.items.add(new int[]{PlusRun.CAKE, nooks.get(which)[0], nooks.get(which)[1], 0});
                 }
@@ -682,7 +744,11 @@ final class RunLevels {
             for (int[] want : wanted) {
                 // In one cellar in two the Old Book sleeps under the last wave, and it is wider for him.
                 boolean den = want[0] == ARENA && number % 6 == 0;
-                int kind = want[0], wide = kind == PASSAGE ? 46 : kind == ARENA ? den ? 30 : 26 : kind == GAME ? 20 : 22;
+                int kind = want[0], wide = kind == PASSAGE ? 46 : kind == ARENA ? ARENA_WIDE : 30;
+                if (kind == ARENA) {
+                    arena(want, den);
+                    continue;
+                }
                 wall(2);
                 int from = at, to = from + wide - 1, far = -1, middle = (from + to) / 2;
                 for (int column = from; column <= to; column++) {
@@ -711,10 +777,10 @@ final class RunLevels {
                         level.land[FLOOR - 1][from + 9] = SPRING;
                         ledge(from + 12, FLOOR - 5, to - from - 11);
                         level.land[FLOOR - 6][to - 3] = SPRING;
-                        ledge(from + 11, FLOOR - 10, 6);
+                        ledge(to - 11, FLOOR - 10, 6);
                         pluses(from + 13, from + 17, FLOOR - 7);
                         level.items.add(new int[]{treat, from + 15, FLOOR - 6, 0});
-                        level.items.add(new int[]{PlusRun.CHEST, from + 12, FLOOR - 11, 0});
+                        level.items.add(new int[]{PlusRun.CHEST, to - 9, FLOOR - 11, 0});
                     }
                 } else if (kind == PASSAGE) {
                     // A way through: two stretches of spikes, each crossed on ledges; signs that walk between them; an upper way to
@@ -738,10 +804,6 @@ final class RunLevels {
                     level.items.add(new int[]{PlusRun.FORM + (number % 2 == 0 ? PlusRun.YELLOW : PlusRun.GREEN), from + 37, FLOOR - 6, 0});
                     pluses(from + 39, to - 6, FLOOR - 1);
                     level.items.add(new int[]{PlusRun.CHEST, to - 4, FLOOR - 1, 0});
-                } else if (kind == ARENA) {
-                    ledge(from + 3, FLOOR - 3, 4);
-                    ledge(to - 6, FLOOR - 3, 4);
-                    ledge(middle - 2, FLOOR - 5, 4);
                 } else if (kind == GAME) {
                     ledge(from + 4, FLOOR - 3, 3);
                     ledge(to - 6, FLOOR - 3, 3);
@@ -753,8 +815,152 @@ final class RunLevels {
                     ledge(from + 6, FLOOR - 3, 3);
                     ledge(to - 8, FLOOR - 3, 3);
                 }
-                level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], den ? 1 : 0});
+                level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], 0, FLOOR, ceiling});
             }
+        }
+
+        /**
+         * A cellar: an arena, walled all round, with a floor and eight storeys of platforms
+         * over it, four squares apart, which is more than a jump. Between a storey and the
+         * one over it there are steps: two squares of thin ledge half way up, under the end
+         * of a platform, from which she jumps up through it; and where there is nothing
+         * under a platform to step from, a spring on what is under it. There are springs on
+         * the floor as well, short runs of spikes between them, and a ledge that rides up
+         * and down the middle. There are three ways it may be laid, by the land: stacks, in
+         * which the platforms of each storey lie over the gaps of the one below; towers, two
+         * of solid block with platforms out from them and bridges between; and terraces, two
+         * flights of platforms that climb from either end and cross. Bread and a ball of ink
+         * lie up in it. In a top corner is a loft, across a gap too wide to jump, with a
+         * chest on it for whoever can fly. And all over it are the places where a wave may
+         * come in.
+         */
+        void arena(int[] want, boolean den) {
+            int number = level.number, style = number / 3 % 3, index = level.rooms.size();
+            for (int wall = 0; wall < 2; wall++) {
+                for (int row = 0; row < DEEP; row++) level.land[row][at + wall] = BLOCK;
+            }
+            at += 2;
+            int from = at, to = from + ARENA_WIDE - 1, floor = ARENA_FLOOR, middle = (from + to) / 2;
+            for (int column = from; column <= to + 2; column++) {
+                for (int row = 0; row < DEEP; row++) level.land[row][column] = row < 2 || row >= floor || column > to ? BLOCK : AIR;
+            }
+            at += ARENA_WIDE + 2;
+            level.land[floor - 1][from + 1] = ENTRY;
+            // The storeys.
+            for (int storey = 1; storey <= STOREYS; storey++) {
+                int row = floor - storey * STOREY;
+                if (style == 0) {
+                    for (int start = from + 5 + storey % 2 * 7; start + 9 <= to - 3; start += 15) ledge(start, row, 10);
+                } else if (style == 1) {
+                    if (storey <= 6) {
+                        // Out from the towers on the odd storeys and on the sixth, which is level with their tops; and further out on the others.
+                        boolean odd = storey % 2 == 1 || storey == 6;
+                        ledge(odd ? from + 22 : from + 8, row, 12);
+                        ledge(odd ? to - 33 : to - 19, row, 12);
+                        if (storey % 2 == 0) {
+                            ledge(from + 40, row, middle - 3 - from - 40);
+                            ledge(middle + 4, row, to - 39 - middle - 4);
+                        }
+                    } else {
+                        ledge(from + 26, row, 26);
+                        ledge(to - 51, row, 26);
+                    }
+                } else {
+                    int step = 11;
+                    ledge(from + 5 + (storey - 1) * step, row, 15);
+                    ledge(to - 19 - (storey - 1) * step, row, 15);
+                    // And on every other storey a platform in the middle, by the ledge that rides.
+                    if (storey % 2 == 1) ledge(middle - 4, row, 8);
+                }
+            }
+            if (style == 1) {
+                // The towers: solid, from over a way through each at the floor to the sixth storey, which their tops are part of.
+                for (int row = floor - 6 * STOREY; row < floor - 3; row++) {
+                    for (int column = 0; column < 6; column++) {
+                        level.land[row][from + 34 + column] = BLOCK;
+                        level.land[row][to - 39 + column] = BLOCK;
+                    }
+                }
+            }
+            // The loft, in the top corner by the far wall: nothing is within a jump of it.
+            int loftRow = floor - STOREYS * STOREY;
+            for (int column = to - 17; column <= to; column++) {
+                for (int row = loftRow - 3; row <= loftRow + STOREY + 2; row++) if (level.land[row][column] == LEDGE) level.land[row][column] = AIR;
+            }
+            ledge(to - 8, loftRow, 7);
+            level.items.add(new int[]{PlusRun.CHEST, to - 5, loftRow - 1, 0});
+            level.lofts.add(new int[]{index, to - 8, to - 2, loftRow});
+            // Spikes on the floor, in short runs, away from the door; and springs between them.
+            for (int start = from + 24; start + 4 < to - 6; start += 31) put(start, floor - 1, 4, SPIKE);
+            for (int spring = from + 12; spring < to - 4; spring += 19) {
+                if (level.land[floor - 1][spring] == AIR) level.land[floor - 1][spring] = SPRING;
+            }
+            // The steps from each storey to the next, and from the floor to the first.
+            for (int storey = 1; storey <= STOREYS; storey++) {
+                int row = floor - storey * STOREY, under = row + STOREY;
+                for (int column = from; column <= to; column++) {
+                    if (level.land[row][column] != LEDGE || column > from && level.land[row][column - 1] == LEDGE) continue;
+                    int end = column;
+                    while (end < to && level.land[row][end + 1] == LEDGE) end++;
+                    if (row == loftRow && column >= to - 8) continue;
+                    boolean joined = false;
+                    // A step under one end of it or the other, where there is something below to jump to the step from.
+                    for (int tries = 0; tries < 2 && !joined; tries++) {
+                        int at = tries == 0 ? column : end - 1;
+                        if (level.land[row + 2][at] != AIR || level.land[row + 2][at + 1] != AIR || level.land[row + 1][at] != AIR) continue;
+                        for (int near = at - 3; near <= at + 4 && !joined; near++) {
+                            if (near < from || near > to) continue;
+                            char ground = level.land[under][near], over = level.land[under - 1][near];
+                            joined = (ground == LEDGE || ground == BLOCK) && (over == AIR || over == SPRING);
+                        }
+                        if (joined) put(at, row + 2, 2, THIN);
+                    }
+                    // Or a spring on what is under it, to go up through it.
+                    for (int below = column + 1; below < end && !joined; below++) {
+                        char ground = level.land[under][below];
+                        if ((ground == LEDGE || ground == BLOCK) && level.land[under - 1][below] == AIR && level.land[under - 2][below] == AIR) {
+                            level.land[under - 1][below] = SPRING;
+                            joined = true;
+                        }
+                    }
+                }
+            }
+            // A ledge that rides up and down the middle, from the floor to over the sixth storey: two of them between the towers.
+            level.movers.add(new int[]{middle - 1, floor - 1, 3, 6 * STOREY + 2, 1, 80});
+            if (style == 1) level.movers.add(new int[]{middle + 12, floor - 1, 3, 3 * STOREY, 1, 56});
+            // Bread up on the fourth storey and a ball of ink on the sixth, each on the first platform there is there.
+            int[] treats = {PlusRun.BREAD, PlusRun.SHIELD};
+            for (int which = 0; which < 2; which++) {
+                int row = floor - (which == 0 ? 4 : 6) * STOREY;
+                for (int column = which == 0 ? from + 6 : middle; column <= to - 12; column++) {
+                    if (level.land[row][column] != LEDGE || level.land[row][column + 2] != LEDGE) continue;
+                    level.items.add(new int[]{treats[which], column + 2, row - 1, 0});
+                    break;
+                }
+            }
+            // Where a wave may come in: along the floor; in the middle of every platform, the higher ones perches; and in the open air.
+            for (int column = from + 16; column <= to - 6; column += 9) {
+                if (level.land[floor - 1][column] == AIR) level.spawns.add(new int[]{index, ON_FLOOR, column, floor});
+            }
+            for (int storey = 1; storey <= STOREYS; storey++) {
+                int row = floor - storey * STOREY;
+                for (int column = from; column <= to; column++) {
+                    if (level.land[row][column] != LEDGE || column > from && level.land[row][column - 1] == LEDGE) continue;
+                    int end = column;
+                    while (end < to && level.land[row][end + 1] == LEDGE) end++;
+                    if (row == loftRow && column >= to - 8 || end - column < 4) continue;
+                    level.spawns.add(new int[]{index, storey >= 5 ? ON_PERCH : ON_PLATFORM, (column + end) / 2, row});
+                }
+            }
+            for (int storey = 2; storey <= 6; storey += 2) {
+                int row = floor - storey * STOREY - 2;
+                for (int column = from + 14; column <= to - 14; column += 17) {
+                    boolean open = true;
+                    for (int across = -1; across <= 1; across++) for (int down = -1; down <= 1; down++) open &= level.land[row + down][column + across] == AIR;
+                    if (open) level.spawns.add(new int[]{index, IN_AIR, column, row});
+                }
+            }
+            level.rooms.add(new int[]{ARENA, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], den ? 1 : 0, floor, 2});
         }
 
         /** Flat ground for some columns. */

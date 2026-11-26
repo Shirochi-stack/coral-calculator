@@ -73,6 +73,18 @@ final class PlusRun {
     static final int STEAMS = 0, COMET = 1, TIDE = 2, MIRROR = 3, GALE = 4, EMBER = 5, PRISM = 6, WHITEN = 7, MIXES = 8;
     /** How many waves of signs a cellar fills with, how long the pluses fall, and how many of them caught win something more. */
     static final int WAVES = 3, ENOUGH = 8;
+    /**
+     * How a cellar's wave stands: announced, when for a beat nothing moves; fought, from
+     * the moment the places where its creatures will come in are marked; and cleared, when
+     * there is a breath before the next is announced.
+     */
+    static final int ANNOUNCED = 1, FOUGHT = 2, CLEARED = 3;
+    /** How long a wave is announced for, how long a place is marked before something comes in at it, and how long the breath after a wave is. */
+    static final float ANNOUNCE = 1.8f, MARKED = 1.1f, BREATH = 2.2f;
+    /** How a cellar was fought, from the best: no hurt and quick; few hurts; no life lost; and done. And what each is worth in pluses. */
+    static final int RANK_S = 3, RANK_A = 2, RANK_B = 1, RANK_C = 0;
+    static final int[] RANK_PAYS = {15, 25, 40, 60};
+    static final float PAR = 110;
     static final float FALLING = 10;
     /** How long rubble hangs before it falls, how long someone takes to arrive, and how long they take over changing. */
     static final float HANGS = .55f, ENTER = 2, FLOURISH = 1.2f;
@@ -245,7 +257,14 @@ final class PlusRun {
     private int entered, reveals, roomWins, wave, caught, dice = 12345;
     private float gameLeft, sinceDrop, gameLasts;
     private int chests;
-    private boolean quitting;
+    private boolean quitting, rewave;
+    /** How the wave of the cellar she is in stands, and for how much longer; and what is about to come in: its kind, across, the top of where it will stand, and in how long. */
+    private int wavePhase;
+    private float waveClock, sinceMoved, sinceShelf;
+    private final List<float[]> pending = new ArrayList<>();
+    /** How the cellar has been fought so far: for how long, with how many hurts, and how many lives lost; and how the last one cleared was ranked. */
+    private float arenaTime;
+    private int arenaHurts, arenaLives, ranked = -1;
     private int heldWeapon = UNARMED, heldRounds, woken, bursts;
     /** In the range, with its gun in her hands; and called on in black, a shadow that nothing touches. */
     private boolean ranging;
@@ -394,6 +413,16 @@ final class PlusRun {
         dice = other.dice;
         gameLeft = other.gameLeft;
         gameLasts = other.gameLasts;
+        rewave = other.rewave;
+        wavePhase = other.wavePhase;
+        waveClock = other.waveClock;
+        sinceMoved = other.sinceMoved;
+        sinceShelf = other.sinceShelf;
+        for (float[] one : other.pending) pending.add(one.clone());
+        arenaTime = other.arenaTime;
+        arenaHurts = other.arenaHurts;
+        arenaLives = other.arenaLives;
+        ranked = other.ranked;
         chests = other.chests;
         sinceDrop = other.sinceDrop;
         quitting = other.quitting;
@@ -532,7 +561,7 @@ final class PlusRun {
     int columns() { return columns; }
 
     char at(int column, int row) {
-        if (column < 0 || column >= columns || row < 0 || row >= RunLevels.ROWS) return RunLevels.AIR;
+        if (column < 0 || column >= columns || row < 0 || row >= level.land.length) return RunLevels.AIR;
         char here = level.land[row][column];
         // A ledge that has crumbled is not there until it is back.
         if (here == RunLevels.CRUMBLE && !crumble.isEmpty() && crumbling(column, row) < 0) return RunLevels.AIR;
@@ -638,7 +667,7 @@ final class PlusRun {
         float middle = x + WIDE / 2, feet = y + TALL;
         if (room >= 0) {
             int[] in = level.rooms.get(room);
-            if (sealed() || Math.abs(feet - RunLevels.FLOOR) > .3f) return -1;
+            if (sealed() || Math.abs(feet - in[11]) > .3f) return -1;
             return Math.abs(middle - in[6] - .5f) < .8f || in[8] >= 0 && Math.abs(middle - in[8] - .5f) < .8f ? room : -1;
         }
         for (int index = 0; index < level.rooms.size(); index++) {
@@ -671,12 +700,20 @@ final class PlusRun {
             room = at;
             roomsFound |= 1 << at;
             revealed |= 1 << at;
-            put(far ? one[8] : one[6], RunLevels.FLOOR);
+            put(far ? one[8] : one[6], one[11]);
+            // A cellar shuts, and its first wave is announced: every time she comes into it, for it may be fought again for how well it is fought.
+            if (one[0] == RunLevels.ARENA) {
+                wave = 1;
+                wavePhase = ANNOUNCED;
+                waveClock = ANNOUNCE;
+                pending.clear();
+                arenaTime = 0;
+                arenaHurts = 0;
+                arenaLives = 0;
+            }
             if ((roomsDone & 1 << at) == 0) {
                 if (one[0] == RunLevels.ARENA) {
-                    // The cellar shuts, and the first of the signs are in it.
-                    wave = 1;
-                    summon(one);
+                    // What is in it is its waves.
                 } else if (one[0] == RunLevels.TRAMPLE) {
                     // Signs keep coming, for fifteen seconds.
                     gameLeft = 15;
@@ -727,56 +764,178 @@ final class PlusRun {
         return room >= 0 && (level.rooms.get(room)[0] == RunLevels.ARENA && wave > 0 || level.rooms.get(room)[0] >= RunLevels.GAME && gameLeft > 0);
     }
 
-    /** A wave of signs in a cellar: one more in each wave than in the last, spread along it, and a moment before any of them moves. */
-    private void summon(int[] one) {
-        if (one[10] != 0 && wave == WAVES) {
-            Foe book = new Foe(RunLevels.OLD_BOOK);
-            book.spawned = true;
-            book.left = health(RunLevels.OLD_BOOK);
-            book.most = book.left;
-            book.x = (one[3] + one[4]) / 2f + 2;
-            book.ground = RunLevels.FLOOR - book.tall();
-            book.y = book.ground;
-            book.home = book.x;
-            book.step = 3;
-            book.act = .5f;
-            // He takes a moment to wake.
-            book.enter = 1.6f;
-            foes.add(book);
-            woken++;
-            return;
-        }
-        int count = 2 + wave;
-        for (int index = 0; index < count; index++) {
-            int kind = level.chapter >= 2 && index % 2 == 1 ? RunLevels.SLIME : RunLevels.MINUS;
-            Foe foe = new Foe(kind);
-            foe.spawned = true;
-            foe.left = 1;
-            foe.x = one[3] + 3.5f + index * (one[4] - one[3] - 6f) / Math.max(1, count - 1);
-            foe.ground = RunLevels.FLOOR - foe.tall();
-            foe.y = foe.ground;
-            foe.home = foe.x;
-            foe.leftward = index % 2 == 0;
-            foe.dazed = .8f;
-            foes.add(foe);
+    /**
+     * A wave is mustered: for each of those who are to come in it, a place in the arena
+     * is chosen and marked, and a moment later that one is there. Those that walk come in
+     * on the floor and the platforms; those that throw and shoot, on the perches; a dragon
+     * in the open air; an outsized one on the floor; and the Old Book in the middle of it.
+     * None comes in on top of her. Each is marked a little after the one before.
+     */
+    private void muster(int[] one) {
+        int[] kinds = RunLevels.wave(level.number, wave, one[10] != 0);
+        for (int index = 0; index < kinds.length; index++) {
+            int kind = kinds[index] % RunLevels.GIANT;
+            boolean giant = kinds[index] >= RunLevels.GIANT, ranged = kind == RunLevels.THROWER || kind == RunLevels.GUNNER;
+            int type = kind == RunLevels.DRAGON ? RunLevels.IN_AIR : ranged ? RunLevels.ON_PERCH : giant || kind == RunLevels.OLD_BOOK || index % 2 == 0
+                    ? RunLevels.ON_FLOOR : RunLevels.ON_PLATFORM;
+            int[] where = kind == RunLevels.OLD_BOOK ? new int[]{room, RunLevels.ON_FLOOR, (one[3] + one[4]) / 2, one[11]} : place(type, 7, 60);
+            if (where == null) where = place(RunLevels.ON_FLOOR, 7, 200);
+            if (where == null) continue;
+            pending.add(new float[]{kinds[index], where[2] + .5f, where[3], MARKED + index * .22f, where[1]});
         }
     }
+
+    /** A place in the arena she is in where something of a kind may come in, not too near her and not too far, and not where something else is about to; or none. */
+    private int[] place(int type, float nearest, float furthest) {
+        int[] best = null;
+        int count = 0;
+        for (int[] spot : level.spawns) if (spot[0] == room && spot[1] == type) count++;
+        if (count == 0) return null;
+        dice = dice * 1103515245 + 12345;
+        int from = (dice >>> 16) % count, seen = 0;
+        for (int turn = 0; turn < 2 && best == null; turn++) {
+            seen = 0;
+            for (int[] spot : level.spawns) {
+                if (spot[0] != room || spot[1] != type) continue;
+                if (seen++ < from && turn == 0) continue;
+                float away = Math.abs(spot[2] + .5f - x - WIDE / 2);
+                boolean taken = false;
+                for (float[] other : pending) taken |= Math.abs(other[1] - spot[2] - .5f) < 1.5f && Math.abs(other[2] - spot[3]) < 1.5f;
+                if (taken || away < nearest && Math.abs(spot[3] - y - TALL) < 3 || away > furthest) continue;
+                best = spot;
+                break;
+            }
+        }
+        return best;
+    }
+
+    /** One who was marked is there: standing on the place it was marked at, or, a dragon, in the air over it. */
+    private void arrive(float[] mark) {
+        int kind = (int) mark[0] % RunLevels.GIANT;
+        boolean giant = mark[0] >= RunLevels.GIANT;
+        Foe foe = new Foe(kind);
+        foe.spawned = true;
+        if (kind == RunLevels.OLD_BOOK) {
+            foe.left = health(RunLevels.OLD_BOOK);
+            foe.most = foe.left;
+            foe.step = 3;
+            foe.act = .5f;
+            // He takes a moment to wake.
+            foe.enter = 1.6f;
+            woken++;
+        } else {
+            // An outsized one is nearly twice the size, and takes six blows.
+            foe.left = giant ? 6 : 1;
+            if (giant) foe.size = 1.9f;
+            foe.dazed = .5f;
+        }
+        foe.x = mark[1] - foe.wide() / 2;
+        foe.ground = (kind == RunLevels.DRAGON ? mark[2] + 3 : mark[2]) - foe.tall();
+        foe.y = foe.ground;
+        if (kind == RunLevels.WORD) foe.y = foe.ground - WORD_HANGS;
+        foe.home = foe.x;
+        foe.leftward = x + WIDE / 2 < mark[1];
+        foe.clock = mark[1] * .37f % HOP_EVERY;
+        foes.add(foe);
+    }
+
+    /**
+     * How well a cellar was fought, from how long it took, how many times she was hurt in
+     * it, and how many lives it cost her: without a hurt and inside the time, the best;
+     * with three hurts at most and no life lost, the next; with no life lost, the next;
+     * and otherwise only done.
+     */
+    static int rank(float time, int hurts, int lives) {
+        return lives > 0 ? RANK_C : hurts == 0 && time <= PAR ? RANK_S : hurts <= 3 ? RANK_A : RANK_B;
+    }
+
+    /** How the wave stands and for how much longer; what is marked to come in; whether the lights are out; how the cellar is going; and how the last one cleared was ranked, or -1. */
+    int wavePhase() { return room >= 0 && wave > 0 ? wavePhase : 0; }
+    float waveClock() { return waveClock; }
+    List<float[]> pending() { return pending; }
+    boolean dark() { return room >= 0 && wave == 2 && wavePhase == FOUGHT && level.rooms.get(room)[0] == RunLevels.ARENA; }
+    float arenaTime() { return arenaTime; }
+    int arenaHurts() { return arenaHurts; }
+    int arenaLives() { return arenaLives; }
+    int ranked() { return ranked; }
 
     /** What happens in the place she is in: a cellar's waves, one after another until the last is cleared; and pluses falling for a while. */
     private void rooms(float seconds) {
         int[] one = level.rooms.get(room);
         if (one[0] == RunLevels.ARENA && wave > 0) {
-            for (Foe foe : foes) if (foe.spawned && !foe.flat) return;
-            if (wave < WAVES) {
-                wave++;
-                summon(one);
+            if (wavePhase == ANNOUNCED) {
+                // A beat of stillness; then the places are marked.
+                if ((waveClock -= seconds) > 0) return;
+                wavePhase = FOUGHT;
+                sinceMoved = 0;
+                sinceShelf = 0;
+                muster(one);
+                // For the last wave something to help lies in the middle of the place: a ribbon, a different one from land to land.
+                if (wave == WAVES) {
+                    int[] ribbons = {YELLOW, GREEN, RED, BROWN, PURPLE, BLUE};
+                    int[] where = null;
+                    for (int[] spot : level.spawns) {
+                        if (spot[0] == room && spot[1] == RunLevels.ON_PLATFORM && (where == null
+                                || Math.abs(spot[2] - (one[3] + one[4]) / 2) < Math.abs(where[2] - (one[3] + one[4]) / 2))) where = spot;
+                    }
+                    if (where != null) items.add(new int[]{FORM + ribbons[level.number % ribbons.length], where[2] + 2, where[3] - 1, 0});
+                }
                 return;
             }
-            // Cleared: twenty pluses, forty where the Old Book slept, and a heart if she is short of one.
+            if (wavePhase == CLEARED) {
+                // A breath; then the next is announced.
+                if ((waveClock -= seconds) > 0) return;
+                wave++;
+                wavePhase = ANNOUNCED;
+                waveClock = ANNOUNCE;
+                return;
+            }
+            arenaTime += seconds;
+            for (int index = pending.size() - 1; index >= 0; index--) {
+                float[] mark = pending.get(index);
+                if ((mark[3] -= seconds) <= 0) {
+                    pending.remove(index);
+                    arrive(mark);
+                }
+            }
+            // One of them that is a long way from her, on some other storey or at the far end, comes after her: it is gone from where it
+            // was, and marked to come in again nearer.
+            if ((sinceMoved += seconds) > 5) {
+                sinceMoved = 0;
+                for (int index = 0; index < foes.size(); index++) {
+                    Foe foe = foes.get(index);
+                    if (!foe.spawned || foe.flat || RunLevels.boss(foe.kind) || foe.kind == RunLevels.DRAGON || foe.size > 1.5f) continue;
+                    if (Math.abs(foe.x - x) < 24 && Math.abs(foe.y + foe.tall() - y - TALL) < 9) continue;
+                    boolean ranged = foe.kind == RunLevels.THROWER || foe.kind == RunLevels.GUNNER;
+                    int[] where = place(ranged ? RunLevels.ON_PERCH : RunLevels.ON_PLATFORM, 6, 16);
+                    if (where == null) where = place(RunLevels.ON_FLOOR, 6, 20);
+                    if (where == null) continue;
+                    foes.remove(index);
+                    pending.add(new float[]{foe.kind, where[2] + .5f, where[3], MARKED, where[1]});
+                    break;
+                }
+            }
+            // In the last wave what is on the shelves comes down: it hangs over where she is going for a moment, and falls.
+            if (wave == WAVES && (sinceShelf += seconds) > 3.2f) {
+                sinceShelf = 0;
+                shoot(DEBRIS, false, x + WIDE / 2 + speedAcross * .6f, Math.max(one[12] + .5f, y - 7), 0, 0, 3);
+            }
+            if (!pending.isEmpty()) return;
+            for (Foe foe : foes) if (foe.spawned && !foe.flat) return;
+            if (wave < WAVES) {
+                wavePhase = CLEARED;
+                waveClock = BREATH;
+                for (Shot shot : shots) if (!shot.hers) shot.left = 0;
+                return;
+            }
+            // Cleared: what it is worth is by how well it was fought, and twenty more where the Old Book slept; and a heart if she is short of one.
             wave = 0;
+            wavePhase = 0;
+            ranked = rank(arenaTime, arenaHurts, arenaLives);
             roomsDone |= 1 << room;
             roomWins++;
-            bonus += one[10] != 0 ? 40 : 20;
+            bonus += RANK_PAYS[ranked] + (one[10] != 0 ? 20 : 0);
+            for (Shot shot : shots) if (!shot.hers) shot.left = 0;
             heal();
         } else if (one[0] == RunLevels.RANGE && gameLeft > 0) {
             // Three targets hang at a time; one hit, another is hung somewhere else.
@@ -789,7 +948,7 @@ final class PlusRun {
                 target.spawned = true;
                 target.left = 1;
                 target.x = one[3] + 4 + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 6);
-                target.ground = RunLevels.FLOOR - target.tall() - (dice >>> 8) % 4 * .9f;
+                target.ground = one[11] - target.tall() - (dice >>> 8) % 4 * .9f;
                 target.y = target.ground;
                 target.home = target.x;
                 foes.add(target);
@@ -814,7 +973,7 @@ final class PlusRun {
                 foe.x = one[3] + 3 + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 6);
                 // Not on top of her.
                 if (Math.abs(foe.x - x) < 2.5f) foe.x = x + (x < (one[3] + one[4]) / 2f ? 4 : -4);
-                foe.ground = RunLevels.FLOOR - foe.tall();
+                foe.ground = one[11] - foe.tall();
                 foe.y = foe.ground;
                 foe.home = foe.x;
                 foe.leftward = foe.x > x;
@@ -833,8 +992,8 @@ final class PlusRun {
                 sinceDrop = 0;
                 dice = dice * 1103515245 + 12345;
                 // Over the middle of the room, where she can get under any of them in time.
-                float at = one[3] + 4.5f + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 9);
-                shoot(PLUSDROP, false, at, RunLevels.FLOOR - 7.6f, 0, 5.5f, 2);
+                float at = (one[3] + one[4]) / 2f - 4.5f + (dice >>> 16) % 1000 / 1000f * 9;
+                shoot(PLUSDROP, false, at, one[11] - 7.6f, 0, 5.5f, 2);
             }
             if ((gameLeft -= seconds) <= 0) {
                 gameLeft = 0;
@@ -860,6 +1019,8 @@ final class PlusRun {
         quitting = false;
         room = -1;
         wave = 0;
+        wavePhase = 0;
+        pending.clear();
         gameLeft = 0;
         unarm();
         if (!locked) for (int index = foes.size() - 1; index >= 0; index--) if (foes.get(index).spawned) foes.remove(index);
@@ -1103,6 +1264,21 @@ final class PlusRun {
         safe = 0;
     }
 
+    /** Deals with the nearest of a cellar's wave that is there, as if she had: for looking at a cellar from end to end in a build made for testing. */
+    void sweep() {
+        Foe nearest = null;
+        for (Foe foe : foes) {
+            if (!foe.spawned || foe.flat) continue;
+            if (nearest == null || Math.abs(foe.x - x) + Math.abs(foe.y - y) < Math.abs(nearest.x - x) + Math.abs(nearest.y - y)) nearest = foe;
+        }
+        if (nearest == null) return;
+        nearest.flat = true;
+        nearest.act = 0;
+        foeX = nearest.x + nearest.wide() / 2;
+        foeY = nearest.y + nearest.tall();
+        flattened++;
+    }
+
     /** Puts something in her hands: for checking the rules, and for looking at them. */
     void arm(int with) {
         weapon = with;
@@ -1155,6 +1331,14 @@ final class PlusRun {
         sinceShot += seconds;
         if (leaving) leave();
         if (quitting) quit();
+        if (rewave) {
+            // A life lost in a cellar: she is back at its door, and the wave she was in is announced again, from its beginning.
+            rewave = false;
+            for (int index = foes.size() - 1; index >= 0; index--) if (foes.get(index).spawned) foes.remove(index);
+            pending.clear();
+            wavePhase = ANNOUNCED;
+            waveClock = ANNOUNCE;
+        }
         if (quest == ASKED && level.quest == RunLevels.TIME) asked(seconds);
         if (room >= 0) rooms(seconds);
         // A moment after the last of them is down, both ways open.
@@ -1427,7 +1611,7 @@ final class PlusRun {
                 if (hurt(false)) return;
             }
         }
-        if (y > RunLevels.ROWS + 1) {
+        if (y > (room >= 0 ? level.land.length : RunLevels.ROWS) + 1) {
             cause = wet ? SANK : FELL;
             hurt(true);
             return;
@@ -2095,7 +2279,7 @@ final class PlusRun {
             else if (shot.kind == DEBRIS) shot.down = shot.age < HANGS ? 0 : 13;
             // A ledge is thin: it stops only what comes down on it, which makes it somewhere to shelter.
             char in = at((int) Math.floor(shot.x), (int) Math.floor(shot.y));
-            if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > RunLevels.ROWS
+            if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > (room >= 0 ? level.land.length : RunLevels.ROWS)
                     || (in == RunLevels.LEDGE ? shot.down > Math.abs(shot.across) : solid(in))) {
                 shots.remove(index);
             } else if (shot.kind == PLUSDROP) {
@@ -2209,6 +2393,7 @@ final class PlusRun {
             if (!fell) return true;
         } else {
             hurts++;
+            if (room >= 0 && wave > 0) arenaHurts++;
             // A letter that has been through a hurt is not one to hand over.
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
             halves -= costs;
@@ -2238,9 +2423,20 @@ final class PlusRun {
             speedAcross = 0;
             speedDown = 0;
             flinch = 0;
-            // Out of the place where someone waits, it is as it was before she came in; and so is a place off the land.
+            // Out of the place where someone waits, it is as it was before she came in; and so is a place off the land. But a cellar is
+            // not left for a life: she is back at its door, inside, and the wave she was in begins again.
             if (locked) leaving = true;
-            if (room >= 0) quitting = true;
+            if (room >= 0 && wave > 0 && level.rooms.get(room)[0] == RunLevels.ARENA) {
+                int[] in = level.rooms.get(room);
+                x = in[6] + (1 - WIDE) / 2;
+                y = in[11] - TALL;
+                firmX = x;
+                firmY = y;
+                arenaLives++;
+                rewave = true;
+            } else if (room >= 0) {
+                quitting = true;
+            }
             return true;
         }
         if (fell) {
@@ -2419,7 +2615,7 @@ final class PlusRun {
         float ahead = foe.leftward ? foe.x - by : foe.x + foe.wide() + by;
         int column = (int) Math.floor(ahead), row = (int) Math.floor(foe.ground + foe.tall() - .001f);
         if (ahead < 0 || ahead > columns || solid(at(column, row)) || !solid(at(column, row + 1)) || at(column, row) == RunLevels.SPIKE
-                || foe.spawned && level.arena >= 0 && (ahead < level.arena + 1.2f || ahead > level.gate - .2f)) {
+                || foe.spawned && level.arena >= 0 && foe.x < level.main && (ahead < level.arena + 1.2f || ahead > level.gate - .2f)) {
             if (turns) foe.leftward = !foe.leftward;
             return false;
         }
