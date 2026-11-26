@@ -164,9 +164,23 @@ final class RunGame {
      * over; where each of them is on the screen; how long since the arrow stepped to
      * another colour; and the mix that last formed, and how long ago.
      */
-    private int ribbonFinger = -1, fanWant, fanDrop, fanOver = -1, seenMixings, seenFaded, seenWhitened, mixShown = -1;
+    private int ribbonFinger = -1, fanOver = -1, seenMixings, seenFaded, seenWhitened, mixShown = -1;
     private float ribbonHeld, sinceStep = 9, mixAge = 9;
     private boolean fanOpen, hintMix;
+    /**
+     * Her mix: the colours a tap on the ribbon calls on, all at once, as bits; it is chosen
+     * in the picker and kept from one land to the next and from one day to the next. In
+     * the picker: the colours ticked; whether it stays open with no finger on it, which it
+     * does when the palette opened it and does not when a hold on the ribbon did; whether
+     * one colour at a time is being chosen; and where its card, its quick choices, and its
+     * button are on the screen.
+     */
+    private int herMix, ticks;
+    private boolean pickerStays, oneAtATime;
+    private final RectF pickerCard = new RectF(), wearButton = new RectF();
+    private final List<RectF> chips = new ArrayList<>();
+    private final List<Integer> chipMixes = new ArrayList<>();
+    private static final int ONE_AT_A_TIME = -1, ALL_I_CAN = -2;
     private final RectF[] fanCells = new RectF[PlusRun.WHITE];
     private float lookAge = 9;
     private static final float LOOK = .55f;
@@ -381,6 +395,7 @@ final class RunGame {
         // What whoever waits at the end of a land gives is hers if she has got past them, whenever that was.
         for (int land = 1; land <= RunLevels.TOTAL; land++) if (starsOf(land) > 0) prize(land);
         chosen = session.tally("run_colour");
+        herMix = session.tally("run_mix");
         // The first time, the story of how it began comes before anything else.
         if (session.tally("run_pro2") == 0) {
             session.keep("run_pro2", 1);
@@ -1050,13 +1065,7 @@ final class RunGame {
         sinceBroke += seconds;
         sinceStep += seconds;
         mixAge += seconds;
-        if (screen == PLAY && ribbonFinger >= 0 && !fanOpen && (ribbonHeld += seconds) >= .3f && Integer.bitCount(perks.colours & 127) > 1) {
-            fanOpen = true;
-            fanWant = fanDrop = 0;
-            fanOver = -1;
-            audio.play("page", .5f);
-            buzz(true);
-        }
+        if (screen == PLAY && ribbonFinger >= 0 && !fanOpen && (ribbonHeld += seconds) >= .3f && Integer.bitCount(perks.colours & 127) > 1) openPicker(false);
         if (toastLeft <= 0 && !toasts.isEmpty() && roomCardAge < 0 && roomResultAge < 0) {
             Object[] next = toasts.remove(0);
             toast((String) next[0], (String) next[1], (Integer) next[2]);
@@ -1743,6 +1752,7 @@ final class RunGame {
                         run.gift(given);
                         if (chosen == 0 || given == PlusRun.BLACK) chosen = given;
                         session.keep("run_colour", chosen);
+                        if (herMix == 0) herMix = 1 << given - 1;
                     } else {
                         perks = kept();
                     }
@@ -2034,13 +2044,48 @@ final class RunGame {
         speak(RunStory.SHOP[1], false);
     }
 
+    /** The picker opens, and the land waits: with her mix ticked, and whatever of hers she is wearing besides, for as far as she can hold them. */
+    private void openPicker(boolean stays) {
+        int owned = perks.colours & 127;
+        if ((herMix & owned) == 0) herMix = 1 << chosen - 1;
+        fanOpen = true;
+        pickerStays = stays;
+        fanOver = -1;
+        int wearing = run.mix() & owned;
+        ticks = PlusRun.most(wearing | herMix & owned, wearing, run.together());
+        // Colours are ticked on and off with one another unless one at a time is asked for.
+        oneAtATime = false;
+        audio.play("page", .5f);
+        buzz(true);
+    }
+
+    /** What is ticked is worn, all at once, and is her mix from now on. */
+    private void wearTicks() {
+        int owned = perks.colours & 127;
+        fanOpen = false;
+        ribbonFinger = -1;
+        idle();
+        if ((ticks & owned) == 0) return;
+        herMix = ticks & owned;
+        session.keep("run_mix", herMix);
+        chosen = Integer.numberOfTrailingZeros(herMix) + 1;
+        session.keep("run_colour", chosen);
+        int waiting = herMix & ~run.ready() & ~run.mix();
+        if (run.wear(herMix) == 0 && (run.mix() & herMix) == 0) {
+            audio.play("no", .4f);
+            pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, waiting != 0 ? "Still waiting" : "Not now");
+        }
+    }
+
     /**
-     * A touch on the ribbon, its arrow, or the colours opened out from it. The arrow is a
-     * button of its own, clear of the ribbon, and steps to the next colour that is hers at
-     * any time. The ribbon, let go of at once, calls on the colour it shows, which is added
-     * to what she wears; held for a third of a second it opens out every colour that is
-     * hers, and the land waits: sliding onto one picks it, to be put on if it is not on and
-     * let go of if it is, and letting go of the screen does all of that at once. Another
+     * A touch on the ribbon, the palette beside it, or the picker they open. The palette
+     * opens the picker, which stays open with no finger on it: in it each colour that is
+     * hers is tapped on or off, several at once; the quick choices over them tick a whole
+     * mix in one tap; "Wear" puts on what is ticked, all at once, and makes it her mix; and
+     * a tap outside it closes it and does nothing. The ribbon, let go of at once, calls on
+     * her mix: every colour of it that is ready, passing over any still waiting. Held for a
+     * third of a second it opens the same picker for as long as the finger is down: sliding
+     * onto a colour ticks or unticks it, and letting go wears what is ticked. Another
      * finger may be on an arrow or the jump all the while. Returns whether the touch was
      * one of these and is done with.
      */
@@ -2050,39 +2095,42 @@ final class RunGame {
         boolean down = action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN;
         boolean up = action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL;
         if (fanOpen) {
-            // Whichever finger is on one of them picks it: the one that opened them, as it slides, or another, as it comes down.
-            for (int each = 0; each < event.getPointerCount(); each++) {
-                if (!down && event.getPointerId(each) != ribbonFinger) continue;
-                if (down && each != index) continue;
-                int over = -1;
-                for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) {
-                    if (fanCells[colour] != null && (perks.colours & 1 << colour - 1) != 0 && fanCells[colour].contains(event.getX(each), event.getY(each))) over = colour;
+            if (down) {
+                // A tap: on a quick choice, on a colour, on the button, or outside, which closes it.
+                for (int chip = 0; chip < chips.size(); chip++) {
+                    if (!chips.get(chip).contains(px, py)) continue;
+                    choose(chipMixes.get(chip));
+                    return true;
                 }
-                if (down && over >= 0) pick(over);
-                else if (!down && over != fanOver) {
-                    fanOver = over;
-                    if (over >= 0) pick(over);
+                int over = cellAt(px, py);
+                if (over >= 0) {
+                    pick(over);
+                } else if (wearButton.contains(px, py)) {
+                    audio.play("tap", .5f);
+                    wearTicks();
+                } else if (pickerStays && !pickerCard.contains(px, py)) {
+                    fanOpen = false;
+                    idle();
+                    audio.play("tap", .3f);
                 }
+                return true;
             }
-            if (up && (finger == ribbonFinger || action != MotionEvent.ACTION_POINTER_UP)) {
-                // Let go of: what was picked is done, all at once.
-                for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) if ((fanDrop & 1 << colour - 1) != 0) run.drop(colour);
-                if (fanWant != 0 && run.callAll(fanWant) == 0) audio.play("no", .4f);
-                fanOpen = false;
-                ribbonFinger = -1;
-                idle();
+            if (!pickerStays) {
+                // Opened by a hold: the finger that holds it ticks what it slides onto, and letting go wears what is ticked.
+                for (int each = 0; each < event.getPointerCount(); each++) {
+                    if (event.getPointerId(each) != ribbonFinger) continue;
+                    int over = cellAt(event.getX(each), event.getY(each));
+                    if (over != fanOver) {
+                        fanOver = over;
+                        if (over >= 0) pick(over);
+                    }
+                }
+                if (up && (finger == ribbonFinger || action != MotionEvent.ACTION_POINTER_UP)) wearTicks();
             }
             return true;
         }
         if (down && nextButton.contains(px, py)) {
-            if (Integer.bitCount(perks.colours & 127) > 1) {
-                do chosen = chosen % PlusRun.BLACK + 1;
-                while ((perks.colours & 1 << chosen - 1) == 0);
-                session.keep("run_colour", chosen);
-                sinceStep = 0;
-                audio.play("tap", .5f);
-                buzz(false);
-            }
+            if (Integer.bitCount(perks.colours & 127) > 1) openPicker(true);
             return true;
         }
         if (down && colourButton.contains(px, py)) {
@@ -2091,35 +2139,60 @@ final class RunGame {
             return true;
         }
         if (up && finger == ribbonFinger) {
-            // Let go of before the colours opened out: a tap, which calls on the colour shown, with whatever she wears.
+            // Let go of before the picker opened: a tap, which calls on her mix, with whatever she wears.
             ribbonFinger = -1;
-            if (!run.call(chosen)) {
+            int owned = perks.colours & 127, mix = herMix & owned;
+            if (mix == 0) mix = 1 << chosen - 1;
+            if (run.callAll(mix) == 0) {
                 audio.play("no", .4f);
-                pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, run.on(chosen) > 0 ? "Already on" : run.untilCall(chosen) > 0
-                        ? "Ready in " + (int) Math.ceil(run.untilCall(chosen)) + " s" : run.cursed() > 0 ? "Not under black" : "No more than " + run.together() + " at once");
+                int first = Integer.numberOfTrailingZeros(mix & ~run.mix()) + 1;
+                pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, (run.mix() & mix) == mix ? "Already on" : run.cursed() > 0 ? "Not under black"
+                        : first <= PlusRun.BLACK && run.untilCall(first) > 0 ? "Ready in " + (int) Math.ceil(run.untilCall(first)) + " s"
+                        : "No more than " + run.together() + " at once");
             }
             return action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL;
         }
         return false;
     }
 
-    /** One of the colours opened out is picked: on, to be let go of, or not; off and ready, to be put on, or not, if there is room for it. */
+    /** Which of the colours opened out a place on the screen is over, or -1. */
+    private int cellAt(float x, float y) {
+        for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) {
+            if (fanCells[colour] != null && (perks.colours & 1 << colour - 1) != 0 && fanCells[colour].contains(x, y)) return colour;
+        }
+        return -1;
+    }
+
+    /** One of the colours in the picker is ticked or unticked: one at a time, it alone; otherwise with the rest, if there is room for it. */
     private void pick(int colour) {
         int bit = 1 << colour - 1;
-        if (run.on(colour) > 0) {
-            fanDrop ^= bit;
-        } else if (run.untilCall(colour) > 0 || run.cursed() > 0) {
+        if (oneAtATime) {
+            ticks = bit;
+        } else if ((ticks & bit) != 0) {
+            ticks &= ~bit;
+        } else if (Integer.bitCount(ticks) >= run.together()) {
             audio.play("no", .3f);
             return;
-        } else if ((fanWant & bit) != 0) {
-            fanWant &= ~bit;
         } else {
-            int own = run.mix() & perks.colours & ~fanDrop;
-            if (Integer.bitCount(own) + Integer.bitCount(fanWant) >= run.together()) {
-                audio.play("no", .3f);
-                return;
-            }
-            fanWant |= bit;
+            ticks |= bit;
+        }
+        audio.play("tap", .5f);
+        buzz(false);
+    }
+
+    /** A quick choice is taken: a named mix, as many as she can wear, or one colour at a time. */
+    private void choose(int which) {
+        int owned = perks.colours & 127;
+        if (which == ONE_AT_A_TIME) {
+            oneAtATime = true;
+            ticks = Integer.lowestOneBit(ticks != 0 ? ticks : herMix & owned);
+        } else if (which == ALL_I_CAN) {
+            oneAtATime = false;
+            ticks = PlusRun.most(owned, run.ready() | run.mix() & owned, run.together());
+        } else {
+            oneAtATime = false;
+            // The prism is any three: the three that are readiest.
+            ticks = which == PlusRun.PRISM ? PlusRun.most(owned, run.ready() | run.mix() & owned, 3) : PlusRun.mixOf(which);
         }
         audio.play("tap", .5f);
         buzz(false);
@@ -4563,22 +4636,39 @@ final class RunGame {
 
     /** The button that calls on the colour she has chosen, with how full what she calls on it with is going round it; and, with more than one to choose from, a smaller one that chooses the next. */
     /**
-     * The ribbon that calls on a colour of hers, and the arrow over it that steps to the
-     * next. The ribbon shows the colour chosen and how that one colour stands, each way
-     * unlike the others. On: filled with the colour, a ring round it running down, the
-     * seconds left written large, and the word "on". Waiting: grey, the ribbon pale, an
-     * hourglass of a ring filling, and "wait" with the seconds to go. Ready: white, the
-     * ribbon whole and bright, a ring of the colour beating round it. Round its rim is a
-     * dot for each colour she is wearing. For a moment after the arrow has stepped, the
-     * name of the colour stepped to is written over the arrow.
+     * The ribbon that calls on her mix, and the palette beside it that opens the picker in
+     * which the mix is chosen. The ribbon is the colour of the mix, with a dot on its rim
+     * for each colour in it: bright if that one is on, grey if it is waiting. How the mix
+     * stands is one of three things, each unlike the others. On, when any of it is: filled
+     * with its colour, a ring running down, the seconds the first of it to go has left
+     * written large, and the word "on". Ready, when some of it could be called: white, its
+     * ribbon whole and bright, a ring of its colour beating round it. And waiting, when
+     * none of it could: grey, the ribbon pale, and "wait" with the seconds until the first
+     * of it is ready.
      */
     private void colourControl(Canvas canvas) {
         int owned = perks.colours & 127;
         if (chosen == 0 || chosen > PlusRun.BLACK || (owned & 1 << chosen - 1) == 0) chosen = Integer.numberOfTrailingZeros(owned) + 1;
+        if ((herMix & owned) == 0) herMix = 1 << chosen - 1;
+        int mix = herMix & owned, wearing = run.mix() & mix, ready = run.ready() & mix, count = Integer.bitCount(mix);
         float x = colourButton.centerX(), y = colourButton.centerY(), round = colourButton.width() / 2;
-        boolean on = run.on(chosen) > 0, waiting = !on && run.untilCall(chosen) > 0, held = ribbonFinger >= 0;
-        int colour = FORM_COLOURS[chosen - 1];
-        boolean pale = chosen == PlusRun.YELLOW;
+        boolean on = wearing != 0, waiting = !on && ready == 0, held = ribbonFinger >= 0;
+        // The colour of the mix, the least time any of it that is on has left, and the least wait of any of it.
+        int red = 0, green = 0, blue = 0, first = Integer.numberOfTrailingZeros(mix) + 1;
+        float left = 99, lasts = 1, until = 99;
+        for (int each = PlusRun.RED; each <= PlusRun.BLACK; each++) {
+            if ((mix & 1 << each - 1) == 0) continue;
+            red += Color.red(FORM_COLOURS[each - 1]);
+            green += Color.green(FORM_COLOURS[each - 1]);
+            blue += Color.blue(FORM_COLOURS[each - 1]);
+            if (run.on(each) > 0 && run.on(each) < left) {
+                left = run.on(each);
+                lasts = Math.max(.1f, run.lasted(each));
+            }
+            if (run.on(each) <= 0) until = Math.min(until, run.untilCall(each));
+        }
+        int colour = count == 7 ? FORM_COLOURS[PlusRun.WHITE - 1] : Color.rgb(red / count, green / count, blue / count);
+        boolean pale = Color.red(colour) * .3f + Color.green(colour) * .59f + Color.blue(colour) * .11f > 170;
         box.set(colourButton.left + dp(3), colourButton.top + dp(3), colourButton.right - dp(3), colourButton.bottom - dp(3));
         text.setTextAlign(Paint.Align.CENTER);
         canvas.save();
@@ -4591,13 +4681,13 @@ final class RunGame {
             canvas.drawCircle(x, y, round, paint);
             paint.setColor(Color.BLACK);
             stroke.setColor(pale ? 0xFF3A3F45 : Color.WHITE);
-            stroke.setAlpha(run.on(chosen) < 2 && (int) (clock * 10) % 2 == 0 ? 110 : 255);
+            stroke.setAlpha(left < 2 && (int) (clock * 10) % 2 == 0 ? 110 : 255);
             stroke.setStrokeWidth(dp(4));
-            canvas.drawArc(box, -90, 360 * Math.max(0, Math.min(1, run.on(chosen) / Math.max(.1f, run.lasted(chosen)))), false, stroke);
+            canvas.drawArc(box, -90, 360 * Math.max(0, Math.min(1, left / lasts)), false, stroke);
             stroke.setAlpha(255);
             text.setColor(pale ? 0xFF3A3F45 : Color.WHITE);
             text.setTextSize(round * .8f);
-            canvas.drawText(String.valueOf((int) Math.ceil(run.on(chosen))), x, y + round * .16f, text);
+            canvas.drawText(String.valueOf((int) Math.ceil(left)), x, y + round * .16f, text);
             text.setTextSize(round * .34f);
             canvas.drawText("on", x, y + round * .58f, text);
         } else if (waiting) {
@@ -4607,14 +4697,14 @@ final class RunGame {
             canvas.drawCircle(x, y, round - dp(2), paint);
             paint.setColor(Color.BLACK);
             paint.setAlpha(70);
-            pieceIn(canvas, two, RIBBON_ART + chosen - 1, x, y - round * .26f, round * .7f, 0);
+            pieceIn(canvas, two, RIBBON_ART + first - 1, x, y - round * .26f, round * .7f, 0);
             paint.setAlpha(255);
             stroke.setColor(colour);
             stroke.setStrokeWidth(dp(3.5f));
-            canvas.drawArc(box, -90, 360 * Math.max(0, Math.min(1, run.charge(chosen))), false, stroke);
+            canvas.drawArc(box, -90, 360 * Math.max(0, Math.min(1, 1 - until / 10f)), false, stroke);
             text.setColor(soft);
             text.setTextSize(round * .34f);
-            canvas.drawText("wait " + (int) Math.ceil(run.untilCall(chosen)) + " s", x, y + round * .58f, text);
+            canvas.drawText("wait " + (int) Math.ceil(until) + " s", x, y + round * .58f, text);
         } else {
             float beat = .5f + .5f * (float) Math.sin(clock * 5);
             paint.setStyle(Paint.Style.FILL);
@@ -4624,85 +4714,147 @@ final class RunGame {
             paint.setColor(Color.BLACK);
             paint.setAlpha(255);
             button(canvas, colourButton, false, colour);
-            pieceIn(canvas, two, RIBBON_ART + chosen - 1, x, y, round * 1.2f, 0);
+            if (count == 1) {
+                pieceIn(canvas, two, RIBBON_ART + first - 1, x, y, round * 1.2f, 0);
+            } else {
+                // A mix: the ribbons of what is in it, small, round the middle; of all seven, the white one.
+                if (count == 7) pieceIn(canvas, two, RIBBON_ART + PlusRun.WHITE - 1, x, y, round * 1.2f, 0);
+                int at = 0;
+                for (int each = PlusRun.RED; each <= PlusRun.BLACK && count < 7; each++) {
+                    if ((mix & 1 << each - 1) == 0) continue;
+                    double turn = -Math.PI / 2 + at++ * Math.PI * 2 / count;
+                    float far = count == 2 ? round * .3f : round * .38f;
+                    pieceIn(canvas, two, RIBBON_ART + each - 1, x + (float) Math.cos(turn) * far, y + (float) Math.sin(turn) * far, round * (count <= 3 ? .72f : .56f), 0);
+                }
+            }
             stroke.setColor(colour);
             stroke.setStrokeWidth(dp(3.5f));
             canvas.drawArc(box, -90, 360, false, stroke);
         }
         canvas.restore();
-        // A dot on its rim for each colour she is wearing, whichever is shown.
-        int wearing = run.mix(), dots = Integer.bitCount(wearing), dot = 0;
-        for (int each = PlusRun.RED; each <= PlusRun.BLACK && dots > 0; each++) {
-            if ((wearing & 1 << each - 1) == 0) continue;
-            double turn = Math.toRadians(-90 + (dot - (dots - 1) / 2f) * 26);
+        // A dot on its rim for each colour of the mix, and for anything else she is wearing: its colour if it is on, grey with a rim of its colour if it waits.
+        int shown = mix | run.mix(), dots = Integer.bitCount(shown), dot = 0;
+        for (int each = PlusRun.RED; each <= PlusRun.BLACK && dots > 1; each++) {
+            if ((shown & 1 << each - 1) == 0) continue;
+            double turn = Math.toRadians(-90 + (dot - (dots - 1) / 2f) * 24);
             float at = x + (float) Math.cos(turn) * (round + dp(1)), high = y + (float) Math.sin(turn) * (round + dp(1));
+            boolean lit = run.on(each) > 0, late = !lit && run.untilCall(each) > 0;
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.WHITE);
+            paint.setColor(late ? FORM_COLOURS[each - 1] : Color.WHITE);
             canvas.drawCircle(at, high, dp(5.5f), paint);
-            paint.setColor(FORM_COLOURS[each - 1]);
-            canvas.drawCircle(at, high, dp(4), paint);
+            paint.setColor(late ? 0xFFB9BEC2 : FORM_COLOURS[each - 1]);
+            canvas.drawCircle(at, high, dp(lit ? 4.4f : 3.4f), paint);
             paint.setColor(Color.BLACK);
             dot++;
         }
         if (fanOpen) {
-            drawFan(canvas);
+            drawPicker(canvas);
             return;
         }
-        // The arrow, when there is more than one colour to step through: with the colour it will step to as a dot beside it.
+        // The palette, when there is more than one colour to choose from: three dabs of colour, hers, on a board.
         if (Integer.bitCount(owned) > 1) {
             button(canvas, nextButton, false, CalculatorLayout.CORAL);
-            text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(0xFF3A3F45);
-            text.setTextSize(nextButton.height() * .62f);
-            canvas.drawText("›", nextButton.centerX() - nextButton.width() * .08f, nextButton.centerY() + nextButton.height() * .2f, text);
-            int next = chosen;
-            do next = next % PlusRun.BLACK + 1;
-            while ((owned & 1 << next - 1) == 0);
+            float px = nextButton.centerX(), py = nextButton.centerY(), size = nextButton.width() * .5f;
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(FORM_COLOURS[next - 1]);
-            canvas.drawCircle(nextButton.centerX() + nextButton.width() * .2f, nextButton.centerY(), nextButton.width() * .11f, paint);
-            paint.setColor(Color.BLACK);
-            if (sinceStep < 1.4f) {
-                // The colour stepped to, by name, for a moment.
-                String name = FORM_NAMES[chosen - 1];
-                text.setTextSize(dp(13));
-                float wide = text.measureText(name) + dp(20), high = dp(24), top = nextButton.top - high - dp(4);
-                box.set(nextButton.centerX() - wide / 2, top, nextButton.centerX() + wide / 2, top + high);
-                plate(canvas, box, high / 2, Math.round(240 * Math.min(1, (1.4f - sinceStep) / .3f)));
-                text.setColor(colour == FORM_COLOURS[PlusRun.YELLOW - 1] ? 0xFF8A6A00 : colour);
-                text.setAlpha(Math.round(255 * Math.min(1, (1.4f - sinceStep) / .3f)));
-                canvas.drawText(name, nextButton.centerX(), top + dp(17), text);
-                text.setAlpha(255);
+            paint.setColor(dark ? 0xFF4A4F54 : 0xFFEADFCF);
+            canvas.drawOval(px - size * .86f, py - size * .7f, px + size * .86f, py + size * .7f, paint);
+            int dab = 0;
+            for (int each = PlusRun.RED; each <= PlusRun.BLACK && dab < 4; each++) {
+                if ((owned & 1 << each - 1) == 0) continue;
+                double turn = Math.PI * (1.1 + dab * .27);
+                paint.setColor(FORM_COLOURS[each - 1]);
+                canvas.drawCircle(px + (float) Math.cos(turn) * size * .5f, py + (float) Math.sin(turn) * size * .36f + size * .05f, size * .17f, paint);
+                dab++;
             }
+            paint.setColor(cardColor);
+            canvas.drawCircle(px + size * .36f, py + size * .26f, size * .15f, paint);
+            paint.setColor(Color.BLACK);
         }
     }
 
     /**
-     * The colours that are hers, opened out in a row over the buttons while the ribbon is
-     * held, each as it stands: on, with a ring of its time; waiting, grey, with its seconds;
-     * or ready. One picked to be put on has a gold ring and a plus; one picked to be let
-     * go of is crossed through. Over the row is how many she may wear, and what the colours
-     * that would then be on would make, if that has a name.
+     * The picker: a card over the buttons, in which the land waits. At its top, quick
+     * choices, each a whole mix in one tap: one colour at a time; as many as she can wear;
+     * and each mix that has a name, that she has made before, and that she owns the
+     * colours of and can hold. Under them, every colour that is hers, each as it stands:
+     * on, with a ring of its time and the seconds; waiting, grey, with its seconds; or
+     * ready. One that is ticked has a gold ring and a tick. Under those, how many are
+     * ticked of how many she may wear, and what they would make, if that has a name; and
+     * the button that wears them.
      */
-    private void drawFan(Canvas canvas) {
-        int owned = perks.colours & 127, count = Integer.bitCount(owned);
-        float cell = Math.min(dp(52), (safe.width() - dp(20)) / count - dp(6)), gap = dp(6), wide = count * cell + (count - 1) * gap;
-        float left = Math.max(safe.left + dp(10), Math.min(safe.right - dp(10) - wide, colourButton.centerX() - wide / 2)), bottom = colourButton.top - dp(10);
-        // Never over her: where the row would lie across her, it lies over her head instead.
+    private void drawPicker(Canvas canvas) {
+        int owned = perks.colours & 127, count = Integer.bitCount(owned), made = session.tally("run_mixes");
+        canvas.drawColor(0x66101018);
+        float wide = Math.min(safe.width() - dp(16), dp(400)), pad = dp(12), inner = wide - pad * 2;
+        float cell = Math.min(dp(52), (inner - (count - 1) * dp(6)) / count), gap = dp(6);
+        // The quick choices, flowed into as many rows as they need.
+        chips.clear();
+        chipMixes.clear();
+        List<String> names = new ArrayList<>();
+        names.add("One at a time");
+        chipMixes.add(ONE_AT_A_TIME);
+        if (run.together() > 1) {
+            names.add("All I can wear");
+            chipMixes.add(ALL_I_CAN);
+        }
+        for (int which = PlusRun.STEAMS; which <= PlusRun.WHITEN; which++) {
+            int of = PlusRun.mixOf(which), needs = which == PlusRun.PRISM ? 3 : Integer.bitCount(of);
+            if ((made & 1 << which) == 0 || (of & owned) != of || needs > run.together() || which == PlusRun.PRISM && count < 3) continue;
+            names.add(MIX_NAMES[which]);
+            chipMixes.add(which);
+        }
+        text.setTextSize(dp(13));
+        float chipHigh = dp(30), across = 0;
+        int rows = 1;
+        float[] widths = new float[names.size()];
+        for (int chip = 0; chip < names.size(); chip++) {
+            widths[chip] = text.measureText(names.get(chip)) + dp(22);
+            if (across > 0 && across + widths[chip] > inner) {
+                rows++;
+                across = 0;
+            }
+            across += widths[chip] + dp(6);
+        }
+        float high = pad + rows * (chipHigh + dp(6)) + dp(4) + cell + dp(10) + dp(40) + pad;
+        float left = Math.max(safe.left + dp(8), Math.min(safe.right - dp(8) - wide, colourButton.centerX() - wide / 2)), bottom = colourButton.top - dp(10);
+        // Never over her: where the card would lie across her, it lies over her head instead, if there is room for it there.
         float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herFeet = (run.y() + PlusRun.TALL - cameraY) * tile, herTop = herFeet - tile * 1.7f;
-        if (herX > left - dp(16) && herX < left + wide + dp(16) && herFeet > bottom - cell - dp(36) && herTop < bottom + dp(6)) bottom = herTop - dp(12);
-        canvas.drawColor(0x55101018);
-        box.set(left - dp(8), bottom - cell - dp(34), left + wide + dp(8), bottom + dp(6));
-        plate(canvas, box, dp(20), 245);
-        int will = run.mix() & ~fanDrop | fanWant, at = 0;
+        if (herX > left - dp(12) && herX < left + wide + dp(12) && herFeet > bottom - high && herTop - dp(12) - high > safe.top + dp(60)) bottom = herTop - dp(12);
+        float top = bottom - high;
+        pickerCard.set(left, top, left + wide, bottom);
+        plate(canvas, pickerCard, dp(22), 250);
+        float at = left + pad, down = top + pad;
+        for (int chip = 0; chip < names.size(); chip++) {
+            if (at > left + pad && at + widths[chip] > left + pad + inner) {
+                at = left + pad;
+                down += chipHigh + dp(6);
+            }
+            RectF where = new RectF(at, down, at + widths[chip], down + chipHigh);
+            chips.add(where);
+            int which = chipMixes.get(chip);
+            boolean lit = which == ONE_AT_A_TIME ? oneAtATime : which == ALL_I_CAN ? false : !oneAtATime && which != PlusRun.PRISM && ticks == PlusRun.mixOf(which);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(lit ? CalculatorLayout.CORAL : dark ? 0xFF3A3F45 : 0xFFF0ECE6);
+            canvas.drawRoundRect(where, chipHigh / 2, chipHigh / 2, paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(lit ? Color.WHITE : ink);
+            text.setTextSize(dp(13));
+            canvas.drawText(names.get(chip), where.centerX(), where.centerY() + dp(4.5f), text);
+            at += widths[chip] + dp(6);
+        }
+        down += chipHigh + dp(10);
+        // The colours.
+        float row = count * cell + (count - 1) * gap, from = left + (wide - row) / 2;
+        int index = 0;
         for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) {
             if ((owned & 1 << colour - 1) == 0) continue;
             if (fanCells[colour] == null) fanCells[colour] = new RectF();
             RectF where = fanCells[colour];
-            where.set(left + at * (cell + gap), bottom - cell, left + at * (cell + gap) + cell, bottom);
-            at++;
+            where.set(from + index * (cell + gap), down, from + index * (cell + gap) + cell, down + cell);
+            index++;
             float x = where.centerX(), y = where.centerY(), round = cell / 2;
-            boolean on = run.on(colour) > 0, waiting = !on && run.untilCall(colour) > 0, want = (fanWant & 1 << colour - 1) != 0, drop = (fanDrop & 1 << colour - 1) != 0;
+            boolean on = run.on(colour) > 0, waiting = !on && run.untilCall(colour) > 0, ticked = (ticks & 1 << colour - 1) != 0;
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(waiting ? (dark ? 0xFF2F3336 : 0xFFDDE0E2) : on ? FORM_COLOURS[colour - 1] : cardColor);
             canvas.drawCircle(x, y, round - dp(2), paint);
@@ -4724,38 +4876,43 @@ final class RunGame {
                 text.setTextSize(round * .42f);
                 canvas.drawText((int) Math.ceil(run.untilCall(colour)) + " s", x, y + round * .68f, text);
             }
-            if (want) {
+            if (ticked) {
                 stroke.setColor(0xFFE0A21A);
                 stroke.setStrokeWidth(dp(4));
                 canvas.drawCircle(x, y, round, stroke);
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0xFFE0A21A);
-                canvas.drawCircle(x + round * .68f, y - round * .68f, dp(8), paint);
+                canvas.drawCircle(x + round * .68f, y - round * .68f, dp(8.5f), paint);
                 paint.setColor(Color.BLACK);
-                text.setColor(Color.WHITE);
-                text.setTextSize(dp(13));
-                canvas.drawText("+", x + round * .68f, y - round * .68f + dp(4.5f), text);
-            } else if (drop) {
-                stroke.setColor(0xFF3A3F45);
-                stroke.setStrokeWidth(dp(3.5f));
-                canvas.drawLine(x - round * .6f, y - round * .6f, x + round * .6f, y + round * .6f, stroke);
+                stroke.setColor(Color.WHITE);
+                stroke.setStrokeWidth(dp(2));
+                float cx = x + round * .68f, cy = y - round * .68f;
+                canvas.drawLine(cx - dp(4), cy, cx - dp(1), cy + dp(3), stroke);
+                canvas.drawLine(cx - dp(1), cy + dp(3), cx + dp(4), cy - dp(3), stroke);
             }
         }
-        // What that would make.
-        int named = -1;
-        boolean red = (will & 1) != 0, blue = (will & 2) != 0, brown = (will & 4) != 0, green = (will & 8) != 0, yellow = (will & 16) != 0, purple = (will & 32) != 0;
-        if (will == 127) named = PlusRun.WHITEN;
-        else if (Integer.bitCount(will) >= 3) named = PlusRun.PRISM;
-        else if (red && blue) named = PlusRun.STEAMS;
-        else if (red && yellow) named = PlusRun.COMET;
-        else if (blue && green) named = PlusRun.TIDE;
-        else if (brown && purple) named = PlusRun.MIRROR;
-        else if (green && yellow) named = PlusRun.GALE;
-        else if (red && brown) named = PlusRun.EMBER;
-        String words = named >= 0 ? MIX_NAMES[named] + ": " + MIX_DOES[named] : "Slide to pick, let go to wear  ·  " + Integer.bitCount(will & perks.colours) + " of " + run.together();
+        down += cell + dp(10);
+        // What that would make, and the button that wears it.
+        int named = PlusRun.naming(ticks), picked = Integer.bitCount(ticks);
+        float button = dp(86);
+        wearButton.set(left + wide - pad - button, down, left + wide - pad, down + dp(40));
+        boolean any = picked > 0;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(any ? CalculatorLayout.CORAL : dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+        canvas.drawRoundRect(wearButton, dp(20), dp(20), paint);
+        paint.setColor(Color.BLACK);
         text.setTextAlign(Paint.Align.CENTER);
-        text.setColor(named >= 0 ? ink : soft);
-        fitted(canvas, words, left + wide / 2, bottom - cell - dp(13), dp(12.5f), wide);
+        text.setColor(any ? Color.WHITE : soft);
+        text.setTextSize(dp(16));
+        canvas.drawText("Wear", wearButton.centerX(), wearButton.centerY() + dp(5.5f), text);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        float room = wide - pad * 2 - button - dp(10);
+        fitted(canvas, named >= 0 ? MIX_NAMES[named] + "  ·  " + picked + " of " + run.together() : picked + " of " + run.together() + " she may wear at once", left + pad,
+                down + dp(16), dp(14.5f), room);
+        text.setColor(soft);
+        fitted(canvas, named >= 0 ? capital(MIX_DOES[named]) : oneAtATime ? "Tap a colour: a tap on the ribbon calls it" : "Tap colours on and off, then Wear", left + pad, down + dp(34),
+                dp(12), room);
     }
 
     private void drawStory(Canvas canvas) {

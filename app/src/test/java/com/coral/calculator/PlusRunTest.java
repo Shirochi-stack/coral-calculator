@@ -2275,6 +2275,76 @@ public class PlusRunTest {
         assertTrue(ringed.on(PlusRun.GREEN) > 20);
     }
 
+    @Test public void aMixIsChosenAllAtOnceAndWornAgainByOneCall() {
+        // Several picked and worn together, as the picker does it: all at once, for as many as she can hold.
+        PlusRun run = owning(3, PlusRun.RED, PlusRun.BLUE, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.PURPLE);
+        int mix = 1 | 2 | 8;
+        assertEquals(mix, run.wear(mix));
+        assertEquals(mix, run.mix());
+        assertEquals(3, run.called());
+        // The same mix asked for again while it is on changes nothing.
+        assertEquals(0, run.wear(mix));
+        assertEquals(mix, run.mix());
+        // Another mix asked for: what is on and not in it is let go of, and what is in it and ready is put on.
+        int other = 1 | 16;
+        assertEquals(16, run.wear(other));
+        assertEquals(other, run.mix());
+        assertTrue(run.untilCall(PlusRun.BLUE) > 9 && run.untilCall(PlusRun.GREEN) > 9);
+        // The remembered mix, called on again by the one call later: every colour of it that is ready is put on, and one still waiting is
+        // passed over without stopping the rest.
+        hold(run, 9.2f, false, false, false);
+        assertEquals(0, run.mix());
+        assertTrue(run.untilCall(PlusRun.RED) > 0);
+        hold(run, 4, false, false, false);
+        assertEquals(2 | 8, run.ready() & mix);
+        assertEquals(2 | 8, run.wear(mix));
+        assertEquals(2 | 8, run.mix());
+        assertFalse(run.has(PlusRun.RED));
+        // The limit holds: of five asked for she wears the three she can.
+        PlusRun many = owning(3, PlusRun.RED, PlusRun.BLUE, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.PURPLE);
+        assertEquals(3, Integer.bitCount(many.wear(1 | 2 | 8 | 16 | 32)));
+        assertEquals(3, Integer.bitCount(many.mix()));
+        // A ribbon's colour is not hers to let go of by choosing another mix.
+        many.lend(PlusRun.BROWN);
+        many.wear(1);
+        assertTrue(many.has(PlusRun.BROWN));
+        assertTrue(many.has(PlusRun.RED));
+        assertFalse(many.has(PlusRun.BLUE));
+
+        // The quick choices. What each named mix is made of, and what some colours together are called.
+        assertEquals(1 | 2, PlusRun.mixOf(PlusRun.STEAMS));
+        assertEquals(1 | 16, PlusRun.mixOf(PlusRun.COMET));
+        assertEquals(2 | 8, PlusRun.mixOf(PlusRun.TIDE));
+        assertEquals(4 | 32, PlusRun.mixOf(PlusRun.MIRROR));
+        assertEquals(8 | 16, PlusRun.mixOf(PlusRun.GALE));
+        assertEquals(1 | 4, PlusRun.mixOf(PlusRun.EMBER));
+        assertEquals(127, PlusRun.mixOf(PlusRun.WHITEN));
+        assertEquals(0, PlusRun.mixOf(PlusRun.PRISM));
+        for (int which = PlusRun.STEAMS; which <= PlusRun.EMBER; which++) assertEquals(which, PlusRun.naming(PlusRun.mixOf(which)));
+        assertEquals(PlusRun.WHITEN, PlusRun.naming(127));
+        assertEquals(PlusRun.PRISM, PlusRun.naming(1 | 2 | 4));
+        assertEquals(PlusRun.PRISM, PlusRun.naming(63));
+        assertEquals(-1, PlusRun.naming(1));
+        assertEquals(-1, PlusRun.naming(2 | 4));
+        assertEquals(-1, PlusRun.naming(0));
+        // Worn, each is what the engine says it is.
+        for (int which = PlusRun.STEAMS; which <= PlusRun.EMBER; which++) {
+            PlusRun.Perks all = new PlusRun.Perks();
+            all.colours = 127;
+            PlusRun named = new PlusRun(flat(60), all);
+            assertEquals(PlusRun.mixOf(which), named.wear(PlusRun.mixOf(which)));
+            assertEquals(1 << which, named.mixed());
+        }
+        // "All I can wear": as many as the limit allows, those that are ready first, each in its order.
+        assertEquals(1 | 2, PlusRun.most(127, 127, 2));
+        assertEquals(1 | 2 | 4, PlusRun.most(127, 127, 3));
+        assertEquals(127, PlusRun.most(127, 127, 7));
+        assertEquals(4 | 8, PlusRun.most(127, 4 | 8 | 16, 2));
+        assertEquals(1 | 8 | 32, PlusRun.most(1 | 2 | 8 | 32, 8 | 32, 3));
+        assertEquals(2 | 16, PlusRun.most(2 | 16, 0, 5));
+        assertEquals(0, PlusRun.most(0, 0, 3));
+    }
+
     @Test public void aRibbonAddsItsColourToWhatSheWearsAndNeverTakesTheirPlace() {
         RunLevels.Level level = flat(60);
         level.items.add(new int[]{PlusRun.FORM + PlusRun.GREEN, 20, FLOOR - 1, 0});
