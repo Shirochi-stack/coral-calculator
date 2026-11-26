@@ -45,8 +45,8 @@ MODEL = "inworld-tts-2"
 # The Mawang is Halgakos herself, sixty years on: her voice, slower and lower.
 VOICES = {
     "H": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "C": ("community-iyfnceehtmbk", .92, 1.05),
-    "R": ("Pixie", 1.3, .94),
+    "C": ("community-iyfnceehtmbk", 1.0, 1.08),
+    "R": ("upbeat-bee-0979__design-voice-02fb12a5", 1.05, 1.0),  # a voice designed for her as a timid crybaby, the user's pick of twenty-two
     "I": ("community-blcuaurhzmvi", .95, 1.06),
     "T": ("community-pwotyqkmtlsi", .92, 1.1),
     "M": ("community-5fwhmdpiq45g", 1.0, .84),
@@ -70,7 +70,7 @@ VOICES = {
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
-    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright, cute and bouncy. She speaks clearly: every word is said in full, crisply, with nothing swallowed, slurred or cut short. ",
+    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels. ",
     "R": "Rune is a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up. ",
     "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
     "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
@@ -125,6 +125,12 @@ SOUNDS = (("Kyaa", "\u304d\u3083\u3042\u3063"), ("waaah", "\u3046\u308f\u3042\u3
 def spoken(text):
     """A line as it is to be said: without the heart, which is not a word, and with its squeals as they are squealed."""
     text = text.replace("\u2661", "").strip()
+    # Chikuwa's voice does not say "bread" properly from its spelling: it is given the word as it sounds.
+    text = re.sub(r"\bbread", "bred", text)
+    text = re.sub(r"\bBread", "Bred", text)
+    # A sound that is written as a word in what is shown is acted, not said: a sniff is a shaky breath in.
+    text = re.sub(r"\b[Ss]niff(le)?\b[.! ]*", "[breathe] ", text)
+    text = re.sub(r"\b[Hh]ic\b[.! ]*", "[breathe] ", text)
     for shown, said in SOUNDS:
         text = text.replace(shown, said)
     return text

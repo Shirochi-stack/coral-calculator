@@ -42,15 +42,15 @@ MODEL = "inworld-tts-2"
 # higher the recording is made afterwards. The same voices as tools/make_run_voice.py.
 VOICES = {
     "h": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "c": ("community-iyfnceehtmbk", .92, 1.05),
+    "c": ("community-iyfnceehtmbk", 1.0, 1.08),
     "t": ("community-pwotyqkmtlsi", .92, 1.1),
-    "r": ("Pixie", 1.25, .94),
+    "r": ("upbeat-bee-0979__design-voice-02fb12a5", 1.05, 1.0),
     "i": ("community-blcuaurhzmvi", .95, 1.06),
 }
 # Who each of them is, for the voice to know.
 WHO = {
     "h": "Halgakos, a smug, teasing translator girl with a cheeky sing-song voice, in a fighting game. She talks fast.",
-    "c": "Chikuwa, a baker girl in a fighting game who thinks of everything in bread: a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright, cute and bouncy. She speaks clearly: every word is said in full, crisply, with nothing swallowed, slurred or cut short.",
+    "c": "Chikuwa, a baker girl in a fighting game who thinks of everything in bread: a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels.",
     "t": "Tsubakieh, a cheerful, unbothered girl with a baseball bat who calls everything normal, in a fighting game. A light, cute, deadpan anime voice.",
     "r": "Rune, a librarian in a fighting game: a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up.",
     "i": "Illya, a lovely magical-girl idol in a fighting game. A sweet, bright, high, sparkling anime voice; polite and sincere, never sultry.",
@@ -86,7 +86,14 @@ def secret(name):
 def spoken(text):
     """A line as it is to be said: without the heart, which is not a word."""
     # A squeal is said as it is squealed in Japanese, not read out as an English word.
-    return text.replace("♡", "").replace("~", "").replace("Kyaa", "きゃあっ").strip()
+    text = text.replace("♡", "").replace("~", "").replace("Kyaa", "きゃあっ").strip()
+    # Chikuwa's voice does not say "bread" properly from its spelling: it is given the word as it sounds.
+    text = re.sub(r"\bbread", "bred", text)
+    text = re.sub(r"\bBread", "Bred", text)
+    # A sound that is written as a word in what is shown is acted, not said: a sniff is a shaky breath in.
+    text = re.sub(r"\b[Ss]niff(le)?\b[.! ]*", "[breathe] ", text)
+    text = re.sub(r"\b[Hh]ic\b[.! ]*", "[breathe] ", text)
+    return text.replace("Uwaaah", "うわああん").replace("Waah", "うわあん").strip()
 
 
 def scene(name):
