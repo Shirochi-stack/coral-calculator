@@ -90,7 +90,7 @@ final class PlusRun {
      * rest wait their turn, and one comes for each that falls. (It can be set, to find what
      * a phone draws without faltering.)
      */
-    static final int CEILING = 16;
+    static final int CEILING = 24;
     static int ceiling = CEILING;
     static final float FALLING = 10;
     /** How long rubble hangs before it falls, how long someone takes to arrive, and how long they take over changing. */
@@ -826,8 +826,12 @@ final class PlusRun {
             int[] where = kind == RunLevels.OLD_BOOK ? new int[]{room, RunLevels.ON_FLOOR, (one[3] + one[4]) / 2, one[11]} : place(type, 7, 60);
             if (where == null) where = place(RunLevels.ON_FLOOR, 7, 200);
             if (where == null) where = place(RunLevels.ON_PLATFORM, 3, 200);
+            // (No place free for it just now: it waits, and those behind it with it.)
+            if (where == null) {
+                reserve.add(0, next);
+                break;
+            }
             fed++;
-            if (where == null) continue;
             pending.add(new float[]{next, where[2] + .5f, where[3], MARKED + batch++ * .22f, where[1]});
             there++;
         }

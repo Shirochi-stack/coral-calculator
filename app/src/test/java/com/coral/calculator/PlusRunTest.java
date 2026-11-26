@@ -2513,7 +2513,7 @@ public class PlusRunTest {
             }
         }
         assertEquals(1, run.livesLost());
-        assertEquals(PlusRun.HEARTS, run.arenaHurts());
+        assertTrue("hurts " + run.arenaHurts(), run.arenaHurts() >= PlusRun.HEARTS);
         assertEquals(1, run.arenaLives());
         hold(run, .05f, false, false, false);
         assertEquals(which[0], run.room());

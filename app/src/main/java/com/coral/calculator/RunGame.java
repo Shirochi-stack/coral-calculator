@@ -5039,7 +5039,7 @@ final class RunGame {
                 text.setTextAlign(Paint.Align.RIGHT);
                 text.setColor(soft);
                 text.setTextSize(dp(13.5f));
-                canvas.drawText((run.waveLeft() + run.pending().size()) + " left", from + wide - dp(16), under + dp(27), text);
+                canvas.drawText(run.waveLeft() + " left", from + wide - dp(16), under + dp(27), text);
             } else {
                 String what = kind == RunLevels.RANGE ? "Targets" : kind == RunLevels.TRAMPLE ? "Flattened" : "Caught";
                 boolean enough = run.caught() >= PlusRun.ENOUGH;
