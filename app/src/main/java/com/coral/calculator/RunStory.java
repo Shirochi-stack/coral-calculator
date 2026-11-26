@@ -709,6 +709,38 @@ final class RunStory {
                     PLAYER + "She has just combined two magic hair colours and found a new power. Surprised, delighted, eager." + FAST},
             {"white1", "All seven at once. White. Look at me glow Sloppy~♡", "H",
                     PLAYER + "All seven of her colours have just fused into shining white and she is glowing. Awed for a second, then vain and thrilled."}};
+    /** One met in the middle of a land, the first time it shows itself: the Margin Wyrm, Blot, the Bookmark Gecko; one of them beaten; and the wyrm driven off. */
+    static final String[][] ROVERS = {
+            {"rover1", "A dragon made of pages, overhead! Dodge what it drops, and hit it when it comes low Sloppy~♡", "H",
+                    PLAYER + "A little dragon made of book pages has just swooped in over her head, dropping things on her. Startled, urgent, coaching." + FAST},
+            {"rover2", "That's no puddle. A giant ink slime! Off the ground when it lands Sloppy~♡", "H",
+                    PLAYER + "A slime as big as a doorway has just risen out of the ground in front of her. Startled, then braced and coaching." + FAST},
+            {"rover3", "Something's on that ribbon. A gecko! It drops, it runs, then the tongue Sloppy~♡", "H",
+                    PLAYER + "A big gecko has just slid down a ribbon to hang over her head. Wary, quick, coaching." + FAST},
+            {"rover4", "Down it goes. And look what it left me Sloppy~♡", "H",
+                    PLAYER + "She has just beaten a big wandering monster that she did not have to fight, and it dropped a reward. Triumphant, pleased with herself." + FAST},
+            {"rover5", "Three passes and it gave up. Good riddance Sloppy~♡", "H",
+                    PLAYER + "A dragon that kept strafing her has finally flown away for good. Relieved, a little smug." + FAST}};
+    /** Those that fly, the first time each kind is near: the comma moth, the caret swallow, the ellipsis cloud, the asterisk, tittles, a candle wisp and a rime flake. */
+    static final String[][] FLIERS = {
+            {"fly1", "Comma moths. They hang right where I jump. Stomp them, or duck under Sloppy~♡", "H",
+                    PLAYER + "She has spotted little flying creatures hovering at jumping height in her way. Alert, matter of fact, coaching." + FAST},
+            {"fly2", "A caret swallow, up there. It marks me, then it dives. Keep moving Sloppy~♡", "H",
+                    PLAYER + "She has spotted a paper bird hovering high overhead that is about to dive at her. Wary, quick, coaching." + FAST},
+            {"fly3", "An ellipsis cloud. Watch the shadows: full stops come straight down Sloppy~♡", "H",
+                    PLAYER + "She has spotted a little cloud flying over that drops things straight down. Alert, dry, coaching." + FAST},
+            {"fly4", "An asterisk, taking aim. It backs off when I get close. Rush it Sloppy~♡", "H",
+                    PLAYER + "She has spotted a hovering star creature that shoots at her from a distance. Sharp, eager, coaching." + FAST},
+            {"fly5", "Tittles, in a line. Bounce along the lot for a combo Sloppy~♡", "H",
+                    PLAYER + "She has spotted a row of tiny flying dots and wants to bounce across all of them. Gleeful, greedy." + FAST},
+            {"fly6", "A candle wisp. Only water puts it out. Or I just outrun it Sloppy~♡", "H",
+                    PLAYER + "She has spotted a living flame drifting after her that her weapons cannot hurt. Wary, practical, coaching." + FAST},
+            {"fly7", "A rime flake. Only fire melts that. Under it, or over Sloppy~♡", "H",
+                    PLAYER + "She has spotted a living snowflake circling in her way that her weapons cannot hurt. Cool, practical, coaching." + FAST}};
+    /** The first time one of those who wait shuts one of her colours off as she changes. */
+    static final String[][] SHUT_OFF = {
+            {"off1", "Hey! She shut one of my colours off. It comes back after the wait Sloppy~♡", "H",
+                    PLAYER + "A boss has just switched off one of her magic hair colours in the middle of a fight. Indignant, then steady." + FAST}};
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -736,7 +768,8 @@ final class RunStory {
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
-                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX);
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
+                SHUT_OFF);
         return groups.toArray(new String[0][][]);
     }
 }

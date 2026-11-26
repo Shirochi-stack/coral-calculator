@@ -2774,6 +2774,267 @@ public class PlusRunTest {
         assertEquals(1, flier.hurts());
     }
 
+    /** A flat land with one of those that fly over it, its feet so far over the ground. */
+    private static PlusRun flown(int kind, int column, int high) {
+        RunLevels.Level level = flat(80);
+        level.foes.add(new int[]{kind, column, FLOOR - high - 1});
+        return new PlusRun(level);
+    }
+
+    /** She comes down onto something from just over it. Returns whether it was beaten by that. */
+    private static boolean stomp(PlusRun run, PlusRun.Foe foe) {
+        int hurts = run.hurts();
+        run.bare();
+        run.place(foe.x + foe.wide() / 2 - PlusRun.WIDE / 2, foe.y - PlusRun.TALL - .4f);
+        for (int step = 0; step < 30 && !foe.flat && run.hurts() == hurts && run.y() + PlusRun.TALL < foe.y + foe.tall(); step++) run.step(STEP, false, false, false);
+        return foe.flat;
+    }
+
+    @Test public void thoseThatFlyAreInTheLandsFromTheTwentyFirstOnAndMoreOfThemLater() {
+        int[] first = new int[RunLevels.RIME + 1];
+        int before = 0, last = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            int here = 0, lines = 0, was = -9;
+            java.util.List<Integer> kinds = new java.util.ArrayList<>();
+            for (int[] foe : level.foes) {
+                if (!RunLevels.flier(foe[0])) continue;
+                here++;
+                if (first[foe[0]] == 0) first[foe[0]] = number;
+                // (Four tittles in a line are one of them.)
+                if (foe[0] != RunLevels.MITE || foe[1] != was + 1) {
+                    lines++;
+                    kinds.add(foe[0]);
+                }
+                was = foe[0] == RunLevels.MITE ? foe[1] : -9;
+                // In open air, over the land itself, short of its end; and at a height something reaches.
+                assertEquals("land " + number, RunLevels.AIR, level.land[foe[2]][foe[1]]);
+                assertTrue("land " + number, foe[1] >= 14 && foe[1] < level.gate - 8 && foe[2] >= 2);
+                int under = RunLevels.top(level, foe[1]);
+                if (under > 0) assertTrue("land " + number + " at " + foe[1], under - foe[2] - 1 <= 5 && under - foe[2] - 1 >= 2);
+            }
+            if (number < RunLevels.FLIERS_FROM) {
+                assertEquals("land " + number, 0, here);
+                continue;
+            }
+            // As many as the land is to have, give or take what there was no room for; and never fewer than two.
+            assertTrue("land " + number + " has " + lines + " of " + RunLevels.fliersIn(number), lines >= Math.max(2, RunLevels.fliersIn(number) - 2) && lines <= RunLevels.fliersIn(number));
+            // The land a kind is first met in has three of it before anything else that flies.
+            for (int kind = RunLevels.DRIFTER; kind <= RunLevels.RIME; kind++) {
+                if (RunLevels.flierFrom(kind) != number) continue;
+                assertTrue("land " + number + " " + kinds, kinds.size() >= 3 && kinds.get(0) == kind && kinds.get(1) == kind && kinds.get(2) == kind);
+            }
+            if (number == RunLevels.FLIERS_FROM) before = lines;
+            last = lines;
+        }
+        for (int kind = RunLevels.DRIFTER; kind <= RunLevels.RIME; kind++) assertEquals("kind " + kind, RunLevels.flierFrom(kind), first[kind]);
+        assertEquals(21, first[RunLevels.DRIFTER]);
+        assertTrue(before >= 2 && last >= before * 3);
+        // And the lands from there on are longer than the count of the lands before would have made them.
+        assertTrue(RunLevels.level(79).gate > RunLevels.level(31).gate + 100);
+    }
+
+    @Test public void eachOfThoseThatFlyDoesWhatItDoesAndIsBeatenAsItShouldBe() {
+        // A comma moth goes to and fro at a height: a touch from the side costs her, coming down on it deals with it, and so does a touch in brown.
+        PlusRun run = flown(RunLevels.DRIFTER, 20, 2);
+        PlusRun.Foe moth = run.foes().get(0);
+        float least = moth.x, most = moth.x, lowest = moth.y;
+        for (int step = 0; step < 60 * 12; step++) {
+            run.step(STEP, false, false, false);
+            least = Math.min(least, moth.x);
+            most = Math.max(most, moth.x);
+            lowest = Math.max(lowest, moth.y + moth.tall());
+        }
+        assertTrue(most - least > 6 && most - least < 8);
+        // (She can walk under it.)
+        assertTrue(lowest < GROUND - .05f);
+        assertEquals(0, run.hurts());
+        touch(run, moth);
+        assertEquals(1, run.hurts());
+        assertFalse(moth.flat);
+        run.bare();
+        assertTrue(stomp(run, moth));
+        assertEquals(1, run.fliers());
+        assertEquals(1, run.hurts());
+        run = flown(RunLevels.DRIFTER, 20, 2);
+        run.lend(PlusRun.BROWN);
+        touch(run, run.foes().get(0));
+        assertTrue(run.foes().get(0).flat);
+        assertEquals(0, run.hurts());
+
+        // A caret swallow hangs high; when she comes under, it marks her, and dives through where she stood and up the other side.
+        run = flown(RunLevels.SWOOPER, 30, 5);
+        PlusRun.Foe swallow = run.foes().get(0);
+        hold(run, 2, false, false, false);
+        assertEquals(0, swallow.mode);
+        assertEquals(0, run.dives());
+        run.place(27, GROUND);
+        float high = swallow.y;
+        boolean marked = false;
+        for (int step = 0; step < 60 * 4 && swallow.mode != 2; step++) {
+            run.step(STEP, false, false, false);
+            marked |= swallow.mode == 1;
+        }
+        assertTrue(marked);
+        assertEquals(2, swallow.mode);
+        assertEquals(1, run.dives());
+        // Standing where she was marked, she is hit; having moved off, she is not.
+        float deepest = 0;
+        for (int step = 0; step < 60 * 2 && swallow.mode == 2 && run.hurts() == 0; step++) {
+            run.step(STEP, false, false, false);
+            deepest = Math.max(deepest, swallow.y + swallow.tall());
+        }
+        assertEquals(1, run.hurts());
+        assertTrue(deepest > GROUND);
+        run = flown(RunLevels.SWOOPER, 30, 5);
+        swallow = run.foes().get(0);
+        run.place(27, GROUND);
+        for (int step = 0; step < 60 * 4 && swallow.mode != 2; step++) run.step(STEP, false, false, false);
+        run.place(21, GROUND);
+        for (int step = 0; step < 60 * 3 && swallow.mode != 0; step++) run.step(STEP, false, false, false);
+        assertEquals(0, run.hurts());
+        assertEquals(0, swallow.mode);
+        assertEquals(high, swallow.y, .4f);
+        // Come down on in its dive, or after, it is dealt with.
+        assertTrue(stomp(run, swallow));
+
+        // An ellipsis cloud flies over and lets full stops fall straight down while she is under its way; in brown one costs half a heart, and in
+        // the air it is the end of a flight in green.
+        run = flown(RunLevels.BOMBER, 30, 4);
+        PlusRun.Foe cloud = run.foes().get(0);
+        hold(run, 3, false, false, false);
+        assertTrue(run.shots().isEmpty());
+        run.place(28, GROUND);
+        run.lend(PlusRun.BROWN);
+        int thrown = run.thrown(), halves = run.halves();
+        boolean puffed = false;
+        for (int step = 0; step < 60 * 20 && run.hurts() == 0; step++) {
+            if (run.on(PlusRun.BROWN) < 3) run.lend(PlusRun.BROWN);
+            puffed |= cloud.mode == 1;
+            for (PlusRun.Shot shot : run.shots()) {
+                assertEquals(PlusRun.STOP, shot.kind);
+                assertEquals(0, shot.across, 0);
+                assertTrue(shot.down > 0);
+                // (She steps under the first that falls.)
+                if (shot.y > GROUND - 1.5f) run.place(shot.x - PlusRun.WIDE / 2, GROUND);
+            }
+            run.step(STEP, false, false, false);
+        }
+        assertTrue(puffed && run.thrown() > thrown);
+        assertEquals(1, run.hurts());
+        assertEquals(halves - 1, run.halves());
+        run = flown(RunLevels.BOMBER, 30, 4);
+        run.lend(PlusRun.GREEN);
+        for (int step = 0; step < 60 * 20 && run.grounded() == 0; step++) {
+            if (run.on(PlusRun.GREEN) < 3) run.lend(PlusRun.GREEN);
+            run.bare();
+            boolean under = false;
+            for (PlusRun.Shot shot : run.shots()) {
+                run.place(shot.x - PlusRun.WIDE / 2, shot.y - PlusRun.TALL / 2);
+                under = true;
+            }
+            if (!under) run.place(28, GROUND - 2);
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(1, run.grounded());
+        assertFalse(run.has(PlusRun.GREEN));
+
+        // An asterisk hovers, takes aim, and fires at where she is; it backs off from her, so far and no further; and in purple what it fires goes back.
+        run = flown(RunLevels.SHOOTER, 30, 3);
+        PlusRun.Foe star = run.foes().get(0);
+        run.place(23, GROUND);
+        boolean aimed = false;
+        for (int step = 0; step < 60 * 6 && run.shots().isEmpty(); step++) {
+            run.step(STEP, false, false, false);
+            aimed |= star.mode == 1;
+        }
+        assertTrue(aimed);
+        assertEquals(1, run.shots().size());
+        PlusRun.Shot fired = run.shots().get(0);
+        assertEquals(PlusRun.DOT, fired.kind);
+        // (At her: to the left and down.)
+        assertTrue(fired.across < 0 && fired.down > 0 && !fired.hers);
+        run.lend(PlusRun.PURPLE);
+        for (int step = 0; step < 60 * 3 && !fired.hers && run.hurts() == 0; step++) run.step(STEP, false, false, false);
+        assertTrue(fired.hers);
+        assertEquals(0, run.hurts());
+        float home = star.home;
+        for (int step = 0; step < 60 * 8; step++) {
+            run.place(star.x - 2, GROUND);
+            run.step(STEP, false, false, false);
+            run.shots().clear();
+        }
+        assertTrue(star.x > home + 4.5f && star.x <= home + 5.05f);
+        // From higher ground, or with a jump and a swing, it is dealt with as anything is.
+        assertTrue(stomp(run, star));
+
+        // Tittles, four in a line: landed on one after another without touching the ground, each is worth one plus more than the last.
+        RunLevels.Level line = flat(80);
+        for (int each = 0; each < 4; each++) line.foes.add(new int[]{RunLevels.MITE, 30 + each, FLOOR - 3});
+        run = new PlusRun(line);
+        int bonus = run.bonus();
+        for (PlusRun.Foe tittle : run.foes()) assertTrue(stomp(run, tittle));
+        assertEquals(4, run.combo());
+        assertEquals(bonus + 1 + 2 + 3, run.bonus());
+        assertEquals(4, run.fliers());
+
+        // A candle wisp comes after her, slowly; nothing she swings or lands on it with puts it out, and it burns whoever lands on it; water does,
+        // and steam, and a touch in brown; and it can be outrun: it goes no further than eight squares from where it began, and then goes back.
+        run = flown(RunLevels.WISP, 30, 3);
+        PlusRun.Foe wisp = run.foes().get(0);
+        run.place(25, GROUND);
+        float apart = Math.abs(wisp.x - run.x());
+        hold(run, 2, false, false, false);
+        assertTrue(Math.abs(wisp.x - run.x()) < apart - 1.5f);
+        assertEquals(0, run.hurts());
+        run.arm(PlusRun.SWORD);
+        int fizzled = run.fizzled();
+        for (int step = 0; step < 60 * 6 && run.fizzled() == fizzled && run.hurts() == 0; step++) {
+            run.place(wisp.x - 1.1f, wisp.y + wisp.tall() - PlusRun.TALL);
+            run.step(STEP, false, true, false, step % 20 == 0);
+        }
+        assertTrue(run.fizzled() > fizzled);
+        assertEquals(RunLevels.WISP, run.fizzledAt());
+        assertFalse(wisp.flat);
+        assertFalse(stomp(run, wisp));
+        assertEquals(1, run.hurts());
+        run.place(60, GROUND);
+        hold(run, 12, false, false, false);
+        assertEquals(wisp.home, wisp.x, .1f);
+        for (int form : new int[]{PlusRun.BLUE, PlusRun.RED}) {
+            run = flown(RunLevels.WISP, 30, 0);
+            wisp = run.foes().get(0);
+            run.lend(form);
+            run.place(27.5f, GROUND);
+            hold(run, .05f, false, true, false);
+            for (int step = 0; step < 90 && !wisp.flat && run.hurts() == 0; step++) run.step(STEP, false, false, false, step % 30 == 0);
+            assertEquals("form " + form, form == PlusRun.BLUE, wisp.flat);
+        }
+        run = flown(RunLevels.WISP, 30, 3);
+        run.lend(PlusRun.BROWN);
+        touch(run, run.foes().get(0));
+        assertTrue(run.foes().get(0).flat);
+
+        // A rime flake goes round and round where it began; only fire melts it.
+        for (int form : new int[]{PlusRun.RED, PlusRun.BLUE}) {
+            run = flown(RunLevels.RIME, 30, 1);
+            PlusRun.Foe flake = run.foes().get(0);
+            float round = 0;
+            for (int step = 0; step < 60 * 6; step++) {
+                run.step(STEP, false, false, false);
+                round = Math.max(round, Math.abs(flake.x - flake.home));
+            }
+            assertEquals(2, round, .1f);
+            run.lend(form);
+            for (int step = 0; step < 60 * 8 && !flake.flat && run.fizzled() == 0; step++) {
+                run.place(flake.x - 2.5f, flake.y + flake.tall() / 2 - PlusRun.TALL / 2);
+                run.step(STEP, false, true, false, step % 30 == 0);
+            }
+            assertEquals("form " + form, form == PlusRun.RED, flake.flat);
+            assertEquals("form " + form, form == PlusRun.RED ? 0 : 1, run.fizzled() > 0 ? 1 : 0);
+        }
+    }
+
     @Test public void aRibbonAddsItsColourToWhatSheWearsAndNeverTakesTheirPlace() {
         RunLevels.Level level = flat(60);
         level.items.add(new int[]{PlusRun.FORM + PlusRun.GREEN, 20, FLOOR - 1, 0});
@@ -3301,7 +3562,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);

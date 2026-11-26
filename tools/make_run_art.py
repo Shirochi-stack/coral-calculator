@@ -408,6 +408,12 @@ def places():
                             ("sumbi", 190, (440, 300)), ("pads", 176, (480, 300)), ("party", 204, (560, 320)),
                             ("oldbook", 200, (480, 320))):
         strip_of(pieces(f"boss_{name}", 1, 4), tall, box, name)
+    # The three met in the middle of lands: about its business, at it, hit, and down.
+    for name, tall, box in (("wyrm", 160, (300, 190)), ("blot", 200, (330, 230)), ("gecko", 110, (420, 160))):
+        strip_of(pieces(f"boss_{name}", 1, 4), tall, box, name)
+    # Those that fly: wings up, wings down, about to do what it does, and beaten.
+    for name in ("drifter", "swooper", "bomber", "shooter", "mite", "wisp", "rime"):
+        strip_of(pieces(f"fly_{name}", 1, 4), 96, (230, 160), f"fly_{name}")
     inside = Image.open(SOURCE / "room.png").convert("RGB")
     inside.resize((SKY_WIDTH, round(inside.size[1] * SKY_WIDTH / inside.size[0])), Image.LANCZOS).save(RES / "plus_run_room.webp", quality=82, method=6)
     return sheet, row

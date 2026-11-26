@@ -207,7 +207,8 @@ final class RunLevels {
     static final int[] FLOCKS = new int[100];
     static int flockTry = -1;
     static {
-        for (int land : new int[]{66, 69, 72, 80}) FLOCKS[land - 1] = 1;
+        for (int land : new int[]{41, 59, 66, 72}) FLOCKS[land - 1] = 1;
+        FLOCKS[69 - 1] = 2;
     }
 
     static int flierFrom(int kind) { return FLIES_FROM[kind - DRIFTER]; }
@@ -242,8 +243,10 @@ final class RunLevels {
 
     private static void perch(Level level, int kind, int column, int until) {
         int high = FLIES_HIGH[kind - DRIFTER], wide = kind == MITE ? 4 : 1;
-        for (int tries = 0; tries < 10; tries++, column += 2) {
-            if (column < 14 || column + wide + 2 >= until) return;
+        for (int tries = 0; tries < 30; tries++, column += 2) {
+            // (Past the end of where they may be, it looks again from the start of it.)
+            if (column + wide + 2 >= until) column = 18 + tries;
+            if (column < 14) return;
             int floor = -1;
             for (int reach = 0; reach <= 5 && floor < 0; reach++) {
                 floor = top(level, column - reach);
@@ -251,6 +254,8 @@ final class RunLevels {
             }
             int row = floor - high - 1;
             boolean clear = floor > 0 && row >= 2;
+            // (A line of them keeps over ground that is all of a height.)
+            for (int each = 1; each < wide && clear; each++) clear = top(level, column + each) == floor;
             for (int beside = column - 2; beside <= column + wide + 1 && clear; beside++) {
                 for (int up = row - 1; up <= row + 1 && clear; up++) clear = level.land[up][beside] == AIR;
             }
