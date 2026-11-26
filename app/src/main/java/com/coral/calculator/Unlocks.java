@@ -75,7 +75,7 @@ final class Unlocks {
      * or a count over lands of Plus run: {@code c(1-30)} is how many of lands 1 to 30 are cleared,
      * {@code t} with three stars, {@code s} their stars, {@code q} with a quest sealed, {@code r}
      * the places found off them and {@code d} those finished. {@code @colours} is how many colours
-     * of hair are kept, {@code @ups} what was bought at the guild counter, {@code @prizes} how many
+     * of hair are kept, {@code @mixes} how many mixes of them have been formed, {@code @ups} what was bought at the guild counter, {@code @prizes} how many
      * bosses have given theirs, and {@code @champs} how many fighters have topped the ladder.
      */
     static boolean holds(String condition, Store store) { return holds(condition, store, null); }
@@ -132,6 +132,7 @@ final class Unlocks {
         if (name.charAt(0) == '@') {
             switch (name) {
                 case "@colours": value = Integer.bitCount(store.tally("run_colours") & 255); break;
+                case "@mixes": value = Integer.bitCount(store.tally("run_mixes")); break;
                 case "@ups": for (int which = 0; which < 12; which++) value += store.tally("run_up_" + which); break;
                 case "@prizes": for (int land = 1; land <= LANDS; land++) if (store.tally("run_prize_" + land) != 0) value++; break;
                 case "@champs": for (int who = 0; who < 8; who++) if (store.tally("fight_cleared_" + who) != 0) value++; break;

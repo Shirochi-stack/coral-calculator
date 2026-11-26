@@ -16,7 +16,7 @@ abstract class TrickRun extends TrickBase {
     private static final int STAMP_RED = 0xFFD8342B, SEAL_GREEN = 0xFF2E9E5B, INK_BLUE = 0xFF27348F;
     /** Her idle frames in each colour of hair, made as they are first wanted. */
     private final Bitmap[] dyedIdle = new Bitmap[Hair.NAMES.length];
-    private Bitmap ownIdle;
+    private Bitmap ownIdle, mixedIdle;
 
     TrickRun(Context context, int kind, boolean dark, Bitmap art, Bitmap pet) { super(context, kind, dark, art, pet); }
 
@@ -373,22 +373,42 @@ abstract class TrickRun extends TrickBase {
         String[] gives = {"", "Red: lava is safe", "Blue: she swims", "Brown: knocks things over", "Green: she flies", "Yellow: she runs faster",
                 "Purple: sends it back", "Black: quite ordinary", "White: all of them at once"};
         if (t < 1.4f) go(clamp(cx, L + wide, R - wide), floor, dp(420));
-        float each = Math.max(.9f, 6.6f / Math.max(1, count));
-        int turn = t < 1.6f ? -1 : (int) ((t - 1.6f) / each), colour = 0, seen = 0;
+        // First each colour by itself; then two of them worn together, or all seven, which is white.
+        float each = Math.max(.75f, 5.8f / Math.max(1, count)), mixAt = 1.6f + each * count + .2f, mixing = t - mixAt;
+        boolean every = (owned & 127) == 127;
+        int turn = t < 1.6f || mixing >= 0 ? -1 : (int) ((t - 1.6f) / each), colour = 0, seen = 0, first = 0, second = 0;
+        for (int which = 1; which <= 7; which++) {
+            if ((owned & 1 << which - 1) == 0) continue;
+            if (first == 0) first = which;
+            else if (second == 0) second = which;
+        }
         float since = t - 1.6f - turn * each;
         for (int which = 1; which <= 8 && turn >= 0; which++) {
             if ((owned & 1 << which - 1) == 0) continue;
             if (seen++ == turn) colour = which;
         }
-        if (colour != 0 && pet() != null) {
-            if (dyedIdle[colour] == null) {
-                if (ownIdle == null) {
-                    Bitmap all = BitmapFactory.decodeResource(context.getResources(), TrickArt.halgakos_pet);
-                    int high = all.getHeight() / PetArt.FRAMES.length;
-                    ownIdle = Bitmap.createBitmap(all, 0, PetArt.IDLE * high, all.getWidth() / PetArt.COLUMNS * PetArt.FRAMES[PetArt.IDLE], high);
-                }
-                dyedIdle[colour] = Hair.dyed(ownIdle, colour);
+        if ((colour != 0 || mixing >= 0) && pet() != null && ownIdle == null) {
+            Bitmap all = BitmapFactory.decodeResource(context.getResources(), TrickArt.halgakos_pet);
+            int high = all.getHeight() / PetArt.FRAMES.length;
+            ownIdle = Bitmap.createBitmap(all, 0, PetArt.IDLE * high, all.getWidth() / PetArt.COLUMNS * PetArt.FRAMES[PetArt.IDLE], high);
+        }
+        if (mixing >= 0 && second != 0 && mixing < 2.6f && pet() != null) {
+            if (mixedIdle == null) {
+                int one = Hair.COLOURS[first], other = Hair.COLOURS[second];
+                mixedIdle = Hair.dyed(ownIdle, every ? PlusRun.WHITE : 0xFF000000 | (Color.red(one) + Color.red(other)) / 2 << 16
+                        | (Color.green(one) + Color.green(other)) / 2 << 8 | (Color.blue(one) + Color.blue(other)) / 2);
             }
+            wear(mixedIdle, PetArt.FRAMES[PetArt.IDLE], (int) (t * 6) % PetArt.FRAMES[PetArt.IDLE], 1);
+            if (every) {
+                // All seven at once, and she glows.
+                for (int ring = 3; ring >= 1; ring--) {
+                    fill(0xFFFFF6C8, .16f * Math.min(1, mixing / .4f));
+                    c.drawCircle(hx, hy - tall * .55f, tall * (.5f + ring * .22f) + (float) Math.sin(t * 5) * dp(3), paint);
+                }
+            }
+        }
+        if (colour != 0 && pet() != null) {
+            if (dyedIdle[colour] == null) dyedIdle[colour] = Hair.dyed(ownIdle, colour);
             wear(dyedIdle[colour], PetArt.FRAMES[PetArt.IDLE], (int) (t * 6) % PetArt.FRAMES[PetArt.IDLE], 1);
             if (colour == PlusRun.GREEN) lift = ease(Math.min(1, since / .4f)) * tall * .5f + (float) Math.sin(t * 4) * dp(4);
             if (colour == PlusRun.YELLOW) {
@@ -419,8 +439,14 @@ abstract class TrickRun extends TrickBase {
             if (since < .4f) fx(c, BURST, hx, hy - tall * .6f, tall * (1 + since * 2), since * 90, 1 - since / .4f);
             plate(c, gives[colour], hx, clamp(hy + dp(26), T, B - dp(20)), dp(13), colour == 8 || colour == 5 ? 0xFF292B2A : Color.WHITE, Hair.COLOURS[colour] & 0xF2FFFFFF, Math.min(1, since / .2f));
         }
-        line(.2f, 1.6f, "Galpi's ribbons. I kept every colour I won Sloppy~♡");
-        line(8.4f, 2.2f, "Pick one for me in my settings. Choose well Sloppy~♡");
+        if (mixing >= 0 && second != 0 && mixing < 2.6f) {
+            if (mixing < .4f) fx(c, BURST, hx, hy - tall * .6f, tall * (1.2f + mixing * 2), mixing * 90, 1 - mixing / .4f);
+            plate(c, every ? "All seven at once: white" : Hair.NAMES[first] + " and " + Hair.NAMES[second] + ", worn together", hx, clamp(hy + dp(26), T, B - dp(20)), dp(13),
+                    0xFF292B2A, 0xF2FFFFFF, Math.min(1, mixing / .2f));
+        }
+        line(.2f, 1.4f, "Galpi's ribbons. I kept every colour I won Sloppy~♡");
+        if (second != 0) line(mixAt + .2f, 2.3f, every ? "All seven on together. That's white. And I glow Sloppy~♡" : "And two at once. They mix. So do I Sloppy~♡");
+        line(mixAt + 2.8f, 2.2f, "Pick one for me in my settings. Choose well Sloppy~♡");
     }
 
     /** Altteul sets up his stall on the screen and prices the user's apps. */

@@ -47,7 +47,9 @@ public class UnlocksTest {
         String how = sign == requirement.length() ? ">=" : requirement.substring(sign, number);
         int asked = sign == requirement.length() ? 1 : Integer.parseInt(requirement.substring(number));
         int wanted = how.equals(">") ? asked + 1 : how.equals("<") ? asked - 1 : asked;
-        if (name.startsWith("@")) {
+        if (name.equals("@mixes")) {
+            kept.with("run_mixes", Math.max(kept.tally("run_mixes"), (1 << wanted) - 1));
+        } else if (name.startsWith("@")) {
             for (int which = 0; which < wanted; which++) {
                 if (name.equals("@colours")) kept.with("run_colours", kept.tally("run_colours") | (1 << wanted) - 1);
                 else if (name.equals("@ups")) kept.with("run_up_" + which, 1);
@@ -234,6 +236,11 @@ public class UnlocksTest {
         int said = 0;
         for (int place = 0; place < lines.length; place++) {
             boolean later = lines[place][0].matches(".*(run_stars_(8[1-9]|9\\d|100)|c\\(81-100\\)|run_open>=8[1-9]|run_colours&128|run_ending).*");
+            // What is said of colours worn together waits for a mix to be formed, whichever volume that is in.
+            if (lines[place][0].contains("@mixes")) {
+                assertFalse(lines[place][1], place < had.length() && had.charAt(place) == '1');
+                continue;
+            }
             boolean unlocked = place < had.length() && had.charAt(place) == '1';
             if (later) assertFalse(lines[place][1], unlocked);
             else assertTrue(lines[place][0], unlocked);
@@ -243,7 +250,10 @@ public class UnlocksTest {
             if (words.contains("Lucy") || words.contains("dragon's") || words.contains("Onii") || words.contains("Translation Killer")) assertTrue(words, later);
         }
         assertTrue(said >= 240);
-        assertEquals(lines.length - said, 60);
+        int mixes = 0;
+        for (String[] line : lines) if (line[0].contains("@mixes")) mixes++;
+        assertTrue(mixes >= 10);
+        assertEquals(60, lines.length - said - mixes);
         List<Integer> tricks = Unlocks.tricks(kept);
         assertFalse(tricks.contains(Unlocks.FIRST_TRICK + Unlocks.RETREAT));
         assertFalse(tricks.contains(Unlocks.FIRST_TRICK + Unlocks.LOST_WORDS));

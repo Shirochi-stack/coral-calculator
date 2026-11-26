@@ -330,6 +330,21 @@ final class UnlockLines {
             {"run_ending&2,run_stars_89", "Lucy asked me to read it to her again. Twice. I said once. I read it three times Sloppy~♡"},
             {"run_ending&2,run_stars_88", "We end localisation together. She brings the fire. I bring the glossary Sloppy~♡"},
             {"run_ending&2,@colours>=8", "The good ending. It took all of you. Don't make me say thank you Sloppy~♡"},
+            // Colours worn together: the mixes she has formed, however many of them there turn out to be.
+            {"@mixes>=1", "Two ribbons at once. I didn't know I could. Neither did Galpi Sloppy~♡"},
+            {"@mixes>=2", "Two mixes found. My hair can't decide what it is. I can Sloppy~♡"},
+            {"@mixes>=3", "Three mixes. Each does something neither colour does alone Sloppy~♡"},
+            {"@mixes>=4", "Four mixes. Rune keeps a colour chart of me now. With tear stains Sloppy~♡"},
+            {"@mixes>=5", "Five mixes named. I'm naming the sixth after myself Sloppy~♡"},
+            {"@mixes>=6", "Six mixes. Illya asked which one matches her dress. All of them, sadly Sloppy~♡"},
+            {"@mixes>=8", "Eight mixes. Tsubakieh says mixing colours isn't normal. Good Sloppy~♡"},
+            {"@mixes>=10", "Ten mixes found. Altteul wants to sell them by the jar Sloppy~♡"},
+            {"@mixes>=12", "Twelve mixes. I've run out of names. The colours haven't run out of tricks Sloppy~♡"},
+            {"@mixes>=1,@colours>=3", "Three colours owned and a mix made. The sums get big from here Sloppy~♡"},
+            {"@mixes>=1,run_colours&1,run_colours&2", "Red and blue together. On fire and able to swim. Don't ask how Sloppy~♡"},
+            {"@mixes>=1,run_colours&8,run_colours&16", "Green and yellow at once. I fly, and fast. Mind the ceiling Sloppy~♡"},
+            {"@mixes>=2,run_colours&4,run_colours&32", "Brown and purple mixed. Throw it at me. It bounces off twice Sloppy~♡"},
+            {"@mixes>=3,@colours>=7", "All seven ribbons on at once. I'm told I glow. You may stare Sloppy~♡"},
     };
 
     /** Page brawl: the five, what they fight with, and how the player fights. */

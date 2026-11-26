@@ -571,6 +571,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             }
             ui = new ContextThemeWrapper(base, R.style.Theme_CoralCalculator);
             art = BitmapFactory.decodeResource(app.getResources(), R.drawable.halgakos);
+            // What was played while she was away, in the app's own screen of games, may have unlocked something.
+            Unlocks.check(PlaySession.get(app), BuildConfig.DEBUG);
             pad = dp(6);
             windows = (WindowManager) base.getSystemService(Context.WINDOW_SERVICE);
             return art != null && windows != null;

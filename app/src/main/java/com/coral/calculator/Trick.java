@@ -13,7 +13,7 @@ import android.graphics.Color;
 final class Trick extends TrickRun {
     private static final int CORAL = CalculatorLayout.CORAL;
     /** How long each runs, in seconds, in the order of {@link Unlocks#TRICK_NAMES}. */
-    private static final float[] LENGTHS = {11, 10.8f, 11, 10.5f, 11.4f, 11, 10.6f, 11, 10.8f, 10.4f, 10.2f, 10.4f, 10.8f, 11.2f, 11, 10.4f, 10.4f, 11, 0, 0,
+    private static final float[] LENGTHS = {11, 10.8f, 11, 10.5f, 11.4f, 11, 12.2f, 11, 10.8f, 10.4f, 10.2f, 10.4f, 10.8f, 11.2f, 11, 10.4f, 10.4f, 11, 0, 0,
             10.4f, 10.4f, 10, 11, 10, 10.4f, 10, 9.8f, 10, 10.4f, 9.8f, 10.4f, 9.6f, 10.8f, 10.4f, 10.2f};
     private static final String[] OWNING = {
             "Just kidding! Nothing fell on anything. This time Sloppy~♡",
@@ -106,7 +106,13 @@ final class Trick extends TrickRun {
         if (shown <= 0) return;
         float y = T + dp(96), x = L + dp(56) - (1 - shown) * dp(160);
         portrait(c, who, x, y, dp(36), shown);
-        plate(c, FightCast.NAMES[who] + "  ·  " + FightCast.WEAPONS[who], Math.min(x + dp(52) + W * .3f, R - dp(20) - W * .3f + dp(40)), y, dp(11.5f), Color.WHITE, FightCast.COLOURS[who] & 0xF2FFFFFF, shown);
+        // Her name and what she fights with, beside her face; what she fights with alone, where there is no room for both.
+        String words = FightCast.NAMES[who] + "  ·  " + FightCast.WEAPONS[who];
+        text.setTextSize(dp(11.5f));
+        float room = R - dp(8) - (x + dp(44));
+        if (text.measureText(words) + dp(15) > room) words = FightCast.WEAPONS[who];
+        float half = (text.measureText(words) + dp(15)) / 2;
+        plate(c, words, Math.min(x + dp(44) + half, R - dp(8) - half), y, dp(11.5f), Color.WHITE, FightCast.COLOURS[who] & 0xF2FFFFFF, shown);
     }
 
     // Page brawl

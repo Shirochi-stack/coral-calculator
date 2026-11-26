@@ -333,6 +333,7 @@ final class PlayStage extends View {
     void setHome(float x, float feet) {
         homeX = x;
         homeY = feet;
+        if (trick != null) trick.setHome(x, feet, homeTall);
     }
 
     /** The same, with how tall she stands there. */

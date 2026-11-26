@@ -204,7 +204,12 @@ public final class PlayActivity extends Activity {
     /** She steps out of her picture and has the whole screen, for a game or a prank. */
     private void openStage(int game) {
         if (stage != null || root.getWidth() == 0) return;
-        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random, Unlocks.tricks(PlaySession.get(this))) : game;
+        PlaySession kept = PlaySession.get(this);
+        Unlocks.check(kept, BuildConfig.DEBUG);
+        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random, Unlocks.tricks(kept)) : game;
+        // A trick newly unlocked is the next one played.
+        int fresh = game == PlaySession.PRANK ? Unlocks.freshTrick(kept) : 0;
+        if (fresh != 0) kind = fresh;
         stage = new PlayStage(this, kind, dark, haptics, art, pet, played -> {
             // Left for the home screen, a long game waits here on its pause, and is found as it was when the app is come back to.
             if (stage.wentHome() && stage.hold()) {
@@ -214,6 +219,8 @@ public final class PlayActivity extends Activity {
             root.removeView(stage);
             stage = null;
             if (figure != null) figure.setVisibility(View.VISIBLE);
+            // What was played may have unlocked something: she says so in her own time, over the other apps.
+            Unlocks.check(PlaySession.get(this), BuildConfig.DEBUG);
             PlaySession.get(this).refresh();
         });
         if (figure != null) {
