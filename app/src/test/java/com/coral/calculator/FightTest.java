@@ -631,10 +631,21 @@ public class FightTest {
         for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
             String name = FightCast.NAMES[kind];
             Fight.Pad pad = new Fight.Pad();
-            // Standing she is one drawing and no other, however long: it is drawn breathing, not swapped for near-copies of itself.
+            // Standing she goes through the four frames of her stance, as she did before any frames were added.
             Set<Integer> frames = new HashSet<>();
             float held = longest(apart(kind, Fight.CHIKUWA, 6), pad, 3, Fight.IDLE, frames);
-            assertEquals(java.util.Collections.singleton(FightFrames.IDLE1), frames);
+            assertTrue(name + " holds a frame of her stance for " + held, held <= .3f && held >= .25f);
+            Set<Integer> stance = new HashSet<>();
+            for (int frame = FightFrames.IDLE1; frame <= FightFrames.IDLE4; frame++) stance.add(frame);
+            assertEquals(stance, frames);
+            // The four are pictures of their own, all but the same height, and stand on the ground.
+            Set<String> where = new HashSet<>();
+            for (int frame = FightFrames.IDLE1; frame <= FightFrames.IDLE4; frame++) {
+                short[] at = FightFrames.FRAMES[kind][frame];
+                assertTrue(where.add(at[0] + " " + at[1] + " " + at[2]));
+                assertTrue(name + " stands " + at[6] + " in frame " + frame, at[6] <= FightFrames.STAND * 1.01f && at[6] >= FightFrames.STAND * .94f);
+                assertTrue(at[4] - at[6] <= 3);
+            }
             // A walk is the frames that were drawn together as one stride and only those: six forward, four backward.
             frames.clear();
             pad.right = true;
