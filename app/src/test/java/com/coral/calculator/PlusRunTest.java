@@ -1342,7 +1342,7 @@ public class PlusRunTest {
             int times = RunLevels.crowdOf(number);
             // Twice in the first three lands; five times after; and one time more with every three levels of the land: ten times in the last.
             assertEquals("land " + number, number <= 3 ? 2 : 5 + (RunLevels.levelOf(number) - 1) / 3, times);
-            if (number > 3) assertTrue(times >= 5 && times <= 10 && times >= RunLevels.crowdOf(number - 1));
+            if (number > 3) assertTrue(times >= 5 && times <= 11 && times >= RunLevels.crowdOf(number - 1));
             // So many times what it was laid with, where there is room for all of them: and never fewer than there were when every land
             // had five times, which was twice over at the least where someone waits at the end and the land is short.
             assertTrue("land " + number + " laid " + laid + " more " + more, more <= laid * (times - 1)
@@ -1379,7 +1379,8 @@ public class PlusRunTest {
 
     @Test public void theLandsHaveMoreCreaturesTheHigherTheirLevel() {
         // What each chapter had when every land had five times what it was laid with, and twice as many again in the air.
-        int[] had = {41, 190, 418, 657, 856, 1530, 1655, 1761, 1815, 2195}, has = new int[RunLevels.ALL_CHAPTERS];
+        // (The two chapters of the third volume are new: there is nothing they had.)
+        int[] had = {41, 190, 418, 657, 856, 1530, 1655, 1761, 1815, 2195, 0, 0}, has = new int[RunLevels.ALL_CHAPTERS];
         int ground = 0, air = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
@@ -4638,7 +4639,7 @@ public class PlusRunTest {
         }
         assertTrue(sorts[RunLevels.PET_SHOP] && sorts[RunLevels.GUILD_HALL] && sorts[RunLevels.HOME] && sorts[RunLevels.SMITHY] && sorts[RunLevels.MARKET]);
         assertTrue("shops " + shops + " halls " + halls + " homes " + homes + " smithies " + smithies + " markets " + markets,
-                shops >= 40 && halls >= 40 && homes >= 40 && smithies >= 40 && markets >= 20 && markets <= 30 && gachas >= 15 && gachas <= 26);
+                shops >= 40 && halls >= 40 && homes >= 40 && smithies >= 40 && markets >= 20 && markets <= 40 && gachas >= 15 && gachas <= 34);
         assertTrue(sorts[RunLevels.GACHA]);
 
         // Gone into, a pet shop: each pet is walked up to, and Nabi's desk is stood at anywhere along it; nothing hurts her; and out again.
@@ -4763,9 +4764,9 @@ public class PlusRunTest {
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             assertEquals(1 + (number - 1) / 5, RunLevels.levelOf(number));
             assertEquals(number <= 25 ? 0 : number <= 50 ? 1 : number <= 75 ? 2 : 3, RunLevels.toughOf(number));
-            assertEquals(number <= 30 ? 0 : number <= 60 ? 1 : 2, RunLevels.biteOf(number));
+            assertEquals(number <= 30 ? 0 : number <= 60 ? 1 : number <= 90 ? 2 : 3, RunLevels.biteOf(number));
         }
-        assertEquals(16, RunLevels.levelOf(RunLevels.TOTAL));
+        assertEquals(20, RunLevels.levelOf(RunLevels.TOTAL));
         // In the lands themselves: every creature takes as many more as its land's level says; those who wait, a paper target, a wisp and a flake do not.
         for (int number : new int[]{5, 30, 55, 80}) {
             RunLevels.Level level = RunLevels.level(number);
@@ -5057,6 +5058,52 @@ public class PlusRunTest {
             assertEquals("level " + level, left[level], Math.max(0, big.left));
             assertEquals(level == RunArms.LEVELS, big.flat);
         }
+    }
+
+    // The third volume
+
+    @Test public void theThirdVolumeHasTwentyLandsAndAFriendInEachButTheLastWhoPledgesWhenSheIsWalkedUpTo() {
+        assertEquals(100, RunLevels.TOTAL);
+        assertEquals(80, RunLevels.SECOND);
+        assertEquals(12, RunLevels.ALL_CHAPTERS);
+        int seen = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            int friend = RunLevels.friendOf(number), here = 0;
+            assertEquals(number > 80 && number < 100 ? number - 81 : -1, friend);
+            // Two chapters of ten; no one waits in any of its lands; and each is longer than any of the first volume.
+            if (number > RunLevels.SECOND) {
+                assertEquals(10 + (number - 81) / 10, RunLevels.chapterOf(number));
+                assertEquals(-1, RunLevels.bossOf(number));
+                assertTrue("land " + number + " is " + level.gate, level.gate > 250);
+                assertEquals(3, level.flags.size());
+            }
+            for (int[] item : level.items) {
+                if (item[0] != PlusRun.PLEDGE) continue;
+                here++;
+                // On flat ground of the land itself, past its second flag, in the open.
+                assertEquals("land " + number, friend, item[4]);
+                assertTrue(item[1] > level.flags.get(1) && item[1] < level.gate);
+                assertEquals(item[2] + 1, RunLevels.top(level, item[1]));
+                assertEquals(RunLevels.AIR, level.land[item[2]][item[1]]);
+                seen |= 1 << item[4];
+            }
+            assertEquals("land " + number, friend >= 0 ? 1 : 0, here);
+        }
+        assertEquals((1 << RunLevels.FRIENDS) - 1, seen);
+        // Walked up to, she pledges: once, however long she is stood by.
+        RunLevels.Level level = RunLevels.level(85);
+        int[] friend = null;
+        for (int[] item : level.items) if (item[0] == PlusRun.PLEDGE) friend = item;
+        PlusRun run = new PlusRun(level);
+        hold(run, .5f, false, false, false);
+        assertEquals(0, run.pledges());
+        assertEquals(-1, run.lastPledge());
+        run.place(friend[1] - .2f, friend[2] + 1 - PlusRun.TALL);
+        hold(run, 1.5f, false, false, false);
+        assertEquals(1, run.pledges());
+        assertEquals(4, run.lastPledge());
+        assertTrue(run.items().contains(friend));
     }
 
     // The ribbon gacha, and the pots of black ink
@@ -6027,9 +6074,9 @@ public class PlusRunTest {
             if (number <= RunLevels.COUNT) first++;
             else second++;
         }
-        assertEquals(10, met[RunLevels.WYRM]);
-        assertEquals(10, met[RunLevels.BLOT]);
-        assertEquals(10, met[RunLevels.GECKO]);
+        assertEquals(13, met[RunLevels.WYRM]);
+        assertEquals(13, met[RunLevels.BLOT]);
+        assertEquals(13, met[RunLevels.GECKO]);
         assertTrue(first >= 5 && second > first * 3);
         for (int rover = RunLevels.WYRM; rover <= RunLevels.GECKO; rover++) {
             assertTrue(RunLevels.rover(rover) && RunLevels.boss(rover));
@@ -6848,7 +6895,8 @@ public class PlusRunTest {
             RunLevels.Level level = RunLevels.level(number);
             int boss = RunLevels.bossOf(number);
             assertEquals(5 + (number - 31) / 10, level.chapter);
-            assertEquals("land " + number, number % 5 == 0, boss >= 0);
+            // (In the third volume no one waits but at its very end.)
+            assertEquals("land " + number, number <= RunLevels.SECOND && number % 5 == 0, boss >= 0);
             assertEquals("land " + number, boss >= 0 ? 4 : 3, level.flags.size());
             assertEquals(boss >= 0, level.guarded);
             assertEquals(boss >= 0, level.arena >= 0);
@@ -6938,7 +6986,9 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19, lines);
+        assertEquals(RunLevels.FRIENDS, RunStory.PLEDGES.length);
+        assertEquals(RunLevels.FRIENDS, RunStory.FRIENDS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);

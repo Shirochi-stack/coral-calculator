@@ -19,7 +19,10 @@ package com.coral.calculator;
 final class RunStory {
     static final String TITLE = "A Book Fell from the Sky";
     static final String[] CHAPTERS = {"Contents Village", "The Silent Archive", "Heart-Flutter Plaza", "The Index Mountains",
-            "The Last Page", "The Half-Title Palace", "The Gazette Press", "Between the Lines", "The Slime Margins", "The Appendix"};
+            "The Last Page", "The Half-Title Palace", "The Gazette Press", "Between the Lines", "The Slime Margins", "The Appendix",
+            "The Unread Shore", "The Dragon's Library"};
+    /** The third volume. */
+    static final String THIRD = "Volume Three";
     /** The second volume, which falls on her head as the first did. */
     static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
@@ -176,6 +179,28 @@ final class RunStory {
                             "The baker calls out from the edge of the last fight, cheering her friend on. Loud, bright, warm, high."},
                     {"in80d", "M-my ink too... sniff... d-don't be alone... uu...", "R",
                             "The little crybaby librarian offers her ink before the last fight. She is sobbing softly, sniffling between every word, tiny and devoted."}};
+            case 81: return new String[][]{
+                    {"in81a", "Volume Three. It wasn't due. And every page of it stops halfway through Sloppy~♡", "H",
+                            PLAYER + "A third giant book has fallen on her, and it is broken: every page stops mid-sentence. Dry, uneasy under the joke." + FAST},
+                    {"in81b", "Something is unwriting it from the far end. I know that kind of quiet. This time I walk with you.", "M",
+                            "The lonely older self, now a friend, recognises a loneliness like her own and offers to come along. Low, calm, steady, kind."},
+                    {"in81c", "They call her the Great Translation Killer, translator-nim. Every series she touches stops at a name.", "N",
+                            "The young queen passes on what her people fear, gravely. Clear, earnest, formal, worried."},
+                    {"in81d", "Then I want everyone. Every friend I made in two volumes. Start pledging Sloppy~♡", "H",
+                            PLAYER + "She decides she will need all her friends for what is coming, and says so as an order. Bossy, bright, determined." + FAST}};
+            case 90: return new String[][]{
+                    {"in90a", "This is where I pledge. Sixty years I needed no one. I was wrong for all sixty.", "M",
+                            "The lonely older self makes a promise to her friend at the edge of the sea. Low, quiet, a little rueful, warm."},
+                    {"in90b", "Noted. Underlined. I'm keeping that one Sloppy~♡", "H",
+                            PLAYER + "She is touched by a promise and hides it behind a joke. Soft, then teasing." + FAST}};
+            case 91: return new String[][]{
+                    {"in91a", "H-Halgakos-nim... sniff... the library at the end... n-nothing in it is translated any more... uu...", "R",
+                            "The little crybaby librarian reports, in tears, that a great library has lost all its translations. Sobbing, hiccuping, frightened."},
+                    {"in91b", "A dragon's library. And someone small living in it alone. I don't like where this is going Sloppy~♡", "H",
+                            PLAYER + "She looks up at a vast ruined library and guesses who lives there. Quiet, uneasy, serious for once."}};
+            case 100: return new String[][]{
+                    {"in100a", "The last land. The Dragon of Lost Words is at the end of it. Everyone with me Sloppy~♡", "H",
+                            PLAYER + "She stands before the final level with all her friends behind her. Steady, proud, a little nervous." + FAST}};
             default: return null;
         }
     }
@@ -700,6 +725,55 @@ final class RunStory {
             {"market4", "A black market under a village. I'm not even surprised. I'm shopping Sloppy~♡", "H",
                     PLAYER + "She walks into a hidden black market for the first time and looks around, unimpressed and interested. Dry, amused, greedy." + FAST},
     };
+    /**
+     * What each of her friends says as she pledges her help, in the lands of the third
+     * volume, in the order of the lands from the eighty-first: Chikuwa, Rune, Illya,
+     * Tsubakieh, the Guild Guard, Penchok-jipsa, Gokhae, Byeoru, Miri for the twins, the
+     * Mawang, Jupan, Yeobaek, Sumbi, the queen, the Brake Pads, the Straight-Ahead Party,
+     * Moru, Inju and Somi.
+     */
+    static final String[] FRIENDS = {"Chikuwa", "Rune", "Illya", "Tsubakieh", "The Guild Guard", "Penchok-jipsa", "Gokhae", "Byeoru", "The Gazette Twins", "The Mawang", "Jupan",
+            "Yeobaek", "Sumbi", "Nuri-yeowang", "The Brake Pads", "The Straight-Ahead Party", "Moru", "Inju", "Somi"};
+    static final String[][] PLEDGES = {
+            {"pledge1", "Bread for the whole army, Halgakos-ssi! I pledge my oven!", "C",
+                    "The sunny baker girl promises her friend all the help she can give before a great battle. Loud, bright, bubbling, high."},
+            {"pledge2", "I-I'll draw every line you need... sniff... I p-pledge my ink... uu...", "R",
+                    "The little crybaby librarian promises her help, in tears and meaning it. Sobbing softly, tiny, devoted."},
+            {"pledge3", "My compliments are yours♡ I pledge my stage, and all nine thousand fans♡", "I",
+                    "The magical-girl idol promises her help with a flourish. Bright, sweet, high, sparkling."},
+            {"pledge4", "Normal No. 3 is ready. I pledge one swing. Normally that is enough.", "T",
+                    "The cheerful girl with the bat promises her help in her calm, deadpan way. Light, pleasant, unbothered."},
+            {"pledge5", "The guild stands with you. I pledge my shield. That is an order to myself.", "D",
+                    "The lady knight who guards the guild promises her help, very formally. Low, firm, dutiful."},
+            {"pledge6", "I shall keep your ink topped up, madam. Consider it pledged, and underlined.", "F",
+                    "The fountain-pen lady butler promises her help with impeccable politeness. Light, dry, crisp."},
+            {"pledge7", "It is being pledged that this interpreter will interpret faithfully. For once.", "G",
+                    "The sly court interpreter, reformed, promises to be faithful in her stiff, over-formal way. Smooth, cool, a little embarrassed."},
+            {"pledge8", "I will write down what really happens. Every word. I pledge the record.", "Q",
+                    "The quiet court scribe promises to keep a true record. Soft, flat, precise, sincere."},
+            {"pledge9", "Extra, extra! The Gazette pledges its front page! And no spoilers this time!", "J",
+                    "The gossipy newspaper girl promises her paper's help, for herself and her twin. High, quick, chirpy."},
+            {"pledge10", "Sixty years I needed no one. I pledge the rest of them to you.", "M",
+                    "The lonely older self makes her promise. Low, slow, quiet, warm."},
+            {"pledge11", "My pledge has no fine print. Don't tell anyone. It's bad for business.", "V",
+                    "The sly merchant girl promises her help for free and is a little shy about it. Quick, bright, hushed."},
+            {"pledge12", "I pledge one cut. A real one. Wake me when it's time.", "Y",
+                    "The sleepy swordswoman promises her help between yawns. Soft, drowsy, slow, sincere."},
+            {"pledge13", "I'll dive under whatever she throws! Pledged! Count on me!", "X",
+                    "The cheerful diver girl promises her help, out of breath and grinning. High, loud, sunny."},
+            {"pledge14", "We pledge the crown's own words, in Our own voice, to be kept as they were spoken.", "N",
+                    "The young queen promises her help, formally and bravely. Clear, earnest, regal."},
+            {"pledge15", "We pledge to stop her. Stopping is what we do.", "Z",
+                    "The two hard-working brake pads promise their help as one. Tomboyish, gruff, cheerful."},
+            {"pledge16", "Straight ahead, no turning! The party pledges its swords!", "a",
+                    "The brash swordswoman promises her whole adventuring party's help. Loud, proud, hot-blooded."},
+            {"pledge17", "Hammer's yours. Pledged. Don't make it a speech.", "W",
+                    "The blunt smith girl promises her help in as few words as she can. Flat, gruff for a girl, kind underneath."},
+            {"pledge18", "Form 100-L: pledge of the whole guild. Stamped. Twice.", "U",
+                    "The guild's receptionist promises the guild's help by stamping a form. Crisp, pleasant, proud."},
+            {"pledge19", "Halgakos-nim! The Footnote Party pledges everything! Even my magnet!", "S",
+                    "The tiny, eager adventurer girl promises everything she has. Very high, loud, excited."},
+    };
     /** At the ribbon gacha: the first time she rolls one; and when a black ribbon blows it up. */
     static final String[][] GACHA = {
             {"gacha1", "A ribbon gacha. One roll. Maybe two. I can stop whenever I like Sloppy~♡", "H",
@@ -866,7 +940,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET, GACHA);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET, GACHA, PLEDGES);
         return groups.toArray(new String[0][][]);
     }
 }

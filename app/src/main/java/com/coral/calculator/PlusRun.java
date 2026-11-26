@@ -133,6 +133,14 @@ final class PlusRun {
      * fast what it throws flies.
      */
     static final int INKPOT = 26;
+    /** A friend, standing in a land of the third volume to pledge her help: which of them is her fifth number. She is walked up to. */
+    static final int PLEDGE = 27;
+    private int pledges, lastPledge = -1;
+    private boolean pledged;
+
+    /** How many times a friend has been walked up to, a count that only goes up; and which was the last. */
+    int pledges() { return pledges; }
+    int lastPledge() { return lastPledge; }
     static final float POT_EVERY = 4.5f, POT_SWELLS = .9f, POT_REACH = 9, POT_FAST = 6.5f;
 
     /** How many times a pot has thrown: a count that only goes up. */
@@ -2645,6 +2653,15 @@ final class PlusRun {
             if (item[0] == DROPOFF) {
                 if (quest == ASKED && level.quest == RunLevels.LETTER && x < item[1] + 2.4f && x + WIDE > item[1] - .4f && y < item[2] + .9f
                         && y + TALL > item[2] + .1f) done();
+                continue;
+            }
+            // A friend stays where she is: walked up to, she pledges, once.
+            if (item[0] == PLEDGE) {
+                if (!pledged && room < 0 && Math.abs(item[1] + .5f - x - WIDE / 2) < 1.6f && Math.abs(item[2] + 1 - y - TALL) < 1.5f) {
+                    pledged = true;
+                    pledges++;
+                    lastPledge = item[4];
+                }
                 continue;
             }
             // A pot of black ink stays where it is: every so often, having swelled, it throws the black curse at her if she is near.

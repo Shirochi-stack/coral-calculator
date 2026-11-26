@@ -40,7 +40,10 @@ final class RunGame {
     private static final float[] WEAPON_LONG = {.78f, .64f, .52f, .98f, 1.08f, .56f, .6f, .7f, 1, 1.1f, .7f, .8f};
     private static final int[] SKIES = {R.drawable.plus_run_sky1, R.drawable.plus_run_sky2, R.drawable.plus_run_sky3,
             R.drawable.plus_run_sky4, R.drawable.plus_run_sky5, R.drawable.plus_run_sky6, R.drawable.plus_run_sky7, R.drawable.plus_run_sky8,
-            R.drawable.plus_run_sky9, R.drawable.plus_run_sky10};
+            R.drawable.plus_run_sky9, R.drawable.plus_run_sky10, R.drawable.plus_run_sky11, R.drawable.plus_run_sky12};
+    /** The ground of the two chapters of the third volume: a cap and a fill for each, four squares in a row. */
+    private Bitmap ground3;
+    private int seenPledges;
     /**
      * The pictures of the second sheet, eight to a row: two for the ground of each chapter
      * of the second volume, lava and water, what the ground there is made of, what flies,
@@ -407,7 +410,7 @@ final class RunGame {
     private final int[] pillActions = new int[3];
     private int pillCount;
     private final RectF[] lands = new RectF[RunLevels.TOTAL];
-    private final RectF[] tabs = {new RectF(), new RectF()}, stallWares = {new RectF(), new RectF(), new RectF(), new RectF()};
+    private final RectF[] tabs = {new RectF(), new RectF(), new RectF()}, tabs3 = {new RectF(), new RectF(), new RectF()}, stallWares = {new RectF(), new RectF(), new RectF(), new RectF()};
     private final RectF stallButton = new RectF();
     /** Which volume's lands the map shows; and from where the counter was opened, to go back there. */
     private int page, counterFrom = MAP;
@@ -629,7 +632,14 @@ final class RunGame {
     // What is kept between one time and the next
 
     /** The furthest land that may be played: each land opens the one after it. */
-    private int open() { return Math.max(1, Math.min(RunLevels.TOTAL, session.tally("run_open"))); }
+    private int open() { return Math.max(1, Math.min(RunLevels.OPEN_TO, session.tally("run_open"))); }
+
+    /** The volumes of the map: how many of them are open; and the first land of one, less one, the land after its last, less one, and how many lands a chapter of it has. */
+    private int volumes() { return open() > RunLevels.SECOND ? 3 : open() > RunLevels.COUNT ? 2 : 1; }
+    private static int firstOf(int volume) { return volume == 0 ? 0 : volume == 1 ? RunLevels.COUNT : RunLevels.SECOND; }
+    private static int lastOf(int volume) { return volume == 0 ? RunLevels.COUNT : volume == 1 ? RunLevels.SECOND : RunLevels.TOTAL; }
+    private static int eachOf(int volume) { return volume == 0 ? RunLevels.IN_CHAPTER : RunLevels.IN_LATER_CHAPTER; }
+    private RectF tabOf(int volume) { return volumes() > 2 ? tabs3[volume] : tabs[volume]; }
 
     private int starsOf(int land) { return session.tally("run_stars_" + land); }
 
@@ -782,6 +792,50 @@ final class RunGame {
                 toast(name + " is driven off", "+ 10 to keep. Beaten, it gives more", CHEST_PICTURE);
             }
             speak(RunStory.ROVERS[4], true);
+        }
+    }
+
+    // Her friends
+
+    /**
+     * One of her friends, standing in a land of the third volume: each as she is drawn where
+     * she was met. Over her head a mark until she has pledged, and a heart once she has.
+     */
+    private void drawFriend(Canvas canvas, int[] item) {
+        int friend = item[4];
+        float x = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile, size = tile * 1.62f, head = feet - tile * 1.9f;
+        if (x < -tile * 3 || x > width + tile * 3) return;
+        boolean near = Math.abs(run.x() - item[1]) < 6, pledged = (session.tally("run_friends") >> friend & 1) != 0;
+        paint.setAlpha(255);
+        if (friend <= 3) {
+            int who = friend == 0 ? CHIKUWA : friend == 1 ? RUNE : friend == 2 ? ILLYA : TSUBAKIEH;
+            frame(canvas, cast(who), friend <= 1 && near ? 1 : 0, CAST_FRAMES[who], x, feet, size, false);
+        } else if (friend == 13) {
+            Bitmap queen = face(10);
+            float tall = tile * 1.7f, wide = tall * queen.getWidth() / queen.getHeight();
+            target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
+            canvas.drawBitmap(queen, null, target, paint);
+        } else if (friend == 16) {
+            Bitmap sheet = smith(0);
+            cell(canvas, sheet, near ? 3 : 0, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+            head = feet - tile * 1.6f;
+        } else if (friend >= 17) {
+            frame(canvas, villagers(), friend == 17 ? RunLevels.INJU - RunLevels.SOMI : 0, VILLAGERS, x, feet - (near ? Math.abs((float) Math.sin(clock * 6)) * tile * .08f : 0), size * .72f, false);
+            head = feet - tile * 1.55f;
+        } else {
+            int kind = friend == 4 ? RunLevels.GUARD : friend == 5 ? RunLevels.BUTLER : friend == 6 ? RunLevels.GOKHAE : friend == 7 ? RunLevels.BYEORU : friend == 8 ? RunLevels.MIRI
+                    : friend == 9 ? RunLevels.MAWANG : friend == 10 ? RunLevels.JUPAN : friend == 11 ? RunLevels.YEOBAEK : friend == 12 ? RunLevels.SUMBI : friend == 14 ? RunLevels.PADS
+                    : RunLevels.PARTY;
+            int which = kind - RunLevels.GOKHAE;
+            // (The twins stand together.)
+            if (kind == RunLevels.MIRI) frame(canvas, later(which + 1), 0, LATER_FRAMES[which + 1], x + tile * .95f, feet, size, false);
+            frame(canvas, later(which), 0, LATER_FRAMES[which], x, feet, size, false);
+        }
+        if (pledged) {
+            paint.setAlpha(255);
+            art(canvas, HEART_ART, x, head + tile * .1f + (float) Math.sin(clock * 3 + item[1]) * tile * .05f, tile * .36f, false);
+        } else {
+            mark(canvas, x, head - Math.abs((float) Math.sin(clock * 4)) * tile * .08f, "Pledge", SPEAKER_COLOURS[RunStory.speaker(RunStory.PLEDGES[friend])], false);
         }
     }
 
@@ -2564,12 +2618,12 @@ final class RunGame {
         soundButton.set(closeButton.left - dp(8) - small, closeButton.top, closeButton.left - dp(8), closeButton.bottom);
         // The map: a page for each volume, with a row of lands for each of its chapters under the chapter's name, and the button that goes on under them all.
         float room = safe.height() - dp(92) - dp(150) - dp(44);
-        for (int volume = 0; volume < 2; volume++) {
-            int each = volume == 0 ? RunLevels.IN_CHAPTER : RunLevels.IN_LATER_CHAPTER, from = volume == 0 ? 0 : RunLevels.COUNT;
+        for (int volume = 0; volume < 3; volume++) {
+            int each = eachOf(volume), from = firstOf(volume);
             float gap = volume == 0 ? dp(8) : dp(5);
             float side = Math.max(dp(22), Math.min(dp(54), Math.min((safe.width() - dp(28) - gap * (each - 1)) / each, room / RunLevels.CHAPTERS - dp(34))));
             float left = safe.centerX() - (side * each + gap * (each - 1)) / 2, top = safe.top + dp(92) + dp(44);
-            for (int index = 0; index < RunLevels.CHAPTERS * each; index++) {
+            for (int index = 0; index < lastOf(volume) - from; index++) {
                 float x = left + index % each * (side + gap), down = top + index / each * (side + dp(34)) + dp(22);
                 lands[from + index].set(x, down, x + side, down + side);
             }
@@ -2579,6 +2633,11 @@ final class RunGame {
         tabs[0].set(safe.left + dp(18), safe.top + dp(80), safe.left + dp(18) + tab, safe.top + dp(114));
         tabs[1].set(tabs[0].right + dp(8), tabs[0].top, tabs[0].right + dp(8) + tab, tabs[0].bottom);
         gearButton.set(safe.right - dp(18) - dp(76), tabs[0].top, safe.right - dp(18), tabs[0].bottom);
+        // (With the third volume there are three of them, narrower.)
+        float third = Math.min(dp(96), (safe.width() - dp(36) - dp(84) - dp(12)) / 3);
+        for (int volume = 0; volume < 3; volume++) {
+            tabs3[volume].set(safe.left + dp(18) + volume * (third + dp(6)), tabs[0].top, safe.left + dp(18) + volume * (third + dp(6)) + third, tabs[0].bottom);
+        }
         // The button that changes what she holds: over the one that uses it, a little smaller.
         float swaps = Math.max(dp(44), size * .66f);
         swapButton.set(strikeButton.centerX() - swaps / 2, strikeButton.top - dp(12) - swaps, strikeButton.centerX() + swaps / 2, strikeButton.top - dp(12));
@@ -2612,7 +2671,7 @@ final class RunGame {
      */
     private void turnTo(int volume) {
         page = volume;
-        int from = volume == 0 ? 0 : RunLevels.COUNT, last = volume == 0 ? RunLevels.COUNT - 1 : RunLevels.TOTAL - 1;
+        int from = firstOf(volume), last = lastOf(volume) - 1;
         float under = lands[last].bottom + dp(16);
         goButton.set(lands[from].left, under, lands[last].right, under + dp(48));
         text.setTextSize(dp(26));
@@ -2798,7 +2857,7 @@ final class RunGame {
         seenPanels = seenFans = seenDuds = seenFinds = seenRefills = seenSwitches = 0;
         sinceHeavy = panelAge = 9;
         seenCuts = seenDashes = seenAirCuts = seenThrusts = seenJets = seenShells = seenLashes = seenSpins = 0;
-        seenPotShots = 0;
+        seenPotShots = seenPledges = 0;
         capsuleAge = 9;
         capsuleWaits = false;
         cutAge = dashAge = airAge = thrustAge = lashAge = spinAge = 9;
@@ -2965,7 +3024,7 @@ final class RunGame {
             stars = 1 + (share >= .6f ? 1 : 0) + (share >= .9f ? 1 : 0);
             if (stars > starsOf(number)) session.keep("run_stars_" + number, stars);
             session.keepBest("run_time_" + number, Math.max(1, Math.round(run.time())), true);
-            if (number >= open() && number < RunLevels.TOTAL) session.keep("run_open", number + 1);
+            if (number >= open() && number < RunLevels.OPEN_TO) session.keep("run_open", number + 1);
             if (number == 1) session.keepBest("run_best", Math.max(1, Math.round(run.time())), true);
             audio.play("win");
             // What whoever waited here gave was hers when they fell; had there been no one to see it then, it is hers now. Her word is about how the land went.
@@ -2975,7 +3034,8 @@ final class RunGame {
             session.keep("run_mobs", session.tally("run_mobs") + run.flattened());
             session.keep("run_fliers", session.tally("run_fliers") + run.fliers());
             session.keep("run_pet_kills", session.tally("run_pet_kills") + run.petKills());
-            pills(number < RunLevels.TOTAL ? number == RunLevels.COUNT ? RunStory.SEQUEL : "Next" : "The end", NEXT, "Again", AGAIN, "Lands", TO_MAP);
+            pills(number < RunLevels.OPEN_TO ? number == RunLevels.COUNT ? RunStory.SEQUEL : number == RunLevels.SECOND ? RunStory.THIRD : "Next" : "The end", NEXT, "Again", AGAIN,
+                    "Lands", TO_MAP);
         } else {
             stars = 0;
             session.keep("run_lost", session.tally("run_lost") + 1);
@@ -3010,8 +3070,8 @@ final class RunGame {
             // The next rung of the black arena.
             blackRung = Math.min(RunMarket.RUNGS, blackRung + 1);
             begin(RunMarket.LANDS[blackRung - 1], true);
-        } else if (action == TO_MAP || number >= RunLevels.TOTAL) {
-            if (number >= RunLevels.COUNT) turnTo(open() > RunLevels.COUNT ? 1 : 0);
+        } else if (action == TO_MAP || number >= RunLevels.OPEN_TO) {
+            if (number >= RunLevels.COUNT) turnTo(volumes() - 1);
             toMap();
         } else {
             play(number + 1);
@@ -3503,6 +3563,21 @@ final class RunGame {
             seenFans = run.fans();
             sinceHeavy = 0;
             audio.play("throw", .7f);
+        }
+        // A friend walked up to, in the third volume: she pledges her help, which is kept; and says so.
+        if (run.pledges() != seenPledges) {
+            seenPledges = run.pledges();
+            int friend = run.lastPledge(), had = session.tally("run_friends");
+            if (friend >= 0 && friend < RunLevels.FRIENDS) {
+                if ((had >> friend & 1) == 0) {
+                    session.keep("run_friends", had | 1 << friend);
+                    boolean several = friend == 8 || friend == 14 || friend == 15;
+                    toast(RunStory.FRIENDS[friend] + (several ? " pledge their help" : " pledges her help"), Integer.bitCount(had | 1 << friend) + " of " + RunLevels.FRIENDS + " are with her", 0);
+                    audio.play("star", .7f);
+                    buzz(true);
+                }
+                person(RunStory.PLEDGES[friend]);
+            }
         }
         // A capsule of the ribbon gacha, come out: it opens, and what was in it is hers, or is not.
         if (capsuleWaits && capsuleAge >= .9f) opened();
@@ -4494,11 +4569,11 @@ final class RunGame {
                 audio.play("tap", .5f);
                 buzz(false);
                 play(open());
-            } else if (open() > RunLevels.COUNT && (tabs[0].contains(x, y) || tabs[1].contains(x, y))) {
+            } else if (volumes() > 1 && (tabOf(0).contains(x, y) || tabOf(1).contains(x, y) || volumes() > 2 && tabOf(2).contains(x, y))) {
                 audio.play("page", .5f);
-                turnTo(tabs[1].contains(x, y) ? 1 : 0);
+                turnTo(tabOf(0).contains(x, y) ? 0 : tabOf(1).contains(x, y) ? 1 : 2);
             } else {
-                int first = page == 0 ? 0 : RunLevels.COUNT, last = page == 0 ? RunLevels.COUNT : RunLevels.TOTAL;
+                int first = firstOf(page), last = lastOf(page);
                 for (int index = first; index < last; index++) {
                     if (lands[index].contains(x, y) && index + 1 <= open()) {
                         audio.play("tap", .5f);
@@ -5499,6 +5574,18 @@ final class RunGame {
                     // The top of a pile has the turf on it; the rest is what lies under. Every other one is
                     // turned about, so the same picture side by side does not show as a pattern.
                     boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
+                    if (chapter >= RunLevels.CHAPTERS * 2) {
+                        // (The third volume's ground is in a row of squares of its own.)
+                        if (ground3 == null) ground3 = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_art5);
+                        int square = ground3.getHeight(), which = (chapter - RunLevels.CHAPTERS * 2) * 2 + (capped ? 0 : 1);
+                        source.set(which * square + 1, 1, which * square + square - 1, square - 1);
+                        target.set(left, y, left + tile + 1, y + tile + 1);
+                        canvas.save();
+                        canvas.scale(column % 2 == 0 ? 1 : -1, capped || row % 2 == 0 ? 1 : -1, left + tile / 2, y + tile / 2);
+                        canvas.drawBitmap(ground3, source, target, paint);
+                        canvas.restore();
+                        continue;
+                    }
                     if (later) {
                         square(canvas, (chapter - RunLevels.CHAPTERS) * 2 + (capped ? 0 : 1), left, y, column % 2 != 0, !capped && row % 2 != 0);
                         continue;
@@ -5665,6 +5752,10 @@ final class RunGame {
             }
             if (item[0] == PlusRun.INKPOT) {
                 drawPot(canvas, item);
+                continue;
+            }
+            if (item[0] == PlusRun.PLEDGE) {
+                drawFriend(canvas, item);
                 continue;
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
@@ -9211,7 +9302,7 @@ final class RunGame {
         drawSky(canvas, RunLevels.chapterOf(open), clock * dp(5));
         canvas.drawColor(dark ? 0x99000000 : 0x66FFFFFF);
         int earned = 0;
-        int all = open > RunLevels.COUNT ? RunLevels.TOTAL : RunLevels.COUNT;
+        int all = lastOf(volumes() - 1);
         for (int land = 1; land <= all; land++) earned += starsOf(land);
         int guild = RunHunts.rank(session.tally("run_hunts"));
         heading(canvas, "Plus run", RunStory.TITLE + "  ·  " + earned + " of " + all * 3 + " stars" + (guild > 0 ? "  ·  " + RunHunts.RANK_NAMES[guild - 1] + " badge" : "")
@@ -9223,16 +9314,19 @@ final class RunGame {
             if (after + dp(14) < shopButton.left) badge(canvas, after, safe.top + dp(29), dp(22), guild);
         }
         if (open > RunLevels.COUNT) {
-            for (int volume = 0; volume < 2; volume++) {
+            int volumes = volumes();
+            for (int volume = 0; volume < volumes; volume++) {
+                RectF tab = tabOf(volume);
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(volume == page ? CalculatorLayout.CORAL : dark ? 0xFF2A2E33 : 0xFFFFFFFF);
                 paint.setAlpha(volume == page ? 255 : 220);
-                canvas.drawRoundRect(tabs[volume], tabs[volume].height() / 2, tabs[volume].height() / 2, paint);
+                canvas.drawRoundRect(tab, tab.height() / 2, tab.height() / 2, paint);
                 paint.setAlpha(255);
                 paint.setColor(Color.BLACK);
                 text.setTextAlign(Paint.Align.CENTER);
                 text.setColor(volume == page ? Color.WHITE : ink);
-                fitted(canvas, volume == 0 ? "Volume One" : RunStory.SEQUEL, tabs[volume].centerX(), tabs[volume].centerY() + dp(5), dp(14), tabs[volume].width() - dp(16));
+                // (Three of them have room only for the short of it.)
+                fitted(canvas, volumes > 2 ? "Vol. " + (volume + 1) : volume == 0 ? "Volume One" : RunStory.SEQUEL, tab.centerX(), tab.centerY() + dp(5), dp(14), tab.width() - dp(16));
             }
         }
         // Its sounds on or off.
@@ -9258,8 +9352,8 @@ final class RunGame {
             canvas.drawLine(x + dp(4), y - dp(4.5f), x + dp(10), y + dp(4.5f), stroke);
             canvas.drawLine(x + dp(10), y - dp(4.5f), x + dp(4), y + dp(4.5f), stroke);
         }
-        int firstShown = page == 0 ? 0 : RunLevels.COUNT, lastShown = page == 0 ? RunLevels.COUNT : RunLevels.TOTAL;
-        int each = page == 0 ? RunLevels.IN_CHAPTER : RunLevels.IN_LATER_CHAPTER;
+        int firstShown = firstOf(page), lastShown = lastOf(page);
+        int each = eachOf(page);
         for (int index = firstShown; index < lastShown; index++) {
             RectF where = lands[index];
             int land = index + 1, got = starsOf(land);
@@ -9373,7 +9467,8 @@ final class RunGame {
             }
             if (bought(1) == 0 && bank() >= UP_COSTS[1][0]) afford = UP_NAMES[1];
             String words = names.named(afford != null && open > 1 ? "Pluses enough for " + afford.toLowerCase(java.util.Locale.ROOT).replace("chikuwa", "Chikuwa") + ". The counter Sloppy~♡"
-                    : starsOf(RunLevels.TOTAL) > 0 ? "We read both volumes to the end. Again Sloppy~♡"
+                    : starsOf(RunLevels.OPEN_TO) > 0 ? "Ninety-nine lands read. The last page isn't written yet Sloppy~♡"
+                    : open == RunLevels.SECOND + 1 ? "Volume Three fell on us. Land 81 Sloppy~♡"
                     : open == 1 ? "Pick the first land. Go on Sloppy~♡" : open == RunLevels.COUNT + 1 ? "Volume Two fell on us. Land 31 Sloppy~♡"
                     : waiting == RunLevels.TSUBAKIEH ? "Tsubakieh and her bat are in land " + open + " Sloppy~♡"
                     : waiting == RunLevels.ZERO ? "The Last Page. Zero is waiting Sloppy~♡"

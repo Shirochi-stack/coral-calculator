@@ -367,6 +367,27 @@ def later():
     return atlas, len(squares), strips
 
 
+def third():
+    """The skies and the ground of the two chapters of the third volume: the ground as four squares in a row of their own, a cap and a fill for each."""
+    for chapter in (11, 12):
+        sky = Image.open(SOURCE / f"sky{chapter}.png").convert("RGB")
+        sky.resize((SKY_WIDTH, round(sky.size[1] * SKY_WIDTH / sky.size[0])), Image.LANCZOS).save(RES / f"plus_run_sky{chapter}.webp", quality=82, method=6)
+    squares = []
+    for name in ("ground11", "ground12"):
+        ground = Image.open(SOURCE / f"{name}.png").convert("RGBA")
+        side = ground.size[0]
+        squares.append(ground.crop((side // 8, 0, side // 8 + side * 3 // 4, side * 3 // 4)).resize((CELL, CELL), Image.LANCZOS))
+        fill = ground.crop((side // 8, side * 3 // 8, side // 8 + side // 2, side * 7 // 8)).resize((CELL, CELL), Image.LANCZOS)
+        # (The spines of the library's books are quietened, so that what stands on them is what is seen.)
+        if name == "ground12":
+            fill = Image.blend(fill, Image.new("RGBA", fill.size, (44, 40, 66, 255)), .55)
+        squares.append(fill)
+    atlas = Image.new("RGBA", (CELL * len(squares), CELL), (0, 0, 0, 0))
+    for index, square in enumerate(squares):
+        atlas.alpha_composite(square.convert("RGBA"), (index * CELL, 0))
+    atlas.save(RES / "plus_run_art5.webp", lossless=True, quality=100, method=6)
+    return atlas.size
+
 def gacha():
     """The ribbon gacha's building, its inside, and its machine as it stands and as it is when it has blown up."""
     house = pieces("gacha_house", 1, 1)[0]
@@ -472,6 +493,8 @@ def places():
     Image.composite(town, clear, town.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_town.webp", lossless=True, quality=100, method=6, exact=True)
     # The ribbon gacha: its building, at the scale of the others; its inside; and its machine, whole and blown up, side by side.
     gacha()
+    # The third volume's two chapters: their skies and their ground.
+    third()
     # The three sisters who keep the smithy, each from a sheet of her own and in a file of her own: at ease, her hammer up, her hammer
     # down, and pleased with her work. Moru is the webtoon's; Pulmu and Sutdol are new.
     for name in SMITHS:
