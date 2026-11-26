@@ -42,17 +42,17 @@ MODEL = "inworld-tts-2"
 # higher the recording is made afterwards. The same voices as tools/make_run_voice.py.
 VOICES = {
     "h": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "c": ("community-iyfnceehtmbk", .95, 1.06),
+    "c": ("community-iyfnceehtmbk", 1.0, 1.08),
     "t": ("community-pwotyqkmtlsi", .92, 1.1),
-    "r": ("Pixie", 1.25, 1.08),
+    "r": ("Pixie", 1.25, .94),
     "i": ("community-blcuaurhzmvi", .95, 1.06),
 }
 # Who each of them is, for the voice to know.
 WHO = {
     "h": "Halgakos, a smug, teasing translator girl with a cheeky sing-song voice, in a fighting game. She talks fast.",
-    "c": "Chikuwa, a sunny, bubbly baker girl in a fighting game, who thinks of everything in bread. A high, bright, cute anime voice.",
+    "c": "Chikuwa, a baker girl in a fighting game who thinks of everything in bread: a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels.",
     "t": "Tsubakieh, a cheerful, unbothered girl with a baseball bat who calls everything normal, in a fighting game. A light, cute, deadpan anime voice.",
-    "r": "Rune, a little crybaby librarian in a fighting game: a very high, small, squeaky, childlike anime voice. She sobs, sniffles and hiccups through every line, whiny and wobbly. Never calm, eloquent or grown-up.",
+    "r": "Rune, a librarian in a fighting game: a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up.",
     "i": "Illya, a lovely magical-girl idol in a fighting game. A sweet, bright, high, sparkling anime voice; polite and sincere, never sultry.",
 }
 # What each kind of line is said in the middle of.
@@ -85,7 +85,8 @@ def secret(name):
 
 def spoken(text):
     """A line as it is to be said: without the heart, which is not a word."""
-    return text.replace("♡", "").replace("~", "").strip()
+    # A squeal is said as it is squealed in Japanese, not read out as an English word.
+    return text.replace("♡", "").replace("~", "").replace("Kyaa", "きゃあっ").strip()
 
 
 def scene(name):

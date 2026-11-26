@@ -45,8 +45,8 @@ MODEL = "inworld-tts-2"
 # The Mawang is Halgakos herself, sixty years on: her voice, slower and lower.
 VOICES = {
     "H": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "C": ("community-iyfnceehtmbk", .95, 1.06),
-    "R": ("Pixie", 1.3, 1.08),
+    "C": ("community-iyfnceehtmbk", 1.0, 1.08),
+    "R": ("Pixie", 1.3, .94),
     "I": ("community-blcuaurhzmvi", .95, 1.06),
     "T": ("community-pwotyqkmtlsi", .92, 1.1),
     "M": ("community-5fwhmdpiq45g", 1.0, .84),
@@ -54,8 +54,8 @@ VOICES = {
 # How each of the others sounds, said to the voice before the scene of every line of hers, so that none of
 # them drifts into sounding grown up or dark, whatever the scene.
 MANNER = {
-    "C": "Chikuwa is a sunny, bubbly girl with a high, bright, cute anime voice. ",
-    "R": "Rune is a little crybaby: a very high, small, squeaky, childlike anime voice. She sobs, sniffles and hiccups through every line, whiny and wobbly, with simple words. Never calm, eloquent or grown-up. ",
+    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels. ",
+    "R": "Rune is a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up. ",
     "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
     "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
 }
@@ -86,7 +86,8 @@ def story():
 
 def spoken(text):
     """A line as it is to be said: without the heart, which is not a word."""
-    return text.replace("♡", "").strip()
+    # A squeal is said as it is squealed in Japanese, not read out as an English word.
+    return text.replace("♡", "").replace("Kyaa", "きゃあっ").strip()
 
 
 def speak(key, text, who, scene):
