@@ -245,13 +245,14 @@ final class RunLevels {
         if (walkers.isEmpty()) walkers.add(MINUS);
         // Where one could stand: on the ground, or on a ledge, with room over it and the same to either side.
         List<int[]> spots = new ArrayList<>();
-        for (int column = 18; column < until; column++) {
+        for (int column = 24; column < until; column++) {
             boolean near = false;
             for (int flag : level.flags) near |= Math.abs(flag - column) < 6;
             for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 10;
             for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
             for (int[] item : level.items) if (item[1] < level.main && (item[3] != 0 || item[0] >= PlusRun.CHEST)) near |= Math.abs(item[1] - column) < 6;
-            for (int[] foe : level.foes) if (rover(foe[0])) near |= Math.abs(foe[1] - column) < 8;
+            // (Well clear of one met in the middle of the land: its place is its own.)
+            for (int[] foe : level.foes) if (rover(foe[0])) near |= Math.abs(foe[1] - column) < 16;
             if (near) continue;
             int floor = top(level, column);
             if (floor > 4 && top(level, column - 1) == floor && top(level, column + 1) == floor && level.land[floor - 1][column] == AIR
@@ -263,7 +264,8 @@ final class RunLevels {
         }
         for (int want = base * (crowdOf(number) - 1); want > 0 && !spots.isEmpty(); ) {
             int[] spot = spots.get(random.nextInt(spots.size()));
-            int size = Math.min(want, 2 + random.nextInt(3)), put = 0;
+            // (In the lands of the first two chapters, which are short, they come one or two together; later, two to four.)
+            int size = Math.min(want, number <= 12 ? 1 + random.nextInt(2) : 2 + random.nextInt(3)), put = 0;
             int kind = !shooters.isEmpty() && random.nextInt(5) == 0 ? shooters.get(random.nextInt(shooters.size())) : walkers.get(random.nextInt(walkers.size()));
             for (int each = 0; each < size; each++) {
                 boolean stands = false;
@@ -275,13 +277,35 @@ final class RunLevels {
             want -= Math.max(1, put);
             for (int index = spots.size() - 1; index >= 0; index--) {
                 int[] other = spots.get(index);
-                if (other[1] == spot[1] && other[0] >= spot[0] - 2 && other[0] <= spot[0] + Math.max(1, put) + 1) spots.remove(index);
+                if (other[1] == spot[1] && other[0] >= spot[0] - 3 && other[0] <= spot[0] + Math.max(1, put) + 2) spots.remove(index);
             }
         }
         // And in the air.
         int known = 0;
         for (int kind = DRIFTER; kind <= RIME; kind++) if (FLIES_FROM[kind - DRIFTER] <= number) known++;
         for (int more = 0; more < fliersIn(number) * 2; more++) perch(level, DRIFTER + random.nextInt(known), 18 + random.nextInt(Math.max(1, until - 30)), until - 2, true);
+    }
+
+    /**
+     * With five times the creatures a land has more to fight with lying in it: one more
+     * thing for every forty squares or so of its length, on flat ground where nothing else
+     * lies, of the kinds that are not a book, turn about.
+     */
+    private static void arsenal(Level level) {
+        int until = (level.arena >= 0 ? level.arena : level.gate) - 10, which = level.number;
+        int[] kinds = {PlusRun.PEN, PlusRun.KNIFE, PlusRun.BRUSH, PlusRun.SWORD, PlusRun.GUN};
+        for (int from = 40; from < until; from += 40) {
+            for (int column = from; column < from + 14 && column < until; column++) {
+                int floor = top(level, column);
+                boolean free = floor > 3 && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR;
+                for (int[] weapon : level.weapons) free &= Math.abs(weapon[1] - column) > 6;
+                for (int[] item : level.items) free &= item[1] != column;
+                for (int[] thing : level.decor) free &= Math.abs(thing[1] - column) > 6;
+                if (!free) continue;
+                level.weapons.add(new int[]{kinds[which++ % kinds.length], column, floor - 1});
+                break;
+            }
+        }
     }
 
     /**
@@ -706,6 +730,7 @@ final class RunLevels {
         crowd(level);
         shelve(level);
         kennel(level);
+        arsenal(level);
         return level;
     }
 
@@ -872,6 +897,7 @@ final class RunLevels {
         crowd(level);
         shelve(level);
         kennel(level);
+        arsenal(level);
         return level;
     }
 

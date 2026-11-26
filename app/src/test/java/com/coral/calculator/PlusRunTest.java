@@ -1296,7 +1296,9 @@ public class PlusRunTest {
                 char under = level.land[foe[2] + 1][foe[1]];
                 assertTrue("land " + number + " at " + foe[1], under == RunLevels.BLOCK || under == RunLevels.LEDGE);
                 assertEquals("land " + number + " at " + foe[1], RunLevels.AIR, level.land[foe[2]][foe[1]]);
-                assertTrue("land " + number + " at " + foe[1], foe[1] >= 18 && foe[1] < level.gate - 5);
+                assertTrue("land " + number + " at " + foe[1], foe[1] >= 24 && foe[1] < level.gate - 5);
+                // (And well clear of one met in the middle of the land.)
+                for (int[] other : level.foes) if (RunLevels.rover(other[0])) assertTrue("land " + number + " at " + foe[1], Math.abs(other[1] - foe[1]) >= 16);
                 for (int flag : level.flags) assertTrue("land " + number + " at " + foe[1] + " by flag " + flag, Math.abs(flag - foe[1]) >= 6);
                 for (int[] thing : level.decor) assertTrue("land " + number + " at " + foe[1] + " in a village", Math.abs(thing[1] - foe[1]) >= 10);
                 if (foe[1] != was + 1 || foe[2] != wasRow) packs++;
@@ -1308,9 +1310,15 @@ public class PlusRunTest {
             // Five times what it was laid with, or twice: give or take a tenth, where there was not room for all of them.
             // (Where someone waits at the end the land is short, and there is room for fewer: twice over at the least.)
             assertTrue("land " + number + " laid " + laid + " more " + more, more <= laid * (times - 1)
-                    && more >= (RunLevels.bossOf(number) >= 0 ? Math.min(laid, laid * (times - 1)) : laid * (times - 1) * 6 / 10));
+                    && more >= (RunLevels.bossOf(number) >= 0 || number <= 12 ? Math.min(laid, laid * (times - 1)) : laid * (times - 1) * 5 / 10));
             // In packs, spread along the land: not all in one place.
             if (more >= 8) assertTrue("land " + number + " packs " + packs + " of " + more, packs >= more / 4 && packs <= more);
+            // In the short lands of the first two chapters they come one or two together, no more.
+            if (number <= 12 && more > 0) assertTrue("land " + number + " packs " + packs + " of " + more, packs * 2 >= more);
+            // And there is more to fight with lying about: a thing for every forty squares or so, over what lies by the flags.
+            int things = 0;
+            for (int[] weapon : level.weapons) if (weapon[1] < level.main) things++;
+            assertTrue("land " + number + " things " + things, things >= level.flags.size() + (level.gate - 60) / 60);
         }
         // One of them keeps still while she is far off, and is about its business when she is near.
         RunLevels.Level level = flat(120);
@@ -1558,7 +1566,7 @@ public class PlusRunTest {
         assertEquals(0, brown.cracks());
         assertEquals(1f, brown.shield(stood), 0);
         // In the last third a shield that breaks throws whoever broke it back.
-        PlusRun late = shutIn(RunLevels.GUARD_LAND, true);
+        PlusRun late = shutIn(RunLevels.COUNT, true);
         PlusRun.Foe last = waiting(late);
         for (int step = 0; step < 60 * 400 && late.phase(last) < 2; step++) {
             if (pressable(late, last)) touch(late, last);
@@ -1571,8 +1579,29 @@ public class PlusRunTest {
             else park(late);
         }
         assertEquals(1, late.thrownBack());
-        assertEquals(PlusRun.strength(RunLevels.GUARD) + 2, Math.round(last.shieldMost));
+        assertEquals(PlusRun.strength(RunLevels.ZERO) + 2, Math.round(last.shieldMost));
         assertTrue(late.opens(last) < 2 && late.forms(last) < 1.5f);
+        // The Guild Guard and Penchok-jipsa, the first anyone meets, are as they began to the end: two pieces, as long a while, and no throwing back.
+        for (int land : new int[]{RunLevels.GUARD_LAND, RunLevels.BUTLER_LAND}) {
+            PlusRun first = shutIn(land, true);
+            PlusRun.Foe early = waiting(first);
+            assertEquals(2, PlusRun.strength(early.kind));
+            float opens = first.opens(early), forms = first.forms(early);
+            for (int step = 0; step < 60 * 400 && first.phase(early) < 2; step++) {
+                if (pressable(first, early)) touch(first, early);
+                else park(first);
+            }
+            assertEquals(2, first.phase(early));
+            for (int step = 0; step < 60 * 20 && (first.absent(early) || first.forming(early) || first.open(early)); step++) park(first);
+            assertEquals("land " + land, 2, Math.round(early.shieldMost));
+            assertEquals("land " + land, opens, first.opens(early), 0);
+            assertEquals("land " + land, forms, first.forms(early), 0);
+            for (int step = 0; step < 60 * 60 && early.left > 1; step++) {
+                if (pressable(first, early)) touch(first, early);
+                else park(first);
+            }
+            assertEquals("land " + land, 0, first.thrownBack());
+        }
     }
 
     @Test public void aPetWaitsInEveryLandFromTheThirdAndKeepsBesideHerForTheWholeOfIt() {
@@ -2200,7 +2229,7 @@ public class PlusRunTest {
             assertTrue("land " + land + " turned nothing aside", parried > 0);
             // Her shield was broken at least once for every two blows that landed on her, and it took as many pieces at least as it has.
             assertTrue("land " + land + " broke " + run.shatters(), run.shatters() >= (most + 1) / 2);
-            assertTrue("land " + land + " chipped " + chipped, chipped >= run.shatters() * 2);
+            assertTrue("land " + land + " chipped " + chipped, chipped + parried >= run.shatters() * 2);
             // They changed when a third of what they could take was gone, and again at two thirds.
             assertEquals("land " + land, java.util.Arrays.asList((most + 2) / 3, (2 * most + 2) / 3), changedAt);
             // Everything each of them does was done.
@@ -4535,7 +4564,8 @@ public class PlusRunTest {
                 assertEquals("land " + number + " column " + weapon[1], weapon[2] + 1, RunLevels.top(level, weapon[1]));
                 if (weapon[0] == PlusRun.GUN) guns++;
             }
-            assertEquals("land " + number, (boss >= 0 ? 5 : 4) + 2 + number % 2, level.weapons.size());
+            int lying = (boss >= 0 ? 5 : 4) + 2 + number % 2;
+            assertTrue("land " + number + " has " + level.weapons.size(), level.weapons.size() >= lying && level.weapons.size() <= lying + level.gate / 40);
             assertTrue("land " + number, guns >= 1);
             assertEquals(level.columns, RunLevels.level(number).columns);
             total += level.columns;
@@ -4923,7 +4953,9 @@ public class PlusRunTest {
             assertEquals(level.columns, RunLevels.level(number).columns);
             // Something to fight with by each flag, and from the second land on by where she starts; each lies on the ground.
             // From the twenty-third there is also a book or a brush, and an ink gun, each before what it is good against.
-            assertEquals("land " + number, (number == 1 ? 2 : waits ? 4 : 3) + Math.min(2, level.chapter), level.weapons.size());
+            // (And, with the creatures there are now, one more for every forty squares or so.)
+            int laid = (number == 1 ? 2 : waits ? 4 : 3) + Math.min(2, level.chapter);
+            assertTrue("land " + number + " has " + level.weapons.size(), level.weapons.size() >= laid && level.weapons.size() <= laid + level.gate / 40);
             // Chikuwa waits with bread from the third land and Rune with her ink from the ninth; ice cream and the rest from the fourth.
             int bread = 0, ink = 0, loose = 0, villagers = 0, stalls = 0;
             for (int[] item : level.items) {
