@@ -4490,6 +4490,8 @@ public class PlusRunTest {
             // (Nor those put in to make up a land's numbers: what is proved is that the land itself can be crossed.)
             if (RunLevels.boss(level.foes.get(index)[0]) || RunLevels.crowd(level.foes.get(index))) level.foes.remove(index);
         }
+        // (Nor a pet that lies waiting: the land is crossed without one.)
+        for (int index = level.items.size() - 1; index >= 0; index--) if (level.items.get(index)[0] >= PlusRun.PET) level.items.remove(index);
         level.guarded = false;
         return level;
     }
