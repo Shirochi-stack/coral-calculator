@@ -166,8 +166,78 @@ final class PlusRun {
     /** How often a mini Chikuwa has a roll for her, how long a puddle of ink lies, how much it slows, and how often the ring of light is ready. */
     static final float GIFT_EVERY = 18, PUDDLE_LASTS = 5, PUDDLE_SLOWS = .45f, WARD_EVERY = 9;
     private static final float[] PET_EVERY = {1.6f, 1, 2.2f, 1.5f, 1.8f, 1.7f, 1.3f, .7f, 2.4f, .35f}, PET_NEAR = {7, 3.2f, 6, 7, 6, 6.5f, 3.5f, 3.6f, 9, 0};
-    private int pet = -1, petKills, petJoined, petStrikes, petDrops, petGifts, petWards, petCopies;
-    private float petGift = GIFT_EVERY, petWard = WARD_EVERY, petPuddle;
+    /** How long after one pet begins on something before another may. */
+    private static final float PET_TURN = .22f;
+
+    /**
+     * One pet that is with her: its kind; whether it is hers for good and came into the
+     * land with her, or is a stray found in this land; where its feet are and which way it
+     * faces; how long until it next does what it does, and how much longer it is busy at
+     * it; and what its kind keeps count of.
+     */
+    static final class Pet {
+        final int kind;
+        boolean stays, left;
+        float x, y, wait = 1, busy, fromX, fromY, toX, toY, down, gift = GIFT_EVERY, ward = WARD_EVERY, puddle;
+        /** Where whoever draws it last saw it. */
+        float seenX, seenY;
+        Foe at;
+        int drops;
+
+        Pet(int kind) { this.kind = kind; }
+    }
+
+    /** Her pets, those that are hers for good first: as many of each sort as she has room for. */
+    private final List<Pet> herd = new ArrayList<>();
+    private int petKills, petJoined, petStrikes, petGifts, petWards, petCopies, lastJoined = -1, petSwaps;
+    private float sincePetAct = 9;
+    /** A pet lying where she stands that she has no room for: she may change one of her strays for it. */
+    private int[] offered;
+
+    List<Pet> herd() { return herd; }
+    /** How many of her pets are strays found in this land. */
+    int strays() {
+        int strays = 0;
+        for (Pet it : herd) if (!it.stays) strays++;
+        return strays;
+    }
+    int lastJoined() { return lastJoined; }
+    int petSwaps() { return petSwaps; }
+    /** The kind of pet she stands at and has no room for, or -1. */
+    int petOffer() { return offered == null ? -1 : offered[0] - PET; }
+
+    /** The stray that has been with her longest gives up its place to the one she stands at. Returns whether there was one to change for. */
+    boolean swapPet() {
+        if (offered == null) return false;
+        for (int index = 0; index < herd.size(); index++) {
+            if (herd.get(index).stays) continue;
+            herd.remove(index);
+            break;
+        }
+        items.remove(offered);
+        Pet joined = join(offered[0] - PET, false);
+        joined.x = offered[1] + .5f;
+        joined.y = offered[2] + 1;
+        offered = null;
+        petSwaps++;
+        return true;
+    }
+
+    private Pet join(int kind, boolean stays) {
+        Pet it = new Pet(kind);
+        it.stays = stays;
+        it.x = x + WIDE / 2;
+        it.y = y + TALL;
+        // (Those that are hers for good go before the strays.)
+        int at = herd.size();
+        if (stays) for (at = 0; at < herd.size() && herd.get(at).stays; ) at++;
+        herd.add(at, it);
+        if (!stays) {
+            petJoined++;
+            lastJoined = kind;
+        }
+        return it;
+    }
     /** The puddles a mini Rune has left: where each lies, the row its top is in, and how much longer it lies. */
     private final List<float[]> puddles = new ArrayList<>();
 
@@ -176,10 +246,10 @@ final class PlusRun {
     int petWards() { return petWards; }
     int petCopies() { return petCopies; }
     /** Whether the ring of light is ready. */
-    boolean warded() { return pet == CHERUB && petWard <= 0; }
-    private float petX, petY, petWait, petBusy, petFromX, petFromY, petToX, petToY, petDown;
-    private boolean petLeft;
-    private Foe petAt;
+    boolean warded() {
+        for (Pet it : herd) if (it.kind == CHERUB && it.ward <= 0) return true;
+        return false;
+    }
 
     /** Which pet is with her, or -1; where its feet are; which way it faces; how much longer it is busy with what it is at; and counts that only go up. */
     /** Where the last thing she took lay: the middle of its square. */
@@ -187,11 +257,12 @@ final class PlusRun {
     float tookY() { return tookY; }
     private float tookX, tookY;
 
-    int pet() { return pet; }
-    float petX() { return petX; }
-    float petY() { return petY; }
-    boolean petLeftward() { return petLeft; }
-    float petBusy() { return petBusy; }
+    /** The first of her pets: its kind, or -1 if she has none; where its feet are; which way it faces; and how much longer it is busy. */
+    int pet() { return herd.isEmpty() ? -1 : herd.get(0).kind; }
+    float petX() { return herd.isEmpty() ? 0 : herd.get(0).x; }
+    float petY() { return herd.isEmpty() ? 0 : herd.get(0).y; }
+    boolean petLeftward() { return !herd.isEmpty() && herd.get(0).left; }
+    float petBusy() { return herd.isEmpty() ? 0 : herd.get(0).busy; }
     int petKills() { return petKills; }
     int petJoined() { return petJoined; }
     int petStrikes() { return petStrikes; }
@@ -199,16 +270,15 @@ final class PlusRun {
 
     /** A pet is hers, there and then: for looking at one, and for the tests. */
     void adopt(int kind) {
-        pet = kind;
-        petX = x + WIDE / 2;
-        petY = y + TALL;
-        petWait = 1;
-        petBusy = 0;
-        petAt = null;
-        petJoined++;
-        petGift = GIFT_EVERY;
-        petWard = WARD_EVERY;
-        puddles.clear();
+        // (With no room for another stray, the one that has been with her longest makes way.)
+        if (strays() >= perks.tempSlots) {
+            for (int index = 0; index < herd.size(); index++) {
+                if (herd.get(index).stays) continue;
+                herd.remove(index);
+                break;
+            }
+        }
+        join(kind, false);
     }
 
     /** Whether something stands in a puddle of ink: it does everything at less than half its pace while it does. */
@@ -221,31 +291,35 @@ final class PlusRun {
 
     /** The one with no wings does as she does: a small one of what she throws, from where it is; or a swing at what is in front of it. */
     private void copied() {
-        if (pet != TWIN || petWait > 0 || weapon == UNARMED) return;
-        petWait = PET_EVERY[TWIN];
-        petCopies++;
-        petStrikes++;
-        petLeft = facingLeft;
-        float way = facingLeft ? -1 : 1;
-        if (weapon == TABLET || weapon == KEYS) {
-            Shot shot = shoot(weapon == TABLET ? PAGE : THROWN_KEY, true, petX + way * .3f, petY - .45f, way * 14, 0, .4f);
-            shot.pets = true;
-            if (weapon == TABLET) shot.spin = way * 14;
-            return;
-        }
-        if (weapon == PEN || weapon == KNIFE || weapon == GUN || weapon == BOOK) {
-            Shot shot = weapon == BOOK ? shoot(BOOK, true, petX + way * .3f, petY - .7f, way * 6, -9, 2.5f) : shoot(weapon, true, petX + way * .3f, petY - .45f, way * 14, 0, .55f);
-            shot.pets = true;
-            return;
-        }
-        petBusy = .18f;
-        petFromX = petToX = petX;
-        petFromY = petToY = petY;
-        petAt = null;
-        for (int index = 0; index < foes.size(); index++) {
-            Foe foe = foes.get(index);
-            float across = (foe.x + foe.wide() / 2 - petX) * way;
-            if (across > -.3f && across < 1.4f && Math.abs(foe.y + foe.tall() - petY) < 1.3f) petted(foe);
+        if (weapon == UNARMED) return;
+        for (int each = 0; each < herd.size(); each++) {
+            Pet it = herd.get(each);
+            if (it.kind != TWIN || it.wait > 0) continue;
+            it.wait = PET_EVERY[TWIN];
+            petCopies++;
+            petStrikes++;
+            it.left = facingLeft;
+            float way = facingLeft ? -1 : 1;
+            if (weapon == TABLET || weapon == KEYS) {
+                Shot shot = shoot(weapon == TABLET ? PAGE : THROWN_KEY, true, it.x + way * .3f, it.y - .45f, way * 14, 0, .4f);
+                shot.pets = true;
+                if (weapon == TABLET) shot.spin = way * 14;
+                continue;
+            }
+            if (weapon == PEN || weapon == KNIFE || weapon == GUN || weapon == BOOK) {
+                Shot shot = weapon == BOOK ? shoot(BOOK, true, it.x + way * .3f, it.y - .7f, way * 6, -9, 2.5f) : shoot(weapon, true, it.x + way * .3f, it.y - .45f, way * 14, 0, .55f);
+                shot.pets = true;
+                continue;
+            }
+            it.busy = .18f;
+            it.fromX = it.toX = it.x;
+            it.fromY = it.toY = it.y;
+            it.at = null;
+            for (int index = 0; index < foes.size(); index++) {
+                Foe foe = foes.get(index);
+                float across = (foe.x + foe.wide() / 2 - it.x) * way;
+                if (across > -.3f && across < 1.4f && Math.abs(foe.y + foe.tall() - it.y) < 1.3f) petted(foe);
+            }
         }
     }
 
@@ -256,7 +330,7 @@ final class PlusRun {
             if (!open(foe)) {
                 // Half a piece off her shield, and never the last of it.
                 if (foe.forming > 0 || foe.shield <= .5f) return false;
-                foe.shield = Math.max(.5f, foe.shield - .5f);
+                foe.shield = Math.max(.5f, foe.shield - (perks.petStrong >= 2 ? 1 : .5f));
                 cracks++;
                 foeX = foe.x + foe.wide() / 2;
                 foeY = foe.y + foe.tall();
@@ -265,80 +339,99 @@ final class PlusRun {
             if (foe.left <= 1 || foe.dazed > 0) return false;
         }
         boolean was = foe.flat;
+        // (From stronger pets a blow on a big one counts twice.)
+        if (perks.petStrong >= 1 && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
         beat(foe, SURE);
         if (foe.flat && !was) petKills++;
         return true;
     }
 
-    /** The pet for a step: it keeps by her, and when it has rested it goes at something. */
+    /** Her pets for a step: each keeps its place by her, and they go at things in turn. */
     private void pets(float seconds) {
-        if (pet < 0) return;
-        float herX = x + WIDE / 2, herFeet = y + TALL;
-        boolean floats = floats(pet);
-        // Left too far behind, or under the land, it is beside her again.
-        if (Math.abs(petX - herX) > 12 || Math.abs(petY - herFeet) > 9) {
-            petX = herX + (facingLeft ? .9f : -.9f);
-            petY = herFeet - (floats ? 1.2f : 0);
-            petBusy = 0;
-            petAt = null;
-            petDown = 0;
-        }
-        // A puddle dries; a mini Rune on the ground leaves one where she is, every so often.
+        sincePetAct += seconds;
+        // A puddle dries.
         for (int index = puddles.size() - 1; index >= 0; index--) if ((puddles.get(index)[2] -= seconds) <= 0) puddles.remove(index);
-        if (pet == MINI_RUNE && (petPuddle -= seconds) <= 0 && petBusy <= 0 && solid(at((int) Math.floor(petX), (int) Math.floor(petY + .05f)))) {
-            petPuddle = 1.1f;
-            puddles.add(new float[]{petX, petY, PUDDLE_LASTS});
+        int floating = 0, running = 0;
+        for (int index = 0; index < herd.size(); index++) {
+            Pet it = herd.get(index);
+            tend(it, seconds, floats(it.kind) ? floating++ : running++);
+        }
+    }
+
+    /**
+     * One pet for a step: it keeps by her, in its place among the others of its kind, and
+     * when it has rested and it is its turn it goes at something. Those that run stand in a
+     * line behind her, one after another; those that float hang behind her shoulder, each
+     * a little further back than the last and by turns higher and lower, so that none is
+     * over her or over another.
+     */
+    private void tend(Pet it, float seconds, int place) {
+        int kind = it.kind;
+        float herX = x + WIDE / 2, herFeet = y + TALL;
+        boolean floats = floats(kind);
+        // Left too far behind, or under the land, it is beside her again.
+        if (Math.abs(it.x - herX) > 12 || Math.abs(it.y - herFeet) > 9) {
+            it.x = herX + (facingLeft ? .9f : -.9f);
+            it.y = herFeet - (floats ? 1.2f : 0);
+            it.busy = 0;
+            it.at = null;
+            it.down = 0;
+        }
+        // A mini Rune on the ground leaves a puddle where she is, every so often.
+        if (kind == MINI_RUNE && (it.puddle -= seconds) <= 0 && it.busy <= 0 && solid(at((int) Math.floor(it.x), (int) Math.floor(it.y + .05f)))) {
+            it.puddle = 1.1f;
+            puddles.add(new float[]{it.x, it.y, PUDDLE_LASTS});
         }
         // A mini Chikuwa has a roll for her every so often while she is short of a heart: half of one back.
-        if (pet == MINI_CHIKUWA && halves < perks.hearts * 2 && state == PLAYING && (petGift -= seconds) <= 0) {
-            petGift = GIFT_EVERY;
+        if (kind == MINI_CHIKUWA && halves < perks.hearts * 2 && state == PLAYING && (it.gift -= seconds) <= 0) {
+            it.gift = GIFT_EVERY;
             halves++;
             petGifts++;
         }
         // The ring of light: when it is ready, the first thing thrown at her that comes near is turned aside.
-        if (pet == CHERUB && (petWard -= seconds) <= 0) {
+        if (kind == CHERUB && (it.ward -= seconds) <= 0) {
             for (int index = shots.size() - 1; index >= 0; index--) {
                 Shot shot = shots.get(index);
                 if (shot.hers || shot.kind == PLUSDROP || Math.hypot(shot.x - herX, shot.y - y - TALL / 2) > 1.5f) continue;
                 shots.remove(index);
-                petWard = WARD_EVERY;
+                it.ward = WARD_EVERY;
                 petWards++;
                 break;
             }
         }
-        if (petBusy > 0) {
+        if (it.busy > 0) {
             // On its way to what it is going at; and there, it deals with it.
-            petBusy -= seconds;
-            float through = 1 - Math.max(0, petBusy) / .28f;
-            if (petAt != null) {
-                petToX = petAt.x + petAt.wide() / 2;
-                petToY = petAt.y + petAt.tall() * (pet == DUCK ? .2f : 1);
+            it.busy -= seconds;
+            float through = 1 - Math.max(0, it.busy) / .28f;
+            if (it.at != null) {
+                it.toX = it.at.x + it.at.wide() / 2;
+                it.toY = it.at.y + it.at.tall() * (kind == DUCK ? .2f : 1);
             }
-            petX = petFromX + (petToX - petFromX) * through;
-            petY = petFromY + (petToY - petFromY) * through - (float) Math.sin(through * Math.PI) * (pet == DOG ? 0 : .8f);
-            if (pet == DOG) {
+            it.x = it.fromX + (it.toX - it.fromX) * through;
+            it.y = it.fromY + (it.toY - it.fromY) * through - (float) Math.sin(through * Math.PI) * (kind == DOG ? 0 : .8f);
+            if (kind == DOG) {
                 // Whatever it runs through on its way goes over.
                 for (int index = 0; index < foes.size(); index++) {
                     Foe foe = foes.get(index);
-                    if (!RunLevels.boss(foe.kind) && Math.abs(foe.x + foe.wide() / 2 - petX) < .7f && Math.abs(foe.y + foe.tall() - petY) < 1.2f) petted(foe);
+                    if (!RunLevels.boss(foe.kind) && Math.abs(foe.x + foe.wide() / 2 - it.x) < .7f && Math.abs(foe.y + foe.tall() - it.y) < 1.2f) petted(foe);
                 }
             }
-            if (petBusy <= 0) {
-                if (petAt != null && pet != DOG) petted(petAt);
-                if (petAt != null && pet == DOG && RunLevels.boss(petAt.kind)) petted(petAt);
-                if (pet == DUCK && ++petDrops % 3 == 0) {
+            if (it.busy <= 0) {
+                if (it.at != null && kind != DOG) petted(it.at);
+                if (it.at != null && kind == DOG && RunLevels.boss(it.at.kind)) petted(it.at);
+                if (kind == DUCK && ++it.drops % 3 == 0) {
                     // Its quack: whatever is near stands dazed.
                     for (Foe foe : foes) {
-                        if (!foe.flat && !RunLevels.boss(foe.kind) && Math.abs(foe.x - petX) < 3 && Math.abs(foe.y - petY) < 3) foe.dazed = Math.max(foe.dazed, 1.2f);
+                        if (!foe.flat && !RunLevels.boss(foe.kind) && Math.abs(foe.x - it.x) < 3 && Math.abs(foe.y - it.y) < 3) foe.dazed = Math.max(foe.dazed, 1.2f);
                     }
                 }
-                petAt = null;
+                it.at = null;
             }
             return;
         }
         // By her: a floater in the air at her shoulder, behind her; one that runs, on the ground behind her, down onto it and up onto it as she goes.
-        float wantX = herX + (facingLeft ? 1 : -1) * (floats ? .8f : 1.1f);
-        if (pet == MONKEY) {
+        float wantX = herX + (facingLeft ? 1 : -1) * (floats ? .8f + .75f * place : 1.1f + .85f * place);
+        if (kind == MONKEY) {
             // A monkey goes after the nearest plus or ribbon within a little way of her, and comes back.
             float nearest = 5.5f;
             for (int[] plus : pluses) {
@@ -356,44 +449,44 @@ final class PlusRun {
                 }
             }
         }
-        if (pet == MINI_RUNE) {
+        if (kind == MINI_RUNE) {
             for (Foe foe : foes) {
                 if (!RunLevels.boss(foe.kind) || foe.flat || absent(foe) || Math.abs(foe.x + foe.wide() / 2 - herX) > 10) continue;
                 wantX = herX + (foe.x + foe.wide() / 2 < herX ? 1.1f : -1.1f);
             }
         }
-        float gap = wantX - petX;
-        petX += Math.signum(gap) * Math.min(Math.abs(gap), (Math.abs(gap) > 3 ? 13 : 8) * seconds);
-        if (Math.abs(gap) > .1f) petLeft = gap < 0;
-        else petLeft = facingLeft;
+        float gap = wantX - it.x;
+        it.x += Math.signum(gap) * Math.min(Math.abs(gap), (Math.abs(gap) > 3 ? 13 : 8) * seconds);
+        if (Math.abs(gap) > .1f) it.left = gap < 0;
+        else it.left = facingLeft;
         if (floats) {
-            float wantY = herFeet - 1.25f + (float) Math.sin(time * 3) * .12f;
-            petY += (wantY - petY) * Math.min(1, 9 * seconds);
+            float wantY = herFeet - 1.25f - (place % 2) * .55f + (float) Math.sin(time * 3 + place) * .12f;
+            it.y += (wantY - it.y) * Math.min(1, 9 * seconds);
         } else {
-            int column = (int) Math.floor(petX), floor = -1;
+            int column = (int) Math.floor(it.x), floor = -1;
             for (int row = (int) Math.floor(herFeet) - 3; row <= (int) Math.floor(herFeet) + 6 && floor < 0; row++) {
                 char here = at(column, row);
                 if ((firm(here) || here == RunLevels.THIN || here == RunLevels.LEDGE) && !solid(at(column, row - 1))) floor = row;
             }
-            if (floor < 0 || !onGround && petY >= herFeet - .01f && petDown >= 0 && herFeet < petY - .6f) {
+            if (floor < 0 || !onGround && it.y >= herFeet - .01f && it.down >= 0 && herFeet < it.y - .6f) {
                 // Nothing under it, or she is in the air: it jumps as she does.
-                petY += (herFeet - petY) * Math.min(1, 7 * seconds);
-                petDown = 0;
-            } else if (petY < floor) {
-                petDown += GRAVITY * seconds;
-                petY = Math.min(floor, petY + petDown * seconds);
-                if (petY >= floor) petDown = 0;
+                it.y += (herFeet - it.y) * Math.min(1, 7 * seconds);
+                it.down = 0;
+            } else if (it.y < floor) {
+                it.down += GRAVITY * seconds;
+                it.y = Math.min(floor, it.y + it.down * seconds);
+                if (it.y >= floor) it.down = 0;
             } else {
                 // Up onto where she has gone.
-                petY = Math.max(floor, petY - 14 * seconds);
-                petDown = 0;
+                it.y = Math.max(floor, it.y - 14 * seconds);
+                it.down = 0;
             }
         }
         // And a monkey fetches: the pluses it passes are hers, and a ribbon near it is brought to her.
-        if (pet == MONKEY) {
+        if (kind == MONKEY) {
             for (int index = pluses.size() - 1; index >= 0; index--) {
                 int[] plus = pluses.get(index);
-                if (Math.hypot(plus[0] + .5f - petX, plus[1] + .5f - petY + .4f) > 1.8f) continue;
+                if (Math.hypot(plus[0] + .5f - it.x, plus[1] + .5f - it.y + .4f) > 1.8f) continue;
                 pluses.remove(index);
                 collected++;
                 plusX = plus[0] + .5f;
@@ -401,61 +494,63 @@ final class PlusRun {
             }
             for (int index = items.size() - 1; index >= 0 && cursed <= 0; index--) {
                 int[] item = items.get(index);
-                if (item[0] <= FORM || item[0] >= FORM + BLACK || item[3] != 0 || Math.hypot(item[1] + .5f - petX, item[2] + .5f - petY + .4f) > 1.8f) continue;
+                if (item[0] <= FORM || item[0] >= FORM + BLACK || item[3] != 0 || Math.hypot(item[1] + .5f - it.x, item[2] + .5f - it.y + .4f) > 1.8f) continue;
                 items.remove(index);
                 taken++;
                 lastTaken = item[0];
                 take(item[0]);
             }
         }
-        if ((petWait -= seconds) > 0 || pet == TWIN) return;
+        // (They take turns: none begins on something within a moment of another's beginning.)
+        if ((it.wait -= seconds) > 0 || kind == TWIN || sincePetAct < PET_TURN) return;
         // Rested, it looks for something near her to go at: a duck, what is in the air first; the rest, whatever is nearest it.
         Foe best = null;
-        float nearest = PET_NEAR[pet];
+        float nearest = PET_NEAR[kind];
         boolean flying = false;
         for (Foe foe : foes) {
             if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) continue;
             if (RunLevels.boss(foe.kind) && (open(foe) ? foe.left <= 1 || foe.dazed > 0 : foe.forming > 0 || foe.shield <= .5f)) continue;
-            boolean own = pet == CAT || pet == DOG || pet == MINI_RUNE;
-            float across = foe.x + foe.wide() / 2 - (own ? petX : herX), down = foe.y + foe.tall() - (own ? petY : herFeet);
+            boolean own = kind == CAT || kind == DOG || kind == MINI_RUNE;
+            float across = foe.x + foe.wide() / 2 - (own ? it.x : herX), down = foe.y + foe.tall() - (own ? it.y : herFeet);
             float away = (float) Math.hypot(across, down);
             boolean air = RunLevels.flier(foe.kind) || foe.kind == RunLevels.DRAGON || foe.y + foe.tall() < foe.ground + foe.tall() - 1;
-            if (pet == DOG && Math.abs(down) > 1.5f) continue;
-            if (away > PET_NEAR[pet]) continue;
-            if (pet == DUCK && air != flying ? air : away < nearest) {
+            if (kind == DOG && Math.abs(down) > 1.5f) continue;
+            if (away > PET_NEAR[kind]) continue;
+            if (kind == DUCK && air != flying ? air : away < nearest) {
                 best = foe;
                 nearest = away;
                 flying = air;
             }
         }
         if (best == null) return;
-        petWait = PET_EVERY[pet];
+        it.wait = PET_EVERY[kind] * perks.petBrisk;
+        sincePetAct = 0;
         petStrikes++;
-        petLeft = best.x + best.wide() / 2 < petX;
-        if (pet == JAR || pet == MONKEY || pet == MINI_CHIKUWA || pet == MINI_RUNE || pet == CHERUB) {
+        it.left = best.x + best.wide() / 2 < it.x;
+        if (kind == JAR || kind == MONKEY || kind == MINI_CHIKUWA || kind == MINI_RUNE || kind == CHERUB) {
             // From where it is: a blot or a flick of ink, straight; a nut or a roll, lobbed; a ray, straight and fast.
             float toX = best.x + best.wide() / 2, toY = best.y + best.tall() / 2;
             Shot shot;
-            if (pet == JAR || pet == MINI_RUNE || pet == CHERUB) {
-                float length = Math.max(.5f, (float) Math.hypot(toX - petX, toY - petY + .5f)), speed = pet == CHERUB ? 17 : 11;
-                shot = shoot(pet == CHERUB ? RAY : BLOT_SHOT, true, petX, petY - .5f, (toX - petX) / length * speed, (toY - petY + .5f) / length * speed, pet == JAR ? 1.2f : pet == CHERUB ? .7f : .45f);
+            if (kind == JAR || kind == MINI_RUNE || kind == CHERUB) {
+                float length = Math.max(.5f, (float) Math.hypot(toX - it.x, toY - it.y + .5f)), speed = kind == CHERUB ? 17 : 11;
+                shot = shoot(kind == CHERUB ? RAY : BLOT_SHOT, true, it.x, it.y - .5f, (toX - it.x) / length * speed, (toY - it.y + .5f) / length * speed, kind == JAR ? 1.2f : kind == CHERUB ? .7f : .45f);
             } else {
-                shot = shoot(pet == MONKEY ? NUT : ROLL, true, petX, petY - .6f, Math.max(-10, Math.min(10, (toX - petX) / .7f)), -9, 2.5f);
+                shot = shoot(kind == MONKEY ? NUT : ROLL, true, it.x, it.y - .6f, Math.max(-10, Math.min(10, (toX - it.x) / .7f)), -9, 2.5f);
             }
             shot.pets = true;
             return;
         }
-        petBusy = .28f;
-        petFromX = petX;
-        petFromY = petY;
-        petAt = best;
-        petToX = best.x + best.wide() / 2;
-        petToY = best.y + best.tall();
-        if (pet == DOG) {
+        it.busy = .28f;
+        it.fromX = it.x;
+        it.fromY = it.y;
+        it.at = best;
+        it.toX = best.x + best.wide() / 2;
+        it.toY = best.y + best.tall();
+        if (kind == DOG) {
             // Its charge is a line along the ground, on past what it goes at.
-            petAt = RunLevels.boss(best.kind) ? best : null;
-            petToX = petX + Math.signum(petToX - petX) * 6;
-            petToY = petY;
+            it.at = RunLevels.boss(best.kind) ? best : null;
+            it.toX = it.x + Math.signum(it.toX - it.x) * 6;
+            it.toY = it.y;
         }
     }
     /** How what is asked of her stands: not asked yet, being done, done, or not to be done this time. */
@@ -510,6 +605,15 @@ final class PlusRun {
          * far the smith has worked on each.
          */
         int pack;
+        /**
+         * Her pets: which of those that are hers for good come into the land with her, as
+         * bits by their kinds; how many strays found in a land may follow her besides; how
+         * much of their usual wait her pets take between one thing and the next; and how
+         * much stronger they are (one: a blow counts twice on a big one; two: and takes a
+         * whole piece off a shield).
+         */
+        int petWith, tempSlots = 1, petStrong;
+        float petBrisk = 1;
         int main = UNARMED;
         int[] levels = new int[RunArms.COUNT];
     }
@@ -816,6 +920,7 @@ final class PlusRun {
         halves = perks.hearts * 2;
         lives = perks.lives;
         // What is in her backpack is with her from the start, and what she begins a land with is in her hands.
+        for (int kind = 0; kind < PETS; kind++) if ((perks.petWith >> kind & 1) != 0) join(kind, true);
         owned = perks.pack | (perks.main != UNARMED ? 1 << perks.main : 0);
         weapon = perks.main;
         rounds = perks.shots;
@@ -1362,7 +1467,7 @@ final class PlusRun {
             if (where == null) continue;
             boolean there = false;
             for (int[] arm : arms) there |= Math.abs(arm[1] - where[2]) < 3 && Math.abs(arm[2] - where[3] + 1) < 2;
-            if (wave == 1 && which == 0 && pet < 0) {
+            if (wave == 1 && which == 0 && herd.isEmpty()) {
                 boolean waits = false;
                 for (int[] item : items) waits |= item[0] >= PET && item[0] < PET + PETS && item[1] >= one[3] && item[1] <= one[4];
                 if (!waits) items.add(new int[]{PET + (level.number + 2) % PETS, where[2] + 2, where[3] - 1, 0});
@@ -1715,6 +1820,17 @@ final class PlusRun {
         perks.formLonger = now.formLonger;
         perks.together = now.together;
         perks.resists |= now.resists;
+        // Her pets: those that are hers for good are those now chosen; and there is as much room for strays as there now is.
+        for (int index = herd.size() - 1; index >= 0; index--) if (herd.get(index).stays && (now.petWith >> herd.get(index).kind & 1) == 0) herd.remove(index);
+        for (int kind = 0; kind < PETS; kind++) {
+            boolean there = false;
+            for (Pet it : herd) there |= it.stays && it.kind == kind;
+            if ((now.petWith >> kind & 1) != 0 && !there) join(kind, true);
+        }
+        perks.petWith = now.petWith;
+        perks.tempSlots = now.tempSlots;
+        perks.petStrong = now.petStrong;
+        perks.petBrisk = now.petBrisk;
         perks.pack |= now.pack;
         owned |= now.pack;
         perks.main = now.main;
@@ -2293,6 +2409,7 @@ final class PlusRun {
             }
         }
         atStall = false;
+        offered = null;
         for (int index = items.size() - 1; index >= 0; index--) {
             int[] item = items.get(index);
             // A stall stays where it is, and she is at it anywhere along its counter.
@@ -2340,6 +2457,10 @@ final class PlusRun {
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST) continue;
+                if (item[0] >= PET && item[0] < PET + PETS && strays() >= perks.tempSlots) {
+                    offered = item;
+                    continue;
+                }
                 items.remove(index);
                 tookX = item[1] + .5f;
                 tookY = item[2] + .5f;
@@ -2349,11 +2470,11 @@ final class PlusRun {
                     keys++;
                     continue;
                 }
-                // A pet that lay waiting goes with her from here on, in place of any that was with her.
+                // A pet that lay waiting goes with her from here on: a stray, for this land.
                 if (item[0] >= PET && item[0] < PET + PETS) {
-                    adopt(item[0] - PET);
-                    petX = item[1] + .5f;
-                    petY = item[2] + 1;
+                    Pet joined = join(item[0] - PET, false);
+                    joined.x = item[1] + .5f;
+                    joined.y = item[2] + 1;
                     continue;
                 }
                 // A chest is opened: ten pluses in it, whatever else; and a stash is done with when its chest is.
@@ -3698,7 +3819,7 @@ final class PlusRun {
         }
         if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
         if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > WAKES)) return;
-        if (pet == MINI_RUNE && mired(foe)) seconds *= PUDDLE_SLOWS;
+        if (!puddles.isEmpty() && mired(foe)) seconds *= PUDDLE_SLOWS;
         foe.clock += seconds;
         if (foe.broken > 0 && !absent(foe)) {
             if ((foe.broken -= seconds) <= 0 || foe.taken >= 2 && foe.dazed <= seconds) {

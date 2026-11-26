@@ -143,7 +143,8 @@ final class RunGame {
      * each step costs, and the picture beside it (-1 for her own, with her wings out).
      */
     private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings: a second jump", "Glossary magnet", "Longer treats", "Bigger ink tank",
-            "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons"};
+            "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons", "A place by her side", "Room for a stray", "Kennel: brisker pets",
+            "Kennel: stronger pets"};
     private static final String[][] UP_GIVES = {
             {"A fourth heart in every land", "A fifth heart in every land"},
             {"A second jump in the air: press jump again"},
@@ -154,9 +155,24 @@ final class RunGame {
             {"A ball of Rune's ink takes two hurts"},
             {"A fourth life in every land", "A fifth life in every land", "A sixth life in every land"},
             {"Three colours worn at once", "Four colours worn at once", "Five colours worn at once", "Every colour at once: white, not yet mastered"},
-            {"A colour is ready a second sooner", "A colour is ready two seconds sooner", "A colour is ready three seconds sooner"}};
+            {"A colour is ready a second sooner", "A colour is ready two seconds sooner", "A colour is ready three seconds sooner"},
+            {"Two pets of her own come into every land", "Three pets of her own come into every land"},
+            {"Two pets found in a land may follow her", "Three pets found in a land may follow her"},
+            {"Her pets wait a fifth less between one thing and the next", "Her pets wait two fifths less"},
+            {"A pet's blow counts twice on a big one", "And a pet takes a whole piece off a shield"}};
     private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}, {200, 350, 500, 900},
-            {120, 240, 400}};
+            {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}};
+    /** For her pets: more of her own beside her, more strays, brisker, stronger. */
+    private static final int PET_PLACES = 10, STRAY_ROOM = 11, PET_BRISK = 12, PET_STRONG = 13;
+    /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
+    private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800};
+    /** The counter's tabs, and what stands under each. */
+    private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms"};
+    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}};
+    private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2;
+    private final RectF[] counterTabs = new RectF[TAB_NAMES.length], petCells = new RectF[PlusRun.PETS];
+    private final RectF petAct = new RectF(), armsAct = new RectF();
+    private int counterTab, shownWares, petOn;
     /** How many colours must be hers before each step of the prism is for sale: the last, all seven. */
     private static final int[] PRISM_NEEDS = {3, 4, 5, 7};
     private static final int PRISM = 8, QUICK = 9;
@@ -167,10 +183,10 @@ final class RunGame {
             "she comes down slowly, and water goes both ways", "what is sent back goes on through a row", "she rises much faster",
             "what she knocks over flies off burning", "whatever lands on her lands by half", "every colour's power for a while: a glow, not yet a light"};
     /** The order they stand in at the counter: lives under hearts. And the picture that stands for her own face. */
-    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 2, 3, 4, 5, 6};
+    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13};
     private static final int HER_FACE = -2;
     private static final int[] UP_ART = {BUFF_ART + PlusRun.BREAD, -1, BUFF_ART + PlusRun.MAGNET, BUFF_ART + PlusRun.ICE, WEAPON_ART + PlusRun.GUN,
-            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART};
+            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART};
     /** How long the ice cream, the magnet and the notes last before anything is bought, as {@link PlusRun} has them. */
     private static final float[] BUFF_LASTS = {0, 8, 0, 10, 6};
 
@@ -589,6 +605,14 @@ final class RunGame {
             else if (prize == RunLevels.TANK) kept.shots += 8;
             else if (prize == RunLevels.QUICK) kept.recharge -= 3;
         }
+        // Her pets: those that are hers for good and chosen to come, no more of them than she has places for; room for strays; and
+        // what the kennel has made of them.
+        int with = session.tally("run_pet_with") & session.tally("run_pet_own");
+        while (Integer.bitCount(with) > 1 + bought(PET_PLACES)) with &= ~Integer.highestOneBit(with);
+        kept.petWith = with;
+        kept.tempSlots = 1 + bought(STRAY_ROOM);
+        kept.petBrisk = 1 - .2f * bought(PET_BRISK);
+        kept.petStrong = bought(PET_STRONG);
         // Her backpack: every thing to fight with that she has found; her tablet-book, which is hers from the start; and her ring of keys
         // once it is. She begins every land with the one of those two that she has chosen.
         int mains = session.tally("run_mains") | 1;
@@ -969,10 +993,10 @@ final class RunGame {
         float arrow = Math.max(stepper, Math.min(ribbon * .7f, size * .66f));
         nextButton.set(colourButton.left - between - arrow, y + (size - arrow) / 2, colourButton.left - between, y + (size + arrow) / 2);
         // The counter: what can be bought, one under another.
-        float high = Math.max(dp(40), Math.min(dp(78), (safe.height() - dp(120)) / wares.length - dp(8)));
+        float high = Math.max(dp(40), Math.min(dp(74), (safe.height() - dp(170)) / 6 - dp(8)));
         float across = Math.min(safe.width() - dp(28), dp(460));
         for (int index = 0; index < wares.length; index++) {
-            float down = safe.top + dp(100) + index * (high + dp(8));
+            float down = safe.top + dp(142) + index * (high + dp(8));
             wares[index].set(safe.centerX() - across / 2, down, safe.centerX() + across / 2, down + high);
         }
     }
@@ -1002,6 +1026,17 @@ final class RunGame {
 
     /** The Back key: out of a run to its pause, out of the story, the counter or a card to the map; false to leave the game. */
     boolean back() {
+        // Whatever sheet is open over the screen is what Back closes: her backpack, or the colours opened out.
+        if (packOpen) {
+            packOpen = false;
+            audio.play("tap", .3f);
+            return true;
+        }
+        if (fanOpen) {
+            fanOpen = false;
+            idle();
+            return true;
+        }
         if (screen == PLAY) {
             pause();
         } else if (screen == PAUSED) {
@@ -1134,7 +1169,8 @@ final class RunGame {
         hintMoved = hintJumped = false;
         seenDrops = seenBeams = seenBlasts = jumpsAtFall = seenCracks = seenShatters = seenThrownBack = 0;
         seenPetJoined = seenPetStrikes = seenPetKills = 0;
-        seenPetGifts = seenPetWards = seenPetCopies = 0;
+        seenPetGifts = seenPetWards = seenPetCopies = seenPetSwaps = 0;
+        offerSeen = -1;
         seenKeys = seenLevers = seenPlates = seenShrines = 0;
         seenPanels = seenFans = seenDuds = seenFinds = seenRefills = seenSwitches = 0;
         sinceHeavy = panelAge = 9;
@@ -1741,12 +1777,12 @@ final class RunGame {
         if (run.petJoined() != seenPetJoined) {
             // A pet goes with her: a card names it and what it does, and the first time each kind does she has a word about it.
             seenPetJoined = run.petJoined();
-            int kind = run.pet(), had = session.tally("run_pets");
+            int kind = run.lastJoined(), had = session.tally("run_pets");
             petGlad = 0;
             audio.play("star", .8f);
             buzz(true);
             if (kind >= 0) {
-                toast(PET_NAMES[kind] + " goes with her", "For the whole of this land: it " + PET_DOES[kind], -(100 + kind));
+                toast(PET_NAMES[kind] + " goes with her", "A stray, for the whole of this land: it " + PET_DOES[kind], -(100 + kind));
                 if ((had & 1 << kind) == 0) {
                     session.keep("run_pets", had | 1 << kind);
                     speak(RunStory.PETS[kind], true);
@@ -1755,8 +1791,8 @@ final class RunGame {
         }
         if (run.petStrikes() != seenPetStrikes) {
             seenPetStrikes = run.petStrikes();
-            audio.play(run.pet() == PlusRun.DUCK || run.pet() == PlusRun.IMP ? "flap" : run.pet() == PlusRun.JAR || run.pet() == PlusRun.MINI_RUNE ? "splash"
-                    : run.pet() == PlusRun.CHERUB ? "ding" : "throw", .35f);
+            int one = run.herd().size() == 1 ? run.pet() : -1;
+            audio.play(one == PlusRun.DUCK || one == PlusRun.IMP ? "flap" : one == PlusRun.JAR || one == PlusRun.MINI_RUNE ? "splash" : one == PlusRun.CHERUB ? "ding" : "throw", .35f);
         }
         if (run.petKills() != seenPetKills) {
             seenPetKills = run.petKills();
@@ -1836,7 +1872,7 @@ final class RunGame {
             audio.play("star", .7f);
             flyTo((run.petX() - cameraX) * tile, (run.petY() - 1 - cameraY) * tile, true, 1);
             pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "Half a heart");
-            petSays("Here!");
+            petSays("Here!", PlusRun.MINI_CHIKUWA);
         }
         if (run.petWards() != seenPetWards) {
             seenPetWards = run.petWards();
@@ -1847,10 +1883,22 @@ final class RunGame {
         wardAge += seconds;
         if (run.petCopies() != seenPetCopies) {
             seenPetCopies = run.petCopies();
-            if (sincePetWord > 9) petSays("Me too!");
+            if (sincePetWord > 9) petSays("Me too!", PlusRun.TWIN);
         }
-        if (run.pet() == PlusRun.IMP && sincePetWord > 13 && run.petBusy() > 0) petSays(IMP_SAYS[(int) (clock * 7) % IMP_SAYS.length]);
-        if (run.pet() == PlusRun.MINI_RUNE && sincePetWord > 11 && boss != null) petSays("Uu...");
+        for (PlusRun.Pet it : run.herd()) {
+            if (it.kind == PlusRun.IMP && sincePetWord > 13 && it.busy > 0) petSays(IMP_SAYS[(int) (clock * 7) % IMP_SAYS.length], it.kind);
+            if (it.kind == PlusRun.MINI_RUNE && sincePetWord > 11 && boss != null) petSays("Uu...", it.kind);
+        }
+        // A pet lying where she stands that she has no room for: she is told, once, that she may change a stray for it.
+        if (run.petOffer() != offerSeen) {
+            offerSeen = run.petOffer();
+            if (offerSeen >= 0) pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "No room: change a stray for it?");
+        }
+        if (run.petSwaps() != seenPetSwaps) {
+            seenPetSwaps = run.petSwaps();
+            audio.play("star", .7f);
+            petGlad = 0;
+        }
         if (run.cracks() != seenCracks) {
             // A piece off a shield: it rings, higher the less of it is left, and shards fly.
             seenCracks = run.cracks();
@@ -2577,6 +2625,12 @@ final class RunGame {
                 if (action == MotionEvent.ACTION_DOWN && roomResultAge > .8f) roomResultAge = 2.6f;
                 return;
             }
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && run.door() < 0 && !run.atStall() && run.petOffer() >= 0
+                    && stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                run.swapPet();
+                buzz(true);
+                return;
+            }
             // The button that changes what she holds: a tap gives her the other of the last two; held, it opens her backpack.
             {
                 int index = event.getActionIndex(), finger = event.getPointerId(index);
@@ -2672,7 +2726,26 @@ final class RunGame {
                 }
                 return;
             }
-            for (int index = 0; index < wares.length; index++) if (wares[index].contains(x, y)) buy(UP_ORDER[index]);
+            for (int tab = 0; tab < TAB_NAMES.length; tab++) {
+                if (counterTabs[tab] != null && counterTabs[tab].contains(x, y)) {
+                    counterTab = tab;
+                    audio.play("page", .5f);
+                    return;
+                }
+            }
+            for (int index = 0; index < shownWares; index++) if (wares[index].contains(x, y)) buy(TAB_WARES[counterTab][index]);
+            if (counterTab == PETS_TAB) {
+                for (int kind = 0; kind < PlusRun.PETS; kind++) {
+                    if (petCells[kind] != null && petCells[kind].contains(x, y)) {
+                        petOn = kind;
+                        audio.play("tap", .5f);
+                    }
+                }
+                if (!petAct.isEmpty() && petAct.contains(x, y)) petDeal();
+            } else if (counterTab == ARMS_TAB && armsAct.contains(x, y)) {
+                audio.play("tap", .5f);
+                openPack(MAP);
+            }
         } else if (screen == STALL) {
             for (int index = 0; index < stallWares.length; index++) {
                 if (!stallWares[index].contains(x, y)) continue;
@@ -2718,6 +2791,38 @@ final class RunGame {
         int owned = Integer.bitCount(colours() & 127);
         return owned >= PRISM_NEEDS[has] ? null : PRISM_NEEDS[has] == 7 ? "Needs all seven colours: " + owned + " of 7 won" : "Needs " + PRISM_NEEDS[has] + " colours won: "
                 + owned + " so far";
+    }
+
+    /**
+     * The pet that is looked at at the counter: one she has not got is bought, if her
+     * pluses stretch to it, and comes along if there is a place for it; one she has comes
+     * along, if there is a place, or is left at home.
+     */
+    private void petDeal() {
+        int own = session.tally("run_pet_own"), with = session.tally("run_pet_with") & own, bit = 1 << petOn, places = 1 + bought(PET_PLACES);
+        if ((own & bit) == 0) {
+            if (bank() < PET_COSTS[petOn]) {
+                audio.play("no", .5f);
+                if (refused <= 0) speak(RunStory.SHOP[2], false);
+                refused = 5;
+                return;
+            }
+            session.keep("run_bank", bank() - PET_COSTS[petOn]);
+            session.keep("run_pet_own", own | bit);
+            if (Integer.bitCount(with) < places) session.keep("run_pet_with", with | bit);
+            session.keep("run_pets", session.tally("run_pets") | bit);
+            audio.play("buy", .6f);
+            buzz(true);
+            speak(RunStory.SHOP[1], false);
+        } else if ((with & bit) != 0) {
+            session.keep("run_pet_with", with & ~bit);
+            audio.play("tap", .5f);
+        } else if (Integer.bitCount(with) < places) {
+            session.keep("run_pet_with", with | bit);
+            audio.play("star", .6f);
+        } else {
+            audio.play("no", .5f);
+        }
     }
 
     /** Buys the next step of something, if her pluses stretch to it. */
@@ -2913,7 +3018,7 @@ final class RunGame {
                 // The buttons are easy to hit: the whole lower part of the screen belongs to one or another of them.
                 // A finger on one of the buttons over the arrows or over the jump is on that button, not on what is under it.
                 if (perks.colours != 0 && (colourButton.contains(x, y) || nextButton.contains(x, y))) continue;
-                if (run != null && (run.atStall() || run.door() >= 0) && stallButton.contains(x, y)) continue;
+                if (run != null && (run.atStall() || run.door() >= 0 || run.petOffer() >= 0) && stallButton.contains(x, y)) continue;
                 if (run != null && run.nextUp() != PlusRun.UNARMED && swapButton.contains(x, y)) continue;
                 if (x > downButton.left - dp(8) && x < downButton.right + dp(8) && y > downButton.top - dp(10) && y < downButton.bottom + dp(4)) {
                     down = true;
@@ -3036,6 +3141,12 @@ final class RunGame {
                 } else {
                     stallSign.setEmpty();
                     if (run.door() >= 0) doorControl(canvas);
+                    else if (run.petOffer() >= 0) {
+                        button(canvas, stallButton, false, 0xFF8A5A33);
+                        paint.setAlpha(255);
+                        cell(canvas, petArt(run.petOffer()), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
+                        label(canvas, stallButton, "Swap");
+                    }
                 }
             } else if (screen == STALL) {
                 canvas.drawColor(0x8C000000);
@@ -5577,18 +5688,21 @@ final class RunGame {
      * after it joins her and after it has dealt with something.
      */
     private void drawPet(Canvas canvas) {
-        int kind = run.pet();
-        if (kind < 0) return;
-        float x = (run.petX() - cameraX) * tile, y = (run.petY() - cameraY) * tile, across = run.petX() - petWasX, down = run.petY() - petWasY;
-        petWasX = run.petX();
-        petWasY = run.petY();
-        boolean busy = run.petBusy() > 0, floats = PlusRun.floats(kind);
+        for (PlusRun.Pet it : run.herd()) drawPet(canvas, it);
+    }
+
+    private void drawPet(Canvas canvas, PlusRun.Pet it) {
+        int kind = it.kind;
+        float x = (it.x - cameraX) * tile, y = (it.y - cameraY) * tile, across = it.x - it.seenX, down = it.y - it.seenY;
+        it.seenX = it.x;
+        it.seenY = it.y;
+        boolean busy = it.busy > 0, floats = PlusRun.floats(kind);
         int pose = busy ? 4 : petGlad < .7f ? 5 : floats ? (Math.abs(across) > .05f ? 3 : (int) (clock * 5) % 2)
                 : Math.abs(down) > .03f ? 3 : Math.abs(across) > .01f ? 1 + (int) (clock * 9) % 2 : 0;
         float tall = tile * .95f * 170 / 100, hop = petGlad < .7f ? Math.abs((float) Math.sin(petGlad / .7f * Math.PI * 2)) * tile * .25f : 0;
         // A soft shadow under one that floats, so that it is seen to be in the air.
-        cell(canvas, petArt(kind), pose, 6, x, y + tile * .04f - hop, tall, !run.petLeftward());
-        if (petWordLeft > 0) {
+        cell(canvas, petArt(kind), pose, 6, x, y + tile * .04f - hop, tall, !it.left);
+        if (petWordLeft > 0 && petWordOf == kind) {
             float show = Math.min(1, Math.min(petWordLeft, 1.8f - petWordLeft) / .2f), size = tile * .26f, over = y - tile * 1.25f - hop;
             text.setTextAlign(Paint.Align.CENTER);
             text.setTextSize(size);
@@ -5690,7 +5804,10 @@ final class RunGame {
     private static final String[] IMP_SAYS = {"Too slow~", "Hehe~", "Mine~", "Sloppy~"};
     private float wardAge = 9;
 
-    private void petSays(String word) {
+    private int petWordOf = -1, offerSeen = -1, seenPetSwaps;
+
+    private void petSays(String word, int kind) {
+        petWordOf = kind;
         petWord = word;
         petWordLeft = 1.8f;
         sincePetWord = 0;
@@ -5928,10 +6045,19 @@ final class RunGame {
         paint.setColor(Color.BLACK);
         float under = safe.top + margin + tall + dp(8), round = dp(36), x = safe.left + margin;
         if (run.pet() >= 0) {
-            float face = dp(42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
-            box.set(left, top, left + face, top + face);
-            plate(canvas, box, face / 2, 235);
-            cell(canvas, petArt(run.pet()), petGlad < .7f ? 5 : 0, 6, left + face / 2, top + face * .86f, face * 1.05f, false);
+            float face = dp(run.herd().size() > 2 ? 30 : 42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
+            for (PlusRun.Pet it : run.herd()) {
+                box.set(left, top, left + face, top + face);
+                plate(canvas, box, face / 2, 235);
+                cell(canvas, petArt(it.kind), petGlad < .7f ? 5 : 0, 6, left + face / 2, top + face * .86f, face * 1.05f, false);
+                if (it.stays) {
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(CalculatorLayout.CORAL);
+                    canvas.drawCircle(left + dp(4), top + dp(4), dp(3.5f), paint);
+                    paint.setColor(Color.BLACK);
+                }
+                top += face + dp(4);
+            }
         }
         // Shut in with someone: her name, and a bar of how much more she can take, marked at its thirds.
         boolean den = false;
@@ -7186,15 +7312,45 @@ final class RunGame {
         }
     }
 
-    /** The counter: what her pluses buy, how far along each she is, and what the next step of it costs. */
+    /**
+     * The counter, in tabs: her hearts and lives, how she moves, her colours, her comforts,
+     * her pets, and what she fights with. Under the open tab: what her pluses buy there,
+     * how far along each she is, and what the next step of it costs.
+     */
     private void drawShop(Canvas canvas) {
         drawSky(canvas, RunLevels.chapterOf(open()), clock * dp(5));
         canvas.drawColor(dark ? 0xAA000000 : 0x77FFFFFF);
         int bank = bank();
-        heading(canvas, "Guild counter", "What she buys here she keeps in every land  ·  + " + bank + " to spend");
-        for (int row = 0; row < wares.length; row++) {
+        heading(canvas, "Guild counter", "What she buys here she keeps in every land  \u00B7  + " + bank + " to spend");
+        // The tabs: one row; the open one is filled.
+        float across = Math.min(safe.width() - dp(28), dp(460)), tab = (across - dp(4) * (TAB_NAMES.length - 1)) / TAB_NAMES.length, from = safe.centerX() - across / 2;
+        for (int index = 0; index < TAB_NAMES.length; index++) {
+            if (counterTabs[index] == null) counterTabs[index] = new RectF();
+            RectF at = counterTabs[index];
+            at.set(from + index * (tab + dp(4)), safe.top + dp(98), from + index * (tab + dp(4)) + tab, safe.top + dp(132));
+            boolean enough = false;
+            for (int which : TAB_WARES[index]) enough |= bought(which) < UP_COSTS[which].length && locked(which) == null && bank >= UP_COSTS[which][bought(which)];
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(index == counterTab ? CalculatorLayout.CORAL : dark ? 0xFF2F3336 : 0xFFF1F3F4);
+            canvas.drawRoundRect(at, dp(17), dp(17), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(index == counterTab ? Color.WHITE : ink);
+            fitted(canvas, TAB_NAMES[index], at.centerX(), at.centerY() + dp(4.5f), dp(12.5f), tab - dp(8));
+            if (enough && index != counterTab) {
+                paint.setColor(CalculatorLayout.CORAL);
+                canvas.drawCircle(at.right - dp(5), at.top + dp(5), dp(3.5f), paint);
+                paint.setColor(Color.BLACK);
+            }
+        }
+        int[] list = TAB_WARES[counterTab];
+        shownWares = list.length;
+        // (With her pets under them, the four that are for her pets are lower rows.)
+        float squeeze = counterTab == PETS_TAB ? Math.min(wares[0].height(), dp(52)) : wares[0].height();
+        for (int row = 0; row < list.length; row++) {
             RectF where = wares[row];
-            int index = UP_ORDER[row];
+            where.set(where.left, safe.top + dp(142) + row * (squeeze + dp(6)), where.right, safe.top + dp(142) + row * (squeeze + dp(6)) + squeeze);
+            int index = list[row];
             float left = where.left, top = where.top, right = where.right, high = where.height(), middle = where.centerY();
             int has = bought(index), steps = UP_COSTS[index].length;
             String locked = locked(index);
@@ -7209,12 +7365,14 @@ final class RunGame {
             float words = left + dp(24) + icon, price = dp(86), room = right - words - price - dp(18);
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(ink);
-            boolean roomy = high > dp(60);
-            fitted(canvas, UP_NAMES[index], words, roomy ? top + dp(25) : middle + dp(5), dp(16), room);
-            if (roomy) {
+            boolean roomy = high > dp(60), two = high >= dp(46);
+            fitted(canvas, UP_NAMES[index], words, roomy ? top + dp(25) : two ? middle - dp(2) : middle + dp(5), dp(roomy ? 16 : 14.5f), room);
+            if (two) {
                 text.setColor(soft);
-                fitted(canvas, done ? "All of it is hers" : locked != null ? UP_GIVES[index][has] + ". " + locked : UP_GIVES[index][has], words, top + dp(44),
-                        dp(12.5f), room);
+                fitted(canvas, done ? "All of it is hers" : locked != null ? UP_GIVES[index][has] + ". " + locked : UP_GIVES[index][has], words, roomy ? top + dp(44) : middle + dp(15),
+                        dp(roomy ? 12.5f : 11.5f), room);
+            }
+            if (roomy) {
                 // How far along it she is: a dot for each step.
                 for (int step = 0; step < steps; step++) {
                     paint.setStyle(Paint.Style.FILL);
@@ -7233,6 +7391,107 @@ final class RunGame {
             text.setColor(done ? soft : can ? Color.WHITE : CalculatorLayout.CORAL);
             text.setTextSize(dp(15));
             fitted(canvas, done ? "Owned" : locked != null ? "Locked" : "+ " + UP_COSTS[index][has], right - dp(12) - price / 2, middle + dp(5.5f), dp(15), price - dp(14));
+        }
+        float under = safe.top + dp(142) + list.length * (squeeze + dp(6)) + dp(6), left = safe.centerX() - across / 2;
+        petAct.setEmpty();
+        armsAct.setEmpty();
+        if (counterTab == PETS_TAB) drawPetShop(canvas, left, under, across, bank);
+        else if (counterTab == COLOURS_TAB) drawMixHints(canvas, left, under, across);
+        else if (counterTab == ARMS_TAB) {
+            // What she fights with is worked on by the smith, in the towns; here is the way to her backpack.
+            box.set(left, under, left + across, under + dp(116));
+            plate(canvas, box, dp(16), 245);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            fitted(canvas, "What she fights with", left + dp(16), under + dp(26), dp(16), across - dp(32));
+            text.setColor(soft);
+            fitted(canvas, "What she finds in the lands is kept in her backpack.", left + dp(16), under + dp(46), dp(12.5f), across - dp(32));
+            fitted(canvas, "The smith, in the towns, will work on each of them.", left + dp(16), under + dp(63), dp(12.5f), across - dp(32));
+            armsAct.set(left + dp(16), under + dp(74), left + across - dp(16), under + dp(108));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(CalculatorLayout.CORAL);
+            canvas.drawRoundRect(armsAct, dp(17), dp(17), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(Color.WHITE);
+            fitted(canvas, "Open her backpack  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
+        } else if (counterTab == 1) {
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(soft);
+            fitted(canvas, "Her wings are what there is to buy for how she moves, so far.", left + dp(6), under + dp(14), dp(12.5f), across - dp(12));
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /**
+     * Her pets at the counter: the ten kinds in two rows of five. One she has is bright,
+     * one that comes along with her is ringed, and one she has not got has its price under
+     * it. Under them, the one that is looked at: what it is, what it does, and the button
+     * that buys it, takes it along or leaves it at home.
+     */
+    private void drawPetShop(Canvas canvas, float left, float top, float across, int bank) {
+        int own = session.tally("run_pet_own"), with = session.tally("run_pet_with") & own, places = 1 + bought(PET_PLACES);
+        float gap = dp(6), side = Math.min(dp(64), (across - gap * 4) / 5), high = side + dp(14);
+        for (int kind = 0; kind < PlusRun.PETS; kind++) {
+            if (petCells[kind] == null) petCells[kind] = new RectF();
+            RectF at = petCells[kind];
+            float x = left + (across - (side * 5 + gap * 4)) / 2 + kind % 5 * (side + gap), y = top + kind / 5 * (high + gap);
+            at.set(x, y, x + side, y + high);
+            boolean hers = (own >> kind & 1) != 0, comes = (with >> kind & 1) != 0;
+            plate(canvas, at, dp(14), 245);
+            if (kind == petOn || comes) {
+                stroke.setColor(comes ? CalculatorLayout.CORAL : dark ? 0xFF9AA0A6 : 0xFF8A8F94);
+                stroke.setStrokeWidth(dp(comes ? 2.5f : 1.5f));
+                canvas.drawRoundRect(at, dp(14), dp(14), stroke);
+            }
+            paint.setAlpha(hers ? 255 : 120);
+            cell(canvas, petArt(kind), hers && (int) (clock * 1.5f + kind) % 5 == 0 ? 5 : 0, 6, at.centerX(), at.top + side * .84f, side * 1.02f, false);
+            paint.setAlpha(255);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(hers ? (comes ? CalculatorLayout.CORAL : soft) : ink);
+            fitted(canvas, comes ? "with her" : hers ? "hers" : "+ " + PET_COSTS[kind], at.centerX(), at.bottom - dp(5), dp(11), side - dp(6));
+        }
+        // The one that is looked at.
+        float y = top + 2 * (high + gap) + dp(4);
+        boolean hers = (own >> petOn & 1) != 0, comes = (with >> petOn & 1) != 0, room = Integer.bitCount(with) < places;
+        box.set(left, y, left + across, y + dp(118));
+        plate(canvas, box, dp(16), 245);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        fitted(canvas, PET_NAMES[petOn], left + dp(16), y + dp(24), dp(15.5f), across - dp(32));
+        text.setTypeface(Typeface.DEFAULT);
+        text.setColor(soft);
+        fitted(canvas, "It " + PET_DOES[petOn] + ". " + (PlusRun.floats(petOn) ? "It flies." : "It runs."), left + dp(16), y + dp(43), dp(12.5f), across - dp(32));
+        fitted(canvas, "Hers for good, it comes into every land  \u00B7  " + Integer.bitCount(with) + " of " + places + (places == 1 ? " place" : " places") + " taken", left + dp(16), y + dp(60),
+                dp(12), across - dp(32));
+        petAct.set(left + dp(16), y + dp(72), left + across - dp(16), y + dp(108));
+        boolean can = hers ? comes || room : bank >= PET_COSTS[petOn];
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(can ? (hers && comes ? (dark ? 0xFF44292E : 0xFFFCE9EB) : CalculatorLayout.CORAL) : dark ? 0xFF2F3336 : 0xFFEDEEEE);
+        canvas.drawRoundRect(petAct, dp(18), dp(18), paint);
+        paint.setColor(Color.BLACK);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(can ? (hers && comes ? CalculatorLayout.CORAL : Color.WHITE) : soft);
+        fitted(canvas, !hers ? "Buy  + " + PET_COSTS[petOn] : comes ? "Leave at home" : room ? "Take along" : "No place free: buy one above", petAct.centerX(), petAct.centerY() + dp(5), dp(14.5f),
+                petAct.width() - dp(24));
+    }
+
+    /** Under her colours: the mixes that have names. One she has made is named, with what it does; one she has not is hinted at: one of its colours, and a question mark. */
+    private void drawMixHints(Canvas canvas, float left, float top, float across) {
+        int made = session.tally("run_mixes");
+        box.set(left, top, left + across, top + dp(30) + MIX_NAMES.length * dp(19) + dp(8));
+        plate(canvas, box, dp(16), 245);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        fitted(canvas, "Mixes: colours worn together", left + dp(16), top + dp(24), dp(14.5f), across - dp(32));
+        for (int mix = 0; mix < MIX_NAMES.length; mix++) {
+            boolean known = (made >> mix & 1) != 0;
+            String of = MIX_OF[mix];
+            int plus = of.indexOf(" + ");
+            String words = known ? MIX_NAMES[mix] + ": " + of + ": " + MIX_DOES[mix] : "???: " + (plus > 0 ? of.substring(0, plus) + " + ?" : mix == 6 ? "three of them, any" : "every one of them");
+            text.setColor(known ? ink : soft);
+            fitted(canvas, words, left + dp(16), top + dp(46) + mix * dp(19), dp(12), across - dp(32));
         }
     }
 }
