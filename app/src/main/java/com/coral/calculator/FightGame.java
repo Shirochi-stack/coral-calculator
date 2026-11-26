@@ -116,6 +116,8 @@ final class FightGame {
     private final boolean tight;
     private long drawNanos, drawnSince, painting;
     private final FightTally tally = new FightTally();
+    /** How much is left of the white that fills the screen as a home run lands. */
+    private float flash;
     private final int[] counted = new int[FightTally.COUNT];
     private int drawn;
     private int slipTest;
@@ -669,6 +671,7 @@ final class FightGame {
         for (int side = 0; side < 2; side++) if (captionLeft[side] > 0) captionLeft[side] -= seconds;
         if (bannerLeft > 0) bannerLeft -= seconds;
         if (shake > 0) shake -= seconds;
+        if (flash > 0) flash -= seconds;
         for (int index = sparks.size() - 1; index >= 0; index--) if ((sparks.get(index)[2] += seconds) > .32f) sparks.remove(index);
         for (int index = slices.size() - 1; index >= 0; index--) if ((slices.get(index)[0] += seconds) > .5f) slices.remove(index);
         grandAge += seconds;
@@ -801,6 +804,12 @@ final class FightGame {
             int by = two[1 - fight.hitSide()].kind;
             audio.play(hard ? by == Fight.TSUBAKIEH ? "bat" : by == Fight.CHIKUWA ? "bread" : "heavy" : "hit", hard ? .8f : .55f);
             if (hard) audio.play("heavy", .5f);
+            if (fight.hitGrand() && hard && two[1 - fight.hitSide()].kind == Fight.TSUBAKIEH) {
+                // The crack of the bat, a far cheer, and the whistle of what she hit going away.
+                audio.play("homer", .95f);
+                flash = .16f;
+                shake = .45f;
+            }
             sparks.add(new float[]{fight.hitX(), fight.hitY(), 0, hard ? 1 : 0});
             if (hard) shake = .22f;
             buzz(hard);
@@ -1199,9 +1208,34 @@ final class FightGame {
             paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK ? Math.round(190 + 65 * (float) Math.sin(clock * 34)) : 255);
             // She is drawn at the one size her frames are kept at: nothing stretches, squashes or scales her.
             float bob = fighter.state == Fight.WALK ? unit * .022f * (float) Math.abs(Math.sin(Math.PI * fighter.clock / (fighter.backing ? .24f : .255f))) : 0;
+            // Sent off by a home run she goes up and away, smaller the higher she is, with a twinkle where she is furthest: no other
+            // blow throws anyone so high.
+            float away = fighter.state == Fight.DOWN ? Math.min(.6f, Math.max(0, (fighter.y - 2.5f) / 8)) : 0;
+            if (away > 0) {
+                canvas.save();
+                canvas.scale(1 - away, 1 - away, x, y - Fight.TALL * unit * .5f);
+                canvas.rotate(fighter.y * 55 * (fighter.facingLeft ? 1 : -1), x, y - Fight.TALL * unit * .5f);
+            }
             frame(canvas, fighter.kind, pose(fighter), x + lunge, y - bob, scale, fighter.facingLeft);
+            if (away > 0) {
+                canvas.restore();
+                if (away > .4f) thing(canvas, BURST_FX, x, y - Fight.TALL * unit * .5f, unit * (.5f + .5f * (float) Math.abs(Math.sin(clock * 20))), clock * 300, false);
+            }
+            if (fighter.kind == Fight.TSUBAKIEH && fighter.state == Fight.ATTACK && fighter.move == Fight.ULTIMATE && fight.phase() == Fight.FIGHTING
+                    && fighter.clock > fighter.doing().startup * .6f && fighter.clock < fighter.doing().startup + fighter.doing().active + .12f) {
+                // Lines of speed across the stage as she swings.
+                stroke.setColor(Color.WHITE);
+                for (int line = 0; line < 9; line++) {
+                    float high = groundY - unit * (.3f + line * .32f), from = (line * 137 % 100) / 100f * width, far = width * (.25f + (line * 61 % 40) / 100f);
+                    stroke.setAlpha(120 + line * 10);
+                    stroke.setStrokeWidth(dp(1.5f + line % 3));
+                    canvas.drawLine(from, high, from + far, high, stroke);
+                }
+                stroke.setAlpha(255);
+            }
             paint.setAlpha(255);
         }
+        if (flash > 0) canvas.drawColor(Color.argb(Math.round(230 * Math.min(1, flash / .1f)), 255, 255, 255));
         // What is in the air.
         for (Fight.Shot shot : fight.shots()) {
             float x = across(shot.x), y = up(shot.y);

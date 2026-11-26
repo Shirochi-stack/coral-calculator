@@ -72,6 +72,10 @@ final class FightPose {
             case Fight.WON:
                 return clock < .3f ? WIN1 : (int) ((clock - .3f) / .4f) % 2 == 0 ? WIN2 : WIN3;
             case Fight.ATTACK:
+                // While her home run is announced she calls her shot, the bat pointed at the sky, and then draws it back.
+                if (fighter.kind == Fight.TSUBAKIEH && fighter.move == Fight.ULTIMATE && fight.phase() == Fight.FLOURISH && fight.flourisher() == fighter.side) {
+                    return fight.flourish() < .5f ? HR1 : HR2;
+                }
                 return striking(fighter);
             default:
                 // Beaten on time she sinks to her knees; before a round she has something to say for herself.
@@ -119,6 +123,12 @@ final class FightPose {
         if (which == Fight.BREAK) return clock < move.startup * .3f ? MS : out ? BREAK : BREAK_W;
         if (which == Fight.LAUNCH) return out ? LAUNCH : LAUNCH_W;
         if (which == Fight.SHOVE) return out ? SHOVE : SHOVE_W;
+        if (which == Fight.ULTIMATE && fighter.kind == Fight.TSUBAKIEH) {
+            // Wound up as she rushes in; the swing; the bat meeting; then the follow-through held, and watching it go.
+            if (!out) return clock < move.startup * .7f ? HR2 : HR3;
+            if (!struck) return HR4;
+            return clock > move.length() - .2f ? HR6 : HR5;
+        }
         float through = move.startup + Math.max(move.active, move.every * (move.times - 1)) + .15f;
         if (which == Fight.CLASH) return !out ? C1 : clock < through ? C2 : C3;
         // Her ultimate: she gathers it, lets it go (each cut of Halgakos's another stroke), and is done.
