@@ -219,7 +219,12 @@ final class RunGame {
     private final boolean[] saidForm = new boolean[PlusRun.WHITE + 1];
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
     private float formLasts = 1, shake, sinceBump = 9, sinceShut = 9, sinceOpened = 9, sinceParry = 9, flash;
-    private boolean wasAtStall;
+    private int seenGreetings;
+    /** The name of the line last said; and how much longer what someone met in the land is saying is not to be talked over. */
+    private String saying;
+    private float personLeft;
+    /** Where on the screen the sign over the stall she stands at is, to be tapped. */
+    private final RectF stallSign = new RectF();
     /** Where she was last hurt, her feet, which way she faced, and how long ago: below zero when that is over. */
     private float knockX, knockY, knockAge = -1;
     private boolean knockLeft;
@@ -473,9 +478,8 @@ final class RunGame {
         tabs[0].set(safe.left + dp(18), safe.top + dp(80), safe.left + dp(18) + tab, safe.top + dp(114));
         tabs[1].set(tabs[0].right + dp(8), tabs[0].top, tabs[0].right + dp(8) + tab, tabs[0].bottom);
         turnTo(page);
-        // The stall in a land: its button under the one that pauses, out of the way of the land.
-        float pill = Math.min(dp(210), safe.width() - dp(40));
-        stallButton.set(pauseButton.right - pill, pauseButton.bottom + dp(8), pauseButton.right, pauseButton.bottom + dp(52));
+        // The stall in a land: its button over the jump, where her thumb already is.
+        stallButton.set(jumpButton.left, jumpButton.top - dp(14) - size, jumpButton.right, jumpButton.top - dp(14));
         // The counter: what can be bought, one under another.
         float high = Math.max(dp(40), Math.min(dp(78), (safe.height() - dp(120)) / wares.length - dp(8)));
         float across = Math.min(safe.width() - dp(28), dp(460));
@@ -533,6 +537,9 @@ final class RunGame {
      */
     private void speak(String[] words, boolean captioned) {
         int who = RunStory.speaker(words);
+        // A line that is still being said is not begun again.
+        if (captioned && words[0].equals(saying) && (captionLeft > 0 || audio.speaking())) return;
+        saying = words[0];
         String said = who == 0 ? names.named(words[1]) : words[1];
         if (captioned) {
             caption = said;
@@ -544,9 +551,20 @@ final class RunGame {
 
     private void speakAny(String[][] lines) { speak(lines[random.nextInt(lines.length)], true); }
 
+    /** Someone met in the land says her line: once, and nothing that is only by the way is said over it. */
+    private void person(String[] words) {
+        speak(words, true);
+        personLeft = captionLeft;
+    }
+
+    /** Something said by the way: not while someone met in the land is still speaking. */
+    private void aside(String[] words) {
+        if (personLeft <= 0) speak(words, true);
+    }
+
     /** A passing remark, made only if nothing else is being said. */
     private void remark(String[][] lines) {
-        if (captionLeft <= 0 && !audio.speaking()) speakAny(lines);
+        if (captionLeft <= 0 && personLeft <= 0 && !audio.speaking()) speakAny(lines);
     }
 
     /**
@@ -624,7 +642,10 @@ final class RunGame {
         seenFormed = seenDoors = seenQuakes = seenParried = seenCensors = seenEntrances = seenSpecials = seenPhases = seenUnlocks = seenWiped = 0;
         java.util.Arrays.fill(remarked, false);
         java.util.Arrays.fill(saidForm, false);
-        saidCombo = saidLast = saidFlag = saidCharm = wasAtStall = false;
+        saidCombo = saidLast = saidFlag = saidCharm = false;
+        seenGreetings = 0;
+        personLeft = 0;
+        saying = null;
         shake = flash = 0;
         sinceBump = sinceShut = sinceOpened = sinceParry = 9;
         knockAge = -1;
@@ -728,6 +749,7 @@ final class RunGame {
         if (knockAge >= 0 && (knockAge += seconds) > KNOCK) knockAge = -1;
         if (shake > 0) shake -= seconds;
         if (flash > 0) flash -= seconds;
+        if (personLeft > 0) personLeft -= seconds;
         sinceBump += seconds;
         sinceShut += seconds;
         sinceOpened += seconds;
@@ -810,10 +832,11 @@ final class RunGame {
             // Bread with every heart full is worth three pluses instead, and Chikuwa says so.
             boolean full = kind == PlusRun.BREAD && run.bonus() != seenBonus;
             // Someone met in a village has her own word as she hands it over; a ribbon's word is said when her hair turns.
-            if (giver >= RunLevels.SOMI) speak(RunStory.MEET[giver - RunLevels.SOMI], true);
-            else if (full) speak(RunStory.FULL[0], true);
-            else if (kind == PlusRun.HOMERUN || kind == PlusRun.COMPLIMENT) speak(RunStory.GIFTS[kind - PlusRun.HOMERUN], true);
-            else if (kind <= PlusRun.NOTES) speak(RunStory.TOOK[kind], true);
+            if (giver >= RunLevels.SOMI) person(RunStory.MEET[giver - RunLevels.SOMI]);
+            else if (full) person(RunStory.FULL[0]);
+            else if (kind == PlusRun.HOMERUN || kind == PlusRun.COMPLIMENT) person(RunStory.GIFTS[kind - PlusRun.HOMERUN]);
+            else if (kind <= PlusRun.NOTES && giver != 0) person(RunStory.TOOK[kind]);
+            else if (kind <= PlusRun.NOTES) aside(RunStory.TOOK[kind]);
             if (full) pop(herX, herY - 1.6f, "+ 3");
             if (kind == PlusRun.HOMERUN) audio.play("bat", .7f);
             seenBonus = run.bonus();
@@ -827,7 +850,7 @@ final class RunGame {
                 double way = random.nextFloat() * Math.PI * 2;
                 bits.add(new float[]{herX, herY - .7f, (float) Math.cos(way) * 5, (float) Math.sin(way) * 5 - 2, .45f, 2 + form});
             }
-            if (form > 0 && !saidForm[form]) {
+            if (form > 0 && !saidForm[form] && personLeft <= 0) {
                 saidForm[form] = true;
                 speak(RunStory.FORMS[form - 1], true);
             }
@@ -868,7 +891,7 @@ final class RunGame {
             buzz(false);
             // Her word about it, the first time in a land.
             int found = run.weapon();
-            if (found >= 0 && !remarked[found]) {
+            if (found >= 0 && !remarked[found] && personLeft <= 0) {
                 remarked[found] = true;
                 speak(RunStory.ARMS[found], true);
             }
@@ -956,9 +979,11 @@ final class RunGame {
             pop(herX, herY - 1.6f, "× 0");
             buzz(true);
         }
-        // At a stall its keeper calls out, once each time she comes up to it.
-        if (run.atStall() && !wasAtStall) speak(RunStory.MEET[RunLevels.ALTTEUL - RunLevels.SOMI], true);
-        wasAtStall = run.atStall();
+        // At a stall its keeper calls out the first time she comes up to it, and not again however often she comes back.
+        if (run.greetings() != seenGreetings) {
+            seenGreetings = run.greetings();
+            if (personLeft <= 0) person(RunStory.MEET[RunLevels.ALTTEUL - RunLevels.SOMI]);
+        }
         // Walking into a way that is shut: it shakes, and she has a word about it.
         if (run.locked() && sinceBump > 1.2f && (goLeft && run.x() <= run.arenaFrom() + 1.02f || goRight && run.x() + PlusRun.WIDE >= run.arenaTo() - .02f)) {
             if (sinceBump > 8 && boss != null && boss.enter <= 0) remark(RunStory.SHUT);
@@ -1105,8 +1130,10 @@ final class RunGame {
                 pause();
                 return;
             }
-            // At a stall, its button opens it; the land waits.
-            if (action == MotionEvent.ACTION_DOWN && run.atStall() && stallButton.contains(x, y)) {
+            // At a stall, its button opens it, and so does a tap on the sign over its keeper; the land waits.
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && run.atStall()
+                    && (stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))
+                    || stallSign.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex())))) {
                 audio.play("tap", .5f);
                 buzz(false);
                 idle();
@@ -1265,6 +1292,7 @@ final class RunGame {
                 control(canvas, jumpButton, goJump, 270, false);
                 if (run.weapon() != PlusRun.UNARMED || run.has(PlusRun.RED) || run.has(PlusRun.BLUE)) strikeControl(canvas);
                 if (run.atStall()) stallControl(canvas);
+                else stallSign.setEmpty();
             } else if (screen == STALL) {
                 canvas.drawColor(0x8C000000);
                 drawStall(canvas);
@@ -1534,6 +1562,21 @@ final class RunGame {
                 float holdY = y - tile * 1.15f + (float) Math.sin(clock * 3.2f + item[1]) * tile * .05f;
                 ring(canvas, x - tile * .95f, holdY, 0xFFFFC53D);
                 help(canvas, item[0], x - tile * .95f, holdY, tile * .7f);
+            }
+            // And over her head a mark, until it is given: she has something for whoever comes up to her. Over a stall's keeper,
+            // a sign that says it is a shop, larger when she is at it, when a tap on it opens the stall.
+            int speaker = who <= 2 ? who : who == 3 ? 4 : who == 4 ? 3 : who == RunLevels.NURI ? 10 : FIRST_VILLAGER + who - RunLevels.SOMI;
+            float head = y - tile * (who <= 4 ? 1.85f : 1.55f);
+            if (item[0] == PlusRun.STALL) {
+                boolean at = run.atStall() && Math.abs(run.x() - item[1]) < 3.5f;
+                float signX = x + tile * .5f;
+                canvas.save();
+                if (at) canvas.scale(1.25f, 1.25f, signX, head);
+                float wide = mark(canvas, signX, head, "Shop", SPEAKER_COLOURS[speaker], true);
+                canvas.restore();
+                if (at) stallSign.set(signX - wide, head - tile * 1.1f, signX + wide, head + tile * .4f);
+            } else if (!given) {
+                mark(canvas, x, head, "!", SPEAKER_COLOURS[speaker], false);
             }
         }
         // What lies about to help, in a ring of its own colour; what a friend holds out is in her hands already.
@@ -2274,18 +2317,73 @@ final class RunGame {
         }
     }
 
-    /** The button that opens a stall she stands at, with what she has to spend there. */
+    /** The button that opens a stall she stands at: round, like the others, over the jump, with a basket on it and what she has to spend. */
     private void stallControl(Canvas canvas) {
-        float round = stallButton.height() / 2;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0x33000000);
-        canvas.drawRoundRect(stallButton.left, stallButton.top + dp(2), stallButton.right, stallButton.bottom + dp(3), round, round, paint);
-        paint.setColor(SPEAKER_COLOURS[FIRST_VILLAGER + RunLevels.ALTTEUL - RunLevels.SOMI]);
-        canvas.drawRoundRect(stallButton, round, round, paint);
-        paint.setColor(Color.BLACK);
-        text.setColor(Color.WHITE);
+        int colour = SPEAKER_COLOURS[FIRST_VILLAGER + RunLevels.ALTTEUL - RunLevels.SOMI];
+        float beat = 1 + .04f * (float) Math.sin(clock * 6);
+        canvas.save();
+        canvas.scale(beat, beat, stallButton.centerX(), stallButton.centerY());
+        button(canvas, stallButton, false, colour);
+        basket(canvas, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .34f, colour);
         text.setTextAlign(Paint.Align.CENTER);
-        fitted(canvas, "Altteul's stall   + " + run.purse(), stallButton.centerX(), stallButton.centerY() + dp(5.5f), dp(15.5f), stallButton.width() - dp(24));
+        text.setColor(0xFF292B2A);
+        text.setTextSize(dp(12.5f));
+        canvas.drawText("Shop  + " + run.purse(), stallButton.centerX(), stallButton.bottom - dp(13), text);
+        canvas.restore();
+    }
+
+    /** A little shopping basket, drawn: a bowl with a handle over it. */
+    private void basket(Canvas canvas, float x, float y, float size, int colour) {
+        stroke.setColor(colour);
+        stroke.setAlpha(255);
+        stroke.setStrokeWidth(size * .16f);
+        box.set(x - size * .42f, y - size * .7f, x + size * .42f, y + size * .3f);
+        canvas.drawArc(box, 180, 180, false, stroke);
+        path.reset();
+        path.moveTo(x - size * .62f, y - size * .12f);
+        path.lineTo(x + size * .62f, y - size * .12f);
+        path.lineTo(x + size * .44f, y + size * .5f);
+        path.lineTo(x - size * .44f, y + size * .5f);
+        path.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(colour);
+        paint.setAlpha(255);
+        canvas.drawPath(path, paint);
+        paint.setColor(Color.BLACK);
+    }
+
+    /**
+     * A mark over someone in the land who has something for her, bobbing: a bubble with a
+     * word or a sign in it, in her colour, and a little tail under it pointing at her.
+     * Returns how wide it is.
+     */
+    private float mark(Canvas canvas, float x, float y, String word, int colour, boolean shop) {
+        text.setTextSize(tile * (shop ? .44f : .4f));
+        float wide = Math.max(tile * .66f, text.measureText(word) + tile * (shop ? .86f : .34f)), high = tile * (shop ? .68f : .6f);
+        float top = y - high + (float) Math.sin(clock * 4.5f + x * .01f) * tile * .07f;
+        box.set(x - wide / 2, top, x + wide / 2, top + high);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0x40000000);
+        canvas.drawRoundRect(box.left, box.top + tile * .04f, box.right, box.bottom + tile * .05f, high / 2, high / 2, paint);
+        paint.setColor(Color.WHITE);
+        canvas.drawRoundRect(box, high / 2, high / 2, paint);
+        path.reset();
+        path.moveTo(x - tile * .1f, top + high - 1);
+        path.lineTo(x + tile * .1f, top + high - 1);
+        path.lineTo(x, top + high + tile * .14f);
+        path.close();
+        canvas.drawPath(path, paint);
+        stroke.setColor(colour);
+        stroke.setAlpha(255);
+        stroke.setStrokeWidth(tile * .045f);
+        canvas.drawRoundRect(box, high / 2, high / 2, stroke);
+        paint.setColor(Color.BLACK);
+        float left = box.left, middle = box.centerY();
+        if (shop) basket(canvas, left + tile * .32f, middle + tile * .02f, tile * .3f, colour);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(colour);
+        canvas.drawText(word, x + (shop ? tile * .22f : 0), middle + tile * .15f, text);
+        return wide;
     }
 
     /** A stall, open: what it sells for the pluses collected in this land, and the way to the counter where what she has banked buys what she keeps. */

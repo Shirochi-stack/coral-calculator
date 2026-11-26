@@ -1331,6 +1331,18 @@ public class PlusRunTest {
         assertEquals(3, run.spent());
         hold(run, .6f, false, true, false);
         assertFalse(run.atStall());
+        // Its keeper greeted her once, when she first came up to it; running away and back again, she is not greeted again.
+        assertEquals(1, run.greetings());
+        for (int turn = 0; turn < 3; turn++) {
+            while (run.x() > 11.8f) run.step(STEP, true, false, false);
+            hold(run, .2f, false, false, false);
+            assertTrue(run.atStall());
+            hold(run, .7f, false, true, false);
+            assertFalse(run.atStall());
+        }
+        assertEquals(1, run.greetings());
+        // And what a villager holds is given once: there is nothing there to be given again.
+        assertEquals(1, run.taken());
     }
 
     @Test public void aFlagOnHighGroundBringsHerBackOntoIt() {

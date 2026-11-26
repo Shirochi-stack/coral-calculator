@@ -185,8 +185,10 @@ final class PlusRun {
     private int combo, bonus, airJumps, flaps, taken, lastTaken = -1, spared, charms, swings, cause;
     private int form, formed, inkLeft, doorsUsed, quakes, cleared, parried, censors, riding = -1;
     private float formLeft, censored, doorWait, offIt;
-    private int spent, giver;
+    private int spent, giver, greetings;
     private boolean atStall;
+    /** The stalls she has been up to, by the column each stands in: its keeper greets her the first time only. */
+    private final java.util.Set<Integer> greeted = new java.util.HashSet<>();
     private boolean locked, leaving;
     private float opening, rearm, sinceShot = 9;
     private int entrances, phases, specials, special, unlocks, streak, wiped;
@@ -287,6 +289,8 @@ final class PlusRun {
         spent = other.spent;
         giver = other.giver;
         atStall = other.atStall;
+        greetings = other.greetings;
+        greeted.addAll(other.greeted);
         locked = other.locked;
         leaving = other.leaving;
         opening = other.opening;
@@ -449,6 +453,8 @@ final class PlusRun {
     int giver() { return giver; }
     /** Whether she stands at a stall; what she has to spend there, which is what she has collected in this land less what she has spent; and what she has spent. */
     boolean atStall() { return atStall; }
+    /** How many stalls she has come up to for the first time: going away and coming back does not count again. */
+    int greetings() { return greetings; }
     int purse() { return collected + bonus - spent; }
     int spent() { return spent; }
 
@@ -753,7 +759,10 @@ final class PlusRun {
             int[] item = items.get(index);
             // A stall stays where it is, and she is at it anywhere along its counter.
             if (item[0] == STALL) {
-                if (x < item[1] + 2.2f && x + WIDE > item[1] - 1.2f && y < item[2] + .9f && y + TALL > item[2] + .1f) atStall = true;
+                if (x < item[1] + 2.2f && x + WIDE > item[1] - 1.2f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
+                    atStall = true;
+                    if (greeted.add(item[1])) greetings++;
+                }
                 continue;
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
