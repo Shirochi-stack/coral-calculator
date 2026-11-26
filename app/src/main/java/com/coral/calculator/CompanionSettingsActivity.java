@@ -41,6 +41,8 @@ public final class CompanionSettingsActivity extends Activity {
     private TextView masterNote;
     private TextView intro;
     private TextView fadeLabel;
+    /** Shows the hair colours again: which are won, and which is worn. */
+    private Runnable showHair;
     /** Set while a switch is moved from code, so that it is not taken for the user's choice. */
     private boolean updating;
     /** The system's permission screen was opened to turn her on. */
@@ -151,7 +153,12 @@ public final class CompanionSettingsActivity extends Activity {
         toggle(content, "Animated Halgakos", "Her pink-haired form breathes and blinks, runs when you drag her, and "
                         + "works alongside the mini calculator. Switch this off for the still Halgakos, who uses "
                         + "less battery.",
-                prefs.animated(), checked -> { prefs.set(CompanionPrefs.ANIMATED, checked); apply(); });
+                prefs.animated(), checked -> {
+                    prefs.set(CompanionPrefs.ANIMATED, checked);
+                    apply();
+                    showHair.run();
+                });
+        hairField(content);
         toggle(content, "Keep her out of the calculator app", "She steps aside while the calculator app is on "
                         + "screen, these settings included, and returns when you leave it. This is about "
                         + "Halgakos herself, not the mini calculator.",
@@ -313,6 +320,8 @@ public final class CompanionSettingsActivity extends Activity {
             if (Settings.canDrawOverlays(this)) prefs.set(CompanionPrefs.ENABLED, true);
         }
         apply();
+        // A colour may have been won in Plus run since this page was last looked at.
+        if (showHair != null) showHair.run();
     }
 
     @Override protected void onSaveInstanceState(Bundle state) {
@@ -423,6 +432,120 @@ public final class CompanionSettingsActivity extends Activity {
             picker.show();
         });
         show.run();
+    }
+
+    /**
+     * The colour of the animated Halgakos's hair: her own pink, and each colour she has won in
+     * Plus run. One not yet won is shown locked.
+     */
+    private void hairField(LinearLayout parent) {
+        TextView label = text("Hair colour", 19, ink());
+        label.setPadding(0, dp(10), 0, dp(4));
+        parent.addView(label);
+        LinearLayout across = new LinearLayout(this);
+        across.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView preview = new ImageView(this);
+        preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        across.addView(preview, new LinearLayout.LayoutParams(dp(66), dp(88)));
+        LinearLayout rows = new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams rowsParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowsParams.leftMargin = dp(6);
+        across.addView(rows, rowsParams);
+        parent.addView(across);
+        TextView note = text("", 15, muted());
+        note.setPadding(0, dp(4), dp(56), dp(8));
+        parent.addView(note);
+        Swatch[] swatches = new Swatch[Hair.NAMES.length];
+        // Which preview was asked for last: one made for an earlier choice is not shown over it.
+        int[] asked = {-1};
+        showHair = () -> {
+            int owned = Hair.owned(this), worn = Hair.chosen(this), won = Integer.bitCount(owned & (1 << Hair.NAMES.length - 1) - 1);
+            boolean animated = prefs.animated();
+            for (Swatch swatch : swatches) {
+                swatch.owned = Hair.owns(owned, swatch.colour);
+                swatch.worn = swatch.colour == worn;
+                swatch.setAlpha(animated ? 1 : .45f);
+                swatch.setContentDescription(Hair.NAMES[swatch.colour] + " hair" + (swatch.worn ? ", chosen" : swatch.owned ? "" : ", not won yet"));
+                swatch.invalidate();
+            }
+            note.setText(!animated ? "The colours are for the animated Halgakos. The still one keeps her white hair."
+                    : won == Hair.NAMES.length - 1 ? "Every colour is won. She wears the one you choose, here and over your other apps."
+                    : "Pink is her own. The others are won in Plus run, from its bosses: " + won + " of " + (Hair.NAMES.length - 1)
+                    + " won so far. One that is won can be worn here.");
+            if (asked[0] == worn) return;
+            asked[0] = worn;
+            new Thread(() -> {
+                android.graphics.Bitmap sheet = Hair.art(this, R.drawable.halgakos_pet, worn);
+                if (sheet == null) return;
+                android.graphics.Bitmap first = android.graphics.Bitmap.createBitmap(sheet, 0, 0, sheet.getWidth() / PetArt.COLUMNS,
+                        sheet.getHeight() / PetArt.FRAMES.length);
+                runOnUiThread(() -> {
+                    if (asked[0] == worn) preview.setImageBitmap(first);
+                });
+            }, "hair").start();
+        };
+        for (int colour = 0; colour < swatches.length; colour++) {
+            if (colour % 5 == 0) rows.addView(new LinearLayout(this));
+            Swatch swatch = new Swatch(colour);
+            swatches[colour] = swatch;
+            swatch.setOnClickListener(view -> {
+                if (!prefs.animated()) return;
+                if (!swatch.owned) {
+                    note.setText(Hair.NAMES[swatch.colour] + " is not won yet. It is one of the rewards of Plus run.");
+                    return;
+                }
+                prefs.setHair(swatch.colour);
+                showHair.run();
+                apply();
+            });
+            ((LinearLayout) rows.getChildAt(rows.getChildCount() - 1)).addView(swatch, new LinearLayout.LayoutParams(dp(46), dp(48)));
+        }
+        showHair.run();
+    }
+
+    /** One hair colour to choose: a round of it, ringed when it is the one worn, and with a padlock over it until it is won. */
+    private final class Swatch extends View {
+        final int colour;
+        boolean owned, worn;
+        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF box = new android.graphics.RectF();
+
+        Swatch(int colour) {
+            super(CompanionSettingsActivity.this);
+            this.colour = colour;
+            setFocusable(true);
+        }
+
+        @Override protected void onDraw(android.graphics.Canvas canvas) {
+            float x = getWidth() / 2f, y = getHeight() / 2f, round = dp(15);
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(Hair.COLOURS[colour]);
+            paint.setAlpha(owned ? 255 : 80);
+            canvas.drawCircle(x, y, round, paint);
+            paint.setStyle(android.graphics.Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(1));
+            paint.setColor(muted());
+            paint.setAlpha(owned ? 160 : 90);
+            canvas.drawCircle(x, y, round, paint);
+            if (worn) {
+                paint.setStrokeWidth(dp(2.5f));
+                paint.setColor(CalculatorLayout.CORAL);
+                canvas.drawCircle(x, y, round + dp(4.5f), paint);
+            }
+            if (!owned) {
+                // A padlock: its bow, then its body.
+                paint.setColor(ink());
+                paint.setStrokeWidth(dp(1.8f));
+                box.set(x - dp(3.6f), y - dp(7.5f), x + dp(3.6f), y + dp(1.5f));
+                canvas.drawArc(box, 180, 180, false, paint);
+                canvas.drawLine(box.left, box.centerY(), box.left, y - dp(.5f), paint);
+                canvas.drawLine(box.right, box.centerY(), box.right, y - dp(.5f), paint);
+                paint.setStyle(android.graphics.Paint.Style.FILL);
+                box.set(x - dp(6), y - dp(1.5f), x + dp(6), y + dp(7.5f));
+                canvas.drawRoundRect(box, dp(1.8f), dp(1.8f), paint);
+            }
+        }
     }
 
     /** A heading over a group of settings. */

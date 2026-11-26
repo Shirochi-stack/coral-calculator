@@ -132,6 +132,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private Bitmap art;
     /** The animated figure's frames, one pose to a row; loaded only while she is animated. */
     private Bitmap pet;
+    /** The colour of the hair in those frames, and whether frames in another colour are being made. */
+    private int hair;
+    private boolean dyeing;
     /** Room around the figure in its window, for her shadow. */
     private int pad;
 
@@ -436,6 +439,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     /** A setting changed: also sizes and places her again, and redraws what is open. */
     void settingsChanged() {
+        dye();
         sync();
         relayout();
         wake();
@@ -469,8 +473,34 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             pet = null;
             return false;
         }
-        if (pet == null) pet = BitmapFactory.decodeResource(app.getResources(), R.drawable.halgakos_pet);
+        if (pet == null) {
+            pet = BitmapFactory.decodeResource(app.getResources(), R.drawable.halgakos_pet);
+            hair = Hair.PINK;
+            dye();
+        }
         return pet != null;
+    }
+
+    /**
+     * Has her wear the hair colour chosen. Her frames in it take a moment to make, so they are made
+     * away from the screen, and she changes when they are ready.
+     */
+    private void dye() {
+        int wanted = Hair.chosen(app);
+        if (pet == null || wanted == hair || dyeing) return;
+        dyeing = true;
+        new Thread(() -> {
+            Bitmap frames = Hair.art(app, R.drawable.halgakos_pet, wanted);
+            handler.post(() -> {
+                dyeing = false;
+                if (pet == null || frames == null) return;
+                pet = frames;
+                hair = wanted;
+                if (sprite != null) sprite.dyed();
+                // It may have been changed again while these were made.
+                dye();
+            });
+        }, "hair").start();
     }
 
     /** The pose she holds when nothing briefer is playing. */
@@ -1538,6 +1568,12 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         /** Plays a pose through once, then goes back to the one she keeps. */
         void play(int value) { play(value, 1); }
 
+        /** Her frames are now in another colour of hair: her birthday frames are made again when next wanted. */
+        void dyed() {
+            party = null;
+            invalidate();
+        }
+
         /** Plays a pose through a number of times, then goes back to the one she keeps. */
         void play(int value, int times) {
             if (pet == null) return;
@@ -1550,7 +1586,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         /** Has her celebrate for a while: her birthday frames one after another, and confetti falling about her. */
         void celebrate(long forMs) {
             if (pet == null) return;
-            if (party == null) party = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.halgakos_party);
+            if (party == null) party = Hair.art(app, R.drawable.halgakos_party, hair);
             partyUntil = android.os.SystemClock.uptimeMillis() + forMs;
             partyStep = 0;
             handler.removeCallbacks(revel);

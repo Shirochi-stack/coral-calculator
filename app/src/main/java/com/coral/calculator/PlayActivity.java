@@ -44,7 +44,7 @@ public final class PlayActivity extends Activity {
         super.onCreate(state);
         fold = new FoldState(this, this::arrangeSoon);
         art = BitmapFactory.decodeResource(getResources(), R.drawable.halgakos);
-        if (new CompanionPrefs(this).animated()) pet = BitmapFactory.decodeResource(getResources(), R.drawable.halgakos_pet);
+        if (new CompanionPrefs(this).animated()) pet = Hair.art(this, R.drawable.halgakos_pet, Hair.chosen(this));
         root = new FrameLayout(this);
         root.setBackgroundColor(dark ? 0xFF17191B : CalculatorLayout.BACKGROUND);
         setContentView(root);

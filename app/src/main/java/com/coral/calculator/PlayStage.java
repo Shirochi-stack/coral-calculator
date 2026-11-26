@@ -214,6 +214,10 @@ final class PlayStage extends View {
         this.dark = dark;
         this.haptics = haptics;
         this.art = art;
+        // The two games with a story tell of her as she is, in her own pink, whatever colour the companion wears.
+        boolean story = game == PlaySession.RUN || game == PlaySession.FIGHT;
+        int hair = pet == null ? Hair.PINK : Hair.chosen(context);
+        if (story && hair != Hair.PINK) pet = android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_pet);
         this.pet = pet;
         this.host = host;
         session = PlaySession.get(context);
@@ -236,8 +240,8 @@ final class PlayStage extends View {
         names = new CompanionPrefs(context);
         if (game == GIANT) {
             // Her frames are small: blown up to the size of the screen they would be a blur.
-            large = android.graphics.BitmapFactory.decodeResource(context.getResources(),
-                    pet != null ? R.drawable.halgakos_pet_large : R.drawable.halgakos_large);
+            large = pet != null ? Hair.art(context, R.drawable.halgakos_pet_large, hair)
+                    : android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_large);
         }
         if (game == PlaySession.RUN) runGame = new RunGame(this, context, dark, haptics, art, pet);
         if (game == PlaySession.FIGHT) fightGame = new FightGame(this, context, dark, haptics, art, pet);
