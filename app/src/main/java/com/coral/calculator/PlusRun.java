@@ -113,6 +113,16 @@ final class PlusRun {
      * from whoever has more than one and ties a ribbon of its colour on her.
      */
     static final int KEY = 21, LEVER = 22, PLATE = 23, SHRINE = 24;
+    /**
+     * And in a building of a village: something to be walked up to, which stays where it
+     * is. What it is is its fifth number: a pet on show, by its kind; or, from a hundred, a
+     * desk at which the counter is opened, at one of its tabs.
+     */
+    static final int SPOT = 25;
+    private int spot = -1;
+
+    /** What she stands at in a building, or -1: a pet on show, by its kind; or a desk, a hundred and the tab of the counter it opens. */
+    int spot() { return spot; }
     static final float BARS_OPEN = 6;
     private int unlocked, raised, barsRoom = -1, keys, levers, plates, shrines;
     private float bars;
@@ -1378,8 +1388,8 @@ final class PlusRun {
                     gameLasts = FALLING;
                     caught = 0;
                     sinceDrop = 0;
-                } else if (one[0] == RunLevels.PASSAGE) {
-                    // A way through is a way through: there is nothing to be done in it but go.
+                } else if (one[0] == RunLevels.PASSAGE || one[0] == RunLevels.HOUSE) {
+                    // A way through is a way through: there is nothing to be done in it but go. Nor in a building, but what she chooses to.
                     roomsDone |= 1 << at;
                 }
             }
@@ -2410,6 +2420,7 @@ final class PlusRun {
         }
         atStall = false;
         offered = null;
+        spot = -1;
         for (int index = items.size() - 1; index >= 0; index--) {
             int[] item = items.get(index);
             // A stall stays where it is, and she is at it anywhere along its counter.
@@ -2425,6 +2436,12 @@ final class PlusRun {
             if (item[0] == DROPOFF) {
                 if (quest == ASKED && level.quest == RunLevels.LETTER && x < item[1] + 2.4f && x + WIDE > item[1] - .4f && y < item[2] + .9f
                         && y + TALL > item[2] + .1f) done();
+                continue;
+            }
+            // What is in a building stays where it is: a desk is stood at anywhere along it, as a stall is; a pet on show, at it.
+            if (item[0] == SPOT) {
+                boolean desk = item[4] >= 100;
+                if (x < item[1] + (desk ? 2.4f : .9f) && x + WIDE > item[1] + (desk ? -.8f : .1f) && y < item[2] + 1.1f && y + TALL > item[2] - .1f) spot = item[4];
                 continue;
             }
             // A lever and a plate stay where they are: the one is pulled once, the other lifts the bars again every time it is stood on.

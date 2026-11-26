@@ -90,6 +90,20 @@ final class RunLevels {
     static final int RANGE = 4;
     /** And a room where signs keep coming for a quarter of a minute, to be dealt with as fast as they come. */
     static final int TRAMPLE = 5;
+    /**
+     * And the buildings of a village, each of which can be gone into: a pet shop, where
+     * the ten pets sit to be looked at and bought; the guild hall, where the counter is; a
+     * home, with someone in who has something for her; and, in time, a smithy and a black
+     * market. Nothing in a building hurts her. A village has two of them, of different
+     * sorts, by the land and by which of the land's villages it is.
+     */
+    static final int HOUSE = 6, PET_SHOP = 0, GUILD_HALL = 1, HOME = 2, SMITHY = 3, MARKET = 4;
+
+    /** The sorts of the two buildings of a village that can be gone into. */
+    static int[] buildingsOf(int number, int village) {
+        int first = (number + village) % 3, second = (first + 1 + (number / 3 + village) % 2) % 3;
+        return new int[]{first, second};
+    }
     /** How tall a place off the land is, from its floor to its ceiling. */
     static final int ROOM_TALL = 13;
     /**
@@ -1073,6 +1087,9 @@ final class RunLevels {
 
         /** The doors asked for so far: the kind of place each leads to, its column and floor, whether it is hidden, and for a passage where it comes out and onto what floor. */
         final List<int[]> wanted = new ArrayList<>();
+        /** The doors of the buildings of its villages: laid after every other place, so that the places a land had before them keep their numbers. */
+        final List<int[]> built = new ArrayList<>();
+        private int villages;
         private int[] passage;
         private boolean inVillage;
 
@@ -1129,7 +1146,7 @@ final class RunLevels {
             if (level.quest == CAKES) {
                 List<int[]> nooks = new ArrayList<>(level.nooks);
                 // Short of three such places, the rest are up on the ledges of the places off the land.
-                for (int[] room : level.rooms) nooks.add(new int[]{room[3] + 5, room[11] - 3});
+                for (int[] room : level.rooms) if (room[0] != HOUSE) nooks.add(new int[]{room[3] + 5, room[11] - 3});
                 for (int which : new int[]{0, nooks.size() / 2, nooks.size() - 1}) {
                     level.items.add(new int[]{PlusRun.CAKE, nooks.get(which)[0], nooks.get(which)[1], 0});
                 }
@@ -1198,6 +1215,38 @@ final class RunLevels {
                 }
                 level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], 0, FLOOR, ceiling, lookOf(number, level.rooms.size()), 0});
             }
+            for (int[] want : built) house(want);
+        }
+
+        /**
+         * The inside of a building of a village. A pet shop: the ten pets, five along its
+         * floor and five on a shelf over them, each to be walked up to; and Nabi, who keeps
+         * it, at its far end. The guild hall: Inju at the counter. A home: someone in, with
+         * something for her, and a few pluses on the floor.
+         */
+        void house(int[] want) {
+            int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL;
+            wall(2);
+            int from = at;
+            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL ? 16 : 14);
+            int to = at - 1;
+            wall(2);
+            level.land[FLOOR - 1][from + 1] = ENTRY;
+            if (sort == PET_SHOP) {
+                ledge(from + 4, FLOOR - 2, 10);
+                for (int pet = 0; pet < PlusRun.PETS; pet++) level.items.add(new int[]{PlusRun.SPOT, from + 4 + pet % 5 * 2, pet < 5 ? FLOOR - 1 : FLOOR - 3, 0, pet});
+                level.items.add(new int[]{PlusRun.SPOT, from + 15, FLOOR - 1, NABI, 100 + 4});
+            } else if (sort == GUILD_HALL) {
+                level.items.add(new int[]{PlusRun.SPOT, from + 11, FLOOR - 1, INJU, 100});
+                pluses(from + 4, from + 6, FLOOR - 1);
+            } else {
+                // (Not whoever has something to ask of her in this land: she is out in the village.)
+                int who = SOMI + (number * 3 + level.rooms.size()) % (ALTTEUL - SOMI);
+                if (level.quest != 0 && who == giverOf(level.quest)) who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
+                level.items.add(new int[]{GIVES[who - SOMI], from + 8, FLOOR - 1, who});
+                pluses(from + 3, from + 6, FLOOR - 1);
+            }
+            level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, LOOKS + sort, sort});
         }
 
         /** Some columns of a place off the land: floor under them, ceiling over them, and nothing between. */
@@ -1732,6 +1781,18 @@ final class RunLevels {
                     level.decor.add(new int[]{6 + random.nextInt(2), from + 21, floor - 1});
                     level.items.add(new int[]{who == NURI ? PlusRun.NOTES : GIVES[who - SOMI], from + 7, floor - 1, who});
                     level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});
+                    // Two of what stands in it are buildings she can go into, of sorts that go by the land and by which village of it this
+                    // is: where a house stood, the pet shop or the guild hall, in a look of its own, or a home as it was. (Nothing here is
+                    // drawn from the numbers the land is made from: the land is the same land.)
+                    int[] sorts = buildingsOf(level.number, villages++);
+                    for (int which = 0; which < 2; which++) {
+                        int column = from + (which == 0 ? 2 : 12), sort = sorts[which];
+                        int[] stands = level.decor.get(level.decor.size() - (which == 0 ? 5 : 3));
+                        if (sort == PET_SHOP) stands[0] = 300 + level.number % 2;
+                        else if (sort == GUILD_HALL) stands[0] = 302 + level.number % 2;
+                        // (Its door is not marked in the land itself, as other doors are: what is laid about a land afterwards is laid as it was.)
+                        built.add(new int[]{HOUSE, column, floor, 0, column, floor, sort});
+                    }
                     if (!inVillage) {
                         inVillage = true;
                         // A stash in the even lands; in the odd ones a game: the room where pluses fall, the range, and the room where signs keep coming, by turns.

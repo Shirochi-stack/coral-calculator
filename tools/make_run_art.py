@@ -428,6 +428,23 @@ def places():
     for name in ("wine", "maps", "vault", "clock", "green", "print", "crystal", "treasure"):
         look = Image.open(SOURCE / f"room_{name}.png").convert("RGB")
         look.resize((SKY_WIDTH, round(look.size[1] * SKY_WIDTH / look.size[0])), Image.LANCZOS).save(RES / f"plus_run_room_{name}.webp", quality=82, method=6)
+    # The insides of the buildings of a village: the pet shop, the guild hall, a home, the smithy and the black market.
+    for name in ("pets", "guild", "home", "smithy", "market"):
+        look = Image.open(SOURCE / f"inside_{name}.png").convert("RGB")
+        look.resize((SKY_WIDTH, round(look.size[1] * SKY_WIDTH / look.size[0])), Image.LANCZOS).save(RES / f"plus_run_room_{name}.webp", quality=82, method=6)
+    # And the buildings themselves, from outside: two pet shops, two guild halls, the smithy and the black market; six in a row, at one scale.
+    buildings = pieces("town", 2, 3)
+    if len(buildings) != 6:
+        raise SystemExit(f"town: {len(buildings)} pieces")
+    scale = 300 / max(building.size[1] for building in buildings)
+    town = Image.new("RGBA", (360 * 6, 304), (0, 0, 0, 0))
+    for index, building in enumerate(buildings):
+        size = (max(1, round(building.size[0] * scale)), max(1, round(building.size[1] * scale)))
+        if size[0] > 356:
+            raise SystemExit(f"building {index} is {size}")
+        town.alpha_composite(building.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * 360 + (360 - size[0]) // 2, 304 - size[1]))
+    clear = Image.new("RGBA", town.size, (0, 0, 0, 0))
+    Image.composite(town, clear, town.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_town.webp", lossless=True, quality=100, method=6, exact=True)
     # And what stands about in them: two things for each, sixteen in a row, all at one scale, each standing on the bottom of its cell.
     things = pieces("props_a", 2, 4) + pieces("props_b", 2, 4)
     if len(things) != 16:
