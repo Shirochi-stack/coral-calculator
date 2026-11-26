@@ -139,6 +139,16 @@ public final class CompanionSettingsActivity extends Activity {
         found.setPadding(0, 0, dp(56), dp(8));
         content.addView(found);
         describeFound();
+        toggle(content, "Games first", "The tap on Halgakos that opens the mini calculator opens her games in its place: two taps "
+                        + "with the setting above on. The mini calculator is still in her menu.",
+                prefs.tapGames(), checked -> {
+                    prefs.set(CompanionPrefs.TAP_GAMES, checked);
+                    describeGestures();
+                    apply();
+                });
+        toggle(content, "Open the app on the games", "Opened from its icon, the app starts on Play with Halgakos. The calculator "
+                        + "is one step back, and the game pad beside her on the calculator opens the games at any time.",
+                prefs.startGames(), checked -> prefs.set(CompanionPrefs.START_GAMES, checked));
         toggle(content, "Speech bubbles", "Now and then she has something to say, in a bubble over her head, and "
                         + "most of it is teasing. A tap on the bubble sends it away.",
                 prefs.chatter(), checked -> { prefs.set(CompanionPrefs.CHATTER, checked); apply(); });
@@ -716,9 +726,10 @@ public final class CompanionSettingsActivity extends Activity {
     }
 
     private void describeGestures() {
+        String opens = prefs.tapGames() ? " to play with her" : " for the mini calculator";
         intro.setText("A mini Halgakos who floats over your other apps. " + (prefs.tapCalculator()
-                ? (prefs.doubleTap() ? "Tap her twice" : "Tap her") + " for the mini calculator, hold her for her menu,"
-                : "Tap her for her menu, hold her for the mini calculator,")
+                ? (prefs.doubleTap() ? "Tap her twice" : "Tap her") + opens + ", hold her for her menu,"
+                : "Tap her for her menu, hold her" + opens + ",")
                 + " and drag her wherever she is out of the way.");
     }
 

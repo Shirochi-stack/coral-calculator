@@ -62,6 +62,8 @@ public final class CalculatorLayout extends ViewGroup {
     private final View[] tools = new View[5];
     /** Opens the companion's settings; it sits beside the full screen tool. */
     private final View companion;
+    /** Opens the games played with her; it sits beside her own button. */
+    private final IconButton games;
     private static final String COMPANION = "companion";
     private final View[] keys = new View[24];
     private final String[] labels = {"mc", "m+", "m−", "mr", "AC", "⌫", "+/−", "÷",
@@ -116,6 +118,10 @@ public final class CalculatorLayout extends ViewGroup {
         companion.setContentDescription("Halgakos companion");
         companion.setOnClickListener(v -> listener.onTool(COMPANION));
         addView(companion);
+        games = new IconButton(context, "games", INK);
+        games.setContentDescription("Play with Halgakos");
+        games.setOnClickListener(v -> listener.onTool("games"));
+        addView(games);
         String[] spoken = {"Memory clear", "Memory add", "Memory subtract", "Memory recall", "All clear", "Backspace", "Change sign", "Divide",
                 "7", "8", "9", "Multiply", "4", "5", "6", "Subtract", "1", "2", "3", "Add", "Percent", "0", "Decimal point", "Equals"};
         for (int i = 0; i < labels.length; i++) {
@@ -293,6 +299,7 @@ public final class CalculatorLayout extends ViewGroup {
             }
         }
         for (int i = 0; i < tools.length; i++) ((IconButton) tools[i]).setColor(i < 2 ? (enabled ? 0xFFE5E7E7 : INK) : (enabled ? 0xFF9CA2A6 : MUTED));
+        games.setColor(enabled ? 0xFFE5E7E7 : INK);
     }
 
     /** Fully rounded ends: a circle when square, a pill when a key is wider than it is tall. */
@@ -340,6 +347,7 @@ public final class CalculatorLayout extends ViewGroup {
         int touchSize = Math.round(Math.max(48 * getResources().getDisplayMetrics().density, w * .092f));
         for (View tool : tools) tool.measure(exact(touchSize), exact(touchSize));
         companion.measure(exact(touchSize), exact(touchSize));
+        games.measure(exact(touchSize), exact(touchSize));
         // Text keeps its full size; lines longer than the display are swiped sideways instead.
         int lineWidth = Math.round(spanWidth - w * .12f);
         // While a calculation is entered, the caret's room comes out of the line. A caret placed
@@ -405,6 +413,7 @@ public final class CalculatorLayout extends ViewGroup {
             float toolY = top + toolRowY(h, touch);
             for (int i = 2; i < tools.length; i++) center(tools[i], start + w * .11f + (i - 2) * toolStep, toolY);
             center(companion, start + w * .89f - toolStep * 2, toolY);
+            center(games, start + w * .89f - toolStep * 3, toolY);
             center(tools[0], start + w * .89f - toolStep, toolY);
             center(tools[1], start + w * .89f, toolY);
             float lineStep = expression.getMeasuredHeight() + lineGap();
@@ -429,6 +438,7 @@ public final class CalculatorLayout extends ViewGroup {
         place(result, x + w * .072f, utilityY - w * (completed ? .285f : .215f));
         float headerY = top + Math.max(w * .077f, (expressionY - top) * .46f) + w * .024f;
         center(companion, x + spanWidth - w * .339f, headerY);
+        center(games, x + spanWidth - w * .471f, headerY);
         center(tools[0], x + spanWidth - w * .207f, headerY);
         center(tools[1], x + spanWidth - w * .075f, headerY);
         finishDisplayLayout(changed);
@@ -963,6 +973,11 @@ public final class CalculatorLayout extends ViewGroup {
                     path.moveTo(8, 5); path.lineTo(22, 5); path.lineTo(22, 19); path.lineTo(8, 19); path.lineTo(1, 12); path.close();
                     canvas.drawPath(path, paint);
                     canvas.drawLine(11, 8, 18, 16, paint); canvas.drawLine(18, 8, 11, 16, paint); break;
+                case "games":
+                    // A game pad: its body, the cross on its left, two buttons on its right.
+                    bounds.set(1.5f, 6.5f, 22.5f, 18.5f); canvas.drawRoundRect(bounds, 5.5f, 5.5f, paint);
+                    canvas.drawLine(5.5f, 12.5f, 10.5f, 12.5f, paint); canvas.drawLine(8, 10, 8, 15, paint);
+                    paint.setStyle(Paint.Style.FILL); canvas.drawCircle(15.2f, 14, 1.3f, paint); canvas.drawCircle(18.6f, 11, 1.3f, paint); break;
                 case "fullscreen":
                     canvas.drawLine(3, 13, 11, 13, paint); canvas.drawLine(11, 13, 11, 21, paint);
                     canvas.drawLine(14, 2, 14, 10, paint); canvas.drawLine(14, 10, 22, 10, paint); break;
