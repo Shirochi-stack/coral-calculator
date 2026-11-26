@@ -69,11 +69,25 @@ final class RunLevels {
         return number % 3 == 0 ? CELLAR : number % 3 == 2 ? other ? CAKES : ROOM : other ? TIME : LETTER;
     }
 
+    /**
+     * What doing what is asked pays, the first time in a land, besides its seal: a purse of
+     * pluses, bigger with every chapter, for the rice cakes; two more shots in every ink gun
+     * for the cellar; treats that last a twentieth longer for the letter; colours ready half
+     * a second sooner for the race; and for the hidden room a white ribbon there and then.
+     * And when everything asked in a chapter is done, a medal: two hundred pluses, and her
+     * colours ready a second sooner.
+     */
+    static final int PURSE = 1, SHOTS = 2, LASTING = 3, QUICKER = 4, RIBBON = 5;
+
+    static int questPrize(int quest) { return quest == CAKES ? PURSE : quest == CELLAR ? SHOTS : quest == LETTER ? LASTING : quest == TIME ? QUICKER : RIBBON; }
+
     /** Who asks it. */
     static int giverOf(int quest) {
         return quest == CAKES ? BOKSUN : quest == CELLAR ? INJU : quest == LETTER ? SOMI : quest == TIME ? TTOSUN : GALPI;
     }
     static final int STASH = 0, PASSAGE = 1, ARENA = 2, GAME = 3;
+    /** And a range, where paper targets hang in the air and an ink gun that does not run dry is put in her hands for twelve seconds. */
+    static final int RANGE = 4;
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
@@ -100,9 +114,11 @@ final class RunLevels {
      * Jupan with her abacus, Sumbi the diver, the Brake Pads, and the Straight-Ahead Party.
      */
     static final int GUARD = 20, BUTLER = 21, BYEORU = 22, JUPAN = 23, SUMBI = 24, PADS = 25, PARTY = 26;
+    /** The Old Book, who sleeps at the bottom of some cellars and is woken by whoever clears them; and a paper target, which is no one. */
+    static final int OLD_BOOK = 27, TARGET = 28;
     static final int GUARD_LAND = 6, BUTLER_LAND = 12;
 
-    static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE; }
+    static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE && kind != TARGET; }
 
     /** Who waits at the end of a land, or -1: for the twins, Miri. */
     static int bossOf(int number) {
@@ -569,9 +585,12 @@ final class RunLevels {
         private boolean inVillage;
 
         /** A door in the land, where the ground is being laid now, to a place of a kind. */
-        int[] door(int kind, int column, boolean hidden) {
-            level.land[floor - 1][column] = ENTRY;
-            int[] want = {kind, column, floor, hidden ? 1 : 0, column, floor};
+        int[] door(int kind, int column, boolean hidden) { return door(kind, column, hidden ? 1 : 0, floor); }
+
+        /** The same, standing on something at a row of its own: hidden behind a crack (1), or up out of the way (2), or plain. */
+        int[] door(int kind, int column, int hidden, int row) {
+            level.land[row - 1][column] = ENTRY;
+            int[] want = {kind, column, row, hidden, column, row};
             wanted.add(want);
             return want;
         }
@@ -585,11 +604,18 @@ final class RunLevels {
         void before(boolean gallery, int column) {
             int number = level.number;
             if (gallery) {
-                if (number % 3 == 1 && passage == null && !has(PASSAGE)) passage = door(PASSAGE, column, true);
+                // In two lands of three, a crack by the ink gun with a passage behind it.
+                if (number % 3 != 2 && passage == null && !has(PASSAGE)) passage = door(PASSAGE, column, true);
             } else if (number % 3 == 0) {
                 if (!has(ARENA)) door(ARENA, column, false);
             } else if (number % 3 == 2 && !has(STASH)) {
-                door(STASH, column, true);
+                // A stash: behind a crack in the wall, or, in every other such land, up out of the way, on a ledge of its own over the crowd's.
+                if (number / 3 % 2 == 0) {
+                    door(STASH, column, true);
+                } else {
+                    ledge(column + 6, floor - 5, 2);
+                    door(STASH, column + 6, 2, floor - 5);
+                }
             }
         }
 
@@ -635,7 +661,9 @@ final class RunLevels {
         void rooms() {
             floor = FLOOR;
             for (int[] want : wanted) {
-                int kind = want[0], wide = kind == PASSAGE ? 16 : kind == ARENA ? 14 : kind == GAME ? 12 : 10;
+                // In one cellar in two the Old Book sleeps under the last wave, and it is wider for him.
+                boolean den = want[0] == ARENA && level.number % 6 == 0;
+                int kind = want[0], wide = kind == PASSAGE ? 16 : den ? 18 : kind == ARENA || kind == RANGE ? 14 : kind == GAME ? 12 : 10;
                 wall(2);
                 int from = at, to = from + wide - 1, far = -1;
                 for (int column = from; column <= to; column++) {
@@ -664,10 +692,10 @@ final class RunLevels {
                 } else if (kind == ARENA) {
                     ledge(from + 2, FLOOR - 2, 3);
                     ledge(to - 4, FLOOR - 2, 3);
-                } else {
+                } else if (kind == GAME) {
                     ledge(from + 5, FLOOR - 2, 2);
                 }
-                level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5]});
+                level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], den ? 1 : 0});
             }
         }
 
@@ -852,7 +880,8 @@ final class RunLevels {
                     level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});
                     if (!inVillage) {
                         inVillage = true;
-                        if (level.number >= PLACES_FROM) door(level.number % 2 == 0 ? STASH : GAME, from + 14, false);
+                        // A stash in the even lands; in the odd ones the room where pluses fall and the range by turns.
+                        if (level.number >= PLACES_FROM) door(level.number % 2 == 0 ? STASH : level.number % 4 == 1 ? GAME : RANGE, from + 14, false);
                     }                    break;
                 }
                 case PACK: {

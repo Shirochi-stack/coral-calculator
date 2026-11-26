@@ -17,6 +17,8 @@ import java.util.List;
 final class PlusRun {
     static final int PLAYING = 0, WON = 1, LOST = 2;
     static final int HEARTS = 3;
+    /** How many lives she starts a land with: each is a set of hearts, and the land is lost with the last of them. */
+    static final int LIVES = 3;
     /** Her size, a little narrower than a square and a little taller. */
     static final float WIDE = .6f, TALL = 1.2f;
     /** How many times Zero has to be landed on. */
@@ -76,6 +78,10 @@ final class PlusRun {
     static final int CAKE = 8, DROPOFF = 9;
     /** How what is asked of her stands: not asked yet, being done, done, or not to be done this time. */
     static final int ASKED = 1, DONE = 2, FAILED = 3;
+    /** And handed in: whoever asked it, or whoever it was for, has thanked her and paid her for it. */
+    static final int PAID = 4;
+    /** Why a stall will not sell something: she cannot pay; it has sold what it had of it; she is wearing a colour; or she has no use for it yet. */
+    static final int SOLD = 0, POOR = 1, SOLD_OUT = 2, WORN = 3, NEEDLESS = 4;
     /**
      * Her forms, each from a ribbon of its colour, which is the colour her hair turns. Red
      * throws fire and walks on lava. Blue throws water and swims. Brown knocks over whatever
@@ -89,8 +95,9 @@ final class PlusRun {
 
     /** What she has been given to keep, from one land to the next: she starts with none of it. */
     static final class Perks {
-        /** How many hearts she starts a land with. */
+        /** How many hearts she starts a land with, and how many lives. */
         int hearts = HEARTS;
+        int lives = LIVES;
         /** Her wings carry her a second jump in the air. */
         boolean wings;
         /** From how far a plus comes to her without being touched, in squares. */
@@ -106,10 +113,11 @@ final class PlusRun {
         /**
          * The colours of hair that are hers to keep, as bits, the first for red: any of them
          * she may call on herself, once what she calls on them with has filled again, which
-         * takes this many seconds. And how many times as long any form lasts.
+         * takes this many seconds from the moment the colour she wore is gone. And how many
+         * times as long any form lasts.
          */
         int colours;
-        float recharge = 18, formLonger = 1;
+        float recharge = 10, formLonger = 1;
     }
     static final int GUN_SHOTS = 16;
     /** How long a swing of the brush or the sword lasts. */
@@ -124,11 +132,11 @@ final class PlusRun {
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
     private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
-            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f};
+            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0};
     private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
-            .9f, .8f, .8f, .9f, .9f, 1.6f, 2};
+            .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f};
     private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
-            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f};
+            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f};
     /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
     private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
@@ -210,7 +218,16 @@ final class PlusRun {
     private int entered, reveals, roomWins, wave, caught, dice = 12345;
     private float gameLeft, sinceDrop;
     private boolean quitting;
+    private int heldWeapon = UNARMED, heldRounds, woken, bursts;
+    /** In the range, with its gun in her hands; and called on in black, a shadow that nothing touches. */
+    private boolean ranging, shadow;
     private int quest, cakes, questGiven, questsDone, questFails, questFlags;
+    /** Where whoever asked it stands; how many times it has been handed in, and she has been reminded of it; and whether she has been away from whoever asked. */
+    private int questColumn = -1, questRow, questsPaid, reminders;
+    private boolean questAway;
+    /** The stall she is at, by its column, and what each stall has sold of each thing it sells. */
+    private int stallAt = -1;
+    private final java.util.Map<Integer, Integer> stallSold = new java.util.HashMap<>();
     /** How full what she calls a colour on with is, from nothing to 1; and how many times she has. */
     private float charge = 1;
     private int called;
@@ -229,14 +246,19 @@ final class PlusRun {
     private int weapon = UNARMED, rounds, swungWith = UNARMED;
     private float sinceStrike = 1, swing;
     private boolean strikeHeld;
-    private int strikes, picked, thrown, turned;
+    private int strikes, picked, thrown, turned, casts;
     private float x, y, speedAcross, speedDown;
     private float startX, startY;
     private boolean onGround, facingLeft, jumpHeld;
     /** She is in the air off a spring, and stays so until she lands. */
     private boolean sprung;
     private float sinceGround = 1, sinceJump = 1, safe;
-    private int hearts = HEARTS, state = PLAYING;
+    /** Her hearts, counted in halves; her lives; and how many of those she has lost here. */
+    private int halves = HEARTS * 2, lives = LIVES, livesLost, state = PLAYING;
+    /** The last firm ground she stood on, where a fall puts her back; how much longer she flinches from a hurt, and which way it sent her. */
+    private float firmX, firmY, flinch, knock;
+    private float sinceCast = 1, sinceBrace = 1, braceX, braceY;
+    private int braces;
     private float time;
     /** Counts that only go up, for whoever shows the game to tell what has just happened. */
     private int collected, flattened, hurts, jumps, landings, springs, flagsPassed, blows;
@@ -249,7 +271,8 @@ final class PlusRun {
     PlusRun(RunLevels.Level level, Perks perks) {
         this.level = level;
         this.perks = perks;
-        hearts = perks.hearts;
+        halves = perks.hearts * 2;
+        lives = perks.lives;
         columns = level.columns;
         pluses.addAll(level.pluses);
         arms.addAll(level.weapons);
@@ -281,6 +304,8 @@ final class PlusRun {
         startY = RunLevels.FLOOR - TALL;
         x = startX;
         y = startY;
+        firmX = x;
+        firmY = y;
     }
 
     private PlusRun(PlusRun other) {
@@ -332,6 +357,12 @@ final class PlusRun {
         gameLeft = other.gameLeft;
         sinceDrop = other.sinceDrop;
         quitting = other.quitting;
+        heldWeapon = other.heldWeapon;
+        heldRounds = other.heldRounds;
+        woken = other.woken;
+        bursts = other.bursts;
+        ranging = other.ranging;
+        shadow = other.shadow;
         quest = other.quest;
         charge = other.charge;
         called = other.called;
@@ -340,6 +371,13 @@ final class PlusRun {
         questsDone = other.questsDone;
         questFails = other.questFails;
         questFlags = other.questFlags;
+        questColumn = other.questColumn;
+        questRow = other.questRow;
+        questsPaid = other.questsPaid;
+        reminders = other.reminders;
+        questAway = other.questAway;
+        stallAt = other.stallAt;
+        stallSold.putAll(other.stallSold);
         questLeft = other.questLeft;
         greeted.addAll(other.greeted);
         locked = other.locked;
@@ -410,6 +448,7 @@ final class PlusRun {
         picked = other.picked;
         thrown = other.thrown;
         turned = other.turned;
+        casts = other.casts;
         x = other.x;
         y = other.y;
         speedAcross = other.speedAcross;
@@ -423,7 +462,16 @@ final class PlusRun {
         sinceGround = other.sinceGround;
         sinceJump = other.sinceJump;
         safe = other.safe;
-        hearts = other.hearts;
+        halves = other.halves;
+        lives = other.lives;
+        livesLost = other.livesLost;
+        firmX = other.firmX;
+        firmY = other.firmY;
+        flinch = other.flinch;
+        knock = other.knock;
+        sinceCast = other.sinceCast;
+        sinceBrace = other.sinceBrace;
+        braces = other.braces;
         state = other.state;
         time = other.time;
         collected = other.collected;
@@ -500,6 +548,8 @@ final class PlusRun {
     int swings() { return swings; }
     /** What last hurt her. */
     int cause() { return cause; }
+    /** How many times she has thrown the fire or the water of a colour: a count that only goes up. */
+    int casts() { return casts; }
     /** Who held out the last thing she took, as {@link RunLevels} numbers them: 0 if it lay about. */
     int giver() { return giver; }
     /** Whether she stands at a stall; what she has to spend there, which is what she has collected in this land less what she has spent; and what she has spent. */
@@ -509,10 +559,33 @@ final class PlusRun {
     int purse() { return collected + bonus - spent; }
     int spent() { return spent; }
 
-    /** Buys something at a stall for some of what she has collected: it is hers at once, as if she had picked it up. Returns whether she could pay. */
+    /** How many of a thing one stall has to sell: a ribbon, one; a ball of ink, one; bread and ice cream, two. */
+    static int stock(int kind) { return kind > FORM || kind == SHIELD ? 1 : 2; }
+
+    /**
+     * Whether the stall she is at will sell her something, and if not, why not. Each stall
+     * has only so many of a thing, and the next stall has its own. A ribbon is not sold
+     * while she wears a colour, so that a colour always ends; nor bread while her hearts
+     * are full, a ball of ink while she has one, or ice cream while she is full of it.
+     */
+    int refusal(int kind, int cost) {
+        if (stallSold(kind) >= stock(kind)) return SOLD_OUT;
+        if (kind > FORM && coloured()) return WORN;
+        if (kind == BREAD && halves >= perks.hearts * 2 || kind == SHIELD && shield || kind == ICE && rush > 0) return NEEDLESS;
+        return purse() < cost ? POOR : SOLD;
+    }
+
+    /** How many of a thing the stall she is at has sold. */
+    int stallSold(int kind) {
+        Integer sold = stallSold.get(stallAt * 64 + Math.min(kind, FORM + 1));
+        return sold == null ? 0 : sold;
+    }
+
+    /** Buys something at a stall for some of what she has collected: it is hers at once, as if she had picked it up. Returns whether it was sold. */
     boolean buy(int kind, int cost) {
-        if (purse() < cost) return false;
+        if (refusal(kind, cost) != SOLD) return false;
         spent += cost;
+        stallSold.put(stallAt * 64 + Math.min(kind, FORM + 1), stallSold(kind) + 1);
         take(kind);
         return true;
     }
@@ -552,7 +625,7 @@ final class PlusRun {
         boolean far;
         if (room < 0) {
             far = one[5] != one[1] && Math.abs(middle - one[5] - .5f) < .8f;
-            if (!far && one[7] != 0 && (revealed & 1 << at) == 0) {
+            if (!far && one[7] == 1 && (revealed & 1 << at) == 0) {
                 revealed |= 1 << at;
                 reveals++;
                 return true;
@@ -566,6 +639,16 @@ final class PlusRun {
                     // The cellar shuts, and the first of the signs are in it.
                     wave = 1;
                     summon(one);
+                } else if (one[0] == RunLevels.RANGE) {
+                    // An ink gun that does not run dry, for twelve seconds; what she carried is hers again after.
+                    gameLeft = 12;
+                    caught = 0;
+                    sinceDrop = 1;
+                    heldWeapon = weapon;
+                    heldRounds = rounds;
+                    ranging = true;
+                    weapon = GUN;
+                    rounds = 999;
                 } else if (one[0] == RunLevels.GAME) {
                     gameLeft = FALLING;
                     caught = 0;
@@ -594,11 +677,28 @@ final class PlusRun {
 
     /** Whether the place she is in is shut until what happens in it is over. */
     boolean sealed() {
-        return room >= 0 && (level.rooms.get(room)[0] == RunLevels.ARENA && wave > 0 || level.rooms.get(room)[0] == RunLevels.GAME && gameLeft > 0);
+        return room >= 0 && (level.rooms.get(room)[0] == RunLevels.ARENA && wave > 0 || level.rooms.get(room)[0] >= RunLevels.GAME && gameLeft > 0);
     }
 
     /** A wave of signs in a cellar: one more in each wave than in the last, spread along it, and a moment before any of them moves. */
     private void summon(int[] one) {
+        if (one[10] != 0 && wave == WAVES) {
+            Foe book = new Foe(RunLevels.OLD_BOOK);
+            book.spawned = true;
+            book.left = health(RunLevels.OLD_BOOK);
+            book.most = book.left;
+            book.x = (one[3] + one[4]) / 2f + 2;
+            book.ground = RunLevels.FLOOR - book.tall();
+            book.y = book.ground;
+            book.home = book.x;
+            book.step = 3;
+            book.act = .5f;
+            // He takes a moment to wake.
+            book.enter = 1.6f;
+            foes.add(book);
+            woken++;
+            return;
+        }
         int count = 2 + wave;
         for (int index = 0; index < count; index++) {
             int kind = level.chapter >= 2 && index % 2 == 1 ? RunLevels.SLIME : RunLevels.MINUS;
@@ -625,12 +725,35 @@ final class PlusRun {
                 summon(one);
                 return;
             }
-            // Cleared: twenty pluses, and a heart if she is short of one.
+            // Cleared: twenty pluses, forty where the Old Book slept, and a heart if she is short of one.
             wave = 0;
             roomsDone |= 1 << room;
             roomWins++;
-            bonus += 20;
-            if (hearts < perks.hearts) hearts++;
+            bonus += one[10] != 0 ? 40 : 20;
+            heal();
+        } else if (one[0] == RunLevels.RANGE && gameLeft > 0) {
+            // Three targets hang at a time; one hit, another is hung somewhere else.
+            int hung = 0;
+            for (Foe foe : foes) if (foe.kind == RunLevels.TARGET && !foe.flat) hung++;
+            if (hung < 3 && (sinceDrop += seconds) > .35f) {
+                sinceDrop = 0;
+                dice = dice * 1103515245 + 12345;
+                Foe target = new Foe(RunLevels.TARGET);
+                target.spawned = true;
+                target.left = 1;
+                target.x = one[3] + 4 + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 6);
+                target.ground = RunLevels.FLOOR - target.tall() - (dice >>> 8) % 4 * .9f;
+                target.y = target.ground;
+                target.home = target.x;
+                foes.add(target);
+            }
+            if ((gameLeft -= seconds) <= 0) {
+                gameLeft = 0;
+                roomsDone |= 1 << room;
+                roomWins++;
+                if (caught >= ENOUGH) bonus += 10;
+                unarm();
+            }
         } else if (one[0] == RunLevels.GAME && gameLeft > 0) {
             if ((sinceDrop += seconds) > .42f) {
                 sinceDrop = 0;
@@ -649,11 +772,21 @@ final class PlusRun {
     }
 
     /** Out of the place she was in, sent back to the flag: it is as it was before she went in, and what was in it with her is gone. */
+    /** The range is over: its targets are gone, and what she carried before it is in her hands again. */
+    private void unarm() {
+        for (Foe foe : foes) if (foe.kind == RunLevels.TARGET) foe.flat = true;
+        if (!ranging) return;
+        ranging = false;
+        weapon = heldWeapon;
+        rounds = heldRounds;
+    }
+
     private void quit() {
         quitting = false;
         room = -1;
         wave = 0;
         gameLeft = 0;
+        unarm();
         if (!locked) for (int index = foes.size() - 1; index >= 0; index--) if (foes.get(index).spawned) foes.remove(index);
     }
 
@@ -705,6 +838,15 @@ final class PlusRun {
     }
     /** Whether a sign can be hurt just now: those who wait at the end, only while they are spent after something they have done. */
     boolean open(Foe foe) { return !RunLevels.boss(foe.kind) || foe.step == 2 && !absent(foe); }
+    /**
+     * How one of those who wait stands toward a blow just now: bare, when one would land;
+     * shielded, when it would be turned aside; reeling, for the moment after one has landed,
+     * when nothing more does; and away, while arriving, changing or out of sight, when
+     * nothing touches them at all. And for how much longer they are bare, if they are.
+     */
+    static final int BARE = 0, SHIELDED = 1, REELING = 2, AWAY = 3;
+    int guard(Foe foe) { return foe.flat ? REELING : absent(foe) ? AWAY : !open(foe) ? SHIELDED : foe.dazed > 0 ? REELING : BARE; }
+    float bareLeft(Foe foe) { return RunLevels.boss(foe.kind) && foe.step == 2 ? Math.max(0, foe.act) : 0; }
     /** Whether one of those who wait is not there to be touched: not come yet, arriving, changing, or out of sight. */
     boolean absent(Foe foe) { return foe.away || foe.enter > 0 || foe.flourish > 0 || foe.unseen; }
     /** How much each of those who wait can take. */
@@ -714,15 +856,16 @@ final class PlusRun {
             case RunLevels.TSUBAKIEH:
                 return 6;
             case RunLevels.GOKHAE:
-                return 7;
+                return 8;
             case RunLevels.ZERO:
             case RunLevels.YEOBAEK:
-                return 8;
+                return 9;
             case RunLevels.MIRI:
             case RunLevels.GARI:
                 return 4;
             case RunLevels.GUARD:
             case RunLevels.BUTLER:
+            case RunLevels.OLD_BOOK:
                 return 5;
             case RunLevels.BYEORU:
             case RunLevels.JUPAN:
@@ -731,11 +874,11 @@ final class PlusRun {
             case RunLevels.PADS:
                 return 7;
             case RunLevels.PARTY:
-                return 8;
-            case RunLevels.KING:
                 return 9;
+            case RunLevels.KING:
+                return 11;
             default:
-                return 10;
+                return 12;
         }
     }
     /** How far through the fight one of those who wait is: 0, then 1 once a third of what they can take is gone, then 2. The twins count as one. */
@@ -758,7 +901,8 @@ final class PlusRun {
     float opening() { return opening; }
     /** Whether any of those who wait still stands. */
     boolean standing() {
-        for (Foe foe : foes) if (RunLevels.boss(foe.kind) && !foe.flat) return true;
+        // (Not the Old Book in his cellar: he is no one's gatekeeper.)
+        for (Foe foe : foes) if (RunLevels.boss(foe.kind) && !foe.flat && !foe.spawned) return true;
         return false;
     }
     /**
@@ -794,7 +938,13 @@ final class PlusRun {
     boolean running() { return Math.abs(speedAcross) > .6f; }
     /** Whether she has just been knocked back, and cannot be again for a moment. */
     boolean safe() { return safe > 0; }
-    int hearts() { return hearts; }
+    /** Her hearts: how many she has any of, and the same counted in halves; her lives; and how many of those she has lost in this land. */
+    int hearts() { return (halves + 1) / 2; }
+    int halves() { return halves; }
+    int lives() { return lives; }
+    int livesLost() { return livesLost; }
+    /** Whether she is flinching from a hurt just now. */
+    boolean flinching() { return flinch > 0; }
     int state() { return state; }
     float time() { return time; }
     int total() { return total; }
@@ -830,6 +980,12 @@ final class PlusRun {
         safe = 0;
     }
 
+    /** Puts something in her hands: for checking the rules, and for looking at them. */
+    void arm(int with) {
+        weapon = with;
+        rounds = with == GUN ? perks.shots : 0;
+    }
+
     /** Puts her somewhere, standing still: for checking the rules from a place of one's choosing. */
     void place(float across, float down) {
         x = across;
@@ -860,12 +1016,13 @@ final class PlusRun {
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         time += seconds;
         if (safe > 0) safe -= seconds;
-        if (formLeft > 0 && (formLeft -= seconds) <= 0) form = 0;
+        if (formLeft > 0 && (formLeft -= seconds) <= 0) fade(true);
         if (censored > 0) censored -= seconds;
         if (doorWait > 0) doorWait -= seconds;
         if (offIt > 0) offIt -= seconds;
         sinceShot += seconds;
-        if (charge < 1) charge = Math.min(1, charge + seconds / perks.recharge);
+        // What she calls a colour on with fills only while she wears none: black that was put on her is not one.
+        if (charge < 1 && !coloured()) charge = Math.min(1, charge + seconds / perks.recharge);
         if (leaving) leave();
         if (quitting) quit();
         if (quest == ASKED && level.quest == RunLevels.TIME) asked(seconds);
@@ -916,8 +1073,24 @@ final class PlusRun {
         float wanted = left == right ? 0 : left ? -fast : fast;
         // On slime there is little to push against, and little to stop her.
         float push = (wanted == 0 ? DRAG : onGround ? PUSH : PUSH_IN_AIR) * seconds * (under == RunLevels.SLICK ? .16f : 1);
-        speedAcross = speedAcross < wanted ? Math.min(wanted, speedAcross + push) : Math.max(wanted, speedAcross - push);
+        // Flinching, she goes the way she was sent, whatever is held.
+        if (flinch > 0) flinch -= seconds;
+        else speedAcross = speedAcross < wanted ? Math.min(wanted, speedAcross + push) : Math.max(wanted, speedAcross - push);
         if (wanted != 0) facingLeft = wanted < 0;
+        // Firm ground under both feet, with nothing in it to hurt her, is where a fall will put her back.
+        if (onGround && riding < 0 && under != RunLevels.AIR) {
+            int row = (int) Math.floor(y + TALL + .05f), from = (int) Math.floor(x), to = (int) Math.floor(x + WIDE - .001f);
+            boolean sound = true;
+            for (int column = from; column <= to; column++) {
+                char below = at(column, row), at = at(column, row - 1);
+                sound &= below != RunLevels.LEDGE && solid(below) && below != RunLevels.SLICK && at != RunLevels.SPIKE && at != RunLevels.LAVA
+                        && crumbling(column, row) == 0;
+            }
+            if (sound) {
+                firmX = x;
+                firmY = y;
+            }
+        }
 
         // Up: a press of the button a moment early, or a moment after the edge, still jumps.
         if (sinceJump <= EARLY && sinceGround <= LATE) {
@@ -983,6 +1156,7 @@ final class PlusRun {
             if (item[0] == STALL) {
                 if (x < item[1] + 2.2f && x + WIDE > item[1] - 1.2f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                     atStall = true;
+                    stallAt = item[1];
                     if (greeted.add(item[1])) greetings++;
                 }
                 continue;
@@ -1006,16 +1180,27 @@ final class PlusRun {
                 giver = item[3];
                 take(item[0]);
                 // Whoever has something to ask of her asks it as she hands over what she holds.
-                if (quest == 0 && level.quest != 0 && item[3] == RunLevels.giverOf(level.quest)) ask();
+                if (quest == 0 && level.quest != 0 && item[3] == RunLevels.giverOf(level.quest)) {
+                    questColumn = item[1];
+                    questRow = item[2];
+                    ask();
+                }
             }
         }
         // A press of the button uses it, once it has rested; the ink gun goes on for as long as the button is held.
         sinceStrike += seconds;
         if (swing > 0) swing -= seconds;
-        // In black nothing she carries is any use to her; in red and in blue the button throws fire and water.
-        if (form == BLACK) swing = 0;
-        else if ((has(RED) || has(BLUE)) && strike && !strikeHeld && sinceStrike >= .32f) cast();
-        else if (weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= REST[weapon]) use();
+        // In black nothing she carries is any use to her. In red and in blue the button throws fire and water, and whatever she
+        // carries is used as well: the one is never lost to the other.
+        sinceCast += seconds;
+        sinceBrace += seconds;
+        if (form == BLACK) {
+            swing = 0;
+        } else {
+            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= REST[weapon];
+            if (used) use();
+            if ((has(RED) || has(BLUE)) && strike && (!strikeHeld || used) && sinceCast >= .32f) cast();
+        }
         strikeHeld = strike;
         // What she is standing in: a spring throws her up, and spikes cost a heart.
         int feetRow = (int) Math.floor(y + TALL - .05f);
@@ -1059,13 +1244,22 @@ final class PlusRun {
         if (fly(seconds)) return;
         for (Foe foe : foes) {
             // Whoever is arriving, changing or out of sight is not there to be touched.
-            if (foe.flat || absent(foe) || x >= foe.x + foe.wide() || x + WIDE <= foe.x || y >= foe.y + foe.tall() || y + TALL <= foe.y) continue;
+            if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || x >= foe.x + foe.wide() || x + WIDE <= foe.x || y >= foe.y + foe.tall()
+                    || y + TALL <= foe.y) continue;
             // Coming down onto a sign deals with it and sends her up again; any other touch knocks her back.
             // A times has a spike on every arm and cannot be landed on at all.
             boolean onto = speedDown > 0 && y + TALL - speedDown * seconds <= foe.y + foe.tall() * .6f;
             if (notes > 0 || has(BROWN)) {
-                // With the notes about her, or in brown, whatever she touches is dealt with.
-                if (foe.dazed <= 0) beat(foe);
+                // With the notes about her, or in brown, whatever she touches is dealt with; one of those who wait, unless spent, only stops against her.
+                if (RunLevels.boss(foe.kind) && !open(foe) && has(BROWN)) {
+                    braced(foe.x + foe.wide() / 2);
+                } else if (has(BROWN) && !RunLevels.boss(foe.kind)) {
+                    // Any sign, from any side, spikes and all, and however much it can take.
+                    foe.left = 1;
+                    beat(foe);
+                } else if (foe.dazed <= 0) {
+                    beat(foe);
+                }
             } else if (onto && foe.kind != RunLevels.TIMES && foe.dazed <= 0) {
                 speedDown = -BOUNCE;
                 airJumps = 0;
@@ -1079,6 +1273,7 @@ final class PlusRun {
                 }
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
+                knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
                 if (hurt(false)) return;
             }
         }
@@ -1097,7 +1292,7 @@ final class PlusRun {
                 startX = flag + (1 - WIDE) / 2;
                 startY = Math.max(0, RunLevels.top(level, flag)) - TALL;
                 flagsPassed++;
-                if (perks.flagHeart && hearts < perks.hearts) hearts++;
+                if (perks.flagHeart) heal();
             }
         }
         if (middle >= level.gate && middle < level.main && gateOpen()) state = WON;
@@ -1109,8 +1304,9 @@ final class PlusRun {
      * Returns whether she could.
      */
     boolean call(int colour) {
-        if (state != PLAYING || colour < RED || colour > WHITE || (perks.colours & 1 << colour - 1) == 0 || charge < 1) return false;
-        charge = 0;
+        if (state != PLAYING || colour < RED || colour > WHITE || (perks.colours & 1 << colour - 1) == 0 || charge < 1 || coloured()) return false;
+        // Black, which is the Mawang's, costs twice the wait when it is over: for it she is a shadow that nothing can touch, and it ends in a burst.
+        shadow = colour == BLACK;
         form = colour;
         formLeft = (colour == BLACK ? 5 : 9) * perks.lasting * perks.formLonger;
         formed++;
@@ -1118,8 +1314,64 @@ final class PlusRun {
         return true;
     }
 
+    /** A colour is given her there and then, to keep: her hair turns to it at once, and it is hers to call on from now. */
+    void gift(int colour) {
+        perks.colours |= 1 << colour - 1;
+        wear(colour, 9 * perks.lasting * perks.formLonger);
+    }
+
+    /** Whether she wears a colour: black that was put on her, which is no use to her, does not count. */
+    boolean coloured() { return form != 0 && (form != BLACK || shadow); }
+
+    /**
+     * The colour she wears is gone, however that came about, and only now does the wait to
+     * call on another begin, from empty: twice over after the shadow, which also goes in a
+     * burst when it has run its time.
+     */
+    private void fade(boolean ran) {
+        if (coloured()) charge = shadow ? -1 : 0;
+        if (shadow && ran) burst();
+        shadow = false;
+        form = 0;
+        formLeft = 0;
+    }
+
+    /** Her hair turns to a colour, by a ribbon or by being given it or by having it put on her: whatever she wore before is gone. */
+    private void wear(int colour, float lasts) {
+        fade(false);
+        form = colour;
+        formLeft = lasts;
+        formed++;
+    }
+
+    /** How long it will be before she can call on a colour again, in seconds, once she wears none. */
+    float untilCall() { return Math.max(0, 1 - charge) * perks.recharge; }
+
+    /** A ribbon's worth of a colour that is not hers: her hair turns to it for as long as a ribbon lasts. */
+    void lend(int colour) { take(FORM + colour); }
+
+    /** The shadow passes: every sign near her, but those who wait, goes over, and whatever was in the air near her is gone. */
+    private void burst() {
+        bursts++;
+        float middle = x + WIDE / 2;
+        for (Foe foe : foes) {
+            if (foe.flat || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || Math.abs(foe.x + foe.wide() / 2 - middle) > 4.5f
+                    || Math.abs(foe.y - y) > 4) continue;
+            foe.flat = true;
+            foe.y = foe.ground;
+            foe.act = 0;
+            flattened++;
+        }
+        for (Shot shot : shots) if (!shot.hers && Math.abs(shot.x - middle) < 6) shot.left = 0;
+    }
+
+    /** Whether she is a shadow; how many times one has passed in a burst; and how many times the Old Book has been woken. */
+    boolean shadow() { return shadow; }
+    int bursts() { return bursts; }
+    int woken() { return woken; }
+
     /** How full what she calls a colour on with is, and how many times she has called on one. */
-    float charge() { return charge; }
+    float charge() { return Math.max(0, charge); }
     int called() { return called; }
 
     /** Something is asked of her: if it is done already it is done; a count begins if it is against one. */
@@ -1139,6 +1391,16 @@ final class PlusRun {
 
     /** How what is asked stands is looked at again: a cellar cleared, the room behind the crack found, the flag reached or the count run out. */
     private void asked(float seconds) {
+        // Back with whoever asked it: done, it is handed in; not yet done, she is reminded of it, each time she comes back from somewhere else.
+        if (quest == DONE && byGiver() && state == PLAYING) pay();
+        if (quest == ASKED) {
+            boolean by = byGiver();
+            if (!by && questColumn >= 0 && Math.abs(x - questColumn) > 6) questAway = true;
+            if (by && questAway) {
+                questAway = false;
+                reminders++;
+            }
+        }
         if (quest != ASKED) return;
         if (level.quest == RunLevels.CELLAR || level.quest == RunLevels.ROOM) {
             for (int index = 0; index < level.rooms.size(); index++) {
@@ -1155,13 +1417,49 @@ final class PlusRun {
         }
     }
 
-    /** It is done: fifteen pluses, and a heart if she is short of one. */
+    /**
+     * It is done, and is now to be handed in: to whoever asked it, by going back to her;
+     * or, if she does not go back, when the land is over. A letter is handed to whoever it
+     * was for, there and then; and whoever counted a race has run after her, and is there.
+     */
     private void done() {
         quest = DONE;
         questsDone++;
         questLeft = 0;
+        if (level.quest == RunLevels.LETTER || level.quest == RunLevels.TIME) pay();
+    }
+
+    /** It is handed in: fifteen pluses, and a heart if she is short of one. */
+    private void pay() {
+        quest = PAID;
+        questsPaid++;
         bonus += 15;
-        if (hearts < perks.hearts) hearts++;
+        heal();
+    }
+
+    /** The land is over, or she is leaving it: what was done and not handed in is handed in now, so that nothing earned is lost. Returns whether there was anything. */
+    boolean settle() {
+        if (quest != DONE) return false;
+        pay();
+        return true;
+    }
+
+    /** Whether she is by whoever asked something of her. */
+    private boolean byGiver() {
+        return questColumn >= 0 && room < 0 && x < questColumn + 2.6f && x + WIDE > questColumn - .6f && Math.abs(y + TALL - questRow - 1) < 1.6f;
+    }
+
+    /** Where whoever asked something of her stands, the column and the row; how many times something has been handed in; and how many times she has come back to be reminded of it. */
+    int questColumn() { return questColumn; }
+    int questRow() { return questRow; }
+    int questsPaid() { return questsPaid; }
+    int reminders() { return reminders; }
+
+    /** A heart back, if she is short of one: a whole one, or as much of one as she is short of. */
+    private boolean heal() {
+        if (halves >= perks.hearts * 2) return false;
+        halves = Math.min(perks.hearts * 2, halves + 2);
+        return true;
     }
 
     private void fail() {
@@ -1182,8 +1480,7 @@ final class PlusRun {
     private void take(int kind) {
         if (kind == BREAD) {
             // Bread she has no need of is worth three pluses.
-            if (hearts < perks.hearts) hearts++;
-            else bonus += 3;
+            if (!heal()) bonus += 3;
         } else if (kind == SHIELD) {
             shield = true;
             inkLeft = perks.inkHurts;
@@ -1196,9 +1493,8 @@ final class PlusRun {
             }
             cleared++;
         } else if (kind > FORM) {
-            form = kind - FORM;
-            formLeft = form == BLACK ? 7 : (form == WHITE ? 12 : 14) * perks.lasting * perks.formLonger;
-            formed++;
+            int colour = kind - FORM;
+            wear(colour, colour == BLACK ? 7 : (colour == WHITE ? 12 : 14) * perks.lasting * perks.formLonger);
         } else if (kind == ICE) {
             rush = LASTS[ICE] * perks.lasting;
         } else if (kind == MAGNET) {
@@ -1229,8 +1525,13 @@ final class PlusRun {
             foe.y = foe.ground;
             foe.act = 0;
             flattened++;
-            if (waits && !standing()) won();
-            else if (waits && phase(foe) > phase) changed();
+            // A paper target is only hit: two pluses for it.
+            if (foe.kind == RunLevels.TARGET) {
+                caught++;
+                bonus += 2;
+            }
+            if (waits && !foe.spawned && !standing()) won();
+            else if (waits && !foe.spawned && phase(foe) > phase) changed();
             return;
         }
         if (!waits) {
@@ -1245,7 +1546,15 @@ final class PlusRun {
         foe.unseen = false;
         // A chunk of King Slime is gone: he is smaller, and stands where he stood.
         if (foe.kind == RunLevels.KING) resize(foe, foe.size * .93f);
-        if (phase(foe) > phase) changed();
+        if (phase(foe) > phase) {
+            if (foe.spawned) {
+                // The Old Book changes by himself.
+                phases++;
+                foe.flourish = FLOURISH;
+            } else {
+                changed();
+            }
+        }
     }
 
     /** A third of what they can take is gone: they change, which takes a moment, and whatever they had in the air is gone. */
@@ -1286,9 +1595,10 @@ final class PlusRun {
     }
 
     /**
-     * She has been sent back to the flag at the door: the place is as it was before she came
-     * in. Whoever waits is gone again, and has back what they had lost since they last
-     * changed; what they made is gone; and what will do against them lies at the door again.
+     * She has lost a life and been sent back to the flag at the door: the place is as it was
+     * before she came in. Whoever waits is gone again, and has back all they had lost, since
+     * she left; of the twins, one who is down stays down. What they made is gone; and what
+     * will do against them lies at the door again.
      */
     private void leave() {
         leaving = false;
@@ -1300,8 +1610,8 @@ final class PlusRun {
                 continue;
             }
             if (!RunLevels.boss(foe.kind) || foe.flat) continue;
-            if (foe.kind != RunLevels.MIRI && foe.kind != RunLevels.GARI) foe.left = foe.most - (phase(foe) * foe.most + 2) / 3;
-            if (foe.kind == RunLevels.KING) resize(foe, (float) Math.pow(.93f, foe.most - foe.left));
+            foe.left = foe.most;
+            if (foe.kind == RunLevels.KING) resize(foe, 1);
             foe.away = true;
             foe.enter = 0;
             foe.flourish = 0;
@@ -1376,8 +1686,8 @@ final class PlusRun {
 
     /** In red she throws fire, which goes on through whatever it meets, and in blue water, which falls as it flies; in white, both. */
     private void cast() {
-        sinceStrike = 0;
-        strikes++;
+        sinceCast = 0;
+        casts++;
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
         if (has(RED)) shoot(FIRE, true, fromX, fromY, way * 13, 0, .9f);
         if (has(BLUE)) shoot(WATER, true, fromX, fromY - .1f, way * 10, -1.5f, 1.1f);
@@ -1422,7 +1732,9 @@ final class PlusRun {
     private void cut(Foe foe, float reach, int with) {
         float from = foe.leftward ? foe.x - reach : foe.x + foe.wide();
         if (safe <= 0 && x < from + reach && x + WIDE > from && y + TALL > foe.y - .2f && y < foe.y + foe.tall()) {
+            if (braced(foe.x + foe.wide() / 2)) return;
             cause = with;
+            knock = foe.leftward ? -1 : 1;
             hurt(false);
         }
     }
@@ -1431,6 +1743,7 @@ final class PlusRun {
     private void quake(float away, float floor) {
         quakes++;
         if (safe <= 0 && onGround && y + TALL > floor - .2f && away < 2.9f) {
+            if (braced(x + WIDE / 2)) return;
             cause = QUAKED;
             hurt(false);
         }
@@ -1452,7 +1765,7 @@ final class PlusRun {
         }
         for (int index = 0; index < level.rooms.size() && room < 0; index++) {
             int[] one = level.rooms.get(index);
-            if (one[7] != 0 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
+            if (one[7] == 1 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
                 revealed |= 1 << index;
                 reveals++;
             }
@@ -1514,6 +1827,7 @@ final class PlusRun {
                         beat(foe);
                         // One sign after another dealt with by what she throws: each is worth one plus more than the last, up to four.
                         if (foe.flat && !RunLevels.boss(foe.kind)) {
+                            if (foe.kind == RunLevels.TARGET) break;
                             streak = sinceShot < 1.6f ? streak + 1 : 1;
                             sinceShot = 0;
                             if (streak > 1) bonus += Math.min(streak - 1, 4);
@@ -1539,12 +1853,12 @@ final class PlusRun {
                     charmed = CHARM;
                     charms++;
                 } else if (shot.kind == CURSE) {
-                    form = BLACK;
-                    formLeft = 4;
-                    formed++;
+                    if (!shadow) wear(BLACK, 4);
                 } else {
+                    // In brown what is thrown at her still lands, but it costs her half a heart.
                     cause = STRUCK;
-                    if (hurt(false)) return true;
+                    knock = Math.signum(shot.across);
+                    if (hurt(false, has(BROWN) ? 1 : 2)) return true;
                 }
             }
         }
@@ -1552,12 +1866,41 @@ final class PlusRun {
     }
 
     /**
-     * She is hurt, by something or by a fall, and comes back at the last flag with a heart
-     * the fewer. The notes keep her from everything but a fall, and a ball of ink takes one
-     * hurt for her. Returns whether anything came of it.
+     * In brown, and in white, nothing that reaches her by touch or from arm's length hurts
+     * her: a body, a swing, a slam. It is turned aside, where it met her. Returns whether it was.
      */
-    private boolean hurt(boolean fell) {
-        if (!fell && notes > 0) return false;
+    private boolean braced(float from) {
+        if (!has(BROWN)) return false;
+        if (sinceBrace > .4f) {
+            sinceBrace = 0;
+            braces++;
+            float middle = x + WIDE / 2;
+            braceX = middle + Math.max(-.6f, Math.min(.6f, from - middle));
+            braceY = y + TALL * .5f;
+        }
+        return true;
+    }
+
+    /** How many times something has been turned aside by her in brown, a count that only goes up; and where the last was. */
+    int braces() { return braces; }
+    float braceX() { return braceX; }
+    float braceY() { return braceY; }
+
+    /** She is hurt, by something or by a fall, and it costs her a heart. */
+    private boolean hurt(boolean fell) { return hurt(fell, 2); }
+
+    /**
+     * She is hurt, by something or by a fall, and it costs her hearts, counted in halves, and
+     * nothing else: she flinches, a step back from whatever it was, cannot be hurt again for
+     * a moment, and goes on from where she is; whoever she was fighting keeps what they had.
+     * A fall puts her back on the last firm ground she stood on. When her hearts are gone she
+     * loses a life: she comes back at the last flag with her hearts full again, and a place
+     * where someone waits, or a place off the land, is as it was before she came in. When her
+     * lives are gone the land is lost. The notes keep her from everything but a fall, and a
+     * ball of ink takes one hurt for her. Returns whether anything came of it.
+     */
+    private boolean hurt(boolean fell, int costs) {
+        if (!fell && (notes > 0 || shadow)) return false;
         if (shield) {
             if (--inkLeft <= 0) shield = false;
             spared++;
@@ -1568,25 +1911,63 @@ final class PlusRun {
             hurts++;
             // A letter that has been through a hurt is not one to hand over.
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
-            if (--hearts <= 0) {
+            halves -= costs;
+        }
+        safe = SAFE;
+        if (halves <= 0) {
+            halves = 0;
+            if (--lives <= 0) {
+                lives = 0;
                 state = LOST;
                 return true;
             }
+            livesLost++;
+            halves = perks.hearts * 2;
+            fade(false);
+            // Whatever was in the air is gone by the time she is back.
+            shots.clear();
+            swing = 0;
+            charmed = 0;
+            riding = -1;
+            wet = false;
+            x = startX;
+            y = startY;
+            firmX = x;
+            firmY = y;
+            speedAcross = 0;
+            speedDown = 0;
+            flinch = 0;
+            // Out of the place where someone waits, it is as it was before she came in; and so is a place off the land.
+            if (locked) leaving = true;
+            if (room >= 0) quitting = true;
+            return true;
         }
-        // Whatever was in the air is gone by the time she is back.
-        shots.clear();
-        swing = 0;
-        charmed = 0;
-        riding = -1;
-        wet = false;
-        x = startX;
-        y = startY;
-        speedAcross = 0;
-        speedDown = 0;
-        safe = SAFE;
-        // Out of the place where someone waits, it is as it was before she came in; and so is a place off the land.
-        if (locked) leaving = true;
-        if (room >= 0) quitting = true;
+        if (fell) {
+            // Back onto the last firm ground: or, if that has gone from under where she stood, to the flag.
+            boolean holds = false;
+            for (int column = (int) Math.floor(firmX); column <= (int) Math.floor(firmX + WIDE - .001f); column++) {
+                holds |= firm(at(column, (int) Math.floor(firmY + TALL + .05f)));
+            }
+            x = holds ? firmX : startX;
+            y = holds ? firmY : startY;
+            speedAcross = 0;
+            speedDown = 0;
+            swing = 0;
+            riding = -1;
+            wet = false;
+            return true;
+        }
+        // A flinch: a step back from it, if there is ground to step back onto.
+        flinch = .2f;
+        float way = knock != 0 ? knock : speedAcross != 0 ? -Math.signum(speedAcross) : facingLeft ? 1 : -1;
+        knock = 0;
+        int column = (int) Math.floor(x + WIDE / 2 + way * 1.3f), feet = (int) Math.floor(y + TALL + .05f);
+        boolean ground = false;
+        for (int row = feet; row <= feet + 2; row++) {
+            char under = at(column, row);
+            ground |= firm(under) || under == RunLevels.THIN || under == RunLevels.LEDGE;
+        }
+        speedAcross = ground && riding < 0 ? way * 4.5f : 0;
         return true;
     }
 
@@ -1690,7 +2071,7 @@ final class PlusRun {
             foe.act += seconds;
             return;
         }
-        if (foe.away) return;
+        if (foe.away || foe.kind == RunLevels.TARGET) return;
         foe.clock += seconds;
         if (foe.dazed > 0) {
             foe.dazed -= seconds;
@@ -1856,9 +2237,9 @@ final class PlusRun {
     }
 
     /** What each of those who wait does, in order, in each third of the fight: the later thirds bring in more. */
-    private static final int[][][] PATTERNS = new int[27][][];
+    private static final int[][][] PATTERNS = new int[29][][];
     /** How long each of them is spent after something they have done. */
-    private static final float[] WINDOW = new float[27];
+    private static final float[] WINDOW = new float[29];
     static {
         PATTERNS[RunLevels.ILLYA] = new int[][]{{1, 3}, {1, 2, 3}, {4, 2, 1, 3}};
         PATTERNS[RunLevels.TSUBAKIEH] = new int[][]{{1, 2}, {1, 3, 2}, {4, 1, 3, 2}};
@@ -1870,7 +2251,7 @@ final class PlusRun {
         PATTERNS[RunLevels.KING] = new int[][]{{1, 2}, {1, 3, 2}, {4, 3, 1, 2}};
         PATTERNS[RunLevels.MAWANG] = new int[][]{{1, 3, 2}, {1, 5, 3, 4, 2}, {6, 5, 4, 1, 3, 2}};
         // The seven others each do three things: two from the first, the third from the second third of the fight on.
-        for (int kind = RunLevels.GUARD; kind <= RunLevels.PARTY; kind++) {
+        for (int kind = RunLevels.GUARD; kind <= RunLevels.OLD_BOOK; kind++) {
             PATTERNS[kind] = kind == RunLevels.SUMBI ? new int[][]{{2, 1}, {2, 3, 1}, {3, 1, 2, 1}} : new int[][]{{1, 2}, {1, 3, 2}, {3, 2, 1, 2}};
             WINDOW[kind] = kind <= RunLevels.BUTLER ? 1.7f : 1.4f;
         }
@@ -1922,6 +2303,10 @@ final class PlusRun {
         float quick = 1 - .14f * phase, floor = foe.ground + foe.tall(), px = x + WIDE / 2;
         // She keeps to the open: never nearer the ends of her place than this.
         float lo = level.arena >= 0 ? level.arena + 2 : foe.home - 12, hi = level.arena >= 0 ? level.gate - 1.5f - foe.wide() : foe.home + 2.5f;
+        if (foe.spawned && room >= 0) {
+            lo = level.rooms.get(room)[3] + 1;
+            hi = level.rooms.get(room)[4] - foe.wide();
+        }
         if ((foe.act -= seconds) <= 0) {
             int what = foe.kind * 10 + foe.mode;
             if (foe.step == 1) done(foe, what, phase, px, floor);
@@ -2070,8 +2455,7 @@ final class PlusRun {
                 // Anything times nothing is nothing: but only what stands on his floor.
                 if (onGround && y + TALL > floor - .2f) {
                     weapon = UNARMED;
-                    form = 0;
-                    formLeft = 0;
+                    fade(false);
                     rush = 0;
                     magnet = 0;
                     notes = 0;
@@ -2180,7 +2564,7 @@ final class PlusRun {
             case 241:
                 foe.x = Math.max(lo, Math.min(hi, px - foe.wide() / 2));
                 foe.y = foe.ground;
-                if (safe <= 0 && onGround && y + TALL > floor - .2f && Math.abs(px - foe.x - foe.wide() / 2) < 1.1f) {
+                if (safe <= 0 && onGround && y + TALL > floor - .2f && Math.abs(px - foe.x - foe.wide() / 2) < 1.1f && !braced(foe.x + foe.wide() / 2)) {
                     cause = TOUCHED;
                     hurt(false);
                 }
@@ -2209,6 +2593,20 @@ final class PlusRun {
                 return 1;
             case 263:
                 shoot(SHOCK, false, middle, floor - .3f, way * 9, 0, 2.6f);
+                thrown++;
+                return .5f;
+            // The Old Book: three bubbles of a snore, lobbed; a flurry of his pages; and himself slammed shut, which runs both ways along the floor.
+            case 271:
+                for (int which = -1; which <= 1; which++) lob(GLOB, middle, foe.y + .3f, px + which * 2.5f);
+                thrown++;
+                return .5f;
+            case 272:
+                spread(BLADE, middle, foe.y + .5f, phase == 2 ? 5 : 3, .28f, 6.5f, 2.2f);
+                return .4f;
+            case 273:
+                shoot(SHOCK, false, middle, floor - .3f, -7, 0, 1.8f);
+                shoot(SHOCK, false, middle, floor - .3f, 7, 0, 1.8f);
+                quakes++;
                 thrown++;
                 return .5f;
             case 192:
@@ -2358,7 +2756,8 @@ final class PlusRun {
             case RunLevels.JUPAN:
             case RunLevels.SUMBI:
             case RunLevels.PADS:
-            case RunLevels.PARTY: {
+            case RunLevels.PARTY:
+            case RunLevels.OLD_BOOK: {
                 if (foe.step == 0) foe.leftward = toLeft;
                 // Each has a way of going the length of the place, at a pace of her own; Sumbi walks up before she swings.
                 float pace = what == 203 ? 4.5f : what == 212 ? 9 : what == 232 ? 10 : what == 252 || what == 262 ? 11 : 0;

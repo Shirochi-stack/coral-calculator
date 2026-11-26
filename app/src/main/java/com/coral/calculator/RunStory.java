@@ -23,11 +23,11 @@ final class RunStory {
     /** The second volume, which falls on her head as the first did. */
     static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
-    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVX";
+    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZab";
     static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang", "Gokhae", "Miri", "Gari", "Yeobaek",
             "Nuri-yeowang",
             "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul",
-            "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi"};
+            "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi", "The Brake Pads", "The Straight-Ahead Party", "The Old Book"};
 
     private static final String PLAYER = "She is talking to the player who controls her in a platform game, whom she calls Sloppy. ";
 
@@ -432,13 +432,14 @@ final class RunStory {
             {"blow6", "Mm? Ow. I'm up, I'm up.", "Y", "The sleepy swordswoman has just been hit while dozing. Startled awake, groggy, slow."},
             {"blow7", "One chunk off him. Keep cutting Sloppy~♡", "H", PLAYER + "She has just cut a piece off a giant slime. Fierce, pleased." + FAST},
             {"blow8", "...You hit like someone with friends.", "M", "The lonely other self has just been hit, and it stirs something in her. Quiet, surprised, a crack in her coldness."},
-            {"blow9", "Ow! That is a pass mark!", "D", "The little knight has just been hit and has to admit it was a good one. Earnest, startled, loud."},
+            {"blow9", "Ow! That is a pass mark!", "D", "The knight has just been hit and has to admit it was a good one. Earnest, startled, loud."},
             {"blow10", "My nib! Most irregular.", "F", "The fountain-pen butler has just been hit. Affronted, prim, pained."},
             {"blow11", "Oh... that will have to be written down.", "Q", "The quiet scribe has just been hit. Soft, surprised, a little dazed."},
             {"blow12", "That one is going on your bill!", "V", "The merchant girl has just been hit. Indignant, quick, bright."},
             {"blow13", "Bwah! Okay, that was a good one!", "X", "The diver girl has just been hit and laughs it off. Loud, sunny, winded."},
-            {"blow14", "That took some grip off them Sloppy~♡", "H", PLAYER + "She has just landed a hit on the two brake pads. Fierce, pleased." + FAST},
-            {"blow15", "Straight into that one Sloppy~♡", "H", PLAYER + "She has just landed a hit on the three adventurers who only go straight. Smug, pleased." + FAST},
+            {"blow14", "Ow! That's coming out of our lining!", "Z", "The two brake pads have just been hit. Gruff, pained, comic."},
+            {"blow15", "We went straight... into that.", "a", "The swordswoman has just led her party straight into a blow. Winded, sheepish, still proud."},
+            {"blow16", "Oof. Right in the spine.", "b", "The old book has just been hit. Winded, grumbling, grandfatherly."},
     };
     /** What they say as they go at her; King Slime says nothing. */
     static final String[][] AIM_LATER = {
@@ -447,11 +448,14 @@ final class RunStory {
             {"aim5", "Censored.", "K", "The shy twin paints black bars across everything her opponent can see. A whisper, nervous."},
             {"aim6", "Excuse my cut. Mmm.", "Y", "The sleepy swordswoman steps out behind her opponent and swings, half asleep. Drowsy, polite, slow."},
             {"aim8", "Alone is easier.", "M", "The lonely other self throws black feathers at the friend who came for her. Cold, tired, hollow."},
-            {"aim9", "Thrusting. Please step back.", "D", "The little knight warns her opponent before she thrusts her halberd. Earnest, polite, loud."},
+            {"aim9", "Thrusting. Please step back.", "D", "The knight warns the opponent before thrusting the halberd. Earnest, formal, loud."},
             {"aim10", "A small correction, if I may.", "F", "The fountain-pen butler flicks ink at his opponent. Polite, dry."},
             {"aim11", "Noted.", "Q", "The quiet scribe throws a scroll at her opponent. Soft, flat."},
             {"aim12", "Catch! Exact change!", "V", "The merchant girl flings coins at her opponent. Bright, gleeful."},
             {"aim13", "Coming up!", "X", "The diver girl bursts up out of the page under her opponent. Loud, sunny."},
+            {"aim14", "Brakes on!", "Z", "The two brake pads stamp down together. Gruff, loud."},
+            {"aim15", "Don't turn! Never turn!", "a", "The swordswoman charges straight at her opponent. Brash, loud."},
+            {"aim16", "Zzz... bubbles...", "b", "The old book snores bubbles at his opponent, half asleep. Slow, mumbling."},
     };
 
     /**
@@ -486,6 +490,12 @@ final class RunStory {
             {"stall1", "Sold! A pleasure doing sums with you!", "L", "The shopkeeper hands over a purchase and flicks her abacus. Delighted, brisk."},
             {"stall2", "Not enough pluses, dear customer. The land is full of them!", "L",
                     "The shopkeeper cheerfully turns down a customer who cannot pay. Bright, teasing, businesslike."},
+            {"stall3", "Sold out, dear customer! That was the last one. My next stall has more!", "L",
+                    "The shopkeeper shows an empty shelf and points down the road to her next stall. Bright, apologetic, businesslike."},
+            {"stall4", "One colour at a time, dear customer! Wear that one out first!", "L",
+                    "The shopkeeper refuses to sell a hair ribbon to someone already wearing one. Bright, firm, amused."},
+            {"stall5", "You don't need that yet, dear customer. I don't sell what won't be used!", "L",
+                    "The shopkeeper waves away a purchase the customer has no use for. Bright, honest, brisk."},
     };
     /**
      * What is said as each of those who wait arrives, once the way back has shut: Zero,
@@ -511,7 +521,7 @@ final class RunStory {
                     "The lonely other self descends on black wings and takes off her mask to begin the last fight. Tired, low, hollow, slow."},
             // And the seven others, in the order they are numbered: for the Brake Pads and the Straight-Ahead Party she says it.
             {"enter9", "Halt! Guild entrance exam. Three questions, and all of them are halberd.", "D",
-                    "A small knight in full armour blocks the way and announces an entrance exam, halberd in hand. Earnest, loud, young, a little muffled by her helmet."},
+                    "A knight in full armour blocks the way and announces an entrance exam, halberd in hand. Earnest, loud, stern, a little muffled by the helmet."},
             {"enter10", "Good evening. Kindly do not smudge the Archive. I should have to blot you.", "F",
                     "A prim butler who is a living fountain pen bars the way with perfect manners and a faint threat. Polite, dry, unhurried."},
             {"enter11", "The court record says you were never here. I am correcting the land to match.", "Q",
@@ -520,10 +530,12 @@ final class RunStory {
                     "A sly merchant girl with an abacus steps into the way and demands a toll. Bright, quick, grinning, sales patter."},
             {"enter13", "Found you! I dive between the lines for a living. Want to see how deep it goes?", "X",
                     "A cheerful diver girl pops up out of the blank page with a crowbar on her shoulder. Loud, sunny, daring, out of breath."},
-            {"enter14", "Two brake pads in hard hats. Jump when they stamp Sloppy~♡", "H",
-                    PLAYER + "Two living brake pads in hard hats have just clocked in to stop her. Amused, wary, coaching." + FAST},
-            {"enter15", "The Straight-Ahead Party. They only go one way. Don't be in it Sloppy~♡", "H",
-                    PLAYER + "Three adventurers who only ever go straight ahead line up against her. Dry, wary, coaching." + FAST},
+            {"enter14", "Break's over! Nobody gets past us without stopping. Hard hats on!", "Z",
+                    "Two living brake pads in hard hats clock in to stop the heroine, speaking as one. Gruff, cheerful, workmanlike, a little worn out."},
+            {"enter15", "Straight-Ahead Party, forward! We don't do corners!", "a",
+                    "The red-haired swordswoman who leads three adventurers that only ever go straight ahead orders the charge. Brash, loud, proud."},
+            {"enter16", "Mmf... who turned my page? I was in the middle of a nap. A hundred years of it.", "b",
+                    "A very old bearded book, asleep at the bottom of a cellar, wakes up grumbling. Slow, sleepy, grandfatherly, a little cross."},
     };
     /** What is said when each of them changes, at a third and at two thirds of the way: two lines each, in the same order; of the twins, Miri first and then Gari. */
     static final String[][] PHASES = {
@@ -556,8 +568,8 @@ final class RunStory {
                     "The lonely other self, wounded, starts using dark versions of her friend's own powers. Low, tired, bitter, slow."},
             {"phase8b", "Then be ordinary. See how long they stay.", "M",
                     "The lonely other self, nearly beaten, throws a black ribbon that makes her opponent an ordinary girl. Hollow, low, her voice wavering."},
-            {"phase9a", "Second question! It is also halberd, but lower!", "D", "The little knight, hit a few times, announces the next part of her exam. Earnest, loud, flustered."},
-            {"phase9b", "Final question! Forward, march!", "D", "The little knight, nearly beaten, orders herself to charge. Earnest, loud, determined."},
+            {"phase9a", "Second question! It is also halberd, but lower!", "D", "The knight, hit a few times, announces the next part of the exam. Earnest, loud, flustered."},
+            {"phase9b", "Final question! Forward, march!", "D", "The knight, nearly beaten, gives the order to charge. Earnest, loud, determined."},
             {"phase10a", "Permit me to underline that.", "F", "The fountain-pen butler, hit a few times, readies a dash on his nib. Polite, dry, a little sharper."},
             {"phase10b", "This will require my signature.", "F", "The fountain-pen butler, nearly beaten, prepares his finest attack with wounded dignity. Polite, cold, clipped."},
             {"phase11a", "Footnote. See below.", "Q", "The quiet scribe, hit a few times, makes ink fall from above. Soft, flat, precise."},
@@ -566,10 +578,12 @@ final class RunStory {
             {"phase12b", "Final offer! Everything must go!", "V", "The merchant girl, nearly beaten, throws everything she has. Loud, desperate, still selling."},
             {"phase13a", "Deep breath! Going under!", "X", "The diver girl, hit a few times, dives into the page to come up under her opponent. Loud, sunny, daring."},
             {"phase13b", "Net's out! Don't wriggle!", "X", "The diver girl, nearly beaten, throws her net. Loud, breathless, laughing."},
-            {"phase14a", "They're skidding now. Get over them Sloppy~♡", "H", PLAYER + "The two brake pads have started skidding across the arena. Urgent, coaching." + FAST},
-            {"phase14b", "Sparks! They're worn right down Sloppy~♡", "H", PLAYER + "The two brake pads, nearly beaten, are throwing sparks. Fierce, pleased." + FAST},
-            {"phase15a", "Arrows, low and high. Read them Sloppy~♡", "H", PLAYER + "The three adventurers have started shooting arrows at two heights. Focused, coaching." + FAST},
-            {"phase15b", "All three at once. Straight ahead, of course Sloppy~♡", "H", PLAYER + "The three adventurers, nearly beaten, all charge together. Dry, fierce." + FAST},
+            {"phase14a", "Skid marks, coming through!", "Z", "The two brake pads, hit a few times, start skidding across the arena. Gruff, loud, enjoying it."},
+            {"phase14b", "We're worn thin... sparks it is, then!", "Z", "The two brake pads, nearly beaten, throw sparks. Tired, stubborn, gruff."},
+            {"phase15a", "Archer! Low and high! Nobody stops!", "a", "The swordswoman, hit a few times, orders her archer to shoot at two heights. Brash, loud, bossy."},
+            {"phase15b", "All together now! Straight! Ahead!", "a", "The swordswoman, nearly beaten, orders all three to charge at once. Loud, desperate, proud."},
+            {"phase16a", "Now I am awake. Mind the pages.", "b", "The old book, hit a few times, shakes his pages loose. Slow, grumbling, grandfatherly."},
+            {"phase16b", "Very well. I shall close on you.", "b", "The old book, nearly beaten, threatens to slam himself shut. Slow, stern, sleepy still."},
     };
     /** As she goes through a door into a place off the land, by its kind: a stash, a passage, a cellar, a room where pluses fall. */
     static final String[][] ROOMS = {
@@ -581,6 +595,8 @@ final class RunStory {
                     PLAYER + "A cellar door has just slammed shut behind her and enemies are appearing. Alarmed, then bossy." + FAST},
             {"room3", "Pluses are falling from the ceiling. Catch them Sloppy~♡", "H",
                     PLAYER + "She has walked into a room where coins rain from above. Excited, urgent." + FAST},
+            {"room4", "A range. And an ink gun that never runs dry. Stand back Sloppy~♡", "H",
+                    PLAYER + "She has walked into a shooting range and been handed an ink gun with endless shots. Gleeful, trigger-happy." + FAST},
     };
     /** When she comes near a crack with a door behind it; and when a cellar is cleared and when the pluses stop falling. */
     static final String[][] CRACK = {
@@ -591,6 +607,8 @@ final class RunStory {
                     PLAYER + "She has just beaten the last wave of enemies in a sealed cellar. Out of breath, cocky." + FAST},
             {"caught1", "Time. Not bad for one pair of hands Sloppy~♡", "H",
                     PLAYER + "A coin-catching game has just ended. Pleased, a little smug." + FAST},
+            {"ranged1", "Time. Count the holes in them Sloppy~♡", "H",
+                    PLAYER + "A target-shooting game has just ended. Smug, pleased." + FAST},
     };
     /**
      * What is asked of her in a land, said by whoever asks it as she hands over what she
@@ -634,9 +652,49 @@ final class RunStory {
                     PLAYER + "She has just won a lasting upgrade after beating a boss. Smug, pleased, teasing." + FAST},
             {"prize3", "A whole bounty. I'm rich. Don't ask for a share Sloppy~♡", "H",
                     PLAYER + "She has just been paid a big reward of coins. Gleeful, greedy, playful." + FAST},
-            {"prize4", "Tap the ribbon by the arrows and I'll change colour Sloppy~♡", "H",
+            {"prize4", "Tap the ribbon by my weapon and I'll change colour Sloppy~♡", "H",
                     PLAYER + "She explains that her newly won hair colour can be called on with a button. Helpful, bossy, bright." + FAST},
     };
+    /**
+     * What is being said in the villages of the second volume, long before anyone has seen
+     * her: that translations are stopping. Said by whoever stands in a land's second
+     * village, in the order they are numbered from Somi; and by Altteul at her stall in its
+     * last two chapters.
+     */
+    static final String[][] RUMOURS = {
+            {"rumour5", "Did you hear? My favourite series just stopped. Volume four. No notice, no nothing.", "S",
+                    "A cheerful young adventurer girl, for once downcast, passes on bad news about a book series. Bright voice, puzzled, a little sad."},
+            {"rumour6", "Three translations halted this month, mid-volume. The guild has no form for it.", "U",
+                    "The guild's receptionist reports, uneasily, that book translations are stopping. Crisp, polite, troubled underneath."},
+            {"rumour7", "The young ones say a dragon is eating the translators' work. Eat your bread, dear, and don't go near.", "B",
+                    "A kind old baker granny repeats a frightening rumour and fusses over the heroine. Warm, worried, elderly."},
+            {"rumour8", "They call her the Great Translation Killer. Nobody has seen her and come back with the next chapter.", "O",
+                    "A lively guild girl tells a scary rumour, half thrilled and half afraid. Loud, hushed at the end."},
+            {"rumour9", "My bookmarks stay where they are now. The pages after them never come.", "P",
+                    "The quiet bookmark witch says, sadly, that stories are stopping. Soft, dreamy, mournful."},
+            {"rumour10", "Footnote: every series she stops, stops at a name. Somebody's name. I do not know why.", "E",
+                    "The careful leader of the Footnote Party shares a strange detail about the stopped translations. Precise, earnest, uneasy."},
+            {"rumour11", "We heard wings last night! Big ones! And in the morning the bookshop had nothing new.", "A",
+                    "A playful cat-eared girl reports something frightening as if it were gossip. High, quick, wide-eyed."},
+            {"rumour12", "Stopped books. Whole shelves of them. Whoever she is, she is angry at something.", "W",
+                    "A blunt, short-spoken smith girl remarks on the stopped translations. Flat, gruff for a girl, thoughtful."},
+            {"rumour13", "Welcome... nothing new in stock, I am afraid. The translations just stopped coming.", "L",
+                    "A thrifty shopkeeper girl, usually brisk, apologises for her empty shelves. Bright voice gone flat and worried."},
+    };
+    /** The first time she calls on black, which is the Mawang's. */
+    static final String[][] SHADOW = {
+            {"shadow1", "Black. For five seconds I'm her shadow, and nothing touches me Sloppy~♡", "H",
+                    PLAYER + "She has just turned into a dark, untouchable shadow of herself using her lonely other self's colour. Low, thrilled, a little eerie." + FAST}};
+    /** When her hearts are gone and it has cost her a life: with lives to spare, and down to the last. */
+    static final String[][] LIFE = {
+            {"life1", "That's a life gone. Back to the flag, hearts full Sloppy~♡", "H",
+                    PLAYER + "She has just lost one of her lives and been set back at the last checkpoint. Winded, annoyed, already getting up again." + FAST},
+            {"life2", "Last life. No more mistakes Sloppy~♡", "H",
+                    PLAYER + "She is down to her very last life. Tense, low, steeling herself." + FAST}};
+    /** The first time she is shut in with someone whose guard is up. */
+    static final String[][] SHIELD = {
+            {"shield1", "See that shield? Nothing lands while it's up. Wait out the attack, then hit Sloppy~♡", "H",
+                    PLAYER + "She is sizing up a boss who is protected by a glowing shield, and working out how to beat her. Sharp, coaching, confident." + FAST}};
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -664,7 +722,7 @@ final class RunStory {
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
-                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES);
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD);
         return groups.toArray(new String[0][][]);
     }
 }
