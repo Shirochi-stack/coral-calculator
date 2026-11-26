@@ -6,7 +6,7 @@ Builds the art of Page brawl from the pictures in assets/fight.
 The pictures were made with an image model (gpt-6-astra, through Glossarion) on transparent
 backgrounds, each fighter drawn from her own non-chibi design sheet of the webtoon:
 
-  * NAME/SHEET.webp are a fighter's frames: thirty sheets of six, three across and two down.
+  * NAME/SHEET.webp are a fighter's frames: twenty-eight sheets of six, three across and two down.
     Eight are of how she moves (idle and guard, walking, walking back, dashing, jumping, being
     hit, going down and getting up, winning and losing) and eight of how she fights (the five
     blows of her quick chain, of her heavy chain, in the air, the smash, her specials, her
@@ -70,11 +70,10 @@ SHEETS = [
     ("extra", "XS DODGE1 DODGE2 C1 C2 C3", (0,)),
     # Her dodges that go somewhere: back away from the other (its start, its furthest, its end), forward past her, and in the air.
     ("slip", "SLIP_S BDODGE1 BDODGE2 BDODGE3 FDODGE ADODGE", (0,)),
-    # The frames that go between the others, for smoother movement: a breath in six steps; the halves of the walk
-    # forward and of the walk backward, with the guard coming up and a turn half made; the jump's in-betweens; coming
-    # round from a blow and getting up; then for every blow the wind-up before it and the follow-through after it.
-    ("breath", "BR1 BR2 BR3 BR4 BR5 BR6", (0, 1, 2, 3, 4, 5)),
-    ("walk2", "WB1 WB2 WB3 WB4 WB5 WB6", (0, 1, 2, 3, 4, 5)),
+    # The frames that go between two different poses of something that happens once: the guard coming up and a turn half
+    # made; the jump's in-betweens; coming round from a blow and getting up; then for every blow the wind-up before it
+    # and the follow-through after it. There are none for what loops or is held: several drawings of one pose never
+    # agree in their small parts, and swapped quickly they flicker. Standing is one frame, a walk its own six.
     ("back2", "BB1 BB2 BB3 BB4 GUARD_UP TURN2", (0, 1, 2, 3)),
     ("jump2", "J_S PUSH RISE2 TOP2 FALL2 LAND2", (0,)),
     ("hits2", "H_S HIT1R HIT2R STAGGER2 PROP HALF_UP", (0,)),
@@ -89,11 +88,11 @@ SHEETS = [
 ]
 # The sheets of in-betweens, which a fighter may be without: what she had before stands in for them.
 MORE = [sheet for sheet, _, _ in SHEETS[17:]]
-# A frame that is only there to give its sheet her height is not kept.
-DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S".split()
+# A frame that is only there to give its sheet her height is not kept; nor is one that is no longer shown: the other
+# poses of standing, the halves of the walk backward, and the second stagger.
+DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S IDLE2 IDLE3 IDLE4 BB1 BB2 BB3 BB4 STAGGER2".split()
 # An in-between is as tall as the two frames it goes between are, taken together: these are the two, for each frame of a sheet.
 BETWEENS = {
-    "walk2": [(f"WALK{n}", f"WALK{n % 6 + 1}") for n in range(1, 7)],
     "back2": [(f"BACK{n}", f"BACK{n % 4 + 1}") for n in range(1, 5)],
 }
 NAMES = [name for _, names, _ in SHEETS for name in names.split()]
