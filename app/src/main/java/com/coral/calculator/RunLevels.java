@@ -150,16 +150,17 @@ final class RunLevels {
         if (number < POTS_FROM) return;
         Random random = new Random(977L * number + 5);
         int until = (level.arena >= 0 ? level.arena : level.gate) - 12, want = 1 + (number - POTS_FROM) / 15, placed = 0;
-        for (int tries = 0; tries < 80 && placed < want; tries++) {
+        for (int tries = 0; tries < 400 && placed < want; tries++) {
             int column = 40 + random.nextInt(Math.max(1, until - 40)), floor = top(level, column);
             boolean free = floor > 4 && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR
                     && top(level, column - 1) == floor && top(level, column + 1) == floor;
             for (int flag : level.flags) free &= Math.abs(flag - column) > 8;
             for (int[] thing : level.decor) free &= Math.abs(thing[1] - column) > 10;
             for (int[] room : level.rooms) free &= Math.abs(room[1] - column) > 5 && Math.abs(room[5] - column) > 5;
-            for (int[] item : level.items) if (item[1] < level.main) free &= Math.abs(item[1] - column) > (item[0] == PlusRun.INKPOT ? 30 : 6);
+            for (int[] item : level.items) if (item[1] < level.main) free &= Math.abs(item[1] - column) > (item[0] == PlusRun.INKPOT ? 30 : 4);
             for (int[] weapon : level.weapons) free &= Math.abs(weapon[1] - column) > 3;
-            for (int[] foe : level.foes) if (foe[1] < level.main && (rover(foe[0]) || foe[2] == floor - 1)) free &= Math.abs(foe[1] - column) > (rover(foe[0]) ? 14 : 1);
+            // (It may stand among creatures: only not where one of them stands, nor near one met in the middle of the land.)
+            for (int[] foe : level.foes) if (foe[1] < level.main && (rover(foe[0]) || foe[2] == floor - 1)) free &= Math.abs(foe[1] - column) > (rover(foe[0]) ? 14 : 0);
             if (!free) continue;
             level.items.add(new int[]{PlusRun.INKPOT, column, floor - 1, 0, random.nextInt(100)});
             placed++;

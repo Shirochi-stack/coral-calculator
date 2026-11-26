@@ -366,18 +366,29 @@ final class RunGame {
     /** The inside of a stash, a passage or a room for a game, by its look; what stands about in them; and what each look is called. */
     private static final int[] LOOK_ART = {R.drawable.plus_run_room_wine, R.drawable.plus_run_room_maps, R.drawable.plus_run_room_vault, R.drawable.plus_run_room_clock,
             R.drawable.plus_run_room_green, R.drawable.plus_run_room_print, R.drawable.plus_run_room_crystal, R.drawable.plus_run_room_treasure,
-            R.drawable.plus_run_room_pets, R.drawable.plus_run_room_guild, R.drawable.plus_run_room_home, R.drawable.plus_run_room_smithy, R.drawable.plus_run_room_market};
+            R.drawable.plus_run_room_pets, R.drawable.plus_run_room_guild, R.drawable.plus_run_room_home, R.drawable.plus_run_room_smithy, R.drawable.plus_run_room_market,
+            R.drawable.plus_run_room_gacha};
     private static final String[] LOOK_NAMES = {"A wine cellar", "A map room", "A flooded vault", "Inside a clock tower", "A greenhouse", "A printing room", "A crystal cave",
-            "A treasure vault", "The pet shop", "The guild hall", "A home", "The smithy", "The black market"};
+            "A treasure vault", "The pet shop", "The guild hall", "A home", "The smithy", "The black market", "The ribbon gacha"};
+    /**
+     * The ribbon gacha: its building, and its machine as it stands and as it is when it has
+     * blown up; and a roll as it is shown: a capsule comes out and opens. How long ago it
+     * was begun, the chance and the price of it, whether it is still to be opened, and what
+     * came out of it.
+     */
+    private Bitmap gachaHouse, gachaMachine;
+    private float capsuleAge = 9;
+    private int capsuleChance, capsuleCost, capsuleGave, seenPotShots;
+    private boolean capsuleWaits;
     /** The buildings of a village from outside: six of them in a row. */
     private Bitmap town;
     /** Its walls, the boards on top of them, and the light that lies over it. */
     private static final int[] LOOK_WALL = {0xFF3A2430, 0xFF2E2A22, 0xFF1F3A36, 0xFF3A2C24, 0xFF1C2440, 0xFF33241C, 0xFF241C3C, 0xFF35302C,
-            0xFF3A2A1E, 0xFF36261C, 0xFF3A2C22, 0xFF2E2420, 0xFF2A1C34};
+            0xFF3A2A1E, 0xFF36261C, 0xFF3A2C22, 0xFF2E2420, 0xFF2A1C34, 0xFF4A2A36};
     private static final int[] LOOK_CAP = {0xFF9A6A52, 0xFF8A6A44, 0xFF5FA08A, 0xFFC09552, 0xFF5A78B8, 0xFFA8744A, 0xFF9A7AE0, 0xFFD0AC58,
-            0xFFC08A52, 0xFFB8784A, 0xFFC09A6A, 0xFF9A8478, 0xFF8A62B0};
+            0xFFC08A52, 0xFFB8784A, 0xFFC09A6A, 0xFF9A8478, 0xFF8A62B0, 0xFFE08AA0};
     private static final int[] LOOK_LIGHT = {0x16FFB060, 0x0CFFE0A0, 0x2030C8A8, 0x18FFA070, 0x263050B0, 0x10FFC080, 0x24A070FF, 0x16FFD060,
-            0x08FFD090, 0x08FFD090, 0x08FFC890, 0x14FF9040, 0x1C9060E0};
+            0x08FFD090, 0x08FFD090, 0x08FFC890, 0x14FF9040, 0x1C9060E0, 0x0CFFC0D0};
     private Bitmap lookArt, props;
     private int lookOf = -1;
     private int seenKeys, seenLevers, seenPlates, seenShrines;
@@ -772,6 +783,176 @@ final class RunGame {
             }
             speak(RunStory.ROVERS[4], true);
         }
+    }
+
+    // The ribbon gacha
+
+    /**
+     * The machine's handle is turned, if it can be and her pluses stretch to it: the roll
+     * is paid for from what she has to keep, and a capsule comes out, which opens a moment
+     * later. One at a time.
+     */
+    private void crank() {
+        float x = run.x() + PlusRun.WIDE / 2, y = run.y() - .4f;
+        if (capsuleWaits) return;
+        if (!run.canRoll()) {
+            audio.play("no", .5f);
+            pop(x, y, run.gachaBlown() ? "It is in pieces" : run.cursed() > 0 ? "Not while black lies on her" : "It holds nothing she has not had");
+            return;
+        }
+        int cost = run.gachaCost();
+        if (bank() < cost) {
+            audio.play("no", .5f);
+            pop(x, y, "A roll is + " + cost);
+            if (refused <= 0) speak(RunStory.SHOP[2], false);
+            refused = 5;
+            return;
+        }
+        if (session.tally("run_gacha") == 0) speak(RunStory.GACHA[0], true);
+        session.keep("run_bank", bank() - cost);
+        session.keep("run_gacha", session.tally("run_gacha") + 1);
+        capsuleCost = cost;
+        capsuleChance = random.nextInt(1 << 20);
+        // (For looking at it blown up, in a build made for testing: the roll of that number is a black one.)
+        if (BuildConfig.DEBUG && session.tally("run_gacha_black") == run.gachaRolls() + 1) capsuleChance = PlusRun.GACHA_COLOUR * RunLevels.machineOf(number).length;
+        capsuleAge = 0;
+        capsuleWaits = true;
+        audio.play("door", .6f);
+        buzz(false);
+    }
+
+    /**
+     * The capsule opens. A ribbon she has not had from the machine: it is in her hair. One
+     * she has had: half the price of the roll back, in pluses. Every colour the machine
+     * holds: white with them, of the kind that is not mastered. A black one: the machine
+     * blows up. (And if she has walked away from it meanwhile, her pluses back.)
+     */
+    private void opened() {
+        capsuleWaits = false;
+        int whites = run.gachaWhites(), gave = run.roll(capsuleChance);
+        float x = run.x() + PlusRun.WIDE / 2, y = run.y() - .4f;
+        capsuleGave = gave;
+        if (gave == 0) {
+            session.keep("run_bank", bank() + capsuleCost);
+            return;
+        }
+        if (gave == PlusRun.BLACK) {
+            session.keep("run_gacha_boom", session.tally("run_gacha_boom") + 1);
+            audio.play("fall", .9f);
+            audio.play("crumble", .8f);
+            shake = Math.max(shake, .5f);
+            buzz(true);
+            for (int spark = 0; spark < 26; spark++) {
+                double way = random.nextFloat() * Math.PI * 2;
+                bits.add(new float[]{x, y, (float) Math.cos(way) * 8, (float) Math.sin(way) * 8 - 3, .7f, 0});
+            }
+            toast("The machine blew up", "A black ribbon: every ribbon is gone, and black lies on her from when she leaves", 0);
+            speak(RunStory.GACHA[1], true);
+            return;
+        }
+        if (gave < 0) {
+            int back = capsuleCost / 2;
+            session.keep("run_bank", bank() + back);
+            audio.play("buy", .5f);
+            pop(x, y, FORM_NAMES[-gave - 1] + " again: + " + back);
+            flyTo((x - cameraX) * tile, (y - cameraY) * tile, false, 4);
+            return;
+        }
+        audio.play("star", .7f);
+        buzz(true);
+        if (run.gachaWhites() > whites) {
+            session.keep("run_gacha_white", session.tally("run_gacha_white") + 1);
+            toast("Every colour it holds: white", "All of them at once, for a while; not mastered. Its time stands still in here", 0);
+        } else {
+            pop(x, y, "A " + FORM_NAMES[gave - 1].toLowerCase(java.util.Locale.ROOT) + " ribbon");
+        }
+    }
+
+    /**
+     * The machine of the ribbon gacha, on its stand; shaking as its handle is turned, and
+     * in pieces once it has blown up. Over it, what it holds: a ribbon of each colour,
+     * bright if she has had it from the machine, with how likely each is and how likely a
+     * black one. And a capsule, as one comes out: it rolls from the chute, hops, and opens
+     * on what was in it.
+     */
+    private void drawMachine(Canvas canvas, int[] item) {
+        if (gachaMachine == null) gachaMachine = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_gacha_machine);
+        boolean blown = run.gachaBlown();
+        float x = (item[1] + 1.2f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .3f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFFC8607C);
+        canvas.drawRect(x - tile * .9f, feet, x + tile * .9f, floor, paint);
+        paint.setColor(0xFFF0A0B8);
+        canvas.drawRect(x - tile * .95f, feet, x + tile * .95f, feet + tile * .1f, paint);
+        paint.setColor(Color.BLACK);
+        float rattle = capsuleWaits && capsuleAge < .5f ? (float) Math.sin(capsuleAge * 60) * tile * .05f : 0;
+        cell(canvas, gachaMachine, blown ? 1 : 0, 2, x + rattle, feet, tile * 2f * gachaMachine.getHeight() / 280f, false);
+        // What it holds, and the chances, on a plate over it.
+        int[] holds = RunLevels.machineOf(number);
+        int held = run.gachaHeld(), black = PlusRun.blackOdds(number), each = Math.round((100f - black) / holds.length);
+        float size = tile * .46f, wide = holds.length * size + tile * .3f, top = feet - tile * 3.55f;
+        box.set(x - Math.max(wide, tile * 3.3f) / 2, top, x + Math.max(wide, tile * 3.3f) / 2, top + tile * .98f);
+        plate(canvas, box, tile * .2f, 235);
+        for (int index = 0; index < holds.length; index++) {
+            paint.setAlpha(blown ? 60 : (held >> holds[index] - 1 & 1) != 0 ? 255 : 105);
+            pieceIn(canvas, two, RIBBON_ART + holds[index] - 1, x + (index - (holds.length - 1) / 2f) * size, top + tile * .3f, size * .9f, 0);
+        }
+        paint.setAlpha(255);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(blown ? soft : ink);
+        fitted(canvas, blown ? "Blown up: shut for this land" : run.gachaDone() ? "She has had all it holds" : "each " + each + "%  ·  black " + black + "%  ·  roll + " + run.gachaCost(), x,
+                top + tile * .82f, tile * .25f, box.width() - tile * .2f);
+        // A capsule: out of the chute, up, and open.
+        if (capsuleAge < 1.5f && (capsuleWaits || capsuleGave != 0)) {
+            float out = Math.min(1, capsuleAge / .9f), cx = x - tile * .1f - out * tile * .9f, cy = feet - tile * .25f - (float) Math.sin(out * Math.PI) * tile * 1.1f;
+            int shown = capsuleWaits ? 0 : capsuleGave;
+            if (capsuleWaits) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFF4F4F8);
+                canvas.drawCircle(cx, cy, tile * .2f, paint);
+                paint.setColor(0xFFE8779A);
+                box.set(cx - tile * .2f, cy - tile * .2f, cx + tile * .2f, cy + tile * .2f);
+                canvas.drawArc(box, 0, 180, true, paint);
+                stroke.setColor(0xFF5A3040);
+                stroke.setStrokeWidth(tile * .03f);
+                canvas.drawCircle(cx, cy, tile * .2f, stroke);
+                paint.setColor(Color.BLACK);
+            } else {
+                // Open: its two halves fall away, and what was in it rises.
+                float since = capsuleAge - .9f, rise = Math.min(1, since / .35f);
+                int colour = Math.abs(shown);
+                paint.setAlpha(Math.round(255 * Math.max(0, 1 - since / .6f)));
+                pieceIn(canvas, two, RIBBON_ART + Math.min(PlusRun.BLACK, colour) - 1, x - tile, feet - tile * .5f - rise * tile * .8f, tile * (.5f + .3f * rise), 0);
+                paint.setAlpha(255);
+            }
+        }
+        if (!blown) mark(canvas, x, top - tile * .05f, "Gacha", 0xFFE8779A, false);
+    }
+
+    /** A pot of black ink: squat, with a black bow; it swells as its turn comes round, and a mark over it warns of what it is about to throw. */
+    private void drawPot(Canvas canvas, int[] item) {
+        float turn = run.potTurn(item), swell = Math.max(0, (turn - (1 - PlusRun.POT_SWELLS / PlusRun.POT_EVERY)) / (PlusRun.POT_SWELLS / PlusRun.POT_EVERY));
+        float x = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile, round = tile * (.3f + .1f * swell);
+        if (x < -tile * 2 || x > width + tile * 2) return;
+        paint.setStyle(Paint.Style.FILL);
+        if (swell > 0) {
+            paint.setColor(0xFF7A3FD0);
+            paint.setAlpha(Math.round(90 * swell));
+            canvas.drawCircle(x, feet - round, round * 1.9f, paint);
+            paint.setAlpha(255);
+        }
+        paint.setColor(0xFF14121C);
+        canvas.drawOval(x - round * 1.15f, feet - round * 1.7f, x + round * 1.15f, feet, paint);
+        paint.setColor(0xFF3A3050);
+        canvas.drawOval(x - round * .7f, feet - round * 1.95f, x + round * .7f, feet - round * 1.45f, paint);
+        paint.setColor(0xFF06050A);
+        canvas.drawOval(x - round * .5f, feet - round * 1.85f, x + round * .5f, feet - round * 1.55f, paint);
+        paint.setColor(0xFF5A4A80);
+        canvas.drawOval(x - round * .75f, feet - round * 1.2f, x - round * .35f, feet - round * .6f, paint);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        pieceIn(canvas, two, RIBBON_ART + PlusRun.BLACK - 1, x + round * .2f, feet - round * .75f, round * 1.1f, 0);
+        if (swell > 0) warn(canvas, x, feet - round * 2.6f, 0xFF7A3FD0);
     }
 
     // The black market
@@ -2617,6 +2798,9 @@ final class RunGame {
         seenPanels = seenFans = seenDuds = seenFinds = seenRefills = seenSwitches = 0;
         sinceHeavy = panelAge = 9;
         seenCuts = seenDashes = seenAirCuts = seenThrusts = seenJets = seenShells = seenLashes = seenSpins = 0;
+        seenPotShots = 0;
+        capsuleAge = 9;
+        capsuleWaits = false;
         cutAge = dashAge = airAge = thrustAge = lashAge = spinAge = 9;
         packOpen = false;
         huntsOpen = false;
@@ -2860,6 +3044,7 @@ final class RunGame {
         mixAge += seconds;
         for (int slot = 0; slot < huntFlash.length; slot++) huntFlash[slot] = Math.max(0, huntFlash[slot] - seconds / 3);
         hammered += seconds;
+        capsuleAge += seconds;
         cutAge += seconds;
         dashAge += seconds;
         airAge += seconds;
@@ -3319,6 +3504,12 @@ final class RunGame {
             sinceHeavy = 0;
             audio.play("throw", .7f);
         }
+        // A capsule of the ribbon gacha, come out: it opens, and what was in it is hers, or is not.
+        if (capsuleWaits && capsuleAge >= .9f) opened();
+        if (run.potShots() != seenPotShots) {
+            seenPotShots = run.potShots();
+            audio.play("throw", .6f);
+        }
         // The four won in the black arena: where she was and which way she faced as each thing was done, to draw it from.
         boolean did = false;
         if (run.cuts() != seenCuts) {
@@ -3677,6 +3868,7 @@ final class RunGame {
                             : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
                             : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
                             : sort == RunLevels.MARKET ? "Harder lands, the black arena, and what tokens buy"
+                            : sort == RunLevels.GACHA ? "A ribbon by chance. In here, ribbons' times stand still"
                             : "Somebody is in", 0);
                     audio.play("page", .7f);
                 } else if (kind <= RunLevels.PASSAGE) {
@@ -4205,6 +4397,10 @@ final class RunGame {
                 idle();
                 if (what == PlusRun.BOARD) {
                     openHunts();
+                    return;
+                }
+                if (what == PlusRun.MACHINE) {
+                    crank();
                     return;
                 }
                 if (what == PlusRun.DEALER) {
@@ -4767,12 +4963,14 @@ final class RunGame {
                         paint.setAlpha(255);
                         if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
                         else if (what == PlusRun.BOARD) pieceIn(canvas, four, SCROLL_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
+                        else if (what == PlusRun.MACHINE) pieceIn(canvas, two, RIBBON_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else if (what == PlusRun.SMITH) thing(canvas, PlusRun.SWORD, stallButton.centerX(), stallButton.centerY() - dp(6), stallButton.height() * .5f, 35, false, false);
                         else if (what == PlusRun.SMITH + 1) gearIcon(canvas, RunGear.HELM, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .36f, SET_COLOURS[2]);
                         else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
                         label(canvas, stallButton, what < 100 ? "Look" : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.DEALER ? "Market" : what == 100 + PETS_TAB ? "Pets" : "Counter");
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.DEALER ? "Market" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                                : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
@@ -5243,7 +5441,11 @@ final class RunGame {
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
             // Over a hundred, it is something of the fourth sheet: a chest in a stash.
-            if (decor[0] >= 300) {
+            if (decor[0] == 306) {
+                // (The ribbon gacha: a picture of its own.)
+                if (gachaHouse == null) gachaHouse = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_gacha_house);
+                cell(canvas, gachaHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else if (decor[0] >= 300) {
                 if (town == null) town = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_town);
                 cell(canvas, town, decor[0] - 300, 6, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
             } else if (decor[0] >= 200) {
@@ -5461,8 +5663,13 @@ final class RunGame {
                 drawStanding(canvas, item);
                 continue;
             }
+            if (item[0] == PlusRun.INKPOT) {
+                drawPot(canvas, item);
+                continue;
+            }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
-                if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
+                if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
+                else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] >= PlusRun.SMITH) drawSmith(canvas, item);
                 else drawBoard(canvas, item);
                 continue;
@@ -6121,6 +6328,11 @@ final class RunGame {
             } else if (sort == RunLevels.SMITHY) {
                 canvas.drawRect(x - round * .5f, y - round * .5f, x + round * .5f, y - round * .1f, paint);
                 canvas.drawRect(x - round * .1f, y - round * .1f, x + round * .1f, y + round * .65f, paint);
+            } else if (sort == RunLevels.GACHA) {
+                // (A ribbon, for the ribbon gacha.)
+                paint.setColor(Color.BLACK);
+                paint.setAlpha(done ? 110 : 255);
+                pieceIn(canvas, two, RIBBON_ART, x, y, round * 1.3f, 0);
             } else {
                 canvas.drawCircle(x, y, round * .55f, paint);
                 paint.setColor(cardColor);

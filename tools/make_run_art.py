@@ -367,6 +367,29 @@ def later():
     return atlas, len(squares), strips
 
 
+def gacha():
+    """The ribbon gacha's building, its inside, and its machine as it stands and as it is when it has blown up."""
+    house = pieces("gacha_house", 1, 1)[0]
+    scale = 300 / house.size[1]
+    size = (max(1, round(house.size[0] * scale)), 300)
+    cell = Image.new("RGBA", (max(360, size[0] + 4), 304), (0, 0, 0, 0))
+    cell.alpha_composite(house.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), ((cell.size[0] - size[0]) // 2, 304 - size[1]))
+    clear = Image.new("RGBA", cell.size, (0, 0, 0, 0))
+    Image.composite(cell, clear, cell.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_gacha_house.webp", lossless=True, quality=100, method=6, exact=True)
+    look = Image.open(SOURCE / "inside_gacha.png").convert("RGB")
+    look.resize((SKY_WIDTH, round(look.size[1] * SKY_WIDTH / look.size[0])), Image.LANCZOS).save(RES / "plus_run_room_gacha.webp", quality=82, method=6)
+    machines = pieces("gacha_machine", 1, 2)
+    scale = 280 / machines[0].size[1]
+    strip = Image.new("RGBA", (300 * 2, 330), (0, 0, 0, 0))
+    for index, machine in enumerate(machines):
+        size = (max(1, round(machine.size[0] * scale)), max(1, round(machine.size[1] * scale)))
+        if size[0] > 296 or size[1] > 330:
+            raise SystemExit(f"machine {index} is {size}")
+        strip.alpha_composite(machine.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * 300 + (300 - size[0]) // 2, 330 - size[1]))
+    clear = Image.new("RGBA", strip.size, (0, 0, 0, 0))
+    Image.composite(strip, clear, strip.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_gacha_machine.webp", lossless=True, quality=100, method=6, exact=True)
+    return cell.size, strip.size
+
 def places():
     """What stands in the villages and in the places where someone waits, and those met in the villages."""
     squares = together(pieces("village", 2, 4), PLACE_CELL) + [None] * 0
@@ -447,6 +470,8 @@ def places():
         town.alpha_composite(building.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * 360 + (360 - size[0]) // 2, 304 - size[1]))
     clear = Image.new("RGBA", town.size, (0, 0, 0, 0))
     Image.composite(town, clear, town.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_town.webp", lossless=True, quality=100, method=6, exact=True)
+    # The ribbon gacha: its building, at the scale of the others; its inside; and its machine, whole and blown up, side by side.
+    gacha()
     # The three sisters who keep the smithy, each from a sheet of her own and in a file of her own: at ease, her hammer up, her hammer
     # down, and pleased with her work. Moru is the webtoon's; Pulmu and Sutdol are new.
     for name in SMITHS:

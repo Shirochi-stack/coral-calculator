@@ -700,6 +700,13 @@ final class RunStory {
             {"market4", "A black market under a village. I'm not even surprised. I'm shopping Sloppy~♡", "H",
                     PLAYER + "She walks into a hidden black market for the first time and looks around, unimpressed and interested. Dry, amused, greedy." + FAST},
     };
+    /** At the ribbon gacha: the first time she rolls one; and when a black ribbon blows it up. */
+    static final String[][] GACHA = {
+            {"gacha1", "A ribbon gacha. One roll. Maybe two. I can stop whenever I like Sloppy~♡", "H",
+                    PLAYER + "She puts coins into a capsule-toy machine that gives hair ribbons, pretending she is not excited. Eager, bluffing, quick." + FAST},
+            {"gacha2", "It blew up. A black one. All my ribbons, gone Sloppy~♡", "H",
+                    PLAYER + "The capsule machine has just exploded in her face and taken her prizes with it. Stunned, sooty, dismayed, a little funny." + FAST},
+    };
     /** When what was asked cannot be done this time: a letter creased, a count run out. */
     static final String[][] UNDONE = {
             {"undone1", "Ugh. That one's off for this run. Next time Sloppy~♡", "H",
@@ -859,7 +866,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET, GACHA);
         return groups.toArray(new String[0][][]);
     }
 }

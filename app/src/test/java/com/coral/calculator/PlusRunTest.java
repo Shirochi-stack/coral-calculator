@@ -5184,7 +5184,7 @@ public class PlusRunTest {
     }
 
     @Test public void potsOfBlackInkStandInTheLaterLandsAndThrowTheCurseAtWhoeverIsNear() {
-        int pots = 0;
+        int pots = 0, without = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
             int here = 0, was = -99;
@@ -5201,10 +5201,12 @@ public class PlusRunTest {
                 for (int[] other : level.items) if (other != item && other[0] == PlusRun.INKPOT) assertTrue(Math.abs(other[1] - item[1]) > 30);
             }
             if (number < RunLevels.POTS_FROM) assertEquals("land " + number, 0, here);
-            else assertTrue("land " + number + " has " + here, here >= 1 && here <= 1 + (number - RunLevels.POTS_FROM) / 15);
+            else assertTrue("land " + number + " has " + here, here <= 1 + (number - RunLevels.POTS_FROM) / 15);
+            if (number >= RunLevels.POTS_FROM && here == 0) without++;
             pots += here;
         }
-        assertTrue("pots " + pots, pots >= 50);
+        // (A land here and there has no flat, empty ground for one.)
+        assertTrue("pots " + pots + " lands without " + without, pots >= 45 && without <= 6);
         // One swells, and throws: at her, if she is near; black lies on her, and it costs her nothing else.
         RunLevels.Level level = flat(90);
         level.items.add(new int[]{PlusRun.INKPOT, 20, FLOOR - 1, 0, 0});
@@ -6936,7 +6938,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);
