@@ -48,6 +48,8 @@ final class Fight {
     static final float ROUND_SECONDS = 60, FLOURISH_SECONDS = 1.1f, BETWEEN = 2.6f;
     /** How long a clash lasts, and how long after it a last tap still counts. */
     static final float CLASH_SECONDS = 4, CLASH_GRACE = .25f;
+    /** How long the bar of a clash is left on show once it is settled, and how much of that it takes to fill for whoever won. */
+    static final float CLASH_SHOWN = .45f, CLASH_SWEEP = .14f;
     /** How long after a blow the next press still goes on with its chain; how long a dodge lasts, how much of it nothing can touch her, and how long before the next. */
     static final float CHAIN_WINDOW = .3f, DODGE_SECONDS = .34f, DODGE_SAFE = .22f, DODGE_REST = .9f;
     static final float DASH_SECONDS = .26f, BACKSTEP_SECONDS = .24f, LAND_SECONDS = .09f;
@@ -419,6 +421,24 @@ final class Fight {
     float hitY() { return hitY; }
     boolean hitHard() { return hitHard; }
     int hitSide() { return hitSide; }
+    /**
+     * Where the divider of a clash's bar stands, from 0 at its left end to 1 at its right: the
+     * left side's colour fills up to it and the right side's from it. It starts in the middle
+     * and goes toward whoever is behind, by how many taps the other leads: a tap of a lead is
+     * easily seen, and however far ahead one is it never reaches an end while they still tap.
+     */
+    static float clashBar(int left, int right) { return .5f + .44f * (float) Math.tanh((left - right) / 8f); }
+
+    float clashBar() { return clashBar(taps[0], taps[1]); }
+
+    /** Who won the clash that has just been settled, while her greater ultimate is announced; below zero at any other time. */
+    int clashWinner() { return phase == FLOURISH && flourisher >= 0 && fighters[flourisher].move == CLASH ? flourisher : -1; }
+
+    /** How long ago it was settled, and how far the bar has filled for whoever won it: all of it, quickly. */
+    float clashAge() { return clashWinner() < 0 ? 0 : phaseClock; }
+
+    float clashSweep() { return clashWinner() < 0 ? 0 : Math.min(1, phaseClock / CLASH_SWEEP); }
+
     /** How much of a clash is left, in seconds; how often a side has tapped in it; and who went for her ultimate second. */
     float clashLeft() { return clashLeft; }
     int taps(int side) { return taps[side]; }
