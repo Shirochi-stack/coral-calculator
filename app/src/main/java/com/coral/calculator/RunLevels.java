@@ -88,6 +88,10 @@ final class RunLevels {
     static final int STASH = 0, PASSAGE = 1, ARENA = 2, GAME = 3;
     /** And a range, where paper targets hang in the air and an ink gun that does not run dry is put in her hands for twelve seconds. */
     static final int RANGE = 4;
+    /** And a room where signs keep coming for a quarter of a minute, to be dealt with as fast as they come. */
+    static final int TRAMPLE = 5;
+    /** How tall a place off the land is, from its floor to its ceiling. */
+    static final int ROOM_TALL = 13;
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
@@ -248,6 +252,8 @@ final class RunLevels {
          * passage, or -1; and the floor she comes out onto.
          */
         final List<int[]> rooms = new ArrayList<>();
+        /** The signs that walk in the places off the land, kept apart while the land itself is put together. */
+        final List<int[]> lodgers = new ArrayList<>();
         /** How many columns the land proper has: what lies beyond is the places its doors lead to. */
         int main;
         /** What is asked of her in it, or 0; and the out-of-the-way places in it where something may be hidden: the column and row of each. */
@@ -341,6 +347,7 @@ final class RunLevels {
         level.arena = draft.arena;
         level.guarded = draft.guarded;
         armLater(level, new Random(seed * 104729 + number * 31L));
+        level.foes.addAll(draft.lodgers);
         return level;
     }
 
@@ -493,6 +500,8 @@ final class RunLevels {
         level.arena = draft.arena;
         level.guarded = draft.guarded;
         arm(level, new Random(seed * 104729 + number * 31L));
+        // The signs that walk in the places off the land join the rest only now, so that what the land is given is what it was given without them.
+        level.foes.addAll(draft.lodgers);
         return level;
     }
 
@@ -656,44 +665,93 @@ final class RunLevels {
 
         /**
          * The places the doors lead to, laid one after another beyond the end of the land,
-         * each walled all round: a floor, a ceiling eight squares over it, and what is in it.
+         * each walled all round, thirteen squares from floor to ceiling, and each a place for
+         * something. A stash is a climb, with a chest at the top of it that is seen from the
+         * door and not reached from it: up steps that are thin, and in the second volume
+         * crumble, or by two springs. A passage is another way through the land, three
+         * screens long, with spikes to cross on ledges, signs walking in it, something worth
+         * having up out of the way, and a chest by its far door. A cellar is wide, with ledges
+         * at two heights to fight from. And the rooms where a game is played have ledges to
+         * play it from. Nothing here is drawn from the numbers the land is made from, so the
+         * land is the same land whatever is behind its doors.
          */
         void rooms() {
             floor = FLOOR;
+            int ceiling = FLOOR - ROOM_TALL, number = level.number;
+            boolean second = number > COUNT;
             for (int[] want : wanted) {
                 // In one cellar in two the Old Book sleeps under the last wave, and it is wider for him.
-                boolean den = want[0] == ARENA && level.number % 6 == 0;
-                int kind = want[0], wide = kind == PASSAGE ? 16 : den ? 18 : kind == ARENA || kind == RANGE ? 14 : kind == GAME ? 12 : 10;
+                boolean den = want[0] == ARENA && number % 6 == 0;
+                int kind = want[0], wide = kind == PASSAGE ? 46 : kind == ARENA ? den ? 30 : 26 : kind == GAME ? 20 : 22;
                 wall(2);
-                int from = at, to = from + wide - 1, far = -1;
+                int from = at, to = from + wide - 1, far = -1, middle = (from + to) / 2;
                 for (int column = from; column <= to; column++) {
-                    for (int row = 0; row < ROWS; row++) if (row < FLOOR - 8 || row >= FLOOR) level.land[row][column] = BLOCK;
+                    for (int row = 0; row < ROWS; row++) if (row < ceiling || row >= FLOOR) level.land[row][column] = BLOCK;
                 }
                 at += wide;
                 wall(2);
                 level.land[FLOOR - 1][from + 1] = ENTRY;
+                char step = second ? CRUMBLE : THIN;
+                int[] treats = {PlusRun.ICE, PlusRun.MAGNET, PlusRun.BREAD, PlusRun.NOTES};
+                int treat = want[3] != 0 ? PlusRun.FORM + PlusRun.YELLOW : treats[number % treats.length];
                 if (kind == STASH) {
-                    // Pluses along the floor and over a ledge, a chest to look at, and something to help.
-                    ledge(from + 4, FLOOR - 2, 4);
                     pluses(from + 3, from + 8, FLOOR - 1);
-                    pluses(from + 4, from + 7, FLOOR - 4);
-                    level.decor.add(new int[]{106, from + 6, FLOOR - 1});
-                    int[] treats = {PlusRun.ICE, PlusRun.MAGNET, PlusRun.BREAD, PlusRun.NOTES};
-                    level.items.add(new int[]{want[3] != 0 ? PlusRun.FORM + PlusRun.YELLOW : treats[level.number % treats.length], from + 8, FLOOR - 3, 0});
+                    if (number % 4 < 2) {
+                        // Steps up the room, each two squares over the last, to a shelf along its far wall with the chest on it.
+                        put(from + 5, FLOOR - 2, 3, THIN);
+                        put(from + 9, FLOOR - 4, 3, step);
+                        put(from + 13, FLOOR - 6, 3, step);
+                        ledge(from + 17, FLOOR - 8, to - from - 16);
+                        pluses(from + 9, from + 11, FLOOR - 6);
+                        pluses(from + 13, from + 15, FLOOR - 8);
+                        level.items.add(new int[]{treat, from + 14, FLOOR - 7, 0});
+                        level.items.add(new int[]{PlusRun.CHEST, to - 1, FLOOR - 9, 0});
+                    } else {
+                        // A spring on the floor to a shelf half way up, and a spring at the end of that to a shelf under the ceiling, where the chest is.
+                        level.land[FLOOR - 1][from + 9] = SPRING;
+                        ledge(from + 12, FLOOR - 5, to - from - 11);
+                        level.land[FLOOR - 6][to - 3] = SPRING;
+                        ledge(from + 11, FLOOR - 10, 6);
+                        pluses(from + 13, from + 17, FLOOR - 7);
+                        level.items.add(new int[]{treat, from + 15, FLOOR - 6, 0});
+                        level.items.add(new int[]{PlusRun.CHEST, from + 12, FLOOR - 11, 0});
+                    }
                 } else if (kind == PASSAGE) {
-                    // A way through, with something to collect on it, and a door at the far end.
+                    // A way through: two stretches of spikes, each crossed on ledges; signs that walk between them; an upper way to
+                    // something worth having; and a chest by the door at the far end.
                     far = to - 1;
                     level.land[FLOOR - 1][far] = ENTRY;
-                    ledge(from + 5, FLOOR - 2, 3);
-                    ledge(from + 9, FLOOR - 3, 3);
-                    pluses(from + 3, to - 3, FLOOR - 1);
-                    pluses(from + 5, from + 7, FLOOR - 4);
-                    pluses(from + 9, from + 11, FLOOR - 5);
+                    if (chapter >= 1) put(from + 7, FLOOR - 1, 6, SPIKE);
+                    put(from + 9, FLOOR - 3, 2, THIN);
+                    pluses(from + 8, from + 11, FLOOR - 5);
+                    ledge(from + 15, FLOOR - 3, 4);
+                    pluses(from + 15, from + 18, FLOOR - 4);
+                    level.lodgers.add(new int[]{MINUS, from + 17, FLOOR - 1});
+                    if (chapter >= 1) put(from + 22, FLOOR - 1, 9, SPIKE);
+                    put(from + 24, FLOOR - 3, 2, step);
+                    put(from + 28, FLOOR - 3, 2, step);
+                    pluses(from + 24, from + 29, FLOOR - 5);
+                    level.lodgers.add(new int[]{chapter >= 2 ? TIMES : MINUS, from + 35, FLOOR - 1});
+                    ledge(from + 32, FLOOR - 3, 3);
+                    ledge(from + 36, FLOOR - 5, 3);
+                    pluses(from + 32, from + 34, FLOOR - 4);
+                    level.items.add(new int[]{PlusRun.FORM + (number % 2 == 0 ? PlusRun.YELLOW : PlusRun.GREEN), from + 37, FLOOR - 6, 0});
+                    pluses(from + 39, to - 6, FLOOR - 1);
+                    level.items.add(new int[]{PlusRun.CHEST, to - 4, FLOOR - 1, 0});
                 } else if (kind == ARENA) {
-                    ledge(from + 2, FLOOR - 2, 3);
-                    ledge(to - 4, FLOOR - 2, 3);
+                    ledge(from + 3, FLOOR - 3, 4);
+                    ledge(to - 6, FLOOR - 3, 4);
+                    ledge(middle - 2, FLOOR - 5, 4);
                 } else if (kind == GAME) {
-                    ledge(from + 5, FLOOR - 2, 2);
+                    ledge(from + 4, FLOOR - 3, 3);
+                    ledge(to - 6, FLOOR - 3, 3);
+                } else if (kind == RANGE) {
+                    ledge(from + 5, FLOOR - 3, 3);
+                    ledge(to - 7, FLOOR - 3, 3);
+                    ledge(middle - 1, FLOOR - 5, 3);
+                } else {
+                    ledge(from + 6, FLOOR - 3, 3);
+                    ledge(to - 8, FLOOR - 3, 3);
                 }
                 level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], den ? 1 : 0});
             }
@@ -880,8 +938,10 @@ final class RunLevels {
                     level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});
                     if (!inVillage) {
                         inVillage = true;
-                        // A stash in the even lands; in the odd ones the room where pluses fall and the range by turns.
-                        if (level.number >= PLACES_FROM) door(level.number % 2 == 0 ? STASH : level.number % 4 == 1 ? GAME : RANGE, from + 14, false);
+                        // A stash in the even lands; in the odd ones a game: the room where pluses fall, the range, and the room where signs keep coming, by turns.
+                        if (level.number >= PLACES_FROM) {
+                            door(level.number % 2 == 0 ? STASH : level.number % 6 == 1 ? GAME : level.number % 6 == 3 ? RANGE : TRAMPLE, from + 14, false);
+                        }
                     }                    break;
                 }
                 case PACK: {

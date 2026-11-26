@@ -198,7 +198,9 @@ final class RunGame {
     private final Sheet two = new Sheet(R.drawable.plus_run_art2, 8), three = new Sheet(R.drawable.plus_run_art3, 4);
     /** And a fourth: a door, a crack in a wall, a cellar door, rice cakes, a letter, a stopwatch, a chest, and a scroll. */
     private final Sheet four = new Sheet(R.drawable.plus_run_art4, 4);
-    private static final int DOOR_PICTURE = 0, CRACK_PICTURE = 1, CELLAR_PICTURE = 2;
+    private static final int DOOR_PICTURE = 0, CRACK_PICTURE = 1, CELLAR_PICTURE = 2, CHEST_PICTURE = 6;
+    /** How many pieces of a heart make a heart, and how many hearts they can make. */
+    private static final int PIECES = 4, PIECE_HEARTS = 2;
     private Bitmap inside;
     private final float[] artWide = new float[ART_COUNT], artTall = new float[ART_COUNT];
     private Bitmap sky;
@@ -255,6 +257,16 @@ final class RunGame {
     /** What is still to be said in cards of their own, when the one on the screen has gone. */
     private final List<Object[]> toasts = new ArrayList<>();
     private boolean saidRumour;
+    /**
+     * A place off the land says what it is as she goes in: which kind, and how long its
+     * card has been up, below nothing when there is none. And when what happens in it is
+     * over, a card of how it went: how long it has been up, its heading, what she did, and
+     * what it gave.
+     */
+    private int roomCard = -1;
+    private float roomCardAge = -1, roomResultAge = -1;
+    private String roomResult = "", roomScore = "", roomGave = "";
+    private int roomPicture, seenChests, tickedAt;
     /**
      * What was asked of her is handed in: how long the moment of it has gone on, below
      * nothing when there is none; who thanks her, where she stands, and whether she has
@@ -423,6 +435,8 @@ final class RunGame {
             else if (prize == RunLevels.QUICK) kept.recharge -= 3;
         }
         kept.recharge = Math.max(4, kept.recharge);
+        // The pieces of a heart found in chests: four of them are a heart, and there are two hearts to be made of them.
+        kept.hearts += Math.min(PIECE_HEARTS, session.tally("run_pieces") / PIECES);
         return kept;
     }
 
@@ -457,7 +471,8 @@ final class RunGame {
 
     /** Says in a card of its own that something has been won: at once, or when the card that is on the screen has gone. */
     private void toast(String title, String words, int picture) {
-        if (toastLeft > .4f) {
+        // One card at a time: behind the one that is up, or behind the card of a place off the land.
+        if (toastLeft > .4f || roomCardAge >= 0 || roomResultAge >= 0) {
             toasts.add(new Object[]{title, words, picture});
             return;
         }
@@ -833,7 +848,9 @@ final class RunGame {
         prizeAge = -1;
         prizeWon = RunLevels.NOTHING;
         saidRumour = false;
-        seenLives = seenCasts = seenBraces = seenPaid = seenReminders = 0;
+        seenLives = seenCasts = seenBraces = seenPaid = seenReminders = seenChests = 0;
+        roomCardAge = roomResultAge = -1;
+        tickedAt = 0;
         handAge = -1;
         handQuiet = false;
         questLine = null;
@@ -968,13 +985,17 @@ final class RunGame {
         sinceParry += seconds;
         sinceStruck += seconds;
         sinceBroke += seconds;
-        if (toastLeft <= 0 && !toasts.isEmpty()) {
+        if (toastLeft <= 0 && !toasts.isEmpty() && roomCardAge < 0 && roomResultAge < 0) {
             Object[] next = toasts.remove(0);
             toast((String) next[0], (String) next[1], (Integer) next[2]);
         }
         // While what was won from whoever fell is rising, everything else waits.
         if (screen == PLAY && prizeAge >= 0) {
             if ((prizeAge += seconds) > 5) prizeAge = -1;
+        } else if (screen == PLAY && roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
+            roomCardAge += seconds;
+        } else if (screen == PLAY && roomResultAge >= 0 && roomResultAge < 2.6f) {
+            roomResultAge += seconds;
         } else if (screen == PLAY && handAge >= 0) {
             handAge += seconds;
             // The seal comes down on it.
@@ -990,6 +1011,8 @@ final class RunGame {
             }
             if (handAge > 7.5f || handSaid && handAge > 4 && !audio.speaking() && captionLeft <= 0) handAge = -1;
         } else if (screen == PLAY) {
+            if (roomCardAge >= 0 && (roomCardAge += seconds) > 3.4f) roomCardAge = -1;
+            if (roomResultAge >= 0 && (roomResultAge += seconds) > 5.5f) roomResultAge = -1;
             step(seconds);
         }
         if (screen == RESULT) {
@@ -1340,20 +1363,31 @@ final class RunGame {
             buzz(false);
             // The places she has found are kept, land by land.
             int known = session.tally("run_rooms_" + number);
-            if ((run.roomsFound() & ~known) != 0) {
-                // A place found for the first time: ten pluses to keep.
-                session.keep("run_bank", bank() + 10);
-                toast("A place off the land found", "+ 10 to keep", 6);
-            }
+            boolean found = (run.roomsFound() & ~known) != 0;
             session.keep("run_rooms_" + number, known | run.roomsFound());
             int in = run.room();
             if (in >= 0) {
                 int kind = here.rooms.get(in)[0];
-                // Her word about the kind of place it is, the first time in a land; of a cellar or a fall of pluses, only while it is still to do.
+                boolean todo = (run.roomsDone() & 1 << in) == 0;
+                // Her word about the kind of place it is, the first time in a land; of a cellar or a game, only while it is still to do.
                 if ((saidRoom & 1 << kind) == 0 && (kind <= RunLevels.PASSAGE || run.sealed())) {
                     saidRoom |= 1 << kind;
                     aside(RunStory.ROOMS[kind]);
                 }
+                // And a card that says what it is and what to do in it: before anything in it begins, where something is about to.
+                if (todo || kind == RunLevels.PASSAGE) {
+                    roomCard = in;
+                    roomCardAge = 0;
+                    tickedAt = 0;
+                    audio.play(run.sealed() ? "star" : "page", .7f);
+                }
+            } else {
+                roomCardAge = -1;
+            }
+            if (found) {
+                // A place found for the first time: ten pluses to keep, said when the card of what it is has gone.
+                session.keep("run_bank", bank() + 10);
+                toast("A place off the land found", "+ 10 to keep", CHEST_PICTURE);
             }
         }
         if (run.reveals() != seenReveals) {
@@ -1365,17 +1399,86 @@ final class RunGame {
                 bits.add(new float[]{herX, herY - .8f, (random.nextFloat() - .5f) * 6, -random.nextFloat() * 4, .5f, 1});
             }
         }
-        if (run.roomWins() != seenWins) {
-            seenWins = run.roomWins();
-            int[] won = run.room() >= 0 ? here.rooms.get(run.room()) : null;
-            boolean cellar = won != null && won[0] == RunLevels.ARENA, range = won != null && won[0] == RunLevels.RANGE;
+        // A chest opened: ten pluses in it. The one by a passage's far door has a purse in it besides, the first time; a stash's is the
+        // doing of the stash, and is told with that.
+        if (run.chests() != seenChests) {
+            seenChests = run.chests();
             audio.play("unlock");
             buzz(true);
-            pop(herX, herY - 1.6f, cellar ? won[10] != 0 ? "+ 40" : "+ 20"
-                    : "+ " + run.caught() * (range ? 2 : 1) + (run.caught() >= PlusRun.ENOUGH ? "   + 10" : ""));
+            pop(herX, herY - 1.6f, "+ 10");
             seenBonus = run.bonus();
-            speak(RunStory.ROOM_WON[cellar ? 0 : range ? 2 : 1], true);
+            for (int spark = 0; spark < 12; spark++) {
+                double way = random.nextFloat() * Math.PI * 2;
+                bits.add(new float[]{herX, herY - .6f, (float) Math.cos(way) * 5, (float) Math.sin(way) * 5 - 2, .5f, 0});
+            }
+            int in = run.room();
+            if (in >= 0 && here.rooms.get(in)[0] == RunLevels.PASSAGE && (session.tally("run_chests_" + number) & 1 << in) == 0) {
+                session.keep("run_chests_" + number, session.tally("run_chests_" + number) | 1 << in);
+                int purse = 20 + 10 * RunLevels.chapterOf(number);
+                session.keep("run_bank", bank() + purse);
+                toast("The passage's chest: + " + purse + " to keep", "For going the other way", CHEST_PICTURE);
+                aside(RunStory.ROOM_WON[4]);
+            }
+        }
+        // What happens in a place off the land is over: a card of how it went and what it gave, and then the way out. What a place gives
+        // the first time is kept, whatever becomes of the run: a cellar a life, there and then, and where the Old Book slept a piece of a
+        // heart; a game the rare white ribbon, if she did enough; a stash a purse, and a hidden one a piece of a heart.
+        if (run.roomWins() != seenWins) {
+            seenWins = run.roomWins();
+            int in = run.room();
+            int[] won = in >= 0 ? here.rooms.get(in) : null;
+            int kind = won == null ? -1 : won[0], chapter = RunLevels.chapterOf(number);
+            boolean first = in >= 0 && (session.tally("run_roomsdone_" + number) & 1 << in) == 0, enough = run.caught() >= PlusRun.ENOUGH;
+            audio.play("unlock");
+            audio.play("win", .6f);
+            buzz(true);
+            seenBonus = run.bonus();
+            roomGave = "";
+            roomPicture = CHEST_PICTURE;
+            if (kind == RunLevels.ARENA) {
+                roomResult = won[10] != 0 ? "The Old Book is shut" : "Cellar cleared";
+                roomScore = PlusRun.WAVES + " waves" + (won[10] != 0 ? ", and the Old Book" : "") + "  ·  + " + (won[10] != 0 ? 40 : 20);
+                roomPicture = CELLAR_PICTURE;
+                if (first) {
+                    run.spare();
+                    roomGave = "A life, there and then";
+                    if (won[10] != 0) roomGave += piece();
+                }
+            } else if (kind == RunLevels.STASH) {
+                roomResult = "The chest is open";
+                roomScore = "+ 10 in it";
+                if (first && won[7] != 0) {
+                    roomGave = piece().substring(2);
+                } else if (first) {
+                    int purse = 30 + 10 * chapter;
+                    session.keep("run_bank", bank() + purse);
+                    roomGave = "A purse: + " + purse + " to keep";
+                }
+            } else {
+                boolean range = kind == RunLevels.RANGE;
+                roomResult = "Time!";
+                roomScore = (range ? "Targets hit: " : kind == RunLevels.TRAMPLE ? "Flattened: " : "Caught: ") + run.caught() + " of " + PlusRun.ENOUGH
+                        + "  ·  + " + (run.caught() * (range ? 2 : 1) + (enough ? 10 : 0));
+                roomPicture = -1;
+                if (first && enough) {
+                    run.lend(PlusRun.WHITE);
+                    session.keep("run_bank", bank() + 20);
+                    roomGave = "The rare white ribbon, and + 20 to keep";
+                } else if (!enough) {
+                    roomGave = "Reach " + PlusRun.ENOUGH + " for the prize";
+                }
+            }
+            roomResultAge = 0;
+            roomCardAge = -1;
+            idle();
+            speak(RunStory.ROOM_WON[kind == RunLevels.ARENA ? 0 : kind == RunLevels.RANGE ? 2 : kind == RunLevels.TRAMPLE ? 3 : kind == RunLevels.STASH ? 4 : 1], true);
             session.keep("run_roomsdone_" + number, session.tally("run_roomsdone_" + number) | run.roomsDone());
+            perks = kept();
+        }
+        // The last seconds of a game tick.
+        if (run.room() >= 0 && run.sealed() && run.gameLeft() > 0 && run.gameLeft() <= 3 && (int) Math.ceil(run.gameLeft()) != tickedAt) {
+            tickedAt = (int) Math.ceil(run.gameLeft());
+            audio.play("tap", .8f);
         }
         // What was asked of her is done, and not yet handed in: it is said at once, and where to go with it.
         if (run.questsDone() != seenDone) {
@@ -1648,7 +1751,7 @@ final class RunGame {
             if (which >= 0 && !foe.flat && foe.x >= from && foe.x <= to && (seen & 1 << which) == 0) found = which;
         }
         for (int[] arm : run.arms()) if (arm[1] >= from && arm[1] <= to && (seen & 1 << 8) == 0) found = 8;
-        for (int[] item : run.items()) if (item[0] > PlusRun.FORM && item[1] >= from && item[1] <= to && (seen & 1 << 24) == 0) found = 24;
+        for (int[] item : run.items()) if (item[0] > PlusRun.FORM && item[0] < PlusRun.CHEST && item[1] >= from && item[1] <= to && (seen & 1 << 24) == 0) found = 24;
         for (int index = 0; index < run.level().movers.size(); index++) {
             float x = run.moverX(index, run.time());
             if (x >= from && x <= to && (seen & 1 << 20) == 0) found = 20;
@@ -1686,6 +1789,15 @@ final class RunGame {
             }
             if (handAge >= 0) {
                 if (action == MotionEvent.ACTION_DOWN && handAge > 2.2f) handAge = -1;
+                return;
+            }
+            // A card that holds the land is sent on by a touch, once it has been up long enough to be seen.
+            if (roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
+                if (action == MotionEvent.ACTION_DOWN && roomCardAge > .5f) roomCardAge = 2.4f;
+                return;
+            }
+            if (roomResultAge >= 0 && roomResultAge < 2.6f) {
+                if (action == MotionEvent.ACTION_DOWN && roomResultAge > .8f) roomResultAge = 2.6f;
                 return;
             }
             if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && perks.colours != 0) {
@@ -1874,6 +1986,7 @@ final class RunGame {
             if (screen == PLAY && prizeAge >= 0) drawPrize(canvas);
             if (screen == PLAY && handAge >= 0) drawHandOver(canvas);
             drawHud(canvas);
+            if (screen == PLAY && (roomCardAge >= 0 || roomResultAge >= 0)) drawRoomCards(canvas);
             if (screen == PLAY) {
                 // Charmed, the arrows are the wrong way round, and show it.
                 boolean charmed = run.charmed() > 0;
@@ -2211,7 +2324,7 @@ final class RunGame {
             if (item[3] != 0 || item[1] < first - 1 || item[1] > last + 1) continue;
             float x = (item[1] + .5f - cameraX) * tile;
             float y = (item[2] + .45f - cameraY) * tile + (float) Math.sin(clock * 3.2f + item[1]) * tile * .07f;
-            ring(canvas, x, y, item[0] > PlusRun.FORM ? FORM_COLOURS[item[0] - PlusRun.FORM - 1] : 0xFFFFC53D);
+            ring(canvas, x, y, item[0] > PlusRun.FORM && item[0] < PlusRun.CHEST ? FORM_COLOURS[item[0] - PlusRun.FORM - 1] : 0xFFFFC53D);
             help(canvas, item[0], x, y, tile * .78f);
         }
         // The things to fight with that lie about, each in a ring of light so it is not taken for part of the land.
@@ -2457,6 +2570,10 @@ final class RunGame {
                 door(canvas, known ? picture : CRACK_PICTURE, one[1], one[2], at == index, known ? "Enter" : "Break");
                 // Where a passage comes out looks like a crack too, until she has come out of it.
                 if (one[5] != one[1]) door(canvas, been ? DOOR_PICTURE : CRACK_PICTURE, one[5], one[9], at == index, "Enter");
+                // Found, a door has a mark over it that says what kind of place it leads to: and a tick, once that is done with.
+                boolean found = been || (session.tally("run_rooms_" + number) & 1 << index) != 0 || known && one[7] != 1;
+                boolean done = (run.roomsDone() & 1 << index) != 0;
+                if (found && at != index) doorMark(canvas, one[0], one[1], one[2], done);
             } else if (in == index) {
                 // Shut until what happens in it is over, its door is dim.
                 if (run.sealed()) paint.setAlpha(110);
@@ -2472,6 +2589,144 @@ final class RunGame {
         if (x < -tile * 2 || x > width + tile * 2) return;
         pieceTall(canvas, four, picture, x, y, tile * 1.85f, false);
         if (here && Math.abs(run.x() + PlusRun.WIDE / 2 - column - .5f) < .9f) mark(canvas, x, y - tile * 2.05f, word, 0xFF8A5A33, false);
+    }
+
+    /**
+     * The mark over a door that has been found, by the kind of place behind it: a chest for
+     * a stash, two arrows for a passage, a sword for a cellar, and a star for a game. Once
+     * the place is done with it is pale, with a tick on it.
+     */
+    private void doorMark(Canvas canvas, int kind, int column, int floor, boolean done) {
+        float x = (column + .5f - cameraX) * tile, y = (floor - cameraY) * tile - tile * 2.15f, round = tile * .3f;
+        if (x < -tile * 2 || x > width + tile * 2) return;
+        y += (float) Math.sin(clock * 2.4f + column) * tile * .04f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0x33000000);
+        canvas.drawCircle(x, y + tile * .03f, round, paint);
+        paint.setColor(cardColor);
+        paint.setAlpha(done ? 150 : 255);
+        canvas.drawCircle(x, y, round, paint);
+        int colour = kind == RunLevels.ARENA ? 0xFFC0392B : kind == RunLevels.PASSAGE ? 0xFF3B7BE0 : kind == RunLevels.STASH ? 0xFF8A5A33 : 0xFFE0A21A;
+        stroke.setColor(colour);
+        stroke.setAlpha(done ? 110 : 255);
+        stroke.setStrokeWidth(tile * .045f);
+        canvas.drawCircle(x, y, round, stroke);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(done ? 110 : 255);
+        if (kind == RunLevels.STASH) {
+            pieceIn(canvas, four, CHEST_PICTURE, x, y, round * 1.35f, 0);
+        } else if (kind == RunLevels.ARENA) {
+            thing(canvas, PlusRun.SWORD, x, y, round * 1.3f, 35, false, false);
+        } else if (kind == RunLevels.PASSAGE) {
+            stroke.setStrokeWidth(tile * .06f);
+            for (int arrow = 0; arrow < 2; arrow++) {
+                float at = x - round * .35f + arrow * round * .5f;
+                canvas.drawLine(at, y - round * .35f, at + round * .35f, y, stroke);
+                canvas.drawLine(at + round * .35f, y, at, y + round * .35f, stroke);
+            }
+        } else {
+            artIn(canvas, STAR_ART, x, y, round * 1.4f);
+        }
+        paint.setAlpha(255);
+        stroke.setAlpha(255);
+        if (done) {
+            stroke.setColor(0xFF2E9E6E);
+            stroke.setStrokeWidth(tile * .07f);
+            canvas.drawLine(x - round * .1f, y + round * .45f, x + round * .2f, y + round * .75f, stroke);
+            canvas.drawLine(x + round * .2f, y + round * .75f, x + round * .75f, y + round * .1f, stroke);
+        }
+    }
+
+    /** Whether the card that says what a place is holds the land while it is up: where something is about to begin in it. */
+    private boolean roomHolds() { return run != null && run.room() >= 0 && run.sealed(); }
+
+    /** A piece of a heart is found, and kept: four of them make a heart for every land, and there are two hearts to be made. What it says of itself, to go after something else. */
+    private String piece() {
+        int pieces = session.tally("run_pieces");
+        if (pieces >= PIECES * PIECE_HEARTS) {
+            session.keep("run_bank", bank() + 60);
+            return ", + 60 to keep";
+        }
+        session.keep("run_pieces", pieces + 1);
+        return (pieces + 1) % PIECES == 0 ? ", the last piece of a heart: a heart more in every land" : ", a piece of a heart: " + (pieces + 1) % PIECES + " of " + PIECES;
+    }
+
+    /**
+     * The card that says what a place off the land is, as she goes in: its kind as a
+     * heading, and under it what there is to do; where something is about to begin, with
+     * the count to beat and "Tap to begin". And the card of how it went, when that is over:
+     * what she did, and what it gave.
+     */
+    private void drawRoomCards(Canvas canvas) {
+        if (roomCardAge >= 0 && run.room() >= 0 && roomCard < run.level().rooms.size()) {
+            int[] one = run.level().rooms.get(roomCard);
+            int kind = one[0];
+            boolean holds = roomHolds() && roomCardAge < 2.4f;
+            String title = kind == RunLevels.ARENA ? "Cellar: three waves" : kind == RunLevels.GAME ? "Mini game: catch the pluses" : kind == RunLevels.RANGE
+                    ? "Mini game: the range" : kind == RunLevels.TRAMPLE ? "Mini game: flatten them" : kind == RunLevels.STASH ? "A stash: climb to the chest"
+                    : "A passage: another way through";
+            String words = kind == RunLevels.ARENA ? (one[10] != 0 ? "Clear them all. Something sleeps under the last wave." : "Clear every sign: the door opens when they are gone.")
+                    : kind == RunLevels.GAME ? "10 seconds. Catch " + PlusRun.ENOUGH + " for the prize." : kind == RunLevels.RANGE
+                    ? "12 seconds, and an ink gun that never empties. Hit " + PlusRun.ENOUGH + "." : kind == RunLevels.TRAMPLE
+                    ? "15 seconds. They keep coming: flatten " + PlusRun.ENOUGH + "." : kind == RunLevels.STASH ? "It is in sight. Find the way up to it."
+                    : "Spikes, signs, and a chest by the far door.";
+            float show = Math.min(1, roomCardAge / .25f) * (holds ? 1 : Math.max(0, Math.min(1, (3.4f - roomCardAge) / .4f)));
+            if (holds) canvas.drawColor(Color.argb(Math.round(90 * show), 20, 16, 30));
+            float wide = Math.min(safe.width() - dp(36), dp(340)), high = dp(holds ? 104 : 80);
+            float left = safe.centerX() - wide / 2, top = safe.top + safe.height() * .3f - dp(14) * (1 - Math.min(1, roomCardAge / .25f));
+            canvas.saveLayerAlpha(left - dp(8), top - dp(8), left + wide + dp(8), top + high + dp(12), Math.round(255 * show));
+            box.set(left, top, left + wide, top + high);
+            plate(canvas, box, dp(22), 250);
+            int colour = kind == RunLevels.ARENA ? 0xFFC0392B : kind == RunLevels.PASSAGE ? 0xFF3B7BE0 : kind == RunLevels.STASH ? 0xFF8A5A33 : 0xFFE0A21A;
+            stroke.setColor(colour);
+            stroke.setStrokeWidth(dp(3));
+            canvas.drawRoundRect(left, top, left + wide, top + high, dp(22), dp(22), stroke);
+            paint.setAlpha(255);
+            if (kind == RunLevels.ARENA) pieceIn(canvas, four, CELLAR_PICTURE, left + dp(38), top + dp(40), dp(46), 0);
+            else if (kind == RunLevels.STASH) pieceIn(canvas, four, CHEST_PICTURE, left + dp(38), top + dp(40), dp(46), 0);
+            else if (kind == RunLevels.PASSAGE) pieceIn(canvas, four, DOOR_PICTURE, left + dp(38), top + dp(40), dp(46), 0);
+            else artIn(canvas, kind == RunLevels.GAME ? PLUS_ART : STAR_ART, left + dp(38), top + dp(40), dp(40));
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            fitted(canvas, title, left + dp(72), top + dp(36), dp(18), wide - dp(88));
+            text.setColor(soft);
+            fitted(canvas, words, left + dp(72), top + dp(58), dp(12.5f), wide - dp(88));
+            if (holds) {
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(colour);
+                text.setTextSize(dp(13));
+                text.setAlpha(roomCardAge > .5f ? Math.round(170 + 80 * (float) Math.sin(clock * 6)) : 90);
+                canvas.drawText("Tap to begin", safe.centerX(), top + dp(88), text);
+                text.setAlpha(255);
+            }
+            canvas.restore();
+        }
+        if (roomResultAge >= 0) {
+            boolean holds = roomResultAge < 2.6f;
+            float show = Math.min(1, roomResultAge / .25f) * (holds ? 1 : Math.max(0, Math.min(1, (5.5f - roomResultAge) / .5f)));
+            if (holds) canvas.drawColor(Color.argb(Math.round(90 * show), 20, 16, 30));
+            float wide = Math.min(safe.width() - dp(36), dp(340)), high = dp(roomGave.isEmpty() ? 84 : 112);
+            float left = safe.centerX() - wide / 2, top = safe.top + safe.height() * .3f - dp(14) * (1 - Math.min(1, roomResultAge / .25f));
+            canvas.saveLayerAlpha(left - dp(8), top - dp(8), left + wide + dp(8), top + high + dp(12), Math.round(255 * show));
+            box.set(left, top, left + wide, top + high);
+            plate(canvas, box, dp(22), 250);
+            stroke.setColor(0xFFE0B13A);
+            stroke.setStrokeWidth(dp(3));
+            canvas.drawRoundRect(left, top, left + wide, top + high, dp(22), dp(22), stroke);
+            paint.setAlpha(255);
+            if (roomPicture >= 0) pieceIn(canvas, four, roomPicture, left + dp(38), top + dp(42), dp(46), 0);
+            else artIn(canvas, STAR_ART, left + dp(38), top + dp(42), dp(40));
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            fitted(canvas, roomResult, left + dp(72), top + dp(36), dp(19), wide - dp(88));
+            text.setColor(soft);
+            fitted(canvas, roomScore, left + dp(72), top + dp(59), dp(13.5f), wide - dp(88));
+            if (!roomGave.isEmpty()) {
+                text.setColor(0xFFB8860B);
+                fitted(canvas, roomGave, left + dp(22), top + dp(92), dp(14), wide - dp(44));
+            }
+            canvas.restore();
+        }
     }
 
     /** The button that uses the door she stands at: round, over the jump, with a door on it and what it will do. */
@@ -2496,7 +2751,8 @@ final class RunGame {
 
     /** Something that helps, by its kind: what lay about in the first volume, what her friends hold out in the second, and the ribbons. */
     private void help(Canvas canvas, int kind, float x, float y, float size) {
-        if (kind > PlusRun.FORM) pieceIn(canvas, two, RIBBON_ART + kind - PlusRun.FORM - 1, x, y, size, 0);
+        if (kind == PlusRun.CHEST) pieceIn(canvas, four, CHEST_PICTURE, x, y, size * 1.5f, 0);
+        else if (kind > PlusRun.FORM) pieceIn(canvas, two, RIBBON_ART + kind - PlusRun.FORM - 1, x, y, size, 0);
         else if (kind == PlusRun.HOMERUN || kind == PlusRun.COMPLIMENT) pieceIn(canvas, two, GIFT_ART + kind - PlusRun.HOMERUN, x, y, size, 0);
         else if (kind == PlusRun.CAKE) pieceIn(canvas, four, CAKE_PICTURE, x, y, size, 0);
         else if (kind <= PlusRun.NOTES) artIn(canvas, BUFF_ART + kind, x, y, size);
@@ -3514,18 +3770,55 @@ final class RunGame {
             canvas.drawText(words, safe.left + margin + dp(36), under + dp(22), text);
             under += high + dp(8);
         }
-        // In a cellar that has shut behind her, which wave it is; where pluses fall, how long they will and how many she has.
+        // In a place off the land where something is going on, a plate of its own, apart from the land's: for a cellar, which wave it is
+        // and how many of it still stand; for a game, the seconds left, as a number and as a bar that runs down, and her count against
+        // the count to beat. The last three seconds are red, and beat.
         if (run.room() >= 0 && run.sealed()) {
-            String words = run.level().rooms.get(run.room())[0] == RunLevels.RANGE ? "Targets   " + (int) Math.ceil(run.gameLeft()) + " s   + " + run.caught() * 2
-                    : run.wave() > 0 ? "Wave " + run.wave() + " of " + PlusRun.WAVES
-                    : "Catch them   " + (int) Math.ceil(run.gameLeft()) + " s   + " + run.caught();
-            text.setTextSize(dp(14.5f));
-            float wide = text.measureText(words) + dp(40), high = dp(38), from = safe.centerX() - wide / 2;
+            int kind = run.level().rooms.get(run.room())[0];
+            boolean cellar = kind == RunLevels.ARENA, last = !cellar && run.gameLeft() <= 3;
+            float wide = Math.min(safe.width() - margin * 2, dp(300)), high = dp(cellar ? 44 : 58), from = safe.centerX() - wide / 2;
             box.set(from, under, from + wide, under + high);
-            plate(canvas, box, high / 2, 235);
-            text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(ink);
-            canvas.drawText(words, safe.centerX(), under + dp(24.5f), text);
+            plate(canvas, box, dp(20), 240);
+            if (last) {
+                stroke.setColor(0xFFE0362F);
+                stroke.setAlpha(Math.round(140 + 110 * (float) Math.sin(clock * 14)));
+                stroke.setStrokeWidth(dp(2.5f));
+                canvas.drawRoundRect(from, under, from + wide, under + high, dp(20), dp(20), stroke);
+                stroke.setAlpha(255);
+            }
+            text.setTextAlign(Paint.Align.LEFT);
+            if (cellar) {
+                paint.setAlpha(255);
+                pieceIn(canvas, four, CELLAR_PICTURE, from + dp(24), under + high / 2, dp(28), 0);
+                text.setColor(ink);
+                text.setTextSize(dp(15.5f));
+                canvas.drawText("Wave " + run.wave() + " of " + PlusRun.WAVES, from + dp(46), under + dp(27.5f), text);
+                text.setTextAlign(Paint.Align.RIGHT);
+                text.setColor(soft);
+                text.setTextSize(dp(13.5f));
+                canvas.drawText(run.waveLeft() + " left", from + wide - dp(16), under + dp(27), text);
+            } else {
+                String what = kind == RunLevels.RANGE ? "Targets" : kind == RunLevels.TRAMPLE ? "Flattened" : "Caught";
+                boolean enough = run.caught() >= PlusRun.ENOUGH;
+                text.setColor(last ? 0xFFE0362F : ink);
+                text.setTextSize(dp(last ? 24 + 2 * (float) Math.sin(clock * 14) : 22));
+                canvas.drawText(String.valueOf((int) Math.ceil(run.gameLeft())), from + dp(18), under + dp(30), text);
+                text.setTextSize(dp(12));
+                text.setColor(soft);
+                canvas.drawText("s", from + dp(18) + dp(last ? 30 : 28), under + dp(30), text);
+                text.setTextAlign(Paint.Align.RIGHT);
+                text.setTextSize(dp(15.5f));
+                text.setColor(enough ? 0xFFE0A21A : ink);
+                canvas.drawText(what + "  " + run.caught() + " / " + PlusRun.ENOUGH + (enough ? "  ★" : ""), from + wide - dp(16), under + dp(29), text);
+                // The bar: what is left of the time, running down from the right.
+                float left = from + dp(16), right = from + wide - dp(16), share = Math.max(0, Math.min(1, run.gameLeft() / Math.max(.1f, run.gameLasts())));
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+                canvas.drawRoundRect(left, under + dp(40), right, under + dp(48), dp(4), dp(4), paint);
+                paint.setColor(last ? 0xFFE0362F : CalculatorLayout.CORAL);
+                canvas.drawRoundRect(left, under + dp(40), left + (right - left) * share, under + dp(48), dp(4), dp(4), paint);
+                paint.setColor(Color.BLACK);
+            }
             under += high + dp(8);
         }
         // Her form: its ribbon, with how much of it is left going round it.
