@@ -227,6 +227,12 @@ final class PlusRun {
         petStrikes++;
         petLeft = facingLeft;
         float way = facingLeft ? -1 : 1;
+        if (weapon == TABLET || weapon == KEYS) {
+            Shot shot = shoot(weapon == TABLET ? PAGE : THROWN_KEY, true, petX + way * .3f, petY - .45f, way * 14, 0, .4f);
+            shot.pets = true;
+            if (weapon == TABLET) shot.spin = way * 14;
+            return;
+        }
         if (weapon == PEN || weapon == KNIFE || weapon == GUN || weapon == BOOK) {
             Shot shot = weapon == BOOK ? shoot(BOOK, true, petX + way * .3f, petY - .7f, way * 6, -9, 2.5f) : shoot(weapon, true, petX + way * .3f, petY - .45f, way * 14, 0, .55f);
             shot.pets = true;
@@ -498,8 +504,103 @@ final class PlusRun {
         boolean resists;
         /** How many of the colours that are hers she may wear at once. */
         int together = 2;
+        /**
+         * Her backpack: the things to fight with that she has found, as bits by their
+         * numbers in {@link RunArms}; the one she begins every land with, or none; and how
+         * far the smith has worked on each.
+         */
+        int pack;
+        int main = UNARMED;
+        int[] levels = new int[RunArms.COUNT];
+    }
+
+    /** Her tablet-book and her ring of keys, which are hers to begin a land with; a page of the one, a key of the other, as they fly; and a blow from the panel the tablet-book opens. */
+    static final int TABLET = RunArms.TABLET, KEYS = RunArms.KEYS, PAGE = 27, THROWN_KEY = 28;
+    private int owned, newly, books, previous = UNARMED, finds, lastFound = UNARMED, refills, lastRefill = UNARMED, switches, duds, keyThrows, panels, fans, doubled, laidDown = UNARMED;
+    private float boost, disarmed, heldFor, sinceDud = 99, panelX, panelY;
+    private boolean heavied, panelLeft;
+
+    /** What is in her backpack now, as bits; what of it she found in this land; and how many books she has left to throw. */
+    int owned() { return owned; }
+    int newly() { return newly; }
+    int books() { return books; }
+    /** What she held before what she holds; for how much longer what she holds is the stronger for a find; and for how much longer her hands are empty. */
+    int previous() { return previous; }
+    float boost() { return boost; }
+    float disarmed() { return disarmed; }
+    /** For how long the button has been held with something that does a heavy thing when it is; and counts that only go up. */
+    float heldFor() { return heldFor; }
+    int finds() { return finds; }
+    int lastFound() { return lastFound; }
+    int refills() { return refills; }
+    int lastRefill() { return lastRefill; }
+    int switches() { return switches; }
+    int duds() { return duds; }
+    int panels() { return panels; }
+    int fans() { return fans; }
+    int doubled() { return doubled; }
+    /** Where the last panel opened: its near edge, its top, and whether it opened to the left. */
+    float panelX() { return panelX; }
+    float panelY() { return panelY; }
+    boolean panelLeftward() { return panelLeft; }
+
+    /** Whether something in her backpack can be taken in hand: it is there, and it is not empty. */
+    boolean usable(int kind) {
+        return kind >= 0 && kind < RunArms.COUNT && (owned >> kind & 1) != 0 && (kind != GUN || rounds > 0) && (kind != BOOK || books > 0);
+    }
+
+    /** She takes something else out of her backpack: at once, whatever she is doing. Returns whether she did. */
+    boolean switchTo(int kind) {
+        if (!usable(kind) || kind == weapon || disarmed > 0 || ranging || state != PLAYING) return false;
+        previous = weapon;
+        weapon = kind;
+        switches++;
+        heldFor = 0;
+        heavied = false;
+        return true;
+    }
+
+    /** The other of the last two she has used; or, with no other, the next thing in her backpack. */
+    boolean swap() { return switchTo(nextUp()); }
+
+    /** What a swap would put in her hands, or nothing. */
+    int nextUp() {
+        if (previous != weapon && usable(previous)) return previous;
+        for (int step = 1; step < RunArms.COUNT; step++) {
+            int kind = (Math.max(0, weapon) + step) % RunArms.COUNT;
+            if (kind != weapon && usable(kind)) return kind;
+        }
+        return UNARMED;
+    }
+
+    /** What lay about is hers: one she has not got goes into her backpack and into her hands; one she has gives ink, or books, or makes what she holds stronger for a while. */
+    private void found(int kind) {
+        if ((owned >> kind & 1) == 0) {
+            owned |= 1 << kind;
+            newly |= 1 << kind;
+            finds++;
+            lastFound = kind;
+            if (kind == GUN) rounds = perks.shots;
+            if (kind == BOOK) books = RunArms.BOOKS;
+            previous = weapon;
+            weapon = kind;
+            return;
+        }
+        refills++;
+        lastRefill = kind;
+        if (kind == GUN) rounds = Math.min(perks.shots * 2, rounds + RunArms.INK);
+        else if (kind == BOOK) books = Math.min(RunArms.BOOKS * 2, books + RunArms.PAGES);
+        else boost = RunArms.BOOSTED;
+    }
+
+    /** What she holds is used up: she holds what she begins a land with, or nothing. */
+    private void emptied() {
+        previous = weapon;
+        weapon = perks.main != weapon && usable(perks.main) ? perks.main : UNARMED;
     }
     static final int GUN_SHOTS = 16;
+    /** A blow from the panel of translation that her tablet-book opens. */
+    private static final int PANELLED = -7;
     /** How long a swing of the brush or the sword lasts. */
     static final float SWING = .18f;
     /** How long before it throws a sign that throws knives can be seen to raise one. */
@@ -522,8 +623,6 @@ final class PlusRun {
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
     private static final float ILLYA_KEEPS = 4.2f, ILLYA_DRIFT = 2.4f, ILLYA_ROOM = 11.5f;
     private static final float HOP_HIGH = 1.9f, HOP_EVERY = 1.3f, STUNNED = 1.1f;
-    /** How long each of her things must rest between one use and the next. */
-    private static final float[] REST = {.42f, .24f, .75f, .42f, .3f, .15f};
     /** How near she must be for a knife to be thrown at her, how often one is, and how fast it flies; and the same for a dot and for Zero's books. */
     private static final float THROW_REACH = 5.2f, THROW_EVERY = 2.6f, THROWN = 4.2f;
     private static final float DOT_REACH = 6, DOT_SPEED = 6.5f, BOOK_REACH = 9, BOOK_EVERY = 3.4f, BOOK_WEIGHT = 30;
@@ -592,6 +691,8 @@ final class PlusRun {
         int taken;
         /** Whether it was put into a land to make up its numbers: such a one keeps still while she is far off. */
         boolean crowd;
+        /** For how much longer a key is stuck in it: the next blow on it that is not a key counts twice. */
+        float unlocked;
         /**
          * For those who wait at the end. How much they can take at most. What they are doing
          * is one of the things they do, numbered from 1 in {@link #mode}, and where they are
@@ -714,6 +815,11 @@ final class PlusRun {
         this.perks = perks;
         halves = perks.hearts * 2;
         lives = perks.lives;
+        // What is in her backpack is with her from the start, and what she begins a land with is in her hands.
+        owned = perks.pack | (perks.main != UNARMED ? 1 << perks.main : 0);
+        weapon = perks.main;
+        rounds = perks.shots;
+        books = RunArms.BOOKS;
         columns = level.columns;
         pluses.addAll(level.pluses);
         arms.addAll(level.weapons);
@@ -884,6 +990,7 @@ final class PlusRun {
             foe.act = from.act;
             foe.mode = from.mode;
             foe.size = from.size;
+            foe.unlocked = from.unlocked;
             foe.most = from.most;
             foe.step = from.step;
             foe.turn = from.turn;
@@ -918,6 +1025,13 @@ final class PlusRun {
         }
         weapon = other.weapon;
         rounds = other.rounds;
+        owned = other.owned;
+        newly = other.newly;
+        books = other.books;
+        previous = other.previous;
+        boost = other.boost;
+        disarmed = other.disarmed;
+        laidDown = other.laidDown;
         swungWith = other.swungWith;
         sinceStrike = other.sinceStrike;
         swing = other.swing;
@@ -1601,6 +1715,11 @@ final class PlusRun {
         perks.formLonger = now.formLonger;
         perks.together = now.together;
         perks.resists |= now.resists;
+        perks.pack |= now.pack;
+        owned |= now.pack;
+        perks.main = now.main;
+        if (now.main != UNARMED) owned |= 1 << now.main;
+        perks.levels = now.levels.clone();
     }
 
     /** Whether she has a second jump in the air to her name. */
@@ -1764,9 +1883,19 @@ final class PlusRun {
 
     /** A blow lands on a shield: a piece of it is gone, more for what is heavy and for what it is weak to; the last piece gone, it is broken. */
     private void chip(Foe foe) {
-        float bite = with == BEAMED || with == BLASTED ? 3 : with == SWORDED || with == PLUNGED || with == BOOK || with == STEAM ? 2 : with == GUN ? .5f : 1;
+        float bite = with == BEAMED ? 3 : with == BLASTED ? RunArms.bite(BOOK, perks.levels[BOOK]) : with == SWORDED ? RunArms.bite(SWORD, perks.levels[SWORD])
+                : with == PLUNGED || with == BOOK || with == STEAM ? 2 : with == GUN ? RunArms.bite(GUN, perks.levels[GUN]) : with == PANELLED ? RunArms.PANEL_BITE
+                : with == PEN || with == KNIFE ? RunArms.bite(with, perks.levels[with]) : with == PAGE ? RunArms.bite(TABLET, perks.levels[TABLET])
+                : with == THROWN_KEY ? RunArms.bite(KEYS, perks.levels[KEYS]) : 1;
         int weak = weak(foe.kind);
         if (weak != 0 && (with == weak || with == STEAM)) bite += 1;
+        // What she holds, the stronger for a find; and a shield with a key in it, from which the next blow that is not a key takes a piece more.
+        if (boost > 0 && with != BEAMED) bite += RunArms.BOOST_BITE;
+        if (foe.unlocked > 0 && with != THROWN_KEY) {
+            bite += 1;
+            foe.unlocked = 0;
+            doubled++;
+        }
         if (absent(foe) || foe.forming > 0 || foe.shieldMost <= 0) {
             parried++;
             return;
@@ -1973,7 +2102,9 @@ final class PlusRun {
     /** Puts something in her hands: for checking the rules, and for looking at them. */
     void arm(int with) {
         weapon = with;
-        rounds = with == GUN ? perks.shots : 0;
+        if (with >= 0) owned |= 1 << with;
+        if (with == GUN) rounds = perks.shots;
+        if (with == BOOK) books = RunArms.BOOKS;
     }
 
     /** Puts her somewhere, standing still: for checking the rules from a place of one's choosing. */
@@ -2147,13 +2278,12 @@ final class PlusRun {
                 plusY = plus[1] + .5f;
             }
         }
-        // A thing to fight with is picked up by touching it, in place of whatever she carried.
+        // A thing to fight with is picked up by touching it: into her backpack, and into her hands if she had none of its kind.
         for (int index = arms.size() - 1; index >= 0; index--) {
             int[] arm = arms.get(index);
             if (x < arm[1] + .85f && x + WIDE > arm[1] + .15f && y < arm[2] + .9f && y + TALL > arm[2] + .1f) {
                 arms.remove(index);
-                weapon = arm[0];
-                rounds = weapon == GUN ? perks.shots : 0;
+                found(arm[0]);
                 picked++;
             }
         }
@@ -2256,6 +2386,10 @@ final class PlusRun {
         }
         // A press of the button uses it, once it has rested; the ink gun goes on for as long as the button is held.
         sinceStrike += seconds;
+        sinceDud += seconds;
+        if (boost > 0) boost -= seconds;
+        // Her hands were emptied: after a while what she held is in them again, if she has a backpack to take it from.
+        if (disarmed > 0 && (disarmed -= seconds) <= 0 && weapon == UNARMED && perks.main != UNARMED) weapon = usable(laidDown) ? laidDown : perks.main;
         if (swing > 0) swing -= seconds;
         // In black nothing she carries is any use to her. In red and in blue the button throws fire and water, and whatever she
         // carries is used as well: the one is never lost to the other.
@@ -2263,8 +2397,20 @@ final class PlusRun {
         sinceBrace += seconds;
         if (mastered) shine(seconds, strike);
         {
-            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= REST[weapon];
+            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= RunArms.rest(weapon, perks.levels[weapon]);
             if (used) use();
+            // Held, a tablet-book opens its panel and a ring of keys goes out in a fan: once for each hold. (With the white that is truly
+            // hers the hold is her beam's.)
+            if (weapon != UNARMED && RunArms.heavy(weapon) && strike && !mastered) {
+                heldFor += seconds;
+                if (heldFor >= RunArms.CHARGE && !heavied) {
+                    heavied = true;
+                    heavy();
+                }
+            } else {
+                heldFor = 0;
+                heavied = false;
+            }
             if ((has(RED) || has(BLUE)) && strike && (!strikeHeld || used) && sinceCast >= .32f) cast();
         }
         strikeHeld = strike;
@@ -2773,6 +2919,12 @@ final class PlusRun {
         foeX = foe.x + foe.wide() / 2;
         foeY = foe.y + foe.tall();
         if (waits) blows++;
+        // One with a key in it: the next blow that is not a key counts twice.
+        if (!waits && foe.unlocked > 0 && with != THROWN_KEY && foe.left > 1) {
+            foe.left--;
+            foe.unlocked = 0;
+            doubled++;
+        }
         if (--foe.left <= 0) {
             foe.flat = true;
             foe.y = foe.ground;
@@ -2958,18 +3110,71 @@ final class PlusRun {
         strikes++;
         copied();
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
-        if (weapon == PEN) {
-            shoot(PEN, true, fromX, fromY, way * 13, 0, 1);
-        } else if (weapon == KNIFE) {
-            shoot(KNIFE, true, fromX, fromY, way * 19, 0, .5f);
+        // How fast it flies and how far it reaches are the table's; a find of something she has already makes it reach a third as far again.
+        int level = perks.levels[weapon];
+        float speed = RunArms.speed(weapon), lasts = speed > 0 ? RunArms.reach(weapon, level) / speed * (boost > 0 ? RunArms.BOOST_FAR : 1) : 0;
+        if (weapon == PEN || weapon == KNIFE) {
+            shoot(weapon, true, fromX, fromY, way * speed, 0, lasts);
         } else if (weapon == BOOK) {
-            shoot(BOOK, true, fromX, fromY - .3f, way * 7.5f + speedAcross * .4f, -11, 3);
+            shoot(BOOK, true, fromX, fromY - .3f, way * speed + speedAcross * .4f, -11, 3);
+            if (--books <= 0) emptied();
         } else if (weapon == GUN) {
-            shoot(GUN, true, fromX, fromY, way * 22, 0, .9f);
-            if (--rounds <= 0) weapon = UNARMED;
+            shoot(GUN, true, fromX, fromY, way * speed, 0, lasts);
+            if (--rounds <= 0) emptied();
+        } else if (weapon == TABLET) {
+            // A page, flicked out and back: it slows as it goes, turns, and comes back through whatever is in its way.
+            Shot page = shoot(PAGE, true, fromX, fromY, way * speed, 0, RunArms.PAGE_TURNS * 2);
+            page.spin = way * speed * (boost > 0 ? RunArms.BOOST_FAR : 1);
+            page.through = true;
+        } else if (weapon == KEYS) {
+            // A key. Once in a while one fails, and nothing leaves her hand: never twice running, never while one of those who wait can
+            // be hurt, and the next is ready almost at once.
+            boolean wide = false;
+            for (Foe foe : foes) wide |= RunLevels.boss(foe.kind) && !foe.flat && !absent(foe) && open(foe);
+            if (++keyThrows % RunArms.FAILS_IN == 0 && sinceDud > 20 && !wide) {
+                duds++;
+                sinceDud = 0;
+                sinceStrike = RunArms.rest(KEYS, level) - .12f;
+                return;
+            }
+            shoot(THROWN_KEY, true, fromX, fromY, way * speed, 0, lasts);
         } else {
             swing = SWING;
             swungWith = weapon;
+        }
+    }
+
+    /** The heavy thing: the tablet-book's panel, which takes all that stands in it and wipes away what is thrown into it; or the whole ring of keys, in a fan. */
+    private void heavy() {
+        float way = facingLeft ? -1 : 1;
+        sinceStrike = RunArms.rest(weapon, perks.levels[weapon]) - RunArms.heavyRest(weapon);
+        strikes++;
+        if (weapon == KEYS) {
+            fans++;
+            float fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f, speed = RunArms.speed(KEYS), lasts = RunArms.reach(KEYS, perks.levels[KEYS]) / speed;
+            for (int key = 0; key < RunArms.FAN; key++) {
+                double turn = (key - (RunArms.FAN - 1) / 2f) * RunArms.FAN_APART * 2 * Math.PI / 6;
+                shoot(THROWN_KEY, true, fromX, fromY, way * (float) Math.cos(turn) * speed, (float) Math.sin(turn) * speed, lasts);
+            }
+            return;
+        }
+        panels++;
+        float wide = RunArms.PANEL_WIDE + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - wide : x + WIDE, to = from + wide;
+        float top = y + TALL - RunArms.PANEL_TALL, bottom = y + TALL;
+        panelX = facingLeft ? x : x + WIDE;
+        panelY = top;
+        panelLeft = facingLeft;
+        for (Foe foe : foes) {
+            if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x - spare(foe, true) >= to || foe.x + foe.wide() + spare(foe, true) <= from || foe.y - spare(foe, false) >= bottom
+                    || foe.y + foe.tall() <= top) continue;
+            beat(foe, PANELLED);
+        }
+        for (int index = shots.size() - 1; index >= 0; index--) {
+            Shot shot = shots.get(index);
+            if (!shot.hers && shot.x > from - .2f && shot.x < to + .2f && shot.y > top - .2f && shot.y < bottom + .2f) {
+                shots.remove(index);
+                turned++;
+            }
         }
     }
 
@@ -3055,7 +3260,8 @@ final class PlusRun {
      */
     private void swung() {
         boolean brush = swungWith == BRUSH;
-        float ahead = brush ? 1.05f : .9f, behind = brush ? .3f : 0, top = y - (brush ? .9f : .15f), bottom = y + TALL;
+        float ahead = RunArms.reach(swungWith, perks.levels[swungWith]) + (boost > 0 ? RunArms.BOOST_SWING : 0), behind = brush ? .3f : 0;
+        float top = y + TALL - RunArms.area(swungWith, perks.levels[swungWith]), bottom = y + TALL;
         float from = facingLeft ? x - ahead : x - behind, to = facingLeft ? x + WIDE + behind : x + WIDE + ahead;
         for (Foe foe : foes) {
             if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x - spare(foe, true) >= to || foe.x + foe.wide() + spare(foe, true) <= from || foe.y - spare(foe, false) >= bottom
@@ -3120,6 +3326,7 @@ final class PlusRun {
             else if (shot.kind == SAYING) shot.down = (float) Math.cos(shot.age * 7) * 3.2f;
             else if (shot.kind == GLOB) shot.down += BOOK_WEIGHT * seconds;
             else if (shot.kind == BOOMERANG) shot.across = shot.spin * (1 - shot.age);
+            else if (shot.kind == PAGE) shot.across = shot.spin * (1 - shot.age / RunArms.PAGE_TURNS);
             else if (shot.kind == DEBRIS) shot.down = shot.age < HANGS ? 0 : 13;
             // A ledge is thin: it stops only what comes down on it, which makes it somewhere to shelter.
             char in = at((int) Math.floor(shot.x), (int) Math.floor(shot.y));
@@ -3161,6 +3368,7 @@ final class PlusRun {
                         drunk++;
                     } else if (foe.dazed <= 0) {
                         beat(foe, shot.kind);
+                        if (shot.kind == THROWN_KEY && !foe.flat) foe.unlocked = RunArms.UNLOCKS;
                         // One sign after another dealt with by what she throws: each is worth one plus more than the last, up to four.
                         if (foe.flat && !RunLevels.boss(foe.kind)) {
                             if (foe.kind == RunLevels.TARGET) break;
@@ -4192,7 +4400,9 @@ final class PlusRun {
             case 34:
                 // Anything times nothing is nothing: but only what stands on his floor.
                 if (onGround && y + TALL > floor - .2f) {
+                    if (weapon != UNARMED) laidDown = weapon;
                     weapon = UNARMED;
+                    disarmed = 3;
                     fade(false);
                     rush = 0;
                     magnet = 0;

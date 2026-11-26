@@ -1443,6 +1443,335 @@ public class PlusRunTest {
         assertTrue(thrower.flat);
     }
 
+    /** A land of flat ground with things to fight with lying on it, each at a column. */
+    private static RunLevels.Level strewn(int... kindsAndColumns) {
+        RunLevels.Level level = flat(120);
+        for (int index = 0; index < kindsAndColumns.length; index += 2) level.weapons.add(new int[]{kindsAndColumns[index], kindsAndColumns[index + 1], FLOOR - 1});
+        return level;
+    }
+
+    private static void strike(PlusRun run) {
+        run.step(STEP, false, false, false, true);
+        run.step(STEP, false, false, false, false);
+    }
+
+    @Test public void whatSheFindsIsKeptInHerBackpackAndSheChangesBetweenThemAtWill() {
+        // A thing found is in her backpack and in her hands; another found, the first is still hers, and a swap goes between the two.
+        PlusRun run = new PlusRun(strewn(PlusRun.PEN, 10, PlusRun.SWORD, 14, PlusRun.PEN, 18, PlusRun.GUN, 22, PlusRun.GUN, 26, PlusRun.BOOK, 30, PlusRun.BOOK, 34));
+        assertEquals(PlusRun.UNARMED, run.weapon());
+        assertEquals(0, run.owned());
+        assertFalse(run.swap());
+        run.place(10.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.PEN, run.weapon());
+        assertEquals(1 << PlusRun.PEN, run.owned());
+        assertEquals(1 << PlusRun.PEN, run.newly());
+        assertEquals(1, run.finds());
+        assertEquals(PlusRun.PEN, run.lastFound());
+        run.place(14.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.SWORD, run.weapon());
+        assertEquals(PlusRun.PEN, run.previous());
+        assertEquals(1 << PlusRun.PEN | 1 << PlusRun.SWORD, run.owned());
+        assertTrue(run.swap());
+        assertEquals(PlusRun.PEN, run.weapon());
+        assertTrue(run.swap());
+        assertEquals(PlusRun.SWORD, run.weapon());
+        assertEquals(2, run.switches());
+        assertFalse(run.switchTo(PlusRun.GUN));
+        assertFalse(run.switchTo(PlusRun.SWORD));
+        assertTrue(run.usable(PlusRun.PEN) && !run.usable(PlusRun.GUN) && !run.usable(PlusRun.TABLET));
+        // One she has already is not put in her hands again: what she holds is the stronger for it, for a while.
+        assertEquals(0, run.boost(), 0);
+        run.place(18.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.SWORD, run.weapon());
+        assertEquals(2, run.finds());
+        assertEquals(1, run.refills());
+        assertEquals(PlusRun.PEN, run.lastRefill());
+        assertEquals(RunArms.BOOSTED, run.boost(), .05f);
+        assertEquals(3, run.picked());
+        // The ink gun keeps its own ink: found, a full tank; fired empty, it is put away and cannot be taken up; ink found fills it by so much.
+        run.place(22.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.GUN, run.weapon());
+        assertEquals(PlusRun.GUN_SHOTS, run.rounds());
+        assertEquals(RunArms.holds(RunArms.GUN, PlusRun.GUN_SHOTS), run.rounds());
+        for (int step = 0; step < 60 * 6 && run.weapon() == PlusRun.GUN; step++) run.step(STEP, false, false, false, true);
+        assertEquals(PlusRun.UNARMED, run.weapon());
+        assertEquals(0, run.rounds());
+        assertFalse(run.usable(PlusRun.GUN));
+        assertFalse(run.switchTo(PlusRun.GUN));
+        run.place(26.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(RunArms.INK, run.rounds());
+        assertEquals(PlusRun.UNARMED, run.weapon());
+        assertTrue(run.switchTo(PlusRun.GUN));
+        // Books: so many to a land; a find of more gives two.
+        run.place(30.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.BOOK, run.weapon());
+        assertEquals(RunArms.BOOKS, run.books());
+        hold(run, 1, false, false, false);
+        for (int thrown = 0; thrown < RunArms.BOOKS; thrown++) {
+            assertEquals(PlusRun.BOOK, run.weapon());
+            strike(run);
+            assertEquals("throw " + thrown, RunArms.BOOKS - thrown - 1, run.books());
+            hold(run, RunArms.rest(RunArms.BOOK, 0) + .05f, false, false, false);
+        }
+        assertEquals(0, run.books());
+        assertEquals(PlusRun.UNARMED, run.weapon());
+        run.place(34.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(RunArms.PAGES, run.books());
+        assertTrue(run.switchTo(PlusRun.BOOK));
+
+        // What is kept from other lands is with her from the start, what she begins a land with is in her hands, and a thing that runs
+        // out leaves her holding that.
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.pack = 1 << PlusRun.PEN | 1 << PlusRun.GUN;
+        perks.main = PlusRun.TABLET;
+        run = new PlusRun(strewn(PlusRun.PEN, 10, PlusRun.KEYS, 14), perks);
+        assertEquals(PlusRun.TABLET, run.weapon());
+        assertEquals(1 << PlusRun.PEN | 1 << PlusRun.GUN | 1 << PlusRun.TABLET, run.owned());
+        assertEquals(0, run.newly());
+        assertTrue(run.switchTo(PlusRun.GUN));
+        assertEquals(PlusRun.GUN_SHOTS, run.rounds());
+        for (int step = 0; step < 60 * 6 && run.weapon() == PlusRun.GUN; step++) run.step(STEP, false, false, false, true);
+        assertEquals(PlusRun.TABLET, run.weapon());
+        // Where a pen lay there is still something for her: not a pen again, but a while of what she holds being stronger.
+        run.place(10.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.TABLET, run.weapon());
+        assertEquals(0, run.finds());
+        assertEquals(1, run.refills());
+        assertTrue(run.boost() > 0);
+        // And a ring of keys found is hers as anything else is.
+        run.place(14.2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.KEYS, run.weapon());
+        assertEquals(1 << PlusRun.KEYS, run.newly());
+        assertTrue(RunArms.main(RunArms.KEYS) && RunArms.main(RunArms.TABLET) && !RunArms.main(RunArms.GUN));
+    }
+
+    @Test public void whatEachThingDoesIsWhatItsCardSaysAndTheFiguresAreTheTables() {
+        // What is thrown: as fast as the table says, and for as long as takes it as far as the table says.
+        for (int weapon : new int[]{PlusRun.PEN, PlusRun.KNIFE, PlusRun.GUN}) {
+            PlusRun run = new PlusRun(flat(120));
+            run.place(20, GROUND);
+            run.arm(weapon);
+            run.step(STEP, false, false, false, true);
+            assertEquals("weapon " + weapon, 1, run.shots().size());
+            PlusRun.Shot shot = run.shots().get(0);
+            assertEquals("weapon " + weapon, RunArms.speed(weapon), shot.across, .001f);
+            float started = shot.x - shot.across * STEP;
+            while (!run.shots().isEmpty()) run.step(STEP, false, false, false);
+            assertEquals("weapon " + weapon, RunArms.reach(weapon, 0), shot.x - started, RunArms.speed(weapon) * STEP * 2);
+        }
+        // Each rests for as long as the table says: no sooner is it used again.
+        for (int weapon = 0; weapon < RunArms.COUNT; weapon++) {
+            PlusRun run = new PlusRun(flat(120));
+            run.place(20, GROUND);
+            run.arm(weapon);
+            strike(run);
+            int strikes = run.strikes();
+            hold(run, RunArms.rest(weapon, 0) - .08f, false, false, false);
+            strike(run);
+            assertEquals("weapon " + weapon, strikes, run.strikes());
+            hold(run, .1f, false, false, false);
+            strike(run);
+            assertEquals("weapon " + weapon, strikes + 1, run.strikes());
+            assertEquals(1 / RunArms.rest(weapon, 0), RunArms.pace(weapon, 0), 0);
+            assertFalse(RunArms.does(weapon).isEmpty() || RunArms.goodFor(weapon).isEmpty() || RunArms.NAMES[weapon].isEmpty());
+        }
+        // What is swung takes what is within its reach, and nothing a little beyond it.
+        for (int weapon : new int[]{PlusRun.BRUSH, PlusRun.SWORD}) {
+            for (int beyond = 0; beyond < 2; beyond++) {
+                RunLevels.Level level = flat(60);
+                level.foes.add(new int[]{RunLevels.THROWER, 30, FLOOR - 1});
+                PlusRun run = new PlusRun(level);
+                PlusRun.Foe foe = run.foes().get(0);
+                // (A small one is taken from as far off as one of the old size: an eighth of its old width is spare.)
+                float edge = foe.x - .8f * .5f * (1 - PlusRun.SMALL);
+                run.arm(weapon);
+                run.place(edge - RunArms.reach(weapon, 0) - PlusRun.WIDE + (beyond == 0 ? .05f : -.08f), GROUND);
+                run.step(STEP, false, true, false);
+                strike(run);
+                hold(run, .3f, false, false, false);
+                assertEquals("weapon " + weapon + " beyond " + beyond, beyond == 0, foe.flat);
+            }
+        }
+        // What each takes off a shield is the table's: tried on one of those who wait, standing in the open with a shield of twenty pieces.
+        float[] took = new float[RunArms.COUNT];
+        for (int weapon : new int[]{PlusRun.PEN, PlusRun.KNIFE, PlusRun.SWORD, PlusRun.BRUSH, PlusRun.GUN, PlusRun.TABLET, PlusRun.KEYS}) {
+            RunLevels.Level level = flat(80);
+            level.foes.add(new int[]{RunLevels.GUARD, 30, FLOOR - 1});
+            PlusRun run = new PlusRun(level);
+            PlusRun.Foe guard = run.foes().get(0);
+            guard.shield = guard.shieldMost = 20;
+            run.arm(weapon);
+            run.place(guard.x - (RunArms.way(weapon) == RunArms.SWUNG ? .6f : 3) - PlusRun.WIDE, GROUND);
+            run.step(STEP, false, true, false);
+            run.step(STEP, false, false, false, true);
+            for (int step = 0; step < 40 && guard.shield == 20; step++) run.step(STEP, false, false, false);
+            took[weapon] = 20 - guard.shield;
+            assertEquals("weapon " + weapon, RunArms.bite(weapon, 0), took[weapon], .001f);
+        }
+        assertTrue(took[PlusRun.SWORD] > took[PlusRun.PEN] && took[PlusRun.PEN] > took[PlusRun.GUN]);
+    }
+
+    @Test public void theTabletBookFlicksAPageOutAndBackAndOpensAPanelWhenHeld() {
+        // A tap: a page, as far as the table says and back to where it left her, through a row of them.
+        RunLevels.Level level = flat(120);
+        level.foes.add(new int[]{RunLevels.TIMES, 23, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.TIMES, 24, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.TIMES, 29, FLOOR - 1});
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.main = PlusRun.TABLET;
+        PlusRun run = new PlusRun(level, perks);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 0;
+        run.place(20, GROUND);
+        run.step(STEP, false, true, false);
+        assertEquals(PlusRun.TABLET, run.weapon());
+        run.step(STEP, false, false, false, true);
+        assertEquals(1, run.shots().size());
+        PlusRun.Shot page = run.shots().get(0);
+        assertEquals(PlusRun.PAGE, page.kind);
+        float from = page.x - page.across * STEP, furthest = from, last = from;
+        for (int step = 0; step < 90 && !run.shots().isEmpty(); step++) {
+            for (PlusRun.Foe foe : run.foes()) if (!foe.flat) foe.x = foe.home;
+            run.step(STEP, false, false, false);
+            furthest = Math.max(furthest, page.x);
+            last = page.x;
+        }
+        assertEquals(RunArms.reach(RunArms.TABLET, 0), furthest - from, .5f);
+        assertTrue("back to " + (last - from), Math.abs(last - from) < 1.2f);
+        assertTrue(run.foes().get(0).flat && run.foes().get(1).flat);
+        assertFalse(run.foes().get(2).flat);
+        assertEquals(0, run.panels());
+        // Held: after a moment a panel opens in front of her, once, and takes all that stands in it, and nothing beyond it; and then
+        // the tablet-book rests the longer.
+        level = flat(120);
+        level.foes.add(new int[]{RunLevels.THROWER, 21, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.THROWER, 22, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.THROWER, 26, FLOOR - 1});
+        run = new PlusRun(level, perks);
+        for (PlusRun.Foe foe : run.foes()) foe.wait = 99;
+        run.place(20.3f - PlusRun.WIDE, GROUND);
+        run.step(STEP, false, true, false);
+        float held = 0;
+        while (run.panels() == 0 && held < 2) {
+            run.shots().clear();
+            run.step(STEP, false, false, false, true);
+            held += STEP;
+        }
+        assertEquals(RunArms.CHARGE, held, .05f);
+        assertEquals(1, run.panels());
+        assertTrue(run.foes().get(0).flat && run.foes().get(1).flat);
+        assertFalse(run.foes().get(2).flat);
+        hold(run, 1, false, false, false);
+        for (int step = 0; step < 60; step++) run.step(STEP, false, false, false, true);
+        assertEquals(2, run.panels());
+        // It rests after: a tap at once does nothing; when it has rested, it flicks a page.
+        run.step(STEP, false, false, false, false);
+        run.shots().clear();
+        strike(run);
+        assertTrue(run.shots().isEmpty());
+        hold(run, RunArms.heavyRest(RunArms.TABLET), false, false, false);
+        strike(run);
+        assertEquals(1, run.shots().size());
+        // The panel takes two pieces off a shield, and wipes away what is thrown into it.
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.GUARD, 30, FLOOR - 1});
+        run = new PlusRun(level, perks);
+        PlusRun.Foe guard = run.foes().get(0);
+        guard.shield = guard.shieldMost = 20;
+        run.place(guard.x - 1 - PlusRun.WIDE, GROUND);
+        run.step(STEP, false, true, false);
+        for (int step = 0; step < 60 && run.panels() == 0; step++) {
+            run.shots().clear();
+            run.step(STEP, false, false, false, true);
+        }
+        assertEquals(1, run.panels());
+        // (A page was flicked at the press, and took its piece before it was cleared away or after: one or none.)
+        assertTrue("took " + (20 - guard.shield), 20 - guard.shield >= RunArms.PANEL_BITE && 20 - guard.shield <= RunArms.PANEL_BITE + RunArms.bite(RunArms.TABLET, 0));
+    }
+
+    @Test public void aKeyLeavesWhatItSticksInUnlockedAndTheRingGoesOutInAFanAndOneFailsNowAndThen() {
+        RunLevels.Level level = flat(120);
+        level.foes.add(new int[]{RunLevels.MINUS, 24, FLOOR - 1, 4});
+        PlusRun run = new PlusRun(level);
+        PlusRun.Foe big = run.foes().get(0);
+        run.arm(PlusRun.KEYS);
+        run.arm(PlusRun.PEN);
+        run.arm(PlusRun.KEYS);
+        run.place(20, GROUND);
+        run.step(STEP, false, true, false);
+        // A key: one blow, and it sticks: for a while the next blow that is not a key counts twice.
+        run.step(STEP, false, false, false, true);
+        assertEquals(PlusRun.THROWN_KEY, run.shots().get(0).kind);
+        for (int step = 0; step < 60 && big.left == 4; step++) {
+            big.x = big.home;
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(3, big.left);
+        assertEquals(RunArms.UNLOCKS, big.unlocked, .1f);
+        assertEquals(0, run.doubled());
+        assertTrue(run.switchTo(PlusRun.PEN));
+        hold(run, .3f, false, false, false);
+        run.step(STEP, false, false, false, true);
+        for (int step = 0; step < 60 && big.left == 3; step++) {
+            big.x = big.home;
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(1, big.left);
+        assertEquals(1, run.doubled());
+        assertEquals(0, big.unlocked, 0);
+        // Held: the whole ring, in a fan.
+        run = new PlusRun(flat(120));
+        run.arm(PlusRun.KEYS);
+        run.place(20, GROUND);
+        for (int step = 0; step < 60 && run.fans() == 0; step++) {
+            run.shots().clear();
+            run.step(STEP, false, false, false, true);
+        }
+        assertEquals(1, run.fans());
+        assertEquals(RunArms.FAN, run.shots().size());
+        float highest = 0, lowest = 0;
+        for (PlusRun.Shot key : run.shots()) {
+            assertEquals(PlusRun.THROWN_KEY, key.kind);
+            highest = Math.min(highest, key.down);
+            lowest = Math.max(lowest, key.down);
+        }
+        assertTrue(highest < -1 && lowest > 1);
+        // Now and then a key fails, and nothing leaves her hand: one throw in thirteen, never twice running, and the next is ready at once.
+        run = new PlusRun(flat(120));
+        run.arm(PlusRun.KEYS);
+        run.place(20, GROUND);
+        int thrown = 0;
+        for (int throwing = 1; throwing < RunArms.FAILS_IN; throwing++) {
+            run.shots().clear();
+            strike(run);
+            assertEquals("throw " + throwing, 1, run.shots().size());
+            hold(run, RunArms.rest(RunArms.KEYS, 0), false, false, false);
+            thrown++;
+        }
+        assertEquals(RunArms.FAILS_IN - 1, thrown);
+        // (Twenty seconds must have gone by since the last that failed: the first is free of that.)
+        run.shots().clear();
+        strike(run);
+        assertEquals(0, run.shots().size());
+        assertEquals(1, run.duds());
+        hold(run, .13f, false, false, false);
+        strike(run);
+        assertEquals(1, run.shots().size());
+        for (int throwing = 0; throwing < RunArms.FAILS_IN * 2; throwing++) {
+            hold(run, RunArms.rest(RunArms.KEYS, 0), false, false, false);
+            strike(run);
+        }
+        assertEquals(1, run.duds());
+    }
+
     @Test public void aBookBurstsWhereItLandsAndIsAFindAndNeverHurtsHer() {
         // No land has more than one book lying in it, and none where she starts; and most have none.
         int with = 0;

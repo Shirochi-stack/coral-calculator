@@ -379,7 +379,9 @@ final class RunLevels {
                 for (int[] item : level.items) free &= item[1] != column;
                 for (int[] thing : level.decor) free &= Math.abs(thing[1] - column) > 6;
                 if (!free) continue;
-                level.weapons.add(new int[]{kinds[which++ % kinds.length], column, floor - 1});
+                // (In one land in five from the seventh on, the first of them is a ring of keys: hers for good once she has found one.)
+                boolean keys = level.number >= 7 && level.number % 5 == 2 && from == 40;
+                level.weapons.add(new int[]{keys ? RunArms.KEYS : kinds[which++ % kinds.length], column, floor - 1});
                 break;
             }
         }
