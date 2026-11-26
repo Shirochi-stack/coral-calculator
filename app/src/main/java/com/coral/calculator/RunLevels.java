@@ -13,7 +13,47 @@ import java.util.Random;
 final class RunLevels {
     static final int COUNT = 30, CHAPTERS = 5, IN_CHAPTER = 6;
     /** With the second volume: fifty more lands, in five chapters of ten. */
-    static final int TOTAL = 80, ALL_CHAPTERS = 10, IN_LATER_CHAPTER = 10;
+    static final int TOTAL = 100, ALL_CHAPTERS = 12, IN_LATER_CHAPTER = 10;
+    /**
+     * The third volume: twenty lands in two chapters, the Unread Shore and the Dragon's
+     * Library, made as the lands of the second are, of everything the second had, and
+     * longer. No one waits at the end of any of them but the last; in each of the others
+     * one of those she has met stands, to pledge her help against what is coming.
+     */
+    static final int SECOND = 80, FRIENDS = 19;
+    /** How far the lands are open: to the last but one, until whoever waits at the end of the hundredth is there. */
+    static final int OPEN_TO = 99;
+
+    /** Which of her friends stands in a land of the third volume to pledge her help, from nought; or none. */
+    static int friendOf(int number) { return number > SECOND && number < TOTAL ? number - SECOND - 1 : -1; }
+
+    /**
+     * The friend of a land stands a little past its second flag, on flat ground where
+     * nothing else stands or lies. She is put in last of all: the land under her is the land
+     * it was.
+     */
+    private static void friend(Level level) {
+        int friend = friendOf(level.number);
+        if (friend < 0 || level.flags.size() < 2) return;
+        int flag = level.flags.get(1);
+        // (Clear of creatures by two squares, if there is such a place; if not, anywhere that none stands.)
+        for (int clear = 2; clear >= 0; clear -= 2) {
+            for (int column = flag + 3; column < level.gate - 6; column++) {
+                int floor = top(level, column);
+                boolean free = floor > 4 && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR && level.land[floor - 3][column] == AIR
+                        && top(level, column - 1) == floor && top(level, column + 1) == floor;
+                for (int[] weapon : level.weapons) free &= Math.abs(weapon[1] - column) > 1;
+                for (int[] item : level.items) if (item[1] < level.main) free &= Math.abs(item[1] - column) > 2;
+                for (int[] thing : level.decor) free &= Math.abs(thing[1] - column) > 6;
+                // (Nor at a door to a place off the land, seen or hidden.)
+                for (int[] room : level.rooms) free &= Math.abs(room[1] - column) > 4 && Math.abs(room[5] - column) > 4;
+                for (int[] foe : level.foes) if (foe[1] < level.main && foe[2] == floor - 1) free &= Math.abs(foe[1] - column) > clear;
+                if (!free) continue;
+                level.items.add(new int[]{PlusRun.PLEDGE, column, floor - 1, 0, friend});
+                return;
+            }
+        }
+    }
     static final int ROWS = 18;
     /** The row the ground's top squares are in. */
     static final int FLOOR = 15;
@@ -227,7 +267,7 @@ final class RunLevels {
                     {TIMES, TIMES, TIMES, THROWER, THROWER, GUNNER, GUNNER, MINUS, MINUS, TIMES + GIANT}};
         } else {
             // The second volume: each chapter has a walker, a bounder, and one that comes after her, of its own; and its dragons fly.
-            int[] walker = {SLIME, POGO, BAR, FAN, BAR}, bounder = {POGO, BAR, SLIME, POGO, FAN}, hunter = {BAR, SLIME, FAN, SLIME, SLIME};
+            int[] walker = {SLIME, POGO, BAR, FAN, BAR, SLIME, FAN}, bounder = {POGO, BAR, SLIME, POGO, FAN, POGO, BAR}, hunter = {BAR, SLIME, FAN, SLIME, SLIME, BAR, SLIME};
             int which = chapter - CHAPTERS, one = walker[which], two = bounder[which], three = hunter[which];
             waves = new int[][]{{one, one, one, MINUS, MINUS, TIMES}, {DRAGON, DRAGON, two, two, two, THROWER, THROWER, GUNNER},
                     {three, three, three, one, one, DRAGON, DRAGON, DRAGON, THROWER, GUNNER, three + GIANT}};
@@ -311,8 +351,8 @@ final class RunLevels {
      * is gives something.
      */
     static final int WYRM = 29, BLOT = 30, GECKO = 31;
-    private static final int[] WYRM_LANDS = {22, 28, 33, 39, 46, 53, 59, 66, 72, 79}, BLOT_LANDS = {15, 27, 32, 38, 44, 51, 57, 63, 69, 76},
-            GECKO_LANDS = {20, 29, 36, 42, 48, 54, 62, 68, 74, 78};
+    private static final int[] WYRM_LANDS = {22, 28, 33, 39, 46, 53, 59, 66, 72, 79, 83, 89, 96}, BLOT_LANDS = {15, 27, 32, 38, 44, 51, 57, 63, 69, 76, 86, 92, 98},
+            GECKO_LANDS = {20, 29, 36, 42, 48, 54, 62, 68, 74, 78, 84, 91, 97};
 
     static boolean rover(int kind) { return kind >= WYRM && kind <= GECKO; }
 
@@ -661,6 +701,8 @@ final class RunLevels {
 
     /** Who waits at the end of a land, or -1: for the twins, Miri. */
     static int bossOf(int number) {
+        // (In the third volume no one waits but at its end; and who that is comes with her.)
+        if (number > SECOND) return -1;
         if (number > COUNT) {
             // The middle of each chapter of the second volume, and its end.
             if (number % IN_LATER_CHAPTER == 5) return BYEORU + (number - COUNT) / IN_LATER_CHAPTER;
@@ -695,6 +737,8 @@ final class RunLevels {
             {ISLANDS, ISLANDS, LOOP, LOOP, ASCENT, DESCENT, SPLIT},
             {CAVE, CAVE, ISLANDS, ASCENT, DESCENT, SPLIT, ROUNDABOUT},
             {ISLANDS, TOWER, SPLIT, CAVE, ASCENT, DESCENT, LOOP, ROUNDABOUT},
+            {ISLANDS, ISLANDS, SPLIT, LOOP, ASCENT, DESCENT, ROUNDABOUT, TOWER},
+            {ISLANDS, TOWER, SPLIT, CAVE, CAVE, ASCENT, DESCENT, LOOP, ROUNDABOUT},
     };
     /**
      * Who may be met in a village, as the number of who holds something out: after Chikuwa
@@ -714,11 +758,16 @@ final class RunLevels {
             {MOVERS, MOVERS, LIFT, THINS, DRAGONS, POGOS, POGOS, BARS, DRAUGHTS, 4, 7, 8},
             {SLICKS, SLICKS, SLIMES, SLIMES, DRAUGHTS, DRAUGHTS, CRUMBLES, WATERS, POGOS, 9, 10, WORDS},
             {LAVAS, LAVAS, MOVERS, DOORS, WORDS, DRAGONS, BARS, SLIMES, FANS, SLICKS, DRAUGHTS, CRUMBLES, BELTS, THINS, LIFT, POGOS},
+            // The Unread Shore: water, slick sand, what rides and what lifts; and the Dragon's Library: everything.
+            {WATERS, WATERS, SLICKS, SLICKS, MOVERS, MOVERS, DRAUGHTS, POGOS, DRAGONS, SLIMES, THINS, CRUMBLES, LIFT, BARS},
+            {LAVAS, WATERS, MOVERS, DOORS, WORDS, WORDS, DRAGONS, BARS, SLIMES, FANS, SLICKS, DRAUGHTS, CRUMBLES, BELTS, THINS, LIFT, POGOS},
     };
     /** The numbers the lands of the second volume are made from, picked as those of the first were. */
     static final long[] LATER_SEEDS = {
             1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1,
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1,
+            // The third volume.
+            1, 2, 3, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1,
     };
 
     private static final int PLAIN = 0, GAP = 1, STEPS = 2, WALL = 3, BRIDGE = 4, HIGH_ROAD = 5, SPIKES = 6, SPRING_WALL = 7,
@@ -909,6 +958,7 @@ final class RunLevels {
         kennel(level);
         arsenal(level);
         pots(level);
+        friend(level);
         return level;
     }
 
@@ -1078,6 +1128,7 @@ final class RunLevels {
         kennel(level);
         arsenal(level);
         pots(level);
+        friend(level);
         return level;
     }
 
