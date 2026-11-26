@@ -42,7 +42,7 @@ MODEL = "inworld-tts-2"
 # higher the recording is made afterwards. The same voices as tools/make_run_voice.py.
 VOICES = {
     "h": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "c": ("community-iyfnceehtmbk", 1.0, 1.08),
+    "c": ("community-iyfnceehtmbk", .92, 1.05),
     "t": ("community-pwotyqkmtlsi", .92, 1.1),
     "r": ("Pixie", 1.25, .94),
     "i": ("community-blcuaurhzmvi", .95, 1.06),
@@ -50,7 +50,7 @@ VOICES = {
 # Who each of them is, for the voice to know.
 WHO = {
     "h": "Halgakos, a smug, teasing translator girl with a cheeky sing-song voice, in a fighting game. She talks fast.",
-    "c": "Chikuwa, a baker girl in a fighting game who thinks of everything in bread: a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels.",
+    "c": "Chikuwa, a baker girl in a fighting game who thinks of everything in bread: a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright, cute and bouncy. She speaks clearly: every word is said in full, crisply, with nothing swallowed, slurred or cut short.",
     "t": "Tsubakieh, a cheerful, unbothered girl with a baseball bat who calls everything normal, in a fighting game. A light, cute, deadpan anime voice.",
     "r": "Rune, a librarian in a fighting game: a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up.",
     "i": "Illya, a lovely magical-girl idol in a fighting game. A sweet, bright, high, sparkling anime voice; polite and sincere, never sultry.",
@@ -128,7 +128,8 @@ def finished(sound, pitch):
     if not loud.any():
         raise RuntimeError("silence")
     first, last = numpy.argmax(loud), len(loud) - numpy.argmax(loud[::-1])
-    sound = sound[max(0, first - RATE_IN // 50): min(len(sound), last + RATE_IN // 8)]
+    # A soft last sound is quieter than what counts as loud here: a third of a second is kept after it, so no word loses its end.
+    sound = sound[max(0, first - RATE_IN // 25): min(len(sound), last + RATE_IN // 3)]
     # Played back faster, a voice is higher: the recording is squeezed by as much as it is to be raised.
     sound = scipy.signal.resample_poly(sound, round(RATE_OUT / pitch), RATE_IN)
     sound = sound / max(1e-6, numpy.max(numpy.abs(sound))) * .92

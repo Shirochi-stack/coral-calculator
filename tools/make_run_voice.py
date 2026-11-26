@@ -45,7 +45,7 @@ MODEL = "inworld-tts-2"
 # The Mawang is Halgakos herself, sixty years on: her voice, slower and lower.
 VOICES = {
     "H": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "C": ("community-iyfnceehtmbk", 1.0, 1.08),
+    "C": ("community-iyfnceehtmbk", .92, 1.05),
     "R": ("Pixie", 1.3, .94),
     "I": ("community-blcuaurhzmvi", .95, 1.06),
     "T": ("community-pwotyqkmtlsi", .92, 1.1),
@@ -70,7 +70,7 @@ VOICES = {
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
-    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels. ",
+    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright, cute and bouncy. She speaks clearly: every word is said in full, crisply, with nothing swallowed, slurred or cut short. ",
     "R": "Rune is a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up. ",
     "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
     "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
@@ -89,14 +89,6 @@ MANNER = {
     "A": "Nabi is a playful cat-eared girl with a high, giggly, mischievous anime voice. ",
     "W": "Moru is a short-spoken smith girl with a flat, blunt but young and light anime voice. ",
     "L": "Altteul is a thrifty young shopkeeper with a high, brisk, bright anime voice, always selling. ",
-}
-# How each of the others sounds, said to the voice before the scene of every line of hers, so that none of
-# them drifts into sounding grown up or dark, whatever the scene.
-MANNER = {
-    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels. ",
-    "R": "Rune is a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up. ",
-    "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
-    "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
 
@@ -175,7 +167,8 @@ def finished(sound, pitch):
     if not loud.any():
         raise RuntimeError("silence")
     first, last = numpy.argmax(loud), len(loud) - numpy.argmax(loud[::-1])
-    sound = sound[max(0, first - RATE_IN // 50): min(len(sound), last + RATE_IN // 8)]
+    # A soft last sound is quieter than what counts as loud here: a third of a second is kept after it, so no word loses its end.
+    sound = sound[max(0, first - RATE_IN // 25): min(len(sound), last + RATE_IN // 3)]
     # Played back slower, a voice is lower: the recording is stretched by as much as it is to be lowered.
     sound = scipy.signal.resample_poly(sound, round(RATE_OUT / pitch), RATE_IN)
     sound = sound / max(1e-6, numpy.max(numpy.abs(sound))) * .92
