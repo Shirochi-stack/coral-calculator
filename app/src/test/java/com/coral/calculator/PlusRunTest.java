@@ -4070,10 +4070,11 @@ public class PlusRunTest {
     }
 
     @Test public void everyLandWithShapeHasPlacesOffItWalledAllRound() {
-        boolean[] kinds = new boolean[RunLevels.TRAMPLE + 1];
+        boolean[] kinds = new boolean[RunLevels.HOUSE + 1];
         int raised = 0, passages = 0, dens = 0;
         int hidden = 0;
-        assertTrue(RunLevels.level(1).rooms.isEmpty());
+        // (The first land has nothing off it but the two buildings of its village.)
+        for (int[] one : RunLevels.level(1).rooms) assertEquals(RunLevels.HOUSE, one[0]);
         for (int number = RunLevels.PLACES_FROM; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
             // A door in its village from the second land; from the second chapter, in two lands of three, another by its first crowd.
@@ -4084,7 +4085,8 @@ public class PlusRunTest {
                 if (one[7] != 0) hidden++;
                 // Its door is in the land proper, on the ground; the place itself is beyond the end of it.
                 assertTrue("land " + number, one[1] < level.gate && one[3] >= level.main && one[4] < level.columns - 1);
-                assertEquals("land " + number, RunLevels.ENTRY, level.land[one[2] - 1][one[1]]);
+                // (A building's door is not marked in the land itself: the land is laid about as it was before there were buildings to go into.)
+                if (one[0] != RunLevels.HOUSE) assertEquals("land " + number, RunLevels.ENTRY, level.land[one[2] - 1][one[1]]);
                 // On the ground, or, up out of the way, on a ledge of its own a jump over the ledge that is over a crowd.
                 if (one[7] == 2) {
                     raised++;
@@ -4110,7 +4112,8 @@ public class PlusRunTest {
                     assertFalse(PlusRun.solid(level.land[FLOOR - 1][column]));
                 }
                 // Each has a look of its own kind: one of the eight.
-                assertTrue("land " + number, one[13] >= 0 && one[13] < RunLevels.LOOKS);
+                if (one[0] == RunLevels.HOUSE) assertEquals("land " + number, RunLevels.LOOKS + one[14], one[13]);
+                else assertTrue("land " + number, one[13] >= 0 && one[13] < RunLevels.LOOKS);
                 // A passage comes out on the ground further on, at a door of its own.
                 if (one[0] == RunLevels.PASSAGE) {
                     assertTrue(one[5] > one[1] && one[5] < level.gate && one[8] > one[6]);
@@ -4123,7 +4126,7 @@ public class PlusRunTest {
             // They are places to move in: a stash and the rooms for games twenty squares and more across, a cellar wider, a passage twice that.
             for (int[] one : level.rooms) {
                 int wide = one[4] - one[3] + 1;
-                assertTrue("land " + number + " kind " + one[0] + " is " + wide, wide >= (one[0] == RunLevels.PASSAGE ? 80 : one[0] == RunLevels.ARENA ? 100 : one[0] == RunLevels.STASH ? 60 : 30));
+                assertTrue("land " + number + " kind " + one[0] + " is " + wide, wide >= (one[0] == RunLevels.PASSAGE ? 80 : one[0] == RunLevels.ARENA ? 100 : one[0] == RunLevels.STASH ? 60 : one[0] == RunLevels.HOUSE ? 14 : 30));
                 // A stash has a chest, which is not on its floor; a passage has one too.
                 int chests = 0;
                 for (int[] item : level.items) {
@@ -4354,7 +4357,7 @@ public class PlusRunTest {
             }
             // A stash's chamber holds one thing more; what stands about in a place stands on clear floor.
             for (int[] thing : level.decor) {
-                if (thing[0] < 200) continue;
+                if (thing[0] < 200 || thing[0] >= 300) continue;
                 assertTrue("land " + number, thing[0] < 200 + RunLevels.LOOKS * 2 && thing[1] >= level.main);
                 assertEquals("land " + number, RunLevels.AIR, level.land[thing[2]][thing[1]]);
                 assertEquals("land " + number, RunLevels.BLOCK, level.land[thing[2] + 1][thing[1]]);
@@ -4461,6 +4464,147 @@ public class PlusRunTest {
         hold(poor, .3f, false, false, false);
         assertEquals(0, poor.shrines());
         assertEquals(2, poor.halves());
+    }
+
+    @Test public void everyVillageHasTwoBuildingsSheCanGoIntoOfDifferentSortsAndNothingInThemHurtsHer() {
+        boolean[] sorts = new boolean[3];
+        int shops = 0, halls = 0, homes = 0;
+        PlusRun inShop = null, inHall = null;
+        int[] shop = null, hall = null;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            int villages = number > RunLevels.COUNT ? 2 : 1, houses = 0;
+            boolean begun = false;
+            java.util.List<int[]> built = new java.util.ArrayList<>();
+            for (int[] one : level.rooms) {
+                // The buildings come after every other place of the land, so that the places it had before keep their numbers.
+                if (one[0] == RunLevels.HOUSE) begun = true;
+                else assertFalse("land " + number, begun);
+                if (one[0] != RunLevels.HOUSE) continue;
+                houses++;
+                built.add(one);
+                int sort = one[14];
+                assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.HOME);
+                sorts[sort] = true;
+                assertEquals(RunLevels.LOOKS + sort, one[13]);
+                // Its door is on the ground of the land, where a building stands to be looked at; the land's own squares there are as they were.
+                assertEquals("land " + number, one[2], RunLevels.top(level, one[1]));
+                assertEquals("land " + number, RunLevels.AIR, level.land[one[2] - 1][one[1]]);
+                boolean stands = false;
+                for (int[] thing : level.decor) stands |= thing[1] == one[1] && thing[2] == one[2] - 1 && (thing[0] < 3 || thing[0] >= 300);
+                assertTrue("land " + number, stands);
+                // Inside: walled, a floor, its door; and nothing of the land's creatures.
+                for (int row = 0; row < RunLevels.ROWS; row++) {
+                    assertEquals(RunLevels.BLOCK, level.land[row][one[3] - 1]);
+                    assertEquals(RunLevels.BLOCK, level.land[row][one[4] + 1]);
+                }
+                assertEquals(RunLevels.ENTRY, level.land[FLOOR - 1][one[6]]);
+                for (int[] foe : level.foes) assertTrue("land " + number, foe[1] < one[3] || foe[1] > one[4]);
+                java.util.List<int[]> spots = new java.util.ArrayList<>();
+                int givers = 0;
+                for (int[] item : level.items) {
+                    if (item[1] < one[3] || item[1] > one[4]) continue;
+                    if (item[0] == PlusRun.SPOT) spots.add(item);
+                    else if (item[3] >= RunLevels.SOMI) {
+                        givers++;
+                        if (level.quest != 0) assertTrue("land " + number, item[3] != RunLevels.giverOf(level.quest));
+                    }
+                }
+                if (sort == RunLevels.PET_SHOP) {
+                    shops++;
+                    // The ten pets, each once: five along the floor and five on a shelf two squares over it; and Nabi at her desk.
+                    assertEquals(11, spots.size());
+                    int seen = 0, low = 0, high = 0;
+                    for (int[] spot : spots) {
+                        if (spot[4] >= 100) {
+                            assertEquals(RunLevels.NABI, spot[3]);
+                            assertEquals(104, spot[4]);
+                            continue;
+                        }
+                        seen |= 1 << spot[4];
+                        if (spot[2] == FLOOR - 1) low++;
+                        else {
+                            high++;
+                            assertEquals(FLOOR - 3, spot[2]);
+                            assertEquals(RunLevels.LEDGE, level.land[FLOOR - 2][spot[1]]);
+                        }
+                    }
+                    assertEquals((1 << PlusRun.PETS) - 1, seen);
+                    assertEquals(5, low);
+                    assertEquals(5, high);
+                    if (inShop == null) {
+                        inShop = new PlusRun(level);
+                        shop = one;
+                    }
+                } else if (sort == RunLevels.GUILD_HALL) {
+                    halls++;
+                    assertEquals(1, spots.size());
+                    assertEquals(RunLevels.INJU, spots.get(0)[3]);
+                    assertEquals(100, spots.get(0)[4]);
+                    if (inHall == null) {
+                        inHall = new PlusRun(level);
+                        hall = one;
+                    }
+                } else {
+                    homes++;
+                    assertEquals(0, spots.size());
+                    assertEquals("land " + number, 1, givers);
+                }
+            }
+            assertEquals("land " + number, villages * 2, houses);
+            // The two of a village are of different sorts, by the land and by which village it is.
+            java.util.Collections.sort(built, (one, other) -> one[1] - other[1]);
+            for (int village = 0; village < villages; village++) {
+                int[] wanted = RunLevels.buildingsOf(number, village);
+                assertTrue(wanted[0] != wanted[1]);
+                assertEquals("land " + number, wanted[0], built.get(village * 2)[14]);
+                assertEquals("land " + number, wanted[1], built.get(village * 2 + 1)[14]);
+            }
+        }
+        assertTrue(sorts[RunLevels.PET_SHOP] && sorts[RunLevels.GUILD_HALL] && sorts[RunLevels.HOME]);
+        assertTrue("shops " + shops + " halls " + halls + " homes " + homes, shops >= 60 && halls >= 60 && homes >= 60);
+
+        // Gone into, a pet shop: each pet is walked up to, and Nabi's desk is stood at anywhere along it; nothing hurts her; and out again.
+        PlusRun run = inShop;
+        run.place(shop[1] + (1 - PlusRun.WIDE) / 2, shop[2] - PlusRun.TALL);
+        run.step(STEP, false, false, false);
+        assertEquals(-1, run.spot());
+        assertTrue(run.enter());
+        int index = run.room();
+        assertEquals(RunLevels.HOUSE, run.level().rooms.get(index)[0]);
+        assertFalse(run.sealed());
+        assertEquals(1 << index, run.roomsDone());
+        int from = shop[3];
+        for (int pet = 0; pet < 5; pet++) {
+            run.place(from + 4 + pet * 2 + .2f, GROUND);
+            run.step(STEP, false, false, false);
+            assertEquals(pet, run.spot());
+            run.place(from + 4 + pet * 2 + .2f, GROUND - 2);
+            hold(run, .2f, false, false, false);
+            assertEquals(5 + pet, run.spot());
+        }
+        run.place(from + 3 + .2f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(-1, run.spot());
+        run.place(from + 16, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(104, run.spot());
+        hold(run, 3, true, false, false);
+        assertEquals(0, run.hurts());
+        hold(run, 3, true, false, false);
+        run.place(shop[6] + (1 - PlusRun.WIDE) / 2, GROUND);
+        hold(run, .2f, false, false, false);
+        assertTrue(run.enter());
+        assertEquals(-1, run.room());
+        assertEquals(shop[1] + (1 - PlusRun.WIDE) / 2, run.x(), .01f);
+        // And the guild hall: Inju's desk is the counter.
+        run = inHall;
+        run.place(hall[1] + (1 - PlusRun.WIDE) / 2, hall[2] - PlusRun.TALL);
+        run.step(STEP, false, false, false);
+        assertTrue(run.enter());
+        run.place(hall[3] + 12, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(100, run.spot());
     }
 
     // What is asked of her
@@ -5721,6 +5865,7 @@ public class PlusRunTest {
             for (int[] item : level.items) {
                 if (item[0] == PlusRun.STALL) stalls++;
                 else if (item[0] == PlusRun.DROPOFF) assertEquals(RunLevels.LETTER, level.quest);
+                else if (item[1] >= level.main && item[3] >= RunLevels.SOMI) continue;
                 else if (item[3] >= RunLevels.SOMI) villagers++;
                 else if (item[3] != 0) friends++;
                 met[item[3]] = true;
@@ -6107,7 +6252,7 @@ public class PlusRunTest {
             int laid = (number == 1 ? 2 : waits ? 4 : 3) + Math.min(2, level.chapter);
             assertTrue("land " + number + " has " + level.weapons.size(), level.weapons.size() >= laid && level.weapons.size() <= laid + level.gate / 40);
             // Chikuwa waits with bread from the third land and Rune with her ink from the ninth; ice cream and the rest from the fourth.
-            int bread = 0, ink = 0, loose = 0, villagers = 0, stalls = 0;
+            int bread = 0, ink = 0, loose = 0, villagers = 0, stalls = 0, inside = 0;
             for (int[] item : level.items) {
                 int top = RunLevels.top(level, item[1]);
                 assertTrue("land " + number + " column " + item[1], item[1] >= level.main || top >= 0 && item[2] < top);
@@ -6116,6 +6261,7 @@ public class PlusRunTest {
                 else if (item[0] == PlusRun.DROPOFF) assertEquals(RunLevels.LETTER, level.quest);
                 else if (item[3] == 1) bread++;
                 else if (item[3] == 2) ink++;
+                else if (item[1] >= level.main && (item[3] >= RunLevels.SOMI || item[0] == PlusRun.SPOT)) inside++;
                 else if (item[3] >= RunLevels.SOMI) villagers++;
                 else loose++;
             }

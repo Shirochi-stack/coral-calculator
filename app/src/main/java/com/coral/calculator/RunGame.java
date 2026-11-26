@@ -303,13 +303,19 @@ final class RunGame {
     private Bitmap inside;
     /** The inside of a stash, a passage or a room for a game, by its look; what stands about in them; and what each look is called. */
     private static final int[] LOOK_ART = {R.drawable.plus_run_room_wine, R.drawable.plus_run_room_maps, R.drawable.plus_run_room_vault, R.drawable.plus_run_room_clock,
-            R.drawable.plus_run_room_green, R.drawable.plus_run_room_print, R.drawable.plus_run_room_crystal, R.drawable.plus_run_room_treasure};
+            R.drawable.plus_run_room_green, R.drawable.plus_run_room_print, R.drawable.plus_run_room_crystal, R.drawable.plus_run_room_treasure,
+            R.drawable.plus_run_room_pets, R.drawable.plus_run_room_guild, R.drawable.plus_run_room_home, R.drawable.plus_run_room_smithy, R.drawable.plus_run_room_market};
     private static final String[] LOOK_NAMES = {"A wine cellar", "A map room", "A flooded vault", "Inside a clock tower", "A greenhouse", "A printing room", "A crystal cave",
-            "A treasure vault"};
+            "A treasure vault", "The pet shop", "The guild hall", "A home", "The smithy", "The black market"};
+    /** The buildings of a village from outside: six of them in a row. */
+    private Bitmap town;
     /** Its walls, the boards on top of them, and the light that lies over it. */
-    private static final int[] LOOK_WALL = {0xFF3A2430, 0xFF2E2A22, 0xFF1F3A36, 0xFF3A2C24, 0xFF1C2440, 0xFF33241C, 0xFF241C3C, 0xFF35302C};
-    private static final int[] LOOK_CAP = {0xFF9A6A52, 0xFF8A6A44, 0xFF5FA08A, 0xFFC09552, 0xFF5A78B8, 0xFFA8744A, 0xFF9A7AE0, 0xFFD0AC58};
-    private static final int[] LOOK_LIGHT = {0x16FFB060, 0x0CFFE0A0, 0x2030C8A8, 0x18FFA070, 0x263050B0, 0x10FFC080, 0x24A070FF, 0x16FFD060};
+    private static final int[] LOOK_WALL = {0xFF3A2430, 0xFF2E2A22, 0xFF1F3A36, 0xFF3A2C24, 0xFF1C2440, 0xFF33241C, 0xFF241C3C, 0xFF35302C,
+            0xFF3A2A1E, 0xFF36261C, 0xFF3A2C22, 0xFF2E2420, 0xFF2A1C34};
+    private static final int[] LOOK_CAP = {0xFF9A6A52, 0xFF8A6A44, 0xFF5FA08A, 0xFFC09552, 0xFF5A78B8, 0xFFA8744A, 0xFF9A7AE0, 0xFFD0AC58,
+            0xFFC08A52, 0xFFB8784A, 0xFFC09A6A, 0xFF9A8478, 0xFF8A62B0};
+    private static final int[] LOOK_LIGHT = {0x16FFB060, 0x0CFFE0A0, 0x2030C8A8, 0x18FFA070, 0x263050B0, 0x10FFC080, 0x24A070FF, 0x16FFD060,
+            0x08FFD090, 0x08FFD090, 0x08FFC890, 0x14FF9040, 0x1C9060E0};
     private Bitmap lookArt, props;
     private int lookOf = -1;
     private int seenKeys, seenLevers, seenPlates, seenShrines;
@@ -1048,6 +1054,9 @@ final class RunGame {
         } else if (screen == SHOP && counterFrom == STALL) {
             regrant();
             screen = STALL;
+        } else if (screen == SHOP && counterFrom == PLAY) {
+            regrant();
+            screen = PLAY;
         } else if (screen == RESULT || screen == SHOP) {
             toMap();
         } else {
@@ -1892,7 +1901,7 @@ final class RunGame {
         // A pet lying where she stands that she has no room for: she is told, once, that she may change a stray for it.
         if (run.petOffer() != offerSeen) {
             offerSeen = run.petOffer();
-            if (offerSeen >= 0) pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "No room: change a stray for it?");
+            if (offerSeen >= 0) pop(run.x() + PlusRun.WIDE / 2, run.y() - .4f, "No room for it: Swap?");
         }
         if (run.petSwaps() != seenPetSwaps) {
             seenPetSwaps = run.petSwaps();
@@ -2129,7 +2138,12 @@ final class RunGame {
                     aside(RunStory.ROOMS[kind]);
                 }
                 // And a card that says what it is and what to do in it: before anything in it begins, where something is about to.
-                if (kind <= RunLevels.PASSAGE) {
+                if (kind == RunLevels.HOUSE) {
+                    int sort = here.rooms.get(in)[14];
+                    toast(LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
+                            : sort == RunLevels.GUILD_HALL ? "The counter is at Inju's desk" : "Somebody is in", 0);
+                    audio.play("page", .7f);
+                } else if (kind <= RunLevels.PASSAGE) {
                     int[] one = here.rooms.get(in);
                     if (todo || kind == RunLevels.PASSAGE) {
                         toast(LOOK_NAMES[Math.max(0, one[13])] + (kind == RunLevels.STASH ? ": a stash" : ": a way through"), kind == RunLevels.PASSAGE ? "It comes out further on"
@@ -2146,7 +2160,8 @@ final class RunGame {
             } else {
                 roomCardAge = -1;
             }
-            if (found) {
+            // (A building of a village stands in plain sight: going into one is not finding a place.)
+            if (found && !(in >= 0 && here.rooms.get(in)[0] == RunLevels.HOUSE)) {
                 // A place found for the first time: ten pluses to keep, said when the card of what it is has gone.
                 session.keep("run_bank", bank() + 10);
                 toast("A place off the land found", "+ 10 to keep", CHEST_PICTURE);
@@ -2625,6 +2640,20 @@ final class RunGame {
                 if (action == MotionEvent.ACTION_DOWN && roomResultAge > .8f) roomResultAge = 2.6f;
                 return;
             }
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && run.door() < 0 && !run.atStall() && run.spot() >= 0
+                    && stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                // In a building: the counter, at the tab of whatever she stands at; a pet on show is the one looked at.
+                int what = run.spot();
+                audio.play("tap", .5f);
+                buzz(false);
+                idle();
+                counterFrom = PLAY;
+                counterTab = what < 100 ? PETS_TAB : what - 100;
+                if (what < 100) petOn = what;
+                screen = SHOP;
+                speak(RunStory.SHOP[0], false);
+                return;
+            }
             if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && run.door() < 0 && !run.atStall() && run.petOffer() >= 0
                     && stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
                 run.swapPet();
@@ -2721,6 +2750,9 @@ final class RunGame {
                 if (counterFrom == STALL) {
                     regrant();
                     screen = STALL;
+                } else if (counterFrom == PLAY) {
+                    regrant();
+                    screen = PLAY;
                 } else {
                     toMap();
                 }
@@ -3018,7 +3050,7 @@ final class RunGame {
                 // The buttons are easy to hit: the whole lower part of the screen belongs to one or another of them.
                 // A finger on one of the buttons over the arrows or over the jump is on that button, not on what is under it.
                 if (perks.colours != 0 && (colourButton.contains(x, y) || nextButton.contains(x, y))) continue;
-                if (run != null && (run.atStall() || run.door() >= 0 || run.petOffer() >= 0) && stallButton.contains(x, y)) continue;
+                if (run != null && (run.atStall() || run.door() >= 0 || run.petOffer() >= 0 || run.spot() >= 0) && stallButton.contains(x, y)) continue;
                 if (run != null && run.nextUp() != PlusRun.UNARMED && swapButton.contains(x, y)) continue;
                 if (x > downButton.left - dp(8) && x < downButton.right + dp(8) && y > downButton.top - dp(10) && y < downButton.bottom + dp(4)) {
                     down = true;
@@ -3141,7 +3173,14 @@ final class RunGame {
                 } else {
                     stallSign.setEmpty();
                     if (run.door() >= 0) doorControl(canvas);
-                    else if (run.petOffer() >= 0) {
+                    else if (run.spot() >= 0) {
+                        int what = run.spot();
+                        button(canvas, stallButton, false, 0xFF8A5A33);
+                        paint.setAlpha(255);
+                        if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
+                        else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
+                        label(canvas, stallButton, what < 100 ? "Look" : what == 100 + PETS_TAB ? "Pets" : "Counter");
+                    } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
                         cell(canvas, petArt(run.petOffer()), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
@@ -3576,7 +3615,10 @@ final class RunGame {
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
             // Over a hundred, it is something of the fourth sheet: a chest in a stash.
-            if (decor[0] >= 200) {
+            if (decor[0] >= 300) {
+                if (town == null) town = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_town);
+                cell(canvas, town, decor[0] - 300, 6, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else if (decor[0] >= 200) {
                 if (props == null) props = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_props);
                 paint.setAlpha(235);
                 cell(canvas, props, decor[0] - 200, 16, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 2.5f, false);
@@ -3752,7 +3794,7 @@ final class RunGame {
                 frame(canvas, villagers(), who - RunLevels.SOMI, VILLAGERS, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f, false);
             }
             // What she holds out, over her hands, until it is taken.
-            if (!given && item[0] != PlusRun.STALL && item[0] != PlusRun.DROPOFF && who >= 3) {
+            if (!given && item[0] != PlusRun.STALL && item[0] != PlusRun.DROPOFF && item[0] != PlusRun.SPOT && who >= 3) {
                 float holdY = y - tile * 1.15f + (float) Math.sin(clock * 3.2f + item[1]) * tile * .05f;
                 ring(canvas, x - tile * .95f, holdY, 0xFFFFC53D);
                 help(canvas, item[0], x - tile * .95f, holdY, tile * .7f);
@@ -3769,6 +3811,9 @@ final class RunGame {
                 float wide = mark(canvas, signX, head, "Shop", SPEAKER_COLOURS[speaker], true);
                 canvas.restore();
                 if (at) stallSign.set(signX - wide, head - tile * 1.1f, signX + wide, head + tile * .4f);
+            } else if (item[0] == PlusRun.SPOT) {
+                // Whoever keeps a building: over her, what her desk is for.
+                mark(canvas, x, head, item[4] == 100 + PETS_TAB ? "Pets" : "Counter", SPEAKER_COLOURS[speaker], true);
             } else if (item[0] == PlusRun.DROPOFF) {
                 // Whoever a letter is for is marked while there is one on its way to her.
                 if (run.quest() == PlusRun.ASKED) mark(canvas, x, head, "Letter", SPEAKER_COLOURS[speaker], false);
@@ -3786,6 +3831,25 @@ final class RunGame {
             if (item[3] != 0 || item[1] < first - 1 || item[1] > last + 1) continue;
             if (item[0] == PlusRun.LEVER || item[0] == PlusRun.PLATE || item[0] == PlusRun.SHRINE) {
                 drawStanding(canvas, item);
+                continue;
+            }
+            if (item[0] == PlusRun.SPOT) {
+                // A pet on show: sitting on a cushion; one of hers hops now and then, one she has not got has its price by it.
+                int kind = item[4];
+                float px = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+                boolean hers = (session.tally("run_pet_own") >> kind & 1) != 0, at = run.spot() == kind;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFE8A0B4);
+                canvas.drawOval(px - tile * .5f, feet - tile * .16f, px + tile * .5f, feet + tile * .04f, paint);
+                paint.setColor(Color.BLACK);
+                float hop = hers && (int) (clock * 1.3f + kind) % 4 == 0 ? Math.abs((float) Math.sin(clock * 6)) * tile * .12f : 0;
+                cell(canvas, petArt(kind), hop > 0 ? 5 : 0, 6, px, feet - tile * .08f - hop, tile * .95f * 170 / 100 * (at ? 1.12f : 1), false);
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setTextSize(tile * .24f);
+                text.setColor(hers ? 0xFF2E9E6E : Color.WHITE);
+                text.setTypeface(Typeface.DEFAULT_BOLD);
+                canvas.drawText(hers ? "hers" : "+ " + PET_COSTS[kind], px, feet + tile * .32f, text);
+                text.setTypeface(Typeface.DEFAULT);
                 continue;
             }
             float x = (item[1] + .5f - cameraX) * tile;
@@ -4105,6 +4169,9 @@ final class RunGame {
         for (int index = 0; index < pops.size(); index++) {
             float[] pop = pops.get(index);
             float x = (pop[0] - cameraX) * tile, y = (pop[1] - pop[2] * 1.4f - cameraY) * tile;
+            // (All of it on the screen, however near the edge it rose.)
+            float half = text.measureText(popWords.get(index)) / 2 + dp(6);
+            if (half * 2 < width) x = Math.max(half, Math.min(width - half, x));
             int alpha = Math.round(255 * Math.min(1, (1.1f - pop[2]) / .3f));
             text.setStyle(Paint.Style.STROKE);
             text.setStrokeWidth(tile * .1f);
@@ -4155,6 +4222,11 @@ final class RunGame {
         // the ceiling to the floor, and the picture's own floor out of sight under the floor she walks on; and it goes by as she does.
         float tall = look < 0 ? height : tile * RunLevels.ROOM_TALL / .66f, top = look < 0 ? 0 : (run.level().rooms.get(run.room())[12] - cameraY) * tile;
         float wide = tall * (float) inside.getWidth() / inside.getHeight(), drift = cameraX * tile * (look < 0 ? .15f : .55f) % (wide * 2);
+        // (A building of a village is small: its picture stands still behind it, its middle in the room's middle, and goes by with the room.)
+        if (look >= RunLevels.LOOKS) {
+            int[] in = run.level().rooms.get(run.room());
+            drift = wide / 2 - ((in[3] + in[4] + 1) / 2f - cameraX) * tile;
+        }
         if (look >= 0) canvas.drawColor(LOOK_WALL[look]);
         paint.setAlpha(255);
         for (int copy = 0; copy * wide - drift < width; copy++) {
@@ -4300,7 +4372,14 @@ final class RunGame {
             int[] one = level.rooms.get(index);
             boolean known = one[7] != 1 || (run.revealed() & 1 << index) != 0, been = (run.roomsFound() & 1 << index) != 0;
             int picture = one[0] == RunLevels.ARENA ? CELLAR_PICTURE : DOOR_PICTURE;
-            if (in < 0) {
+            if (in < 0 && one[0] == RunLevels.HOUSE) {
+                // A building of a village: its door is the one it is drawn with. Over it, what it is; and, at it, the word.
+                float x = (one[1] + .5f - cameraX) * tile, y = (one[2] - cameraY) * tile;
+                if (x > -tile * 3 && x < width + tile * 3) {
+                    if (at == index) mark(canvas, x, y - tile * 2.05f, "Enter", 0xFF8A5A33, false);
+                    else doorMark(canvas, 100 + one[14], one[1], one[2], false, 0);
+                }
+            } else if (in < 0) {
                 door(canvas, known ? picture : CRACK_PICTURE, one[1], one[2], at == index, known ? "Enter" : "Break");
                 // Where a passage comes out looks like a crack too, until she has come out of it.
                 if (one[5] != one[1]) door(canvas, been ? DOOR_PICTURE : CRACK_PICTURE, one[5], one[9], at == index, "Enter");
@@ -4349,7 +4428,40 @@ final class RunGame {
         canvas.drawCircle(x, y, round, stroke);
         paint.setColor(Color.BLACK);
         paint.setAlpha(done ? 110 : 255);
-        if (kind < 0) {
+        if (kind >= 100) {
+            // A building: a paw for the pet shop, a quill for the guild hall, a roof for a home, a hammer for the smithy, a moon for the black market.
+            int sort = kind - 100;
+            paint.setColor(0xFF8A5A33);
+            stroke.setColor(0xFF8A5A33);
+            stroke.setStrokeWidth(round * .16f);
+            if (sort == RunLevels.PET_SHOP) {
+                canvas.drawOval(x - round * .4f, y - round * .05f, x + round * .4f, y + round * .6f, paint);
+                for (int toe = 0; toe < 3; toe++) canvas.drawCircle(x + (toe - 1) * round * .42f, y - round * (toe == 1 ? .5f : .3f), round * .2f, paint);
+            } else if (sort == RunLevels.GUILD_HALL) {
+                canvas.drawLine(x - round * .45f, y + round * .55f, x + round * .4f, y - round * .5f, stroke);
+                path.reset();
+                path.moveTo(x + round * .45f, y - round * .6f);
+                path.quadTo(x - round * .3f, y - round * .5f, x - round * .2f, y + round * .25f);
+                path.quadTo(x + round * .5f, y + round * .1f, x + round * .45f, y - round * .6f);
+                canvas.drawPath(path, paint);
+            } else if (sort == RunLevels.HOME) {
+                path.reset();
+                path.moveTo(x - round * .6f, y);
+                path.lineTo(x, y - round * .6f);
+                path.lineTo(x + round * .6f, y);
+                path.close();
+                canvas.drawPath(path, paint);
+                canvas.drawRect(x - round * .4f, y, x + round * .4f, y + round * .55f, paint);
+            } else if (sort == RunLevels.SMITHY) {
+                canvas.drawRect(x - round * .5f, y - round * .5f, x + round * .5f, y - round * .1f, paint);
+                canvas.drawRect(x - round * .1f, y - round * .1f, x + round * .1f, y + round * .65f, paint);
+            } else {
+                canvas.drawCircle(x, y, round * .55f, paint);
+                paint.setColor(cardColor);
+                canvas.drawCircle(x + round * .25f, y - round * .12f, round * .45f, paint);
+            }
+            paint.setColor(Color.BLACK);
+        } else if (kind < 0) {
             text.setTextAlign(Paint.Align.CENTER);
             text.setTextSize(round * 1.5f);
             text.setTypeface(Typeface.DEFAULT_BOLD);
@@ -7323,11 +7435,26 @@ final class RunGame {
         int bank = bank();
         heading(canvas, "Guild counter", "What she buys here she keeps in every land  \u00B7  + " + bank + " to spend");
         // The tabs: one row; the open one is filled.
-        float across = Math.min(safe.width() - dp(28), dp(460)), tab = (across - dp(4) * (TAB_NAMES.length - 1)) / TAB_NAMES.length, from = safe.centerX() - across / 2;
+        // (The row is shared out by the length of their words, so that every word is the same size.)
+        float across = Math.min(safe.width() - dp(28), dp(460)), from = safe.centerX() - across / 2, worded = 0, lettered = dp(12.5f);
+        text.setTextSize(lettered);
+        for (String name : TAB_NAMES) worded += text.measureText(name);
+        float spare = (across - dp(3) * (TAB_NAMES.length - 1) - worded) / TAB_NAMES.length;
+        if (spare < dp(8)) {
+            lettered *= Math.max(.7f, (across - dp(3) * (TAB_NAMES.length - 1) - dp(8) * TAB_NAMES.length) / worded);
+            text.setTextSize(lettered);
+            worded = 0;
+            for (String name : TAB_NAMES) worded += text.measureText(name);
+            spare = (across - dp(3) * (TAB_NAMES.length - 1) - worded) / TAB_NAMES.length;
+        }
+        float next = from;
         for (int index = 0; index < TAB_NAMES.length; index++) {
             if (counterTabs[index] == null) counterTabs[index] = new RectF();
             RectF at = counterTabs[index];
-            at.set(from + index * (tab + dp(4)), safe.top + dp(98), from + index * (tab + dp(4)) + tab, safe.top + dp(132));
+            text.setTextSize(lettered);
+            float tab = text.measureText(TAB_NAMES[index]) + spare;
+            at.set(next, safe.top + dp(98), next + tab, safe.top + dp(132));
+            next += tab + dp(3);
             boolean enough = false;
             for (int which : TAB_WARES[index]) enough |= bought(which) < UP_COSTS[which].length && locked(which) == null && bank >= UP_COSTS[which][bought(which)];
             paint.setStyle(Paint.Style.FILL);
@@ -7336,7 +7463,8 @@ final class RunGame {
             paint.setColor(Color.BLACK);
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(index == counterTab ? Color.WHITE : ink);
-            fitted(canvas, TAB_NAMES[index], at.centerX(), at.centerY() + dp(4.5f), dp(12.5f), tab - dp(8));
+            text.setTextSize(lettered);
+            canvas.drawText(TAB_NAMES[index], at.centerX(), at.centerY() + lettered * .36f, text);
             if (enough && index != counterTab) {
                 paint.setColor(CalculatorLayout.CORAL);
                 canvas.drawCircle(at.right - dp(5), at.top + dp(5), dp(3.5f), paint);
