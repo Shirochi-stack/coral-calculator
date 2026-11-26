@@ -69,7 +69,7 @@ VOICES = {
     "L": ("community-qj9kc2jtun4a", 1.1, 1.2),
     # Five more who wait at the ends of lands: the Guild Guard, Penchok-jipsa, Byeoru, Jupan and Sumbi.
     "D": ("upbeat-bee-0979__design-voice-2d592424", 1.0, 1.0),  # a voice designed as a low, firm lady knight, the user's pick of fourteen
-    "F": ("Felix", 1.0, 1.04),
+    "F": ("Carla", 1.0, 1.06),  # a young woman's voice, crisp and dry: every character who speaks is a girl or a woman
     "Q": ("community-qj9kc2jtun4a", .88, 1.06),
     "V": ("community-mzyrf5zr14rb", 1.1, 1.12),
     "X": ("community-qdnchfkneudi", 1.12, 1.1),
@@ -100,7 +100,7 @@ MANNER = {
     "W": "Moru is a short-spoken smith girl with a flat, blunt but young and light anime voice. ",
     "L": "Altteul is a thrifty young shopkeeper with a high, brisk, bright anime voice, always selling. ",
     "D": "The Guild Guard is a lady knight in full armour who guards the guild's door and takes its entrance exam very seriously: a low, firm, dutiful voice, stern and formal, barking orders with total conviction, in clear American English. ",
-    "F": "Penchok-jipsa is a living fountain pen who is a prim butler: a light, dry, impeccably polite voice, never old or gruff. ",
+    "F": "Penchok-jipsa is a living fountain pen who is a prim lady butler: a young woman's voice, light, dry, crisp and impeccably polite, unhurried, never old, gruff or deep, in clear American English. ",
     "Q": "Byeoru is a quiet young court scribe with a soft, high, flat anime voice, precise and unhurried. ",
     "V": "Jupan is a sly young merchant girl with a high, quick, bright anime voice, always bargaining. ",
     "X": "Sumbi is a cheerful diver girl with a high, loud, sunny anime voice, daring and out of breath. ",
