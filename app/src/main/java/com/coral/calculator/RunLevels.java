@@ -163,6 +163,57 @@ final class RunLevels {
     static final int GUARD = 20, BUTLER = 21, BYEORU = 22, JUPAN = 23, SUMBI = 24, PADS = 25, PARTY = 26;
     /** The Old Book, who sleeps at the bottom of some cellars and is woken by whoever clears them; and a paper target, which is no one. */
     static final int OLD_BOOK = 27, TARGET = 28;
+    /**
+     * And three who do not wait at the end of anything, but are met in the middle of some
+     * lands from the middle of the first volume on: the Margin Wyrm, a dragon of folded
+     * pages, which crosses the land three times, strafing it, and comes low once each time;
+     * Blot, a slime as big as a doorway, which fills the way, leaps, spits, and comes apart
+     * into slimes as it is beaten; and the Bookmark Gecko, which hangs by its ribbon over
+     * the way and drops on whoever passes under. None of them has to be beaten; each that
+     * is gives something.
+     */
+    static final int WYRM = 29, BLOT = 30, GECKO = 31;
+    private static final int[] WYRM_LANDS = {22, 28, 33, 39, 46, 53, 59, 66, 72, 79}, BLOT_LANDS = {15, 27, 32, 38, 44, 51, 57, 63, 69, 76},
+            GECKO_LANDS = {20, 29, 36, 42, 48, 54, 62, 68, 74, 78};
+
+    static boolean rover(int kind) { return kind >= WYRM && kind <= GECKO; }
+
+    /** Which of the three is met in a land, or -1: in no land where someone waits at the end. */
+    static int roverOf(int number) {
+        if (bossOf(number) >= 0) return -1;
+        for (int land : WYRM_LANDS) if (land == number) return WYRM;
+        for (int land : BLOT_LANDS) if (land == number) return BLOT;
+        for (int land : GECKO_LANDS) if (land == number) return GECKO;
+        return -1;
+    }
+
+    /**
+     * The one met in a land is put into it: on flat, empty ground a little past its middle,
+     * where there is room for it. Where a land has no such stretch there, a narrower one
+     * will do, and then any firm ground at all between its middle and its gate.
+     */
+    private static void rove(Level level) {
+        int rover = roverOf(level.number);
+        if (rover < 0) return;
+        for (int reach = 4; reach >= 0; reach -= 2) {
+            for (int column = level.gate * 11 / 20; column < level.gate - 12; column++) {
+                int floor = top(level, column);
+                boolean clear = floor > 6;
+                for (int beside = column - reach; beside <= column + reach && clear; beside++) {
+                    clear = top(level, beside) == floor;
+                    for (int up = 1; up <= 4 && clear; up++) clear = level.land[floor - up][beside] == AIR;
+                }
+                if (reach > 0) {
+                    for (int[] room : level.rooms) clear &= Math.abs(room[1] - column) > 6 && Math.abs(room[5] - column) > 6;
+                    for (int flag : level.flags) clear &= Math.abs(flag - column) > 6;
+                    for (int[] item : level.items) if (item[1] < level.main) clear &= Math.abs(item[1] - column) > 5;
+                }
+                if (!clear) continue;
+                level.foes.add(new int[]{rover, column, floor - 1});
+                return;
+            }
+        }
+    }
     static final int GUARD_LAND = 6, BUTLER_LAND = 12;
 
     static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE && kind != TARGET; }
@@ -405,6 +456,7 @@ final class RunLevels {
         level.guarded = draft.guarded;
         armLater(level, new Random(seed * 104729 + number * 31L));
         level.foes.addAll(draft.lodgers);
+        rove(level);
         return level;
     }
 
@@ -564,6 +616,7 @@ final class RunLevels {
         arm(level, new Random(seed * 104729 + number * 31L));
         // The signs that walk in the places off the land join the rest only now, so that what the land is given is what it was given without them.
         level.foes.addAll(draft.lodgers);
+        rove(level);
         return level;
     }
 
@@ -798,6 +851,7 @@ final class RunLevels {
                     put(from + 28, FLOOR - 3, 2, step);
                     pluses(from + 24, from + 29, FLOOR - 5);
                     level.lodgers.add(new int[]{chapter >= 2 ? TIMES : MINUS, from + 35, FLOOR - 1});
+                    if (chapter >= 2) level.lodgers.add(new int[]{THROWER, from + 33, FLOOR - 4});
                     ledge(from + 32, FLOOR - 3, 3);
                     ledge(from + 36, FLOOR - 5, 3);
                     pluses(from + 32, from + 34, FLOOR - 4);

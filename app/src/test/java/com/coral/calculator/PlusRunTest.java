@@ -1382,7 +1382,7 @@ public class PlusRunTest {
             if (run.open(gari) && gari.dazed <= 0) touch(run, gari);
             else park(run);
         }
-        assertEquals(4, run.blows());
+        assertEquals(PlusRun.health(RunLevels.GARI), run.blows());
         until(run, miri, 3);
         RunLevels.Level level = run.level();
         int floor = floorOf(run);
@@ -1479,6 +1479,8 @@ public class PlusRunTest {
             }
         }
         assertEquals(4, foe.mode);
+        // (Changing, he has shut her colour off: it is put on her again, for the purposes of this.)
+        if (run.form() != PlusRun.YELLOW) run.lend(PlusRun.YELLOW);
         assertEquals(PlusRun.YELLOW, run.form());
         PlusRun below = run.copy();
         below.place(level.arena + 3, floor - PlusRun.TALL);
@@ -1705,7 +1707,7 @@ public class PlusRunTest {
             if (item[0] == PlusRun.CHEST) chests++;
         }
         assertEquals(level.chapter >= 1 ? 15 : 0, spikes);
-        assertEquals(2, walkers);
+        assertEquals(level.chapter >= 2 ? 3 : 2, walkers);
         assertEquals(1, ribbons);
         assertEquals(1, chests);
         // The chest by the far door is opened by touching it: ten pluses, once.
@@ -2588,6 +2590,190 @@ public class PlusRunTest {
         assertEquals(0, PlusRun.most(0, 0, 3));
     }
 
+    /** A long flat land with one of the three met in the middle of lands put in it, and the notes about her for as good as ever. */
+    private static PlusRun roving(int rover, int column) {
+        RunLevels.Level level = flat(220);
+        level.gate = 200;
+        level.foes.add(new int[]{rover, column, FLOOR - 1});
+        level.items.add(new int[]{PlusRun.NOTES, 3, FLOOR - 1, 0});
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.lasting = 1000;
+        PlusRun run = new PlusRun(level, perks);
+        hold(run, .5f, false, true, false);
+        assertTrue(run.notes() > 100);
+        return run;
+    }
+
+    @Test public void theThreeMetInTheMiddleOfLandsAreRousedDoWhatTheyDoAndCanBeBeatenWhenTheyAreSpent() {
+        // Where they are met: one in each of thirty lands, from the middle of the first volume on, more of them in the second; none where
+        // someone waits at the end; each on the ground of the land itself, past its middle and short of its gate.
+        int[] met = new int[RunLevels.GECKO + 1];
+        int first = 0, second = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            int rover = RunLevels.roverOf(number), there = 0;
+            for (int[] foe : level.foes) {
+                if (!RunLevels.rover(foe[0])) continue;
+                there++;
+                assertEquals("land " + number, rover, foe[0]);
+                assertTrue("land " + number + " at " + foe[1], foe[1] > level.gate * 2 / 5 && foe[1] < level.gate - 8);
+                assertEquals("land " + number, RunLevels.top(level, foe[1]) - 1, foe[2]);
+            }
+            assertEquals("land " + number, rover >= 0 ? 1 : 0, there);
+            if (rover < 0) continue;
+            assertTrue("land " + number, number >= 15 && RunLevels.bossOf(number) < 0);
+            met[rover]++;
+            if (number <= RunLevels.COUNT) first++;
+            else second++;
+        }
+        assertEquals(10, met[RunLevels.WYRM]);
+        assertEquals(10, met[RunLevels.BLOT]);
+        assertEquals(10, met[RunLevels.GECKO]);
+        assertTrue(first >= 5 && second > first * 3);
+        for (int rover = RunLevels.WYRM; rover <= RunLevels.GECKO; rover++) {
+            assertTrue(RunLevels.rover(rover) && RunLevels.boss(rover));
+            assertTrue(PlusRun.health(rover) >= 4);
+        }
+
+        // Each of them: not there until she comes near; then shielded but for the moments it is spent; and beaten in those.
+        for (int rover = RunLevels.WYRM; rover <= RunLevels.GECKO; rover++) {
+            PlusRun run = roving(rover, 60);
+            PlusRun.Foe foe = null;
+            for (PlusRun.Foe each : run.foes()) if (each.kind == rover) foe = each;
+            String who = "rover " + rover;
+            assertTrue(who, foe.away);
+            assertEquals(who, PlusRun.AWAY, run.guard(foe));
+            assertEquals(who, 0, run.roused());
+            assertFalse(who, run.standing());
+            int spent = 0, shielded = 0, thrown = run.thrown(), quakes = run.quakes();
+            boolean hung = false;
+            for (int step = 0; step < 60 * 240 && !foe.flat; step++) {
+                // She keeps to where it is: for the wyrm, on through the land, so that it comes again.
+                float stand = rover == RunLevels.WYRM ? Math.min(180, 30 + run.time() * 2.2f) : 56;
+                int guard = run.guard(foe);
+                if (guard == PlusRun.SHIELDED) shielded++;
+                if (rover == RunLevels.GECKO && !foe.away && foe.y < foe.ground - 5) hung = true;
+                if (guard == PlusRun.BARE && foe.dazed <= 0) {
+                    int blows = run.blows();
+                    touch(run, foe);
+                    assertEquals(who, blows + 1, run.blows());
+                    spent++;
+                } else {
+                    // Out of its way: in the air over where she keeps.
+                    run.place(stand, GROUND - 9);
+                    run.step(STEP, false, false, false);
+                }
+            }
+            assertTrue(who + " still up after " + run.blows() + " blows, roused " + run.roused(), foe.flat);
+            assertEquals(who, PlusRun.health(rover), run.blows());
+            assertEquals(who, PlusRun.health(rover), spent);
+            assertTrue(who, shielded > 30);
+            assertTrue(who, run.roused() >= 1);
+            assertEquals(who, 0, run.hurts());
+            if (rover == RunLevels.WYRM) {
+                // It strafed: things fell from it. And it came more than once.
+                assertTrue(who, run.thrown() > thrown + 3);
+                assertTrue(who + " roused " + run.roused(), run.roused() >= 2);
+            } else if (rover == RunLevels.BLOT) {
+                // It leapt and shook the ground, and spat; and it came apart, a slime for every blow.
+                assertTrue(who, run.quakes() > quakes);
+                assertTrue(who, run.thrown() > thrown);
+                assertEquals(who, PlusRun.health(rover), run.splits());
+                int slimes = 0;
+                for (PlusRun.Foe each : run.foes()) if (each.kind == RunLevels.SLIME && each.spawned) slimes++;
+                assertTrue(who + " slimes " + slimes, slimes >= 2);
+            } else {
+                assertTrue(who, hung);
+            }
+        }
+
+        // Without the notes, standing where it does what it does costs her; and a touch while it is shielded is turned aside and costs it nothing.
+        PlusRun bare = roving(RunLevels.BLOT, 60);
+        PlusRun.Foe blot = null;
+        for (PlusRun.Foe each : bare.foes()) if (each.kind == RunLevels.BLOT) blot = each;
+        for (int step = 0; step < 60 * 30 && bare.hurts() == 0; step++) {
+            bare.bare();
+            bare.place(56, GROUND);
+            bare.step(STEP, false, false, false);
+        }
+        assertEquals(1, bare.hurts());
+        assertEquals(PlusRun.health(RunLevels.BLOT), blot.left);
+
+        // The wyrm not beaten is driven off: after its third coming it does not come again, and the land is hers to finish.
+        PlusRun off = roving(RunLevels.WYRM, 60);
+        for (int step = 0; step < 60 * 200 && off.state() == PlusRun.PLAYING; step++) {
+            off.place(Math.min(199.5f, 30 + off.time() * 1.6f), GROUND - 9);
+            off.step(STEP, false, false, false);
+        }
+        assertEquals(3, off.roused());
+        PlusRun.Foe wyrm = null;
+        for (PlusRun.Foe each : off.foes()) if (each.kind == RunLevels.WYRM) wyrm = each;
+        assertTrue(wyrm.away && !wyrm.flat);
+    }
+
+    @Test public void whoeverSheFightsShutsOffAColourAndASlimeDrinksFireAndAFullStopGroundsHer() {
+        // A third of what one of those who wait can take gone, she changes, and as she does she shuts off the colour that has longest to go.
+        PlusRun run = shutIn(RunLevels.GUARD_LAND, true);
+        run.lend(PlusRun.YELLOW);
+        hold(run, 3, false, false, false);
+        run.lend(PlusRun.GREEN);
+        PlusRun.Foe foe = waiting(run);
+        int shuts = run.shuts();
+        for (int step = 0; step < 60 * 300 && run.phases() == 0; step++) {
+            if (run.on(PlusRun.GREEN) < 5) run.lend(PlusRun.GREEN);
+            if (run.on(PlusRun.YELLOW) < 2) run.lend(PlusRun.YELLOW);
+            if (run.open(foe) && foe.dazed <= 0) touch(run, foe);
+            else park(run);
+        }
+        assertEquals(1, run.phases());
+        assertEquals(shuts + 1, run.shuts());
+        assertEquals(PlusRun.GREEN, run.lastShut());
+        assertFalse(run.has(PlusRun.GREEN));
+        assertTrue(run.has(PlusRun.YELLOW));
+        assertTrue(run.untilCall(PlusRun.GREEN) > 9);
+
+        // A slime drinks fire: it is not beaten by it, but grows, and takes two blows after; water still deals with one.
+        for (int form : new int[]{PlusRun.RED, PlusRun.BLUE}) {
+            RunLevels.Level level = flat(60);
+            level.foes.add(new int[]{RunLevels.SLIME, 14, FLOOR - 1});
+            PlusRun wet = new PlusRun(level);
+            wet.lend(form);
+            wet.place(8, GROUND);
+            hold(wet, .1f, false, true, false);
+            PlusRun.Foe slime = wet.foes().get(0);
+            for (int step = 0; step < 240 && wet.flattened() == 0 && wet.drunk() == 0; step++) wet.step(STEP, false, false, false, step % 30 == 0);
+            assertEquals("form " + form, form == PlusRun.RED ? 1 : 0, wet.drunk());
+            assertEquals("form " + form, form == PlusRun.RED ? 0 : 1, wet.flattened());
+            if (form == PlusRun.RED) {
+                assertTrue(slime.size > 1.4f);
+                assertEquals(2, slime.left);
+                assertFalse(slime.flat);
+            }
+        }
+
+        // A dragon's full stop that lands on her in the air is the end of her flight.
+        RunLevels.Level sky = flat(60);
+        sky.foes.add(new int[]{RunLevels.DRAGON, 20, FLOOR - 1});
+        PlusRun flier = new PlusRun(sky);
+        flier.lend(PlusRun.GREEN);
+        PlusRun.Foe dragon = flier.foes().get(0);
+        for (int step = 0; step < 60 * 30 && flier.grounded() == 0; step++) {
+            if (flier.on(PlusRun.GREEN) < 3) flier.lend(PlusRun.GREEN);
+            boolean struck = false;
+            for (PlusRun.Shot shot : flier.shots()) {
+                if (shot.kind != PlusRun.STOP || shot.hers) continue;
+                flier.place(shot.x - PlusRun.WIDE / 2, shot.y - PlusRun.TALL / 2);
+                struck = true;
+            }
+            if (!struck) flier.place(dragon.x - 4, GROUND - 3);
+            flier.bare();
+            flier.step(STEP, false, false, true);
+        }
+        assertEquals(1, flier.grounded());
+        assertFalse(flier.has(PlusRun.GREEN));
+        assertEquals(1, flier.hurts());
+    }
+
     @Test public void aRibbonAddsItsColourToWhatSheWearsAndNeverTakesTheirPlace() {
         RunLevels.Level level = flat(60);
         level.items.add(new int[]{PlusRun.FORM + PlusRun.GREEN, 20, FLOOR - 1, 0});
@@ -3021,7 +3207,7 @@ public class PlusRunTest {
     }
 
     @Test public void theLandsOfTheSecondVolumeAreLongerAndHaveWhatTheirChaptersAreMadeOf() {
-        boolean[] ground = new boolean[128], signs = new boolean[RunLevels.PARTY + 1], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
+        boolean[] ground = new boolean[128], signs = new boolean[RunLevels.GECKO + 1], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
         int movers = 0, doors = 0, first = 0, total = 0, heights = 0, crowd = 0;
         for (int number = 1; number <= RunLevels.COUNT; number++) first += RunLevels.level(number).columns;
         for (int number = RunLevels.COUNT + 1; number <= RunLevels.TOTAL; number++) {

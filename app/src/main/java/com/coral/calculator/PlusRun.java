@@ -157,11 +157,11 @@ final class PlusRun {
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
     private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
-            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0};
+            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0, 6.5f, 1.2f, 3};
     private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
-            .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f};
+            .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f, 2.6f, 1.5f, 1.9f};
     private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
-            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f};
+            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f, 1.5f, 1.2f, .8f};
     /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
     private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
@@ -305,6 +305,8 @@ final class PlusRun {
     private float firmX, firmY, flinch, knock;
     private float sinceCast = 1, sinceBrace = 1, braceX, braceY;
     private int braces;
+    /** Counts that only go up: one met in the middle of a land roused; Blot come apart; a colour shut off by whoever she fights; a slime grown on fire; and she brought down out of the air. */
+    private int roused, splits, shuts, drunk, grounded, lastShut;
     private float time;
     /** Counts that only go up, for whoever shows the game to tell what has just happened. */
     private int collected, flattened, hurts, jumps, landings, springs, flagsPassed, blows;
@@ -343,6 +345,13 @@ final class PlusRun {
                 foe.step = 3;
                 foe.act = .6f;
                 foe.away = level.arena >= 0;
+                // One met in the middle of a land is not there until she comes near; Blot is twice the size of anything.
+                if (RunLevels.rover(spec[0])) {
+                    foe.away = true;
+                    foe.step = 3;
+                    if (spec[0] == RunLevels.BLOT) resize(foe, 2);
+                    foe.home = foe.x;
+                }
             }
             foes.add(foe);
         }
@@ -539,6 +548,12 @@ final class PlusRun {
         sinceCast = other.sinceCast;
         sinceBrace = other.sinceBrace;
         braces = other.braces;
+        roused = other.roused;
+        splits = other.splits;
+        shuts = other.shuts;
+        drunk = other.drunk;
+        grounded = other.grounded;
+        lastShut = other.lastShut;
         state = other.state;
         time = other.time;
         collected = other.collected;
@@ -1146,17 +1161,21 @@ final class PlusRun {
                 return 9;
             case RunLevels.MIRI:
             case RunLevels.GARI:
-                return 4;
             case RunLevels.GUARD:
             case RunLevels.BUTLER:
             case RunLevels.OLD_BOOK:
+            case RunLevels.GECKO:
                 return 5;
+            case RunLevels.WYRM:
+                return 4;
+            case RunLevels.BLOT:
+                return 6;
             case RunLevels.BYEORU:
             case RunLevels.JUPAN:
-                return 6;
+                return 7;
             case RunLevels.SUMBI:
             case RunLevels.PADS:
-                return 7;
+                return 8;
             case RunLevels.PARTY:
                 return 9;
             case RunLevels.KING:
@@ -1185,8 +1204,8 @@ final class PlusRun {
     float opening() { return opening; }
     /** Whether any of those who wait still stands. */
     boolean standing() {
-        // (Not the Old Book in his cellar: he is no one's gatekeeper.)
-        for (Foe foe : foes) if (RunLevels.boss(foe.kind) && !foe.flat && !foe.spawned) return true;
+        // (Not the Old Book in his cellar, nor one met in the middle of a land: they are no one's gatekeepers.)
+        for (Foe foe : foes) if (RunLevels.boss(foe.kind) && !RunLevels.rover(foe.kind) && !foe.flat && !foe.spawned) return true;
         return false;
     }
     /**
@@ -2000,6 +2019,7 @@ final class PlusRun {
                 caught++;
                 bonus++;
             }
+            if (foe.kind == RunLevels.BLOT) split(foe);
             if (waits && !foe.spawned && !standing()) won();
             else if (waits && !foe.spawned && phase(foe) > phase) changed();
             return;
@@ -2016,6 +2036,11 @@ final class PlusRun {
         foe.unseen = false;
         // A chunk of King Slime is gone: he is smaller, and stands where he stood.
         if (foe.kind == RunLevels.KING) resize(foe, foe.size * .93f);
+        // And a slime's worth of Blot is gone: it is smaller, and the slime hops off.
+        if (foe.kind == RunLevels.BLOT) {
+            resize(foe, Math.max(1.1f, foe.size - .16f));
+            split(foe);
+        }
         if (phase(foe) > phase) {
             if (foe.spawned) {
                 // The Old Book changes by himself.
@@ -2027,9 +2052,24 @@ final class PlusRun {
         }
     }
 
+    /** Blot comes apart: a slime hops off it, to one side or the other by turns. */
+    private void split(Foe foe) {
+        splits++;
+        float side = splits % 2 == 0 ? -1.4f : 1.4f;
+        spawn(RunLevels.SLIME, foe.x + foe.wide() / 2 + side * foe.size, foe.ground + foe.tall());
+    }
+
     /** A third of what they can take is gone: they change, which takes a moment, and whatever they had in the air is gone. */
     private void changed() {
         phases++;
+        // And as they change they shut off one of the colours she wears, the one with the longest still to go: it is gone, and waits as if it had run its time.
+        int longest = 0;
+        for (int colour = RED; colour < BLACK; colour++) if (worn[colour] > 0 && (longest == 0 || worn[colour] > worn[longest])) longest = colour;
+        if (longest != 0 && pale <= 0) {
+            end(longest, false);
+            lastShut = longest;
+            shuts++;
+        }
         for (Foe other : foes) if (RunLevels.boss(other.kind) && !other.flat) other.flourish = FLOURISH;
         for (Shot shot : shots) if (!shot.hers) shot.left = 0;
     }
@@ -2302,6 +2342,12 @@ final class PlusRun {
                         shot.across = -shot.across;
                         shot.left = 1.2f;
                         turned++;
+                    } else if (foe.kind == RunLevels.SLIME && (shot.kind == FIRE || shot.kind == STEAM) && foe.size < 1.2f) {
+                        // A slime drinks fire, and steam: it is not beaten by it but grows on it, half as big again, and takes two blows after.
+                        shots.remove(index);
+                        resize(foe, 1.5f);
+                        foe.left = 2;
+                        drunk++;
                     } else if (foe.dazed <= 0) {
                         beat(foe);
                         // One sign after another dealt with by what she throws: each is worth one plus more than the last, up to four.
@@ -2337,6 +2383,11 @@ final class PlusRun {
                 } else if (shot.kind == CURSE) {
                     if (worn[BLACK] <= 0) curse(4);
                 } else {
+                    // A dragon's full stop is the end of a flight: the wind goes out of her hair, and waits as if it had run its time.
+                    if (shot.kind == STOP && worn[GREEN] > 0 && !onGround) {
+                        end(GREEN, false);
+                        grounded++;
+                    }
                     // In brown what is thrown at her still lands, but it costs her half a heart.
                     cause = STRUCK;
                     knock = Math.signum(shot.across);
@@ -2362,6 +2413,14 @@ final class PlusRun {
         }
         return true;
     }
+
+    /** Counts that only go up: one met in the middle of a land roused; Blot come apart; a colour of hers shut off, and which; a slime grown on fire; and she grounded. */
+    int roused() { return roused; }
+    int splits() { return splits; }
+    int shuts() { return shuts; }
+    int lastShut() { return lastShut; }
+    int drunk() { return drunk; }
+    int grounded() { return grounded; }
 
     /** How many times something has been turned aside by her in brown, a count that only goes up; and where the last was. */
     int braces() { return braces; }
@@ -2568,7 +2627,7 @@ final class PlusRun {
             foe.act += seconds;
             return;
         }
-        if (foe.away || foe.kind == RunLevels.TARGET) return;
+        if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
         foe.clock += seconds;
         if (foe.dazed > 0) {
             foe.dazed -= seconds;
@@ -2576,6 +2635,10 @@ final class PlusRun {
         }
         float middle = foe.x + foe.wide() / 2, away = Math.abs(x + WIDE / 2 - middle);
         boolean toLeft = x + WIDE / 2 < middle;
+        if (RunLevels.rover(foe.kind)) {
+            roam(foe, seconds, middle, toLeft);
+            return;
+        }
         if (RunLevels.boss(foe.kind)) {
             waits(foe, seconds, middle, away, toLeft);
             return;
@@ -2608,6 +2671,184 @@ final class PlusRun {
             return;
         }
         walk(foe, SPEED[foe.kind] * seconds, true);
+    }
+
+    /**
+     * The three met in the middle of a land. Each is as those who wait are in this: it shows
+     * what is coming, does it, and is then spent, which is the only time a blow lands; a
+     * third of what it can take gone, it changes. The Margin Wyrm is roused three times,
+     * as she comes a quarter, half and three quarters of the way through the land: each
+     * time it flies in high from ahead, dropping blots along her way, turns behind her,
+     * comes down level with her, hangs there spent, and is gone again; after the third time
+     * it is driven off, if it has not been beaten. Blot sits in the way where she finds
+     * it: it gathers itself and leaps at her, shaking the ground where it lands, or spits
+     * two lumps of itself; and each blow that lands takes a slime's worth out of it, which
+     * hops off as a slime. The Bookmark Gecko hangs over her on its ribbon, shows itself,
+     * drops, runs at her, lashes its tongue, and is spent; and then goes back up its ribbon.
+     */
+    private void roam(Foe foe, float seconds, float middle, boolean toLeft) {
+        float px = x + WIDE / 2, feet = y + TALL;
+        int phase = phase(foe);
+        if (foe.away) {
+            if (room >= 0 || state != PLAYING) return;
+            if (foe.kind == RunLevels.WYRM) {
+                // (How many times it has come is kept where its things done would be.)
+                if (foe.did >= 3 || px < level.gate * (foe.did + 1) / 4f - 6) return;
+                foe.did++;
+                foe.x = px + 13;
+                foe.ground = feet - 7 - foe.tall();
+                foe.leftward = true;
+            } else if (Math.abs(px - foe.home - foe.wide() / 2) > 9) {
+                return;
+            }
+            foe.away = false;
+            foe.enter = foe.did <= 1 ? 1 : .4f;
+            foe.step = 0;
+            foe.mode = foe.kind == RunLevels.WYRM ? 0 : 1;
+            foe.act = foe.kind == RunLevels.WYRM ? 0 : 1;
+            foe.wait = .5f;
+            foe.y = foe.kind == RunLevels.GECKO ? foe.ground - 7 : foe.ground;
+            if (foe.kind == RunLevels.GECKO) foe.x = Math.max(foe.home - 7, Math.min(foe.home + 7, px - foe.wide() / 2));
+            roused++;
+            return;
+        }
+        if (foe.enter > 0) {
+            foe.enter -= seconds;
+            return;
+        }
+        if (foe.flourish > 0) {
+            foe.flourish -= seconds;
+            return;
+        }
+        float floor = foe.ground + foe.tall();
+        if (foe.kind == RunLevels.WYRM) {
+            if (foe.step == 0) {
+                foe.x -= SPEED[foe.kind] * seconds;
+                foe.y = foe.ground + (float) Math.sin(foe.clock * 3) * .3f;
+                if ((foe.wait -= seconds) <= 0 && Math.abs(middle - px) < 7.5f) {
+                    foe.wait = .6f - .08f * phase;
+                    shoot(STOP, false, middle, foe.y + foe.tall(), 0, 6.5f, 3);
+                    thrown++;
+                }
+                if (middle < px - 5) {
+                    foe.step = 1;
+                    foe.leftward = false;
+                }
+            } else if (foe.step == 1) {
+                // Down, level with her, a little way behind.
+                float low = feet - foe.tall() - .7f, beside = px - 3.2f;
+                foe.y += Math.signum(low - foe.y) * Math.min(Math.abs(low - foe.y), 7 * seconds);
+                foe.x += Math.signum(beside - middle) * Math.min(Math.abs(beside - middle), 5 * seconds);
+                foe.leftward = toLeft;
+                if (Math.abs(low - foe.y) < .05f) {
+                    foe.step = 2;
+                    foe.act = 2.2f - .3f * phase;
+                }
+            } else if (foe.step == 2) {
+                // Spent, and not hit: that was its coming low for this time.
+                if ((foe.act -= seconds) <= 0) {
+                    foe.step = 3;
+                    foe.mode = 2;
+                }
+            } else if (foe.mode < 1) {
+                // Hit once, it hangs there a moment longer, and can be hit once more before it goes.
+                foe.mode++;
+                foe.step = 2;
+                foe.act = 1.3f;
+            } else {
+                // Up and away, until the next time.
+                foe.y -= 6 * seconds;
+                foe.x -= 7 * seconds;
+                foe.leftward = true;
+                if (foe.y < feet - 13) foe.away = true;
+            }
+            return;
+        }
+        if (foe.kind == RunLevels.BLOT) {
+            float lo = foe.home - 6, hi = foe.home + 6;
+            if (foe.step == 3) {
+                foe.y = foe.ground;
+                if ((foe.act -= seconds) <= 0) {
+                    foe.mode = foe.turn++ % 2 == 0 ? 1 : 2;
+                    foe.step = 0;
+                    foe.act = .8f - .1f * phase;
+                    foe.leftward = toLeft;
+                }
+            } else if (foe.step == 0) {
+                if ((foe.act -= seconds) <= 0) {
+                    foe.step = 1;
+                    foe.act = foe.mode == 1 ? .85f : .3f;
+                    // A leap is aimed at where she is, no further than it may go from where it sat.
+                    foe.fromX = foe.x;
+                    foe.toX = Math.max(lo, Math.min(hi, px - foe.wide() / 2));
+                    if (foe.mode == 2) {
+                        lob(GLOB, middle, foe.y + .3f, px - 1.2f);
+                        lob(GLOB, middle, foe.y + .3f, px + 1.2f);
+                        thrown++;
+                    }
+                }
+            } else if (foe.step == 1) {
+                foe.act -= seconds;
+                if (foe.mode == 1) {
+                    float through = 1 - Math.max(0, foe.act) / .85f;
+                    foe.x = foe.fromX + (foe.toX - foe.fromX) * through;
+                    foe.y = foe.ground - (float) Math.sin(through * Math.PI) * 3.2f;
+                }
+                if (foe.act <= 0) {
+                    foe.y = foe.ground;
+                    if (foe.mode == 1) quake(Math.abs(px - foe.x - foe.wide() / 2) - foe.wide() / 2 + 1, floor);
+                    foe.step = 2;
+                    foe.act = 1.6f - .15f * phase;
+                }
+            } else if ((foe.act -= seconds) <= 0) {
+                foe.step = 3;
+                foe.act = .7f;
+            }
+            return;
+        }
+        // The Bookmark Gecko.
+        float hangs = foe.ground - 7;
+        if (foe.step == 3) {
+            // Back up its ribbon, and along to over where she is.
+            foe.y = Math.max(hangs, foe.y - 8 * seconds);
+            if (foe.y <= hangs && (foe.act -= seconds) <= 0) {
+                float over = Math.max(foe.home - 7, Math.min(foe.home + 7, px - foe.wide() / 2));
+                foe.x += Math.signum(over - foe.x) * Math.min(Math.abs(over - foe.x), 6 * seconds);
+                if (Math.abs(over - foe.x) < .3f) {
+                    foe.step = 0;
+                    foe.mode = 1;
+                    foe.act = .9f - .12f * phase;
+                }
+            }
+        } else if (foe.step == 0) {
+            if ((foe.act -= seconds) <= 0) foe.step = 1;
+        } else if (foe.step == 1) {
+            if (foe.mode == 1) {
+                // The drop.
+                if ((foe.y += 16 * seconds) >= foe.ground) {
+                    foe.y = foe.ground;
+                    foe.mode = 2;
+                    foe.act = .6f;
+                    foe.leftward = toLeft;
+                }
+            } else if (foe.mode == 2) {
+                // The run at her.
+                foe.act -= seconds;
+                if (!walk(foe, 9 * seconds, false) || foe.act <= 0) {
+                    foe.mode = 3;
+                    foe.act = .35f;
+                    foe.leftward = toLeft;
+                }
+            } else if ((foe.act -= seconds) <= 0) {
+                // The tongue.
+                cut(foe, 2.4f, STRUCK);
+                foe.step = 2;
+                foe.act = 1.5f - .15f * phase;
+            }
+        } else if ((foe.act -= seconds) <= 0) {
+            foe.step = 3;
+            foe.act = .5f;
+        }
     }
 
     /** Walks something on the way it faces, if there is ground to walk on and nothing in the way; if not, it may turn. Returns whether it moved. */
@@ -2734,9 +2975,9 @@ final class PlusRun {
     }
 
     /** What each of those who wait does, in order, in each third of the fight: the later thirds bring in more. */
-    private static final int[][][] PATTERNS = new int[29][][];
+    private static final int[][][] PATTERNS = new int[32][][];
     /** How long each of them is spent after something they have done. */
-    private static final float[] WINDOW = new float[29];
+    private static final float[] WINDOW = new float[32];
     static {
         PATTERNS[RunLevels.ILLYA] = new int[][]{{1, 3}, {1, 2, 3}, {4, 2, 1, 3}};
         PATTERNS[RunLevels.TSUBAKIEH] = new int[][]{{1, 2}, {1, 3, 2}, {4, 1, 3, 2}};
@@ -2761,6 +3002,8 @@ final class PlusRun {
         WINDOW[RunLevels.YEOBAEK] = 1.5f;
         WINDOW[RunLevels.KING] = 1.4f;
         WINDOW[RunLevels.MAWANG] = 1.5f;
+        // In the second volume they are spent for a little less long than they were.
+        for (int kind = RunLevels.GOKHAE; kind <= RunLevels.PARTY; kind++) if (kind != RunLevels.GUARD && kind != RunLevels.BUTLER) WINDOW[kind] *= .88f;
     }
 
     /**
