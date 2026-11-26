@@ -40,7 +40,7 @@ final class RunRide {
     /** Lucy's breath: how often, how long it takes to cross, and how near the Mother it must arrive. */
     static final float BREATH_EVERY = 1, BREATH_FLIES = .55f, BREATH_TRUE = .38f;
     /** How many pieces her shield has in each stage, how long she is open once it is gone, how long it takes to form, and how often a friend takes a piece. */
-    static final int[] SHIELD = {4, 5, 6};
+    static final int[] SHIELD = {5, 6, 7};
     static final float OPEN = 4.5f, FORMS = 1.2f, HELP_EVERY = 9;
     /** How many times the beam must read her; and how long she reels as a stage ends. */
     static final int TAKES = 45;
