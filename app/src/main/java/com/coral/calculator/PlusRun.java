@@ -16,6 +16,12 @@ import java.util.List;
  */
 final class PlusRun {
     static final int PLAYING = 0, WON = 1, LOST = 2;
+    /**
+     * And two ways the last land of all may stand that are neither: risen, when the white that is truly hers has formed and the
+     * fight has left the ground, to be gone on with in the air (see {@link RunFlight}); and unmade, when the black ribbon lay on her
+     * for good.
+     */
+    static final int RISEN = 3, UNMADE = 4;
     static final int HEARTS = 3;
     /** How many lives she starts a land with: each is a set of hearts, and the land is lost with the last of them. */
     static final int LIVES = 3;
@@ -708,6 +714,11 @@ final class PlusRun {
          */
         int colours;
         float recharge = 10, formLonger = 1;
+        /**
+         * Whether she is whole: every colour hers to keep, and every friend met on the way to the last land pledged to her. It is
+         * what the black ribbon thrown there is turned by.
+         */
+        boolean whole;
         /** Whether black on her lasts no longer than a ribbon does, and not twice as long: what the Mawang gave. */
         boolean resists;
         /** How many of the colours that are hers she may wear at once. */
@@ -892,11 +903,11 @@ final class PlusRun {
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
     private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
-            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0, 6.5f, 1.2f, 3, 1.8f, 2, 2.6f, 2.2f, 3, 1.3f, 1.3f};
+            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0, 6.5f, 1.2f, 3, 1.8f, 2, 2.6f, 2.2f, 3, 1.3f, 1.3f, 2.4f};
     private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
-            .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f, 2.6f, 1.5f, 1.9f, .9f, 1, 1.2f, .9f, .5f, .8f, .9f};
+            .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f, 2.6f, 1.5f, 1.9f, .9f, 1, 1.2f, .9f, .5f, .8f, .9f, .8f};
     private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
-            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f, 1.5f, 1.2f, .8f, .7f, .8f, .8f, .9f, .45f, .9f, .9f};
+            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f, 1.5f, 1.2f, .8f, .7f, .8f, .8f, .9f, .45f, .9f, .9f, 1.15f};
     /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
     private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
@@ -2005,6 +2016,84 @@ final class PlusRun {
         mingle();
     }
 
+    /**
+     * Lucy, at the end of the last land. Two thirds beaten, she does what the Mawang did, and means it: she throws the black
+     * ribbon, and nothing turns it aside. For as long as that takes nothing else moves. If she is whole, every colour hers and
+     * every friend pledged, the black goes in with the rest and what comes of it is the white that is truly hers, and the fight
+     * leaves the ground: the land is risen. If she is not, the black lies on her for good: the land is unmade. How long the
+     * moment is, and how much of it is left when the ribbon reaches her.
+     */
+    static final float MOMENT = 5.4f, MOMENT_LANDS = 3.2f;
+    private float moment;
+    private boolean decided, ribboned;
+
+    /** How much longer the moment lasts; whether it has come; whether the ribbon has reached her; and whether she is whole. */
+    float moment() { return moment; }
+    boolean decided() { return decided; }
+    boolean ribboned() { return ribboned; }
+    boolean whole() { return perks.whole; }
+
+    private void decide(Foe foe) {
+        phases++;
+        decided = true;
+        moment = MOMENT;
+        // She is not to be touched again down here.
+        foe.flourish = 1e6f;
+        foe.dazed = 0;
+        foe.unseen = false;
+        for (Foe other : foes) {
+            if (other.spawned && !other.flat) {
+                other.flat = true;
+                other.act = 0;
+            }
+        }
+        for (Shot shot : shots) shot.left = 0;
+        swing = 0;
+    }
+
+    private void momentous(float seconds) {
+        moment -= seconds;
+        if (!ribboned && moment <= MOMENT_LANDS) {
+            ribboned = true;
+            if (perks.whole) {
+                master();
+            } else {
+                fade(false);
+                cursed = BLACKENED;
+                cursedFor = BLACKENED;
+            }
+        }
+        if (moment <= 0) {
+            moment = 0;
+            state = perks.whole ? RISEN : UNMADE;
+        }
+    }
+
+    /** In the air over the library a life is lost: it is one of those she came into the land with. Returns whether she has one left to go on with. */
+    boolean spend() {
+        if (state != RISEN) return false;
+        if (--lives <= 0) {
+            lives = 0;
+            state = LOST;
+            return false;
+        }
+        livesLost++;
+        return true;
+    }
+
+    /** The flight is won: Lucy is down, and the last land with her. */
+    void flown() {
+        if (state != RISEN) return;
+        for (Foe foe : foes) {
+            if (foe.kind != RunLevels.LUCY) continue;
+            foe.left = 0;
+            foe.flat = true;
+            foe.flourish = 0;
+            foe.y = foe.ground;
+        }
+        state = WON;
+    }
+
     boolean mastered() { return mastered; }
 
     /**
@@ -2046,6 +2135,7 @@ final class PlusRun {
         if (now.main != UNARMED) owned |= 1 << now.main;
         perks.levels = now.levels.clone();
         // What she wears, put on or taken off: a heart that went with it goes with it.
+        perks.whole = now.whole;
         perks.defence = now.defence;
         perks.stomp = now.stomp;
         perks.mercy = now.mercy;
@@ -2172,6 +2262,7 @@ final class PlusRun {
             case RunLevels.MIRI:
             case RunLevels.GARI:
             case RunLevels.OLD_BOOK:
+            case RunLevels.LUCY:
                 return 4;
             case RunLevels.SUMBI:
             case RunLevels.YEOBAEK:
@@ -2305,6 +2396,7 @@ final class PlusRun {
                 return 9;
             case RunLevels.KING:
                 return 11;
+            // (Lucy, twelve: four as a child, four with her dragon side out; and the last four are not taken on the ground.)
             default:
                 return 12;
         }
@@ -2476,6 +2568,11 @@ final class PlusRun {
     }
 
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
+        // The moment of the black ribbon: nothing else moves.
+        if (moment > 0) {
+            momentous(seconds);
+            return;
+        }
         time += seconds;
         if (safe > 0) safe -= seconds;
         // Each colour she wears has its own time; each that is gone waits its own wait, which begins when it goes.
@@ -3379,6 +3476,11 @@ final class PlusRun {
             resize(foe, Math.max(1.1f, foe.size - .16f));
             split(foe);
         }
+        // Lucy's last third is not taken from her on the ground: it is the moment of the black ribbon.
+        if (foe.kind == RunLevels.LUCY && phase(foe) >= 2) {
+            decide(foe);
+            return;
+        }
         if (phase(foe) > phase) {
             if (foe.spawned || RunLevels.rover(foe.kind)) {
                 // The Old Book changes by himself, and so does one met in the middle of a land.
@@ -3463,7 +3565,8 @@ final class PlusRun {
                 continue;
             }
             if (!RunLevels.boss(foe.kind) || foe.flat) continue;
-            foe.left = foe.most;
+            // (Lucy with her dragon side out keeps it: that part of the fight begins again from its own beginning.)
+            foe.left = foe.kind == RunLevels.LUCY && phase(foe) >= 1 ? foe.most - (foe.most + 2) / 3 : foe.most;
             if (foe.kind == RunLevels.KING) resize(foe, 1);
             foe.away = true;
             foe.enter = 0;
@@ -4844,9 +4947,9 @@ final class PlusRun {
     }
 
     /** What each of those who wait does, in order, in each third of the fight: the later thirds bring in more. */
-    private static final int[][][] PATTERNS = new int[32][][];
+    private static final int[][][] PATTERNS = new int[40][][];
     /** How long each of them is spent after something they have done. */
-    private static final float[] WINDOW = new float[32];
+    private static final float[] WINDOW = new float[40];
     static {
         PATTERNS[RunLevels.ILLYA] = new int[][]{{1, 3}, {1, 2, 3}, {4, 2, 1, 3}};
         PATTERNS[RunLevels.TSUBAKIEH] = new int[][]{{1, 2}, {1, 3, 2}, {4, 1, 3, 2}};
@@ -4871,6 +4974,9 @@ final class PlusRun {
         WINDOW[RunLevels.YEOBAEK] = 1.5f;
         WINDOW[RunLevels.KING] = 1.4f;
         WINDOW[RunLevels.MAWANG] = 1.5f;
+        // Lucy: three things as a child, and two more with her dragon side out. (Her last third is not fought on the ground.)
+        PATTERNS[RunLevels.LUCY] = new int[][]{{1, 3, 2}, {4, 1, 5, 2}, {4, 5, 1, 2}};
+        WINDOW[RunLevels.LUCY] = 1.35f;
         // In the second volume they are spent for a little less long than they were.
         for (int kind = RunLevels.GOKHAE; kind <= RunLevels.PARTY; kind++) if (kind != RunLevels.GUARD && kind != RunLevels.BUTLER) WINDOW[kind] *= .88f;
     }
@@ -4975,6 +5081,7 @@ final class PlusRun {
                 return .8f;
             case 33:
             case 73:
+            case 392:
             case 151:
             case 174:
             case 181:
@@ -5221,9 +5328,32 @@ final class PlusRun {
                 thrown++;
                 return .5f;
             case 192:
+            case 395:
                 foe.fromX = px;
                 foe.toX = Math.min(foe.ground, y + TALL - foe.tall());
                 return 1.1f;
+            // Lucy, as a child: three squirts of her water gun in a fan; her swim ring, thrown, which comes back; and three water
+            // balloons, lobbed. And with her dragon side out: five squirts; mist that falls the length of the place, with room
+            // between; and a swoop at her visitor (395).
+            case 391:
+                spread(DOT, middle, foe.y + foe.tall() * .45f, phase >= 1 ? 5 : 3, .26f, 6.5f, 2.2f);
+                return .4f;
+            case 392: {
+                Shot ring = shoot(BOOMERANG, false, middle, floor - .55f, way * 10, 0, 2);
+                ring.spin = way * 10;
+                thrown++;
+                return .2f;
+            }
+            case 393:
+                for (int which = -1; which <= 1; which++) lob(GLOB, middle, foe.y + .3f, px + which * 2.5f);
+                thrown++;
+                return .5f;
+            case 394:
+                for (float column = lo - 1 + foe.turn % 2 * 1.5f; column < hi + foe.wide() + 1.5f; column += 3) {
+                    shoot(DOT, false, column, Math.max(.5f, floor - 8.5f), 0, 6, 1.6f);
+                }
+                thrown++;
+                return .6f;
             case 193:
                 foe.fromX = 0;
                 return 1;
@@ -5389,6 +5519,25 @@ final class PlusRun {
                 }
                 break;
             }
+            case RunLevels.LUCY: {
+                // Lucy: on her feet as a child, keeping her distance while she makes ready; on the wing once her dragon side is out,
+                // and down only when she is spent, or at the end of a swoop.
+                boolean swoop = what == 395 && doing;
+                if (!swoop) foe.leftward = toLeft;
+                boolean low = phase == 0 || foe.step == 2;
+                if (!swoop) foe.y += Math.max(-6 * seconds, Math.min(6 * seconds, (low ? foe.ground : foe.ground - 2.6f) - foe.y));
+                if (foe.step == 0) {
+                    float keeps = px + (toLeft ? 4.5f : -4.5f) - foe.wide() / 2;
+                    foe.x += Math.max(-2.6f * seconds, Math.min(2.6f * seconds, keeps - foe.x));
+                }
+                if (swoop) {
+                    float across = foe.fromX - middle, down = foe.toX - foe.y, length = Math.max(.3f, (float) Math.hypot(across, down));
+                    foe.x += across / length * 8.5f * seconds;
+                    foe.y = Math.min(foe.ground, foe.y + down / length * 8.5f * seconds);
+                    if (length < .4f || foe.y >= foe.ground) foe.act = 0;
+                }
+                break;
+            }
             default: {
                 // The Mawang: on the wing for most of what she does, on the ground for her fire and her dash, and when she is spent.
                 boolean swoop = what == 192 && doing, dash = what == 195 && doing;
@@ -5430,7 +5579,7 @@ final class PlusRun {
     /** What comes of a thing when it is over: where a leap comes down, the ground jumps or rubble falls. */
     private void done(Foe foe, int what, int phase, float px, float floor) {
         float middle = foe.x + foe.wide() / 2;
-        if (what == 72 || what == 32 || what == 181 || what == 173 || what == 192) foe.y = foe.ground;
+        if (what == 72 || what == 32 || what == 181 || what == 173 || what == 192 || what == 395) foe.y = foe.ground;
         if (what == 72) {
             shoot(SHOCK, false, middle, floor - .3f, -8, 0, 1.8f);
             shoot(SHOCK, false, middle, floor - .3f, 8, 0, 1.8f);

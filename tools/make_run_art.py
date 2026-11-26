@@ -63,8 +63,9 @@ ARM_CELL = (304, 248)
 PARTY_CELL = (173, 202)
 ARMS = ("pen", "knife", "book", "brush", "sword", "gun")
 # The brush stands over her head and is taken for part of her horns, which would make her too small: on that sheet
-# she is given the size she has on the sheets drawn to the same layout.
-ARM_SCALE = {"arm3": .505}
+# she is given the size she has on the sheets drawn to the same layout. And in white, with both wings grown, her horns were drawn larger
+# than they are: there she is given the size at which she stands as tall as she does with her tablet-book.
+ARM_SCALE = {"arm3": .505, "white": .645, "back": .5}
 # Her friends and foes from the webtoon: how many rows and frames across each sheet has, and the cell each frame goes in.
 CAST = {"chikuwa": (1, 3), "rune": (1, 3), "illya": (1, 4), "tsubakieh": (2, 3)}
 CAST_CELL = (288, 248)
@@ -388,6 +389,32 @@ def third():
     atlas.save(RES / "plus_run_art5.webp", lossless=True, quality=100, method=6)
     return atlas.size
 
+def finale(report):
+    """
+    The end of the third volume. Lucy, who is new, from sheets of her own: as a child, and with her dragon side out, four frames each
+    (standing, at it, hit, and down); and as a dragon seen from the front, four frames (wings up, wings down, roaring, and struck), each in
+    the middle of its cell. And Halgakos in the white that is truly hers, with both wings grown: twelve frames from the side (four of a
+    wing beat; gathering, letting go, holding and settling on the ground; and the same four in the air), and six from behind (four of a
+    wing beat, gathering, and letting go).
+    """
+    strip_of(pieces("lucy_girl", 1, 4), 168, (300, 236), "lucy_girl")
+    strip_of(pieces("lucy_wings", 1, 4), 176, (330, 250), "lucy_wings")
+    dragon = pieces("lucy_dragon", 1, 4)
+    scale = 300 / max(frame.size[1] for frame in dragon)
+    box = (440, 320)
+    strip = Image.new("RGBA", (box[0] * len(dragon), box[1]), (0, 0, 0, 0))
+    for index, frame in enumerate(dragon):
+        size = (max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale)))
+        if size[0] > box[0] or size[1] > box[1]:
+            raise SystemExit(f"dragon frame {index} is {size}")
+        strip.alpha_composite(frame.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * box[0] + (box[0] - size[0]) // 2, (box[1] - size[1]) // 2))
+    clear = Image.new("RGBA", strip.size, (0, 0, 0, 0))
+    Image.composite(strip, clear, strip.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_lucy_dragon.webp", lossless=True, quality=100, method=6, exact=True)
+    white, _ = her_frames("white", "white_beam", (240, 212), 14, 6, report)
+    back, _ = her_frames("back", "white_back", (204, 236), 14, 6, report, down=1)
+    return strip.size, white.size, back.size
+
+
 def gacha():
     """The ribbon gacha's building, its inside, and its machine as it stands and as it is when it has blown up."""
     house = pieces("gacha_house", 1, 1)[0]
@@ -516,16 +543,16 @@ def places():
     return sheet, row
 
 
-def her_frames(name, source, box, gap, across, report):
-    """Frames of her from a sheet of two rows, in one row, in the pink and at the size of her running frames."""
+def her_frames(name, source, box, gap, across, report, down=2):
+    """Frames of her from a sheet of two rows (or of as many as said), in one row, in the pink and at the size of her running frames."""
     sheet = cleared(Image.open(SOURCE / f"{source}.png"))
     # The faint haze the model leaves round her is taken off, so she has no glow about her in the game.
     sheet.putalpha(sheet.getchannel("A").point(lambda value: 0 if value < 48 else value))
     mask = solid(sheet)
     # For her losing frames the gap is wide enough that the stars over her head stay with her.
     rows = runs([mask.crop((0, y, sheet.size[0], y + 1)).getbbox() is not None for y in range(sheet.size[1])], gap, 60)
-    if len(rows) != 2:
-        raise SystemExit(f"expected 2 rows of {name} frames, found {len(rows)}")
+    if len(rows) != down:
+        raise SystemExit(f"expected {down} rows of {name} frames, found {len(rows)}")
     frames = []
     for top, bottom in rows:
         strip = sheet.crop((0, top, sheet.size[0], bottom))
@@ -638,6 +665,8 @@ def main():
     clear = Image.new("RGBA", row.size, (0, 0, 0, 0))
     Image.composite(row, clear, row.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_arms2.webp", lossless=True, quality=100, method=6, exact=True)
     her_frames("party", "party", PARTY_CELL, 14, 3, report)
+    # The end of the third volume: Lucy in her three looks, and Halgakos in white, from the side and from behind.
+    finale(report)
     others = [cast_frames(name) for name in CAST]
     faces = [face(name) for name in FACES]
     print("atlas", atlas.size, "cells", len(cells), "jump", jump.size, "lose", lose.size, "armed", armed[0].size,

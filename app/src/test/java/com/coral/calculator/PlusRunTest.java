@@ -5071,12 +5071,12 @@ public class PlusRunTest {
             RunLevels.Level level = RunLevels.level(number);
             int friend = RunLevels.friendOf(number), here = 0;
             assertEquals(number > 80 && number < 100 ? number - 81 : -1, friend);
-            // Two chapters of ten; no one waits in any of its lands; and each is longer than any of the first volume.
+            // Two chapters of ten; no one waits in any of its lands but the last, where Lucy does; and each is longer than any of the first volume.
             if (number > RunLevels.SECOND) {
                 assertEquals(10 + (number - 81) / 10, RunLevels.chapterOf(number));
-                assertEquals(-1, RunLevels.bossOf(number));
-                assertTrue("land " + number + " is " + level.gate, level.gate > 250);
-                assertEquals(3, level.flags.size());
+                assertEquals(number == RunLevels.TOTAL ? RunLevels.LUCY : -1, RunLevels.bossOf(number));
+                assertTrue("land " + number + " is " + level.gate, level.gate > (number == RunLevels.TOTAL ? 150 : 250));
+                assertEquals(number == RunLevels.TOTAL ? 4 : 3, level.flags.size());
             }
             for (int[] item : level.items) {
                 if (item[0] != PlusRun.PLEDGE) continue;
@@ -5104,6 +5104,296 @@ public class PlusRunTest {
         assertEquals(1, run.pledges());
         assertEquals(4, run.lastPledge());
         assertTrue(run.items().contains(friend));
+    }
+
+    // Lucy, and the end of the last land
+
+    /** Her shut in with Lucy, with the notes about her for as good as ever; whole or not. */
+    private static PlusRun withLucy(boolean whole) {
+        RunLevels.Level level = RunLevels.level(RunLevels.TOTAL);
+        int floor = RunLevels.top(level, level.arena + 3);
+        PlusRun.Perks perks = new PlusRun.Perks();
+        level.items.add(new int[]{PlusRun.NOTES, level.arena + 3, floor - 1, 0});
+        perks.lasting = 1000;
+        perks.whole = whole;
+        PlusRun run = new PlusRun(level, perks);
+        run.place(level.arena + 3.2f, floor - PlusRun.TALL);
+        run.step(STEP, false, false, false);
+        return run;
+    }
+
+    /** Blows on Lucy whenever one can land, until she can take no more than so much. */
+    private static void wornTo(PlusRun run, PlusRun.Foe lucy, int until) {
+        for (int step = 0; step < 60 * 400 && run.state() == PlusRun.PLAYING && !run.decided() && lucy.left > until; step++) {
+            if (pressable(run, lucy)) touch(run, lucy);
+            else park(run);
+        }
+    }
+
+    /** She falls out of the land until it has cost her a life. */
+    private static void lifeLost(PlusRun run) {
+        int before = run.livesLost();
+        for (int fall = 0; fall < 12 && run.livesLost() == before; fall++) {
+            run.place(run.level().arena + 5, run.level().land.length + 2);
+            hold(run, .3f, false, false, false);
+        }
+        assertEquals(before + 1, run.livesLost());
+        hold(run, .1f, false, false, false);
+    }
+
+    @Test public void lucyWaitsAtTheEndOfTheLastLandAndHerLastThirdIsNotTakenFromHerOnTheGround() {
+        assertEquals(RunLevels.LUCY, RunLevels.bossOf(RunLevels.TOTAL));
+        assertTrue(RunLevels.boss(RunLevels.LUCY));
+        assertFalse(RunLevels.rover(RunLevels.LUCY) || RunLevels.flier(RunLevels.LUCY));
+        assertEquals(RunLevels.TOTAL, RunLevels.OPEN_TO);
+        assertEquals(12, PlusRun.health(RunLevels.LUCY));
+        for (boolean whole : new boolean[]{true, false}) {
+            PlusRun run = withLucy(whole);
+            PlusRun.Foe lucy = waiting(run);
+            assertEquals(RunLevels.LUCY, lucy.kind);
+            assertTrue(run.locked());
+            assertEquals(0, run.phase(lucy));
+            // A third of what she can take: her dragon side comes out, as anyone else changes.
+            wornTo(run, lucy, 8);
+            assertEquals(8, lucy.left);
+            assertEquals(1, run.phase(lucy));
+            assertEquals(1, run.phases());
+            assertFalse(run.decided());
+            // Another third, and it is not a change: it is the moment of the black ribbon, in which nothing moves.
+            wornTo(run, lucy, 4);
+            assertTrue(run.decided());
+            assertEquals(4, lucy.left);
+            assertEquals(2, run.phases());
+            assertEquals(PlusRun.PLAYING, run.state());
+            assertTrue(run.absent(lucy));
+            for (PlusRun.Shot shot : run.shots()) assertTrue(shot.left <= 0);
+            float time = run.time(), x = run.x(), y = run.y();
+            hold(run, PlusRun.MOMENT - PlusRun.MOMENT_LANDS - .1f, false, true, true);
+            assertEquals(time, run.time(), 0);
+            assertEquals(x, run.x(), 0);
+            assertEquals(y, run.y(), 0);
+            assertFalse(run.ribboned());
+            assertFalse(run.mastered());
+            // The ribbon reaches her: whole, it is the white that is truly hers; not whole, black lies on her and every colour is gone.
+            hold(run, .2f, false, false, false);
+            assertTrue(run.ribboned());
+            assertEquals(whole, run.mastered());
+            assertEquals(whole, run.white());
+            assertEquals(!whole, run.cursed() > 0);
+            assertEquals(PlusRun.PLAYING, run.state());
+            hold(run, PlusRun.MOMENT, false, false, false);
+            assertEquals(whole ? PlusRun.RISEN : PlusRun.UNMADE, run.state());
+            assertEquals(0, run.moment(), 0);
+            assertFalse(lucy.flat);
+            // And then the land is not played on the ground any more.
+            hold(run, 1, false, true, false);
+            assertEquals(x, run.x(), 0);
+            if (whole) {
+                // In the air a life lost is one of hers; and the flight won is the land won, with Lucy down.
+                int lives = run.lives();
+                assertTrue(run.spend());
+                assertEquals(lives - 1, run.lives());
+                assertEquals(PlusRun.RISEN, run.state());
+                run.flown();
+                assertEquals(PlusRun.WON, run.state());
+                assertTrue(lucy.flat);
+                assertFalse(run.standing());
+            } else {
+                assertFalse(run.spend());
+                run.flown();
+                assertEquals(PlusRun.UNMADE, run.state());
+                assertFalse(lucy.flat);
+            }
+        }
+        // The last life spent in the air loses the land.
+        PlusRun run = withLucy(true);
+        wornTo(run, waiting(run), 4);
+        hold(run, PlusRun.MOMENT + .2f, false, false, false);
+        assertEquals(PlusRun.RISEN, run.state());
+        for (int life = run.lives(); life > 1; life--) assertTrue(run.spend());
+        assertFalse(run.spend());
+        assertEquals(PlusRun.LOST, run.state());
+        assertEquals(0, run.lives());
+    }
+
+    @Test public void aLifeLostToLucyBeginsThatPartOfTheFightAgainAndNotTheWholeOfIt() {
+        // As a child: she has back all she had lost.
+        PlusRun run = withLucy(false);
+        PlusRun.Foe lucy = waiting(run);
+        wornTo(run, lucy, 10);
+        assertEquals(10, lucy.left);
+        lifeLost(run);
+        assertFalse(run.locked());
+        assertTrue(lucy.away);
+        assertEquals(12, lucy.left);
+        // With her dragon side out: she keeps it, and has back what she had lost of that third.
+        run = withLucy(false);
+        lucy = waiting(run);
+        wornTo(run, lucy, 6);
+        assertEquals(6, lucy.left);
+        assertEquals(1, run.phase(lucy));
+        lifeLost(run);
+        assertFalse(run.locked());
+        assertEquals(8, lucy.left);
+        assertEquals(1, run.phase(lucy));
+        // Come back in, she arrives as she was: with her dragon side out.
+        int floor = RunLevels.top(run.level(), run.level().arena + 3);
+        run.place(run.level().arena + 3.2f, floor - PlusRun.TALL);
+        hold(run, PlusRun.ENTER + .3f, false, false, false);
+        assertTrue(run.locked());
+        assertFalse(lucy.away);
+        assertEquals(1, run.phase(lucy));
+        assertFalse(run.decided());
+    }
+
+    @Test public void lucyDoesThreeThingsAsAChildAndTwoMoreWithHerDragonSideOut() {
+        PlusRun run = withLucy(false);
+        PlusRun.Foe lucy = waiting(run);
+        int did = 0;
+        for (int step = 0; step < 60 * 40; step++) {
+            park(run);
+            if (lucy.step == 1) did |= 1 << lucy.mode;
+        }
+        assertEquals(1 << 1 | 1 << 2 | 1 << 3, did);
+        assertEquals(lucy.ground, lucy.y, .01f);
+        wornTo(run, lucy, 8);
+        did = 0;
+        boolean flew = false, landed = false;
+        for (int step = 0; step < 60 * 60; step++) {
+            park(run);
+            // (Parked over her, she is swooped at, and with the notes about her that is a blow: what Lucy has left is kept where it was.)
+            lucy.left = 8;
+            if (run.absent(lucy)) continue;
+            if (lucy.step == 1) did |= 1 << lucy.mode;
+            // On the wing while she is at it; down while she is spent.
+            flew |= lucy.y < lucy.ground - 2;
+            landed |= lucy.step == 2 && lucy.y > lucy.ground - .1f;
+        }
+        assertEquals(1 << 1 | 1 << 2 | 1 << 4 | 1 << 5, did);
+        assertTrue(flew && landed);
+        assertFalse(run.decided());
+    }
+
+    /** How far clear of something on its way a place is: nothing or less, and it lands there. */
+    private static float clear(RunFlight.Thing thing, float x, float y) {
+        return thing.kind == RunFlight.GUST ? Math.abs(y - thing.y) - RunFlight.BAR : thing.kind == RunFlight.PILLAR ? Math.abs(x - thing.x) - RunFlight.BAR
+                : (float) Math.hypot(x - thing.x, y - thing.y) - RunFlight.NEAR;
+    }
+
+    /**
+     * A flight flown by someone who has understood it: out of the way of what is about to arrive, if she is not behind the beam; and
+     * otherwise to where Lucy is, with the beam held. Until it is over, or the time is up.
+     */
+    private static void fly(RunFlight flight, float seconds) {
+        float[][] ways = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        for (int step = 0; step < seconds * 60 && flight.state() == RunFlight.FLYING; step++) {
+            float x = flight.x(), y = flight.y();
+            boolean threatened = false;
+            for (RunFlight.Thing thing : flight.things()) threatened |= !thing.gone && thing.far / thing.speed < .7f && clear(thing, x, y) < .1f;
+            if (threatened && flight.beam() <= 0) {
+                int chosen = 0;
+                float best = -9;
+                for (int way = 0; way < ways.length; way++) {
+                    float least = 9;
+                    for (RunFlight.Thing thing : flight.things()) {
+                        float until = thing.far / thing.speed;
+                        if (thing.gone || until > 1) continue;
+                        float thereX = Math.max(-1, Math.min(1, x + ways[way][0] * RunFlight.SPEED * until));
+                        float thereY = Math.max(-RunFlight.HIGH, Math.min(RunFlight.HIGH, y + ways[way][1] * RunFlight.SPEED * until));
+                        least = Math.min(least, clear(thing, thereX, thereY));
+                    }
+                    if (least > best + .001f) {
+                        best = least;
+                        chosen = way;
+                    }
+                }
+                flight.step(STEP, ways[chosen][0] < 0, ways[chosen][0] > 0, ways[chosen][1] < 0, ways[chosen][1] > 0, false);
+            } else {
+                flight.step(STEP, flight.lucyX() < x - .06f, flight.lucyX() > x + .06f, flight.lucyY() < y - .06f, flight.lucyY() > y + .06f, true);
+            }
+        }
+    }
+
+    @Test public void theFlightIsWonWithTheBeamAndByNothingElse() {
+        int hurts = 0;
+        for (long seed = 1; seed <= 24; seed++) {
+            RunFlight flight = new RunFlight(6, 2, seed);
+            assertEquals(RunFlight.FLYING, flight.state());
+            assertEquals(1, flight.left(), 0);
+            fly(flight, 240);
+            assertEquals("seed " + seed + " after " + flight.time() + " with " + flight.hurts() + " hurts", RunFlight.WON, flight.state());
+            assertEquals(0, flight.left(), 0);
+            assertEquals(RunFlight.TAKES, flight.hits());
+            assertEquals(2, flight.stages());
+            assertEquals(2, flight.stage());
+            assertTrue("seed " + seed, flight.beams() >= 3);
+            assertTrue(flight.things().isEmpty());
+            hurts += flight.hurts();
+        }
+        // Flown well it costs little: less than a hurt a flight, on the whole.
+        assertTrue("hurts " + hurts, hurts < 24);
+        // Without the beam nothing is ever taken from her, however long it goes on; and what comes has to be flown round.
+        RunFlight dodging = new RunFlight(600, 2, 5);
+        for (int step = 0; step < 60 * 60; step++) dodging.step(STEP, step / 90 % 2 == 0, step / 90 % 2 == 1, false, false, false);
+        assertEquals(RunFlight.FLYING, dodging.state());
+        assertEquals(1, dodging.left(), 0);
+        assertEquals(0, dodging.beams());
+        assertTrue(dodging.thrown() > 20);
+        // Left where she is, she is hurt until she falls.
+        RunFlight still = new RunFlight(6, 2, 7);
+        for (int step = 0; step < 60 * 60 && still.state() == RunFlight.FLYING; step++) still.step(STEP, false, false, false, false, false);
+        assertEquals(RunFlight.FELL, still.state());
+        assertEquals(3, still.hurts());
+        assertEquals(0, still.halves());
+        // What she wears takes some of a hurt off there too: at a half a hurt she lasts twice as many of them.
+        RunFlight worn = new RunFlight(6, 1, 7);
+        for (int step = 0; step < 60 * 90 && worn.state() == RunFlight.FLYING; step++) worn.step(STEP, false, false, false, false, false);
+        assertEquals(6, worn.hurts());
+    }
+
+    @Test public void theBeamIsGatheredAndLastsAndRestsAndCutsWhatComesAlongItOutOfTheAir() {
+        RunFlight flight = new RunFlight(6, 2, 3);
+        assertEquals(0, flight.charge(), 0);
+        assertEquals(1, flight.rested(), 0);
+        // Held, it gathers; let go of early, it is lost.
+        for (int step = 0; step < 20; step++) flight.step(STEP, false, false, false, false, true);
+        assertTrue(flight.charge() > .5f && flight.charge() < 1);
+        flight.step(STEP, false, false, false, false, false);
+        assertEquals(0, flight.charge(), 0);
+        assertEquals(0, flight.beams());
+        // Held long enough, it is out, for as long as it lasts; and then it rests before it can be gathered again.
+        float before = flight.time();
+        while (flight.beam() <= 0 && flight.time() < before + 2) flight.step(STEP, false, false, false, false, true);
+        assertEquals(RunFlight.CHARGE, flight.time() - before, .03f);
+        assertEquals(1, flight.beams());
+        before = flight.time();
+        while (flight.beam() > 0) flight.step(STEP, false, false, false, false, true);
+        assertEquals(RunFlight.LASTS, flight.time() - before, .03f);
+        assertTrue(flight.rested() < .1f);
+        assertEquals(0, flight.charge(), 0);
+        before = flight.time();
+        while (flight.beam() <= 0 && flight.time() < before + 5) flight.step(STEP, false, false, false, false, true);
+        assertEquals(RunFlight.WAIT + RunFlight.CHARGE, flight.time() - before, .05f);
+        assertEquals(2, flight.beams());
+        // While it is gathered and while it is out she flies more slowly.
+        RunFlight slow = new RunFlight(6, 2, 3), quick = new RunFlight(6, 2, 3);
+        for (int step = 0; step < 20; step++) {
+            slow.step(STEP, false, true, false, false, true);
+            quick.step(STEP, false, true, false, false, false);
+        }
+        assertEquals(quick.x() * RunFlight.SLOWED, slow.x(), .01f);
+        // And out, it cuts what is coming at her along it out of the air: held on where she is, nothing arrives while it lasts.
+        RunFlight behind = new RunFlight(6, 2, 11);
+        int hurts = 0, cut = 0;
+        for (int step = 0; step < 60 * 40 && behind.state() == RunFlight.FLYING; step++) {
+            int had = behind.hurts();
+            boolean out = behind.beam() > 0;
+            behind.step(STEP, false, false, false, false, true);
+            if (out && behind.hurts() > had) hurts++;
+            cut = behind.wiped();
+        }
+        assertEquals(0, hurts);
+        assertTrue(cut > 3);
     }
 
     // The ribbon gacha, and the pots of black ink
@@ -6711,7 +7001,8 @@ public class PlusRunTest {
         int last = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             int prize = RunLevels.prizeOf(number);
-            assertEquals("land " + number, RunLevels.bossOf(number) >= 0, prize != RunLevels.NOTHING);
+            // (Lucy has nothing to hand over: what is won in the last land is the white that is truly hers, and it is won in the moment.)
+            assertEquals("land " + number, RunLevels.bossOf(number) >= 0 && number != RunLevels.TOTAL, prize != RunLevels.NOTHING);
             if (prize > 0) {
                 assertFalse("land " + number, won[prize]);
                 won[prize] = true;
@@ -6888,7 +7179,7 @@ public class PlusRunTest {
     }
 
     @Test public void theLandsOfTheSecondVolumeAreLongerAndHaveWhatTheirChaptersAreMadeOf() {
-        boolean[] ground = new boolean[128], signs = new boolean[RunLevels.RIME + 1], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
+        boolean[] ground = new boolean[128], signs = new boolean[RunLevels.LUCY + 1], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
         int movers = 0, doors = 0, first = 0, total = 0, heights = 0, crowd = 0;
         for (int number = 1; number <= RunLevels.COUNT; number++) first += RunLevels.level(number).columns;
         for (int number = RunLevels.COUNT + 1; number <= RunLevels.TOTAL; number++) {
@@ -6896,7 +7187,7 @@ public class PlusRunTest {
             int boss = RunLevels.bossOf(number);
             assertEquals(5 + (number - 31) / 10, level.chapter);
             // (In the third volume no one waits but at its very end.)
-            assertEquals("land " + number, number <= RunLevels.SECOND && number % 5 == 0, boss >= 0);
+            assertEquals("land " + number, number <= RunLevels.SECOND && number % 5 == 0 || number == RunLevels.TOTAL, boss >= 0);
             assertEquals("land " + number, boss >= 0 ? 4 : 3, level.flags.size());
             assertEquals(boss >= 0, level.guarded);
             assertEquals(boss >= 0, level.arena >= 0);
@@ -6986,7 +7277,9 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 4 + 12, lines);
+        assertEquals(12, RunStory.LUCY.length);
+        assertEquals("e", RunStory.LUCY[0][2]);
         assertEquals(RunLevels.FRIENDS, RunStory.PLEDGES.length);
         assertEquals(RunLevels.FRIENDS, RunStory.FRIENDS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);

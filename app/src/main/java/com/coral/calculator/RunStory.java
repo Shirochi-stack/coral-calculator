@@ -26,12 +26,12 @@ final class RunStory {
     /** The second volume, which falls on her head as the first did. */
     static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
-    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZabcd";
+    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZabcde";
     static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang", "Gokhae", "Miri", "Gari", "Yeobaek",
             "Nuri-yeowang",
             "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul",
             "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi", "The Brake Pads", "The Straight-Ahead Party", "The Old Book",
-            "Pulmu", "Sutdol"};
+            "Pulmu", "Sutdol", "Lucy"};
 
     private static final String PLAYER = "She is talking to the player who controls her in a platform game, whom she calls Sloppy. ";
 
@@ -293,6 +293,15 @@ final class RunStory {
                             "The beaten interpreter, sentenced to proofreading, sulks in her stiff, over-formal way. Defeated, grumbling, put out."},
                     {"out80f", "Two volumes, read to the end. Now can I have my ice cream Sloppy~♡", "H",
                             PLAYER + "Both books are finished and she is worn out and happy. Tired, fond, teasing, a contented sigh, talking quickly."}};
+            case 100: return new String[][]{
+                    {"out100a", "...It didn't hurt. You read me, and it didn't hurt.", "e",
+                            "The little dragon girl, a child again and worn out after the fight, is astonished that being understood did not hurt. Very small, quiet, sniffling, wondering."},
+                    {"out100b", "It never does. I only say what was meant. Now show me the book Sloppy~♡", "H",
+                            PLAYER + "She kneels by the little dragon girl she has just beaten and speaks gently to her. Soft, kind, sure of herself, a little tired."},
+                    {"out100c", "...Promise you won't change a single word?", "e",
+                            "The little dragon girl hugs a book to her chest and asks the translator for a promise. A child's voice, small, suspicious, hopeful."},
+                    {"out100d", "Every word as written. Honorifics and all. Cross my horns Sloppy~♡", "H",
+                            PLAYER + "She makes a solemn promise to a child, and means it, with a small joke at the end. Warm, steady, fond."}};
             default: return null;
         }
     }
@@ -781,6 +790,37 @@ final class RunStory {
             {"gacha2", "It blew up. A black one. All my ribbons, gone Sloppy~♡", "H",
                     PLAYER + "The capsule machine has just exploded in her face and taken her prizes with it. Stunned, sooty, dismayed, a little funny." + FAST},
     };
+    /**
+     * Lucy, the Dragon of Lost Words, at the end of the last land, and what is said to her. In order: as she comes; as she goes at her
+     * visitor; when a blow lands; when her dragon side comes out; the black ribbon; the white that turned it; the flight, which
+     * Halgakos begins; twice more in the air; and, where the ribbon was not turned, the three lines of the land unmade.
+     */
+    static final String[][] LUCY = {
+            {"lucy1", "Bleh! Another translator. I'm Lucy, Dragon of Lost Words. Hand over that tablet, dummy!", "e",
+                    "A bratty little dragon girl in a swim ring blocks the way at the end of a ruined library and sticks her tongue out at the translator who has come for her. Cheeky, loud, taunting, sing-song."},
+            {"lucy2", "Splash! You're all wet, dummy!", "e",
+                    "The bratty little dragon girl squirts her toy water gun at her opponent and laughs at her. Gleeful, mocking, quick."},
+            {"lucy3", "Ow! No fair! I wasn't ready!", "e",
+                    "The bratty little dragon girl has just been hit and is outraged about it. A yelp, whiny, indignant."},
+            {"lucy4", "Now I'm mad! Horns out. Wings out. You asked for it!", "e",
+                    "The bratty little dragon girl, hit a few times, stamps her foot and lets her horns, wings and tail come out. Furious, pouting, loud, a child's tantrum."},
+            {"lucy5", "Fine! Black ribbon. Nobody reads you ever again. Bye-bye, translator!", "e",
+                    "The little dragon girl, nearly beaten and close to tears, throws a black ribbon that will erase her opponent for good. Shrill, spiteful, her voice wobbling."},
+            {"lucy6", "W-white?! That's cheating! Then I'll be big. Really, really big!", "e",
+                    "The little dragon girl sees her black ribbon turn into shining white on her opponent and panics, then decides to turn into a full dragon. Shocked, stammering, then defiant and loud."},
+            {"lucy7", "After her. Hold the strike and keep the beam on her. It only says what she means Sloppy~♡", "H",
+                    PLAYER + "She rises into the sky on white wings to chase a dragon and tells the player how to use her beam of light. Calm, sure, urgent, a little awed." + FAST},
+            {"lucy8", "Stop reading me! Stop it, stop it, stop it!", "e",
+                    "The little dragon, caught in a beam of light that translates what she really feels, shouts at her opponent to stop. A child's voice, frantic, embarrassed, close to tears."},
+            {"lucy9", "You'll get it wrong! Everybody gets it wrong!", "e",
+                    "The little dragon, nearly beaten in the sky, cries out the thing she is really afraid of. A child's voice, breaking, desperate, crying."},
+            {"lucy10", "Hah! I win! I win... Why is it so quiet?", "e",
+                    "The little dragon girl has erased her opponent and every word around her; she cheers, and then hears how silent it is. Triumphant, then small and unsure."},
+            {"lucy11", "Bleh. Dumb translator. I'm Lucy. Remember who beat you!", "e",
+                    "The little dragon girl sticks her tongue out at the opponent she has beaten and flies off; she is crying and pretending not to be. Taunting, sniffling, her voice cracking."},
+            {"lucy12", "Not enough. Not alone. I'm going back for every colour and every friend Sloppy~♡", "H",
+                    PLAYER + "She has lost to the dragon because she came without all her friends, and resolves to go back for them. Quiet, hurt, stubborn, then determined."},
+    };
     /** When what was asked cannot be done this time: a letter creased, a count run out. */
     static final String[][] UNDONE = {
             {"undone1", "Ugh. That one's off for this run. Next time Sloppy~♡", "H",
@@ -940,7 +980,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET, GACHA, PLEDGES);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS, MARKET, GACHA, PLEDGES, LUCY);
         return groups.toArray(new String[0][][]);
     }
 }
