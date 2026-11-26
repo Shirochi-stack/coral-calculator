@@ -115,6 +115,24 @@ final class RunGame {
     private final RectF swapButton = new RectF(), gearButton = new RectF(), packButton = new RectF(), packAct = new RectF(), packCard = new RectF();
     private final RectF[] packRows = new RectF[RunArms.COUNT];
     private boolean packOpen;
+    /**
+     * The board of hunts, open over the guild hall: its card; for each hunt on it the button
+     * that takes it on or hands it in, and the one that gives it up, which asks once before
+     * it does; what was last paid, and what came with it. And, in a land: how much of what
+     * she has dealt with has been counted, which of her hunts something can be done towards
+     * there, and how lately each got further.
+     */
+    private boolean huntsOpen;
+    private final RectF huntsCard = new RectF();
+    private final RectF[] huntActs = {new RectF(), new RectF(), new RectF()}, huntDrops = {new RectF(), new RectF(), new RectF()};
+    private int dropAsk = -1, seenFells;
+    private String huntPaid = "", huntMore = "";
+    private final boolean[] huntHere = new boolean[RunHunts.SLOTS];
+    private final float[] huntFlash = new float[RunHunts.SLOTS];
+    /** How many treats the pet shop takes for each pet, in place of pluses; and the colours of the badges of the guild's ranks. */
+    private static final int[] PET_TREATS = {2, 2, 2, 2, 3, 4, 4, 4, 4, 5};
+    private static final int[] BADGE_COLOURS = {0xFFCFC5AE, 0xFFD9B77E, 0xFF8A5A33, 0xFFE0A21A, 0xFF7A4BC8};
+    private final RectF petTreat = new RectF();
     private int packFrom, packOn = PlusRun.UNARMED, swapFinger = -1;
     private float swapHeld, sinceHeavy = 9, panelAge = 9, panelX, panelY;
     private boolean panelLeft;
@@ -670,6 +688,7 @@ final class RunGame {
         int kind = rover.kind, had = session.tally("run_rover_" + number);
         String name = waitName(kind);
         if (beaten) {
+            for (int slot = 0; slot < RunHunts.SLOTS; slot++) if (RunHunts.countsRover(hunt(slot), kind)) hunted(slot);
             session.keep("run_rovers", session.tally("run_rovers") | 1 << kind - RunLevels.WYRM);
             session.keep("run_roved", session.tally("run_roved") + 1);
             audio.play("win", .8f);
@@ -697,6 +716,322 @@ final class RunGame {
             }
             speak(RunStory.ROVERS[4], true);
         }
+    }
+
+    // The hunts
+
+    /** The hunt in a place on the board, or nought; and how it stands: nought, on offer; else taken on, and one more than how much of it is done. */
+    private int hunt(int slot) { return session.tally("run_hunt_" + slot); }
+    private int huntAt(int slot) { return session.tally("run_hunt_at_" + slot); }
+
+    /** What she has to fight with, a bit for each thing: what is in her backpack, the tablet-book, and her keys if they are hers. */
+    private int armsOwned() { return session.tally("run_pack") | 1 << PlusRun.TABLET | ((session.tally("run_mains") & 2) != 0 ? 1 << PlusRun.KEYS : 0); }
+
+    /** Fills the board: every empty place on it gets the next hunt, which is not the same as what is on it. */
+    private void stock() {
+        int[] on = new int[RunHunts.SLOTS];
+        for (int slot = 0; slot < on.length; slot++) on[slot] = hunt(slot);
+        for (int slot = 0; slot < on.length; slot++) {
+            if (on[slot] != 0) continue;
+            int serial = session.tally("run_hunt_serial");
+            on[slot] = RunHunts.offer(serial, open(), armsOwned(), session.tally("run_hunts"), on);
+            session.keep("run_hunt_serial", serial + 1);
+            session.keep("run_hunt_" + slot, on[slot]);
+            session.keep("run_hunt_at_" + slot, 0);
+        }
+        huntsHere();
+    }
+
+    /** Which of the hunts she has taken on something can be done towards in the land she is in. */
+    private void huntsHere() {
+        for (int slot = 0; slot < RunHunts.SLOTS; slot++) huntHere[slot] = run != null && hunt(slot) != 0 && huntAt(slot) > 0 && RunHunts.here(hunt(slot), run.level());
+    }
+
+    /** One more done of a hunt she has taken on; and when that is all of it, a card that says so. It is kept there and then, whatever becomes of the land. */
+    private void hunted(int slot) {
+        int hunt = hunt(slot), at = huntAt(slot), many = RunHunts.many(hunt);
+        if (hunt == 0 || at <= 0 || at > many) return;
+        session.keep("run_hunt_at_" + slot, at + 1);
+        huntFlash[slot] = 1;
+        if (at == many) {
+            toast("Hunt done: " + RunHunts.brief(hunt), "Hand it in at any guild hall", SCROLL_PICTURE);
+            buzz(true);
+        }
+    }
+
+    /** The board is looked at: the land waits. The first time, Inju says what it is. */
+    private void openHunts() {
+        stock();
+        huntsOpen = true;
+        dropAsk = -1;
+        huntPaid = huntMore = "";
+        goLeft = goRight = goJump = goStrike = false;
+        jumpPressed = strikePressed = false;
+        audio.play("page", .6f);
+        if (session.tally("run_hunts_met") == 0) {
+            session.keep("run_hunts_met", 1);
+            person(RunStory.HUNTS[0]);
+        }
+    }
+
+    /** And left: the first time with a hunt taken on, she has her say about it. */
+    private void closeHunts() {
+        huntsOpen = false;
+        audio.play("tap", .3f);
+        boolean any = false;
+        for (int slot = 0; slot < RunHunts.SLOTS; slot++) any |= huntAt(slot) > 0;
+        if (any && session.tally("run_hunts_met") == 1) {
+            session.keep("run_hunts_met", 2);
+            if (!audio.speaking()) speak(RunStory.HUNTS[4], true);
+        }
+    }
+
+    private void huntsTouch(float x, float y) {
+        for (int slot = 0; slot < RunHunts.SLOTS; slot++) {
+            int hunt = hunt(slot), at = huntAt(slot);
+            if (hunt == 0) continue;
+            boolean finished = at > RunHunts.many(hunt);
+            if (!huntActs[slot].isEmpty() && huntActs[slot].contains(x, y)) {
+                dropAsk = -1;
+                if (at == 0) {
+                    // Taken on: from now what she does counts for it, in whatever land.
+                    session.keep("run_hunt_at_" + slot, 1);
+                    huntPaid = huntMore = "";
+                    audio.play("unlock", .6f);
+                    buzz(false);
+                    if (!audio.speaking()) person(RunStory.HUNTS[1]);
+                    huntsHere();
+                } else if (finished) {
+                    handIn(slot);
+                }
+                return;
+            }
+            if (!huntDrops[slot].isEmpty() && huntDrops[slot].contains(x, y)) {
+                // Given up, once it has been asked whether she is sure: it comes off the board, and another goes up.
+                if (dropAsk != slot) {
+                    dropAsk = slot;
+                    audio.play("tap", .4f);
+                    return;
+                }
+                dropAsk = -1;
+                session.keep("run_hunt_" + slot, 0);
+                session.keep("run_hunt_at_" + slot, 0);
+                stock();
+                audio.play("page", .5f);
+                return;
+            }
+        }
+        dropAsk = -1;
+        if (!huntsCard.contains(x, y)) closeHunts();
+    }
+
+    /**
+     * A hunt that is done is handed in: its pluses, what the smith works with and its treat
+     * are hers; and with so many handed in, something besides: a pet of her own, a place
+     * for one more pet, room for one more stray, a rank in the guild and its badge. Another
+     * hunt takes its place on the board.
+     */
+    private void handIn(int slot) {
+        int hunt = hunt(slot), done = session.tally("run_hunts") + 1, was = RunHunts.rank(done - 1), rank = RunHunts.rank(done), more = 0;
+        int[] gives = RunHunts.materials(hunt);
+        session.keep("run_hunts", done);
+        for (int index = 0; index < gives.length; index++) if (gives[index] > 0) session.keep("run_mat_" + index, session.tally("run_mat_" + index) + gives[index]);
+        if (RunHunts.treat(hunt)) session.keep("run_treats", session.tally("run_treats") + 1);
+        huntPaid = "Paid: " + RunHunts.pays(hunt);
+        huntMore = "";
+        int brings = RunHunts.brings(done);
+        if (brings == RunHunts.A_PET) {
+            int own = session.tally("run_pet_own"), kind = 0;
+            while (kind < PlusRun.PETS && (own >> kind & 1) != 0) kind++;
+            if (kind < PlusRun.PETS) {
+                int with = session.tally("run_pet_with") & own;
+                session.keep("run_pet_own", own | 1 << kind);
+                session.keep("run_pets", session.tally("run_pets") | 1 << kind);
+                if (Integer.bitCount(with) < 1 + bought(PET_PLACES)) session.keep("run_pet_with", with | 1 << kind);
+                huntMore = PET_NAMES[kind] + " is hers for good";
+            } else {
+                more = 300;
+                huntMore = "Every pet is hers already: + 300";
+            }
+        } else if (brings != RunHunts.NOTHING) {
+            int which = brings == RunHunts.A_PLACE ? PET_PLACES : STRAY_ROOM;
+            if (bought(which) < UP_COSTS[which].length) {
+                session.keep("run_up_" + which, bought(which) + 1);
+                huntMore = brings == RunHunts.A_PLACE ? "A place for one more pet of hers" : "Room for one more stray";
+            } else {
+                more = 400;
+                huntMore = "She has every place there is: + 400";
+            }
+        }
+        if (rank > was) huntMore = (huntMore.isEmpty() ? "" : huntMore + "  ·  ") + "The " + RunHunts.RANK_NAMES[rank - 1] + " badge of the guild";
+        session.keep("run_bank", bank() + RunHunts.pluses(hunt) + more);
+        session.keep("run_hunt_" + slot, 0);
+        session.keep("run_hunt_at_" + slot, 0);
+        stock();
+        regrant();
+        audio.play("buy", .6f);
+        audio.play(huntMore.isEmpty() ? "star" : "win", .6f);
+        buzz(true);
+        person(RunStory.HUNTS[rank > was ? 3 : 2]);
+    }
+
+    /** The badge of a rank in the guild: a seal in the rank's colour, with two tails of ribbon and a quill across it. */
+    private void badge(Canvas canvas, float x, float y, float size, int rank) {
+        int colour = BADGE_COLOURS[Math.max(0, Math.min(BADGE_COLOURS.length - 1, rank - 1))];
+        float round = size / 2;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(CalculatorLayout.CORAL);
+        for (int side = -1; side <= 1; side += 2) {
+            path.reset();
+            path.moveTo(x + side * round * .62f, y + round * .4f);
+            path.lineTo(x + side * round * .8f, y + round * 1.7f);
+            path.lineTo(x + side * round * .38f, y + round * 1.35f);
+            path.lineTo(x + side * round * .06f, y + round * 1.62f);
+            path.lineTo(x + side * round * .06f, y + round * .4f);
+            path.close();
+            canvas.drawPath(path, paint);
+        }
+        paint.setColor(colour);
+        canvas.drawCircle(x, y, round, paint);
+        stroke.setColor(mixed(colour, Color.BLACK, .35f));
+        stroke.setStrokeWidth(size * .09f);
+        canvas.drawCircle(x, y, round * .9f, stroke);
+        stroke.setColor(Color.WHITE);
+        stroke.setStrokeWidth(size * .11f);
+        canvas.drawLine(x - round * .4f, y + round * .45f, x + round * .42f, y - round * .46f, stroke);
+        stroke.setStrokeWidth(size * .07f);
+        canvas.drawLine(x - round * .02f, y - round * .32f, x + round * .2f, y + round * .08f, stroke);
+        paint.setColor(Color.BLACK);
+    }
+
+    /**
+     * The board of hunts, over the guild hall: her rank in the guild and its badge; the
+     * three that are on the board, each with what it asks, what it pays, how far it has got
+     * and a button that takes it on, hands it in or gives it up; what comes next for so
+     * many handed in; and what she has of what hunts pay.
+     */
+    private void drawHunts(Canvas canvas) {
+        canvas.drawColor(0x99000000);
+        int done = session.tally("run_hunts"), rank = RunHunts.rank(done);
+        float wide = Math.min(safe.width() - dp(24), dp(430)), pad = dp(16), high = dp(88), gap = dp(8);
+        float tall = pad + dp(50) + RunHunts.SLOTS * (high + gap) + dp(80) + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
+        huntsCard.set(left, top, left + wide, top + tall);
+        plate(canvas, huntsCard, dp(22), 255);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        fitted(canvas, "The hunts board", left + pad, top + pad + dp(18), dp(20), wide * .55f);
+        text.setTypeface(Typeface.DEFAULT);
+        text.setColor(soft);
+        fitted(canvas, "Inju keeps it  ·  " + done + " handed in  ·  a hunt is done over any lands", left + pad, top + pad + dp(38), dp(12), wide - pad * 2);
+        // Her rank, and its badge.
+        text.setTextAlign(Paint.Align.RIGHT);
+        text.setColor(rank > 0 ? ink : soft);
+        fitted(canvas, rank > 0 ? RunHunts.RANK_NAMES[rank - 1] + " rank" : "No rank yet", left + wide - pad - (rank > 0 ? dp(28) : 0), top + pad + dp(17), dp(13), wide * .34f);
+        if (rank > 0) badge(canvas, left + wide - pad - dp(10), top + pad + dp(9), dp(20), rank);
+        float y = top + pad + dp(50);
+        for (int slot = 0; slot < RunHunts.SLOTS; slot++) {
+            int hunt = hunt(slot), at = huntAt(slot), many = Math.max(1, RunHunts.many(hunt));
+            boolean taken = at > 0, finished = at > many, asking = dropAsk == slot && taken && !finished;
+            box.set(left + dp(8), y, left + wide - dp(8), y + high);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(finished ? (dark ? 0xFF24382E : 0xFFE6F5EC) : taken ? (dark ? 0xFF44292E : 0xFFFCE9EB) : dark ? 0xFF2C3033 : 0xFFF5F6F7);
+            canvas.drawRoundRect(box, dp(14), dp(14), paint);
+            paint.setColor(Color.BLACK);
+            float inner = left + dp(20), room = wide - dp(40) - dp(96);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            fitted(canvas, RunHunts.words(hunt), inner, y + dp(25), dp(14.5f), room);
+            text.setTypeface(Typeface.DEFAULT);
+            text.setColor(CalculatorLayout.CORAL);
+            fitted(canvas, RunHunts.pays(hunt), inner, y + dp(45), dp(12.5f), room);
+            // How far it has got: a bar, and the count.
+            int got = taken ? Math.min(many, at - 1) : 0;
+            float end = inner + room - dp(74);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+            canvas.drawRoundRect(inner, y + dp(61), end, y + dp(68), dp(4), dp(4), paint);
+            paint.setColor(finished ? 0xFF2E9E6E : CalculatorLayout.CORAL);
+            if (got > 0) canvas.drawRoundRect(inner, y + dp(61), inner + (end - inner) * got / many, y + dp(68), dp(4), dp(4), paint);
+            paint.setColor(Color.BLACK);
+            text.setColor(finished ? 0xFF2E9E6E : soft);
+            fitted(canvas, finished ? "done" : taken ? got + " of " + many : "on the board", end + dp(8), y + dp(69), dp(12), dp(66));
+            // Its button: take it on, or hand it in; or, while it is being done, give it up.
+            huntActs[slot].setEmpty();
+            huntDrops[slot].setEmpty();
+            RectF button = taken && !finished ? huntDrops[slot] : huntActs[slot];
+            button.set(left + wide - dp(20) - dp(84), y + high / 2 - dp(18), left + wide - dp(20), y + high / 2 + dp(18));
+            if (taken && !finished) {
+                stroke.setColor(asking ? CalculatorLayout.CORAL : soft);
+                stroke.setStrokeWidth(dp(1.5f));
+                canvas.drawRoundRect(button, dp(18), dp(18), stroke);
+                text.setColor(asking ? CalculatorLayout.CORAL : soft);
+            } else {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(finished ? 0xFF2E9E6E : CalculatorLayout.CORAL);
+                canvas.drawRoundRect(button, dp(18), dp(18), paint);
+                paint.setColor(Color.BLACK);
+                text.setColor(Color.WHITE);
+            }
+            text.setTextAlign(Paint.Align.CENTER);
+            fitted(canvas, finished ? "Hand in" : taken ? (asking ? "Sure?" : "Give up") : "Take", button.centerX(), button.centerY() + dp(5), dp(14), button.width() - dp(12));
+            y += high + gap;
+        }
+        // What comes next for so many handed in; what she has of what hunts pay; and what was just paid, with what came with it.
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        fitted(canvas, "At " + RunHunts.nextAt(done) + " handed in: " + RunHunts.nextIs(done), left + pad, y + dp(16), dp(12.5f), wide - pad * 2);
+        text.setColor(soft);
+        StringBuilder has = new StringBuilder("She has: ");
+        for (int index = 0; index < RunHunts.MATERIALS.length; index++) has.append(session.tally("run_mat_" + index)).append(' ').append(RunHunts.MATERIALS[index].toLowerCase(java.util.Locale.ROOT)).append("  ·  ");
+        int treats = session.tally("run_treats");
+        has.append(treats).append(treats == 1 ? " treat" : " treats");
+        fitted(canvas, has.toString(), left + pad, y + dp(35), dp(12.5f), wide - pad * 2);
+        if (!huntPaid.isEmpty()) {
+            text.setColor(0xFF2E9E6E);
+            fitted(canvas, huntPaid, left + pad, y + dp(54), dp(12.5f), wide - pad * 2);
+            if (!huntMore.isEmpty()) fitted(canvas, huntMore, left + pad, y + dp(73), dp(12.5f), wide - pad * 2);
+        } else {
+            fitted(canvas, "Type metal, ink crystal and gold leaf are what the smith works with", left + pad, y + dp(54), dp(12), wide - pad * 2);
+            fitted(canvas, "The pet shop gives a pet for treats  ·  tap outside to close", left + pad, y + dp(73), dp(12), wide - pad * 2);
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /** The board of hunts as it stands in the guild hall: on two posts, with what is on it pinned up; and over it its name, or, when a hunt of hers is done, that it can be handed in. */
+    private void drawBoard(Canvas canvas, int[] item) {
+        float x = (item[1] + 1 - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF6B4426);
+        canvas.drawRect(x - tile * .95f, feet - tile * 1.9f, x - tile * .82f, feet, paint);
+        canvas.drawRect(x + tile * .82f, feet - tile * 1.9f, x + tile * .95f, feet, paint);
+        box.set(x - tile * 1.15f, feet - tile * 2.05f, x + tile * 1.15f, feet - tile * .7f);
+        canvas.drawRoundRect(box, tile * .08f, tile * .08f, paint);
+        paint.setColor(0xFFB98A56);
+        box.inset(tile * .09f, tile * .09f);
+        canvas.drawRoundRect(box, tile * .05f, tile * .05f, paint);
+        boolean any = false;
+        for (int slot = 0; slot < RunHunts.SLOTS; slot++) {
+            int hunt = hunt(slot), at = huntAt(slot);
+            boolean taken = at > 0, finished = hunt != 0 && at > RunHunts.many(hunt);
+            any |= finished;
+            float px = x + (slot - 1) * tile * .66f, py = feet - tile * (1.4f + slot % 2 * .08f);
+            canvas.save();
+            canvas.rotate((slot - 1) * 4, px, py);
+            paint.setColor(finished ? 0xFFDDF2E4 : taken ? 0xFFFCE0E4 : 0xFFFFF7E6);
+            canvas.drawRect(px - tile * .25f, py - tile * .34f, px + tile * .25f, py + tile * .34f, paint);
+            paint.setColor(0x55000000);
+            for (int line = 0; line < 3; line++) {
+                canvas.drawRect(px - tile * .17f, py - tile * .14f + line * tile * .13f, px + tile * (line == 2 ? .04f : .17f), py - tile * .1f + line * tile * .13f, paint);
+            }
+            paint.setColor(CalculatorLayout.CORAL);
+            canvas.drawCircle(px, py - tile * .27f, tile * .05f, paint);
+            canvas.restore();
+        }
+        paint.setColor(Color.BLACK);
+        if (any) mark(canvas, x, feet - tile * 2.3f - Math.abs((float) Math.sin(clock * 5)) * tile * .12f, "Hand in!", 0xFFE0A21A, false);
+        else mark(canvas, x, feet - tile * 2.3f, "Hunts", 0xFF8A5A33, false);
     }
 
     /** The ribbons a place off this land gives are tied on, there and then: one colour in the first volume, two after; never white. What they are, in words. */
@@ -1038,6 +1373,10 @@ final class RunGame {
             audio.play("tap", .3f);
             return true;
         }
+        if (huntsOpen) {
+            closeHunts();
+            return true;
+        }
         if (fanOpen) {
             fanOpen = false;
             idle();
@@ -1184,6 +1523,8 @@ final class RunGame {
         seenPanels = seenFans = seenDuds = seenFinds = seenRefills = seenSwitches = 0;
         sinceHeavy = panelAge = 9;
         packOpen = false;
+        huntsOpen = false;
+        seenFells = 0;
         swapFinger = -1;
         petWordLeft = 0;
         wardAge = 9;
@@ -1199,6 +1540,7 @@ final class RunGame {
             perks.lives = 1;
         }
         run = new PlusRun(RunLevels.level(land), perks);
+        huntsHere();
         // For looking at a land's later parts in a build made for testing: she starts by its first flag, its second,
         // inside the place where someone waits, or, for a number over a thousand, at the column that many over it.
         int from = BuildConfig.DEBUG ? session.tally("run_from") : 0;
@@ -1391,6 +1733,7 @@ final class RunGame {
         sinceBroke += seconds;
         sinceStep += seconds;
         mixAge += seconds;
+        for (int slot = 0; slot < huntFlash.length; slot++) huntFlash[slot] = Math.max(0, huntFlash[slot] - seconds / 3);
         if (screen == PLAY && ribbonFinger >= 0 && !fanOpen && (ribbonHeld += seconds) >= .3f && Integer.bitCount(perks.colours & 127) > 1) openPicker(false);
         // Held, the button that changes what she holds opens her backpack, and the land waits.
         if (screen == PLAY && swapFinger >= 0 && !packOpen && (swapHeld += seconds) >= .35f) openPack(PLAY);
@@ -1404,7 +1747,7 @@ final class RunGame {
         // While what was won from whoever fell is rising, everything else waits.
         if (screen == PLAY && prizeAge >= 0 && prizeAge < 2) {
             prizeAge += seconds;
-        } else if (screen == PLAY && (fanOpen || packOpen)) {
+        } else if (screen == PLAY && (fanOpen || packOpen || huntsOpen)) {
             // The land waits while she chooses.
         } else if (screen == PLAY && roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
             roomCardAge += seconds;
@@ -2141,7 +2484,7 @@ final class RunGame {
                 if (kind == RunLevels.HOUSE) {
                     int sort = here.rooms.get(in)[14];
                     toast(LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
-                            : sort == RunLevels.GUILD_HALL ? "The counter is at Inju's desk" : "Somebody is in", 0);
+                            : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk" : "Somebody is in", 0);
                     audio.play("page", .7f);
                 } else if (kind <= RunLevels.PASSAGE) {
                     int[] one = here.rooms.get(in);
@@ -2231,6 +2574,13 @@ final class RunGame {
         // What happens in a place off the land is over: a card of how it went and what it gave, and then the way out. What a place gives
         // the first time is kept, whatever becomes of the run: a cellar a life, there and then, and where the Old Book slept a piece of a
         // heart; a game the rare white ribbon, if she did enough; a stash a purse, and a hidden one a piece of a heart.
+        // What she deals with counts towards the hunts she has taken on.
+        List<int[]> fells = run.fells();
+        if (seenFells > fells.size()) seenFells = 0;
+        for (; seenFells < fells.size(); seenFells++) {
+            int[] one = fells.get(seenFells);
+            for (int slot = 0; slot < RunHunts.SLOTS; slot++) if (RunHunts.counts(hunt(slot), one[0], one[1])) hunted(slot);
+        }
         if (run.roomWins() != seenWins) {
             seenWins = run.roomWins();
             int in = run.room();
@@ -2250,6 +2600,7 @@ final class RunGame {
                 // next two are pluses to keep. It can be fought again for a better one.
                 int rank = Math.max(0, run.ranked()), best = session.tally("run_rank_" + number) - 1, pays = PlusRun.RANK_PAYS[rank] + (won[10] != 0 ? 20 : 0);
                 roomRank = rank;
+                for (int slot = 0; slot < RunHunts.SLOTS; slot++) if (RunHunts.countsCellar(hunt(slot), rank)) hunted(slot);
                 roomResult = won[10] != 0 ? "The Old Book is shut" : "Cellar cleared";
                 roomScore = PlayStage.clock(Math.max(1, Math.round(run.arenaTime()))) + "  ·  " + (run.arenaHurts() == 0 ? "not a hurt" : run.arenaHurts() + (run.arenaHurts() == 1 ? " hurt" : " hurts"))
                         + (run.arenaLives() > 0 ? "  ·  " + run.arenaLives() + (run.arenaLives() == 1 ? " life" : " lives") : "") + "  ·  + " + pays;
@@ -2618,6 +2969,10 @@ final class RunGame {
             if (action == MotionEvent.ACTION_DOWN) packTouch(x, y);
             return;
         }
+        if (huntsOpen) {
+            if (action == MotionEvent.ACTION_DOWN) huntsTouch(x, y);
+            return;
+        }
         if (screen == PLAY) {
             if (action == MotionEvent.ACTION_DOWN && pauseButton.contains(x, y)) {
                 audio.play("tap", .5f);
@@ -2647,6 +3002,10 @@ final class RunGame {
                 audio.play("tap", .5f);
                 buzz(false);
                 idle();
+                if (what == PlusRun.BOARD) {
+                    openHunts();
+                    return;
+                }
                 counterFrom = PLAY;
                 counterTab = what < 100 ? PETS_TAB : what - 100;
                 if (what < 100) petOn = what;
@@ -2774,6 +3133,7 @@ final class RunGame {
                     }
                 }
                 if (!petAct.isEmpty() && petAct.contains(x, y)) petDeal();
+                else if (!petTreat.isEmpty() && petTreat.contains(x, y)) petTrade();
             } else if (counterTab == ARMS_TAB && armsAct.contains(x, y)) {
                 audio.play("tap", .5f);
                 openPack(MAP);
@@ -2855,6 +3215,23 @@ final class RunGame {
         } else {
             audio.play("no", .5f);
         }
+    }
+
+    /** The pet that is looked at is had for treats, if she has as many as it takes. */
+    private void petTrade() {
+        int own = session.tally("run_pet_own"), with = session.tally("run_pet_with") & own, bit = 1 << petOn, treats = session.tally("run_treats");
+        if ((own & bit) != 0) return;
+        if (treats < PET_TREATS[petOn]) {
+            audio.play("no", .5f);
+            return;
+        }
+        session.keep("run_treats", treats - PET_TREATS[petOn]);
+        session.keep("run_pet_own", own | bit);
+        if (Integer.bitCount(with) < 1 + bought(PET_PLACES)) session.keep("run_pet_with", with | bit);
+        session.keep("run_pets", session.tally("run_pets") | bit);
+        audio.play("buy", .6f);
+        buzz(true);
+        speak(RunStory.SHOP[1], false);
     }
 
     /** Buys the next step of something, if her pluses stretch to it. */
@@ -3178,8 +3555,9 @@ final class RunGame {
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
                         if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
+                        else if (what == PlusRun.BOARD) pieceIn(canvas, four, SCROLL_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
-                        label(canvas, stallButton, what < 100 ? "Look" : what == 100 + PETS_TAB ? "Pets" : "Counter");
+                        label(canvas, stallButton, what < 100 ? "Look" : what == PlusRun.BOARD ? "Hunts" : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
@@ -3211,6 +3589,7 @@ final class RunGame {
         }
         // Her backpack, over whatever is there.
         if (packOpen) drawPack(canvas);
+        if (huntsOpen) drawHunts(canvas);
     }
 
     /** Her backpack is opened: from a land, where the land waits; from the pause; or from the map. */
@@ -3831,6 +4210,10 @@ final class RunGame {
             if (item[3] != 0 || item[1] < first - 1 || item[1] > last + 1) continue;
             if (item[0] == PlusRun.LEVER || item[0] == PlusRun.PLATE || item[0] == PlusRun.SHRINE) {
                 drawStanding(canvas, item);
+                continue;
+            }
+            if (item[0] == PlusRun.SPOT && item[4] >= 100) {
+                drawBoard(canvas, item);
                 continue;
             }
             if (item[0] == PlusRun.SPOT) {
@@ -6321,6 +6704,31 @@ final class RunGame {
             fitted(canvas, words, safe.left + margin + dp(36), under + dp(22), dp(13.5f), wide - dp(50));
             under += high + dp(8);
         }
+        // The hunts she has taken on that something can be done towards in this land: a small plate for each, with how far it has got.
+        for (int slot = 0; slot < RunHunts.SLOTS; slot++) {
+            if (!huntHere[slot]) continue;
+            int hunt = hunt(slot), at = huntAt(slot), many = RunHunts.many(hunt);
+            boolean finished = at > many;
+            if (hunt == 0 || at <= 0 || finished && huntFlash[slot] <= 0) continue;
+            String words = RunHunts.brief(hunt) + "  " + Math.min(many, at - 1) + " / " + many + (finished ? "  ·  done" : "");
+            text.setTextSize(dp(12.5f));
+            float high = dp(28), wide = Math.min(text.measureText(words) + dp(46), safe.width() - margin * 2);
+            box.set(safe.left + margin, under, safe.left + margin + wide, under + high);
+            plate(canvas, box, high / 2, 225);
+            if (huntFlash[slot] > 0) {
+                stroke.setColor(finished ? 0xFF2E9E6E : CalculatorLayout.CORAL);
+                stroke.setAlpha(Math.round(255 * Math.min(1, huntFlash[slot] * 2)));
+                stroke.setStrokeWidth(dp(2));
+                canvas.drawRoundRect(box, high / 2, high / 2, stroke);
+                stroke.setAlpha(255);
+            }
+            paint.setAlpha(255);
+            pieceIn(canvas, four, SCROLL_PICTURE, safe.left + margin + dp(16), under + high / 2, dp(19), 0);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(finished ? 0xFF2E9E6E : ink);
+            fitted(canvas, words, safe.left + margin + dp(30), under + dp(18.5f), dp(12.5f), wide - dp(46));
+            under += high + dp(6);
+        }
         // In a place off the land where something is going on, a plate of its own, apart from the land's: for a cellar, which wave it is
         // and how many of it still stand; for a game, the seconds left, as a number and as a bar that runs down, and her count against
         // the count to beat. The last three seconds are red, and beat.
@@ -7259,7 +7667,14 @@ final class RunGame {
         int earned = 0;
         int all = open > RunLevels.COUNT ? RunLevels.TOTAL : RunLevels.COUNT;
         for (int land = 1; land <= all; land++) earned += starsOf(land);
-        heading(canvas, "Plus run", RunStory.TITLE + "  ·  " + earned + " of " + all * 3 + " stars");
+        int guild = RunHunts.rank(session.tally("run_hunts"));
+        heading(canvas, "Plus run", RunStory.TITLE + "  ·  " + earned + " of " + all * 3 + " stars" + (guild > 0 ? "  ·  " + RunHunts.RANK_NAMES[guild - 1] + " badge" : ""));
+        if (guild > 0) {
+            // The badge of her rank in the guild, kept: by the name, where there is room for it.
+            text.setTextSize(dp(26));
+            float after = safe.left + dp(18) + text.measureText("Plus run") + dp(20);
+            if (after + dp(14) < shopButton.left) badge(canvas, after, safe.top + dp(29), dp(22), guild);
+        }
         if (open > RunLevels.COUNT) {
             for (int volume = 0; volume < 2; volume++) {
                 paint.setStyle(Paint.Style.FILL);
@@ -7522,6 +7937,7 @@ final class RunGame {
         }
         float under = safe.top + dp(142) + list.length * (squeeze + dp(6)) + dp(6), left = safe.centerX() - across / 2;
         petAct.setEmpty();
+        petTreat.setEmpty();
         armsAct.setEmpty();
         if (counterTab == PETS_TAB) drawPetShop(canvas, left, under, across, bank);
         else if (counterTab == COLOURS_TAB) drawMixHints(canvas, left, under, across);
@@ -7593,7 +8009,19 @@ final class RunGame {
         fitted(canvas, "It " + PET_DOES[petOn] + ". " + (PlusRun.floats(petOn) ? "It flies." : "It runs."), left + dp(16), y + dp(43), dp(12.5f), across - dp(32));
         fitted(canvas, "Hers for good, it comes into every land  \u00B7  " + Integer.bitCount(with) + " of " + places + (places == 1 ? " place" : " places") + " taken", left + dp(16), y + dp(60),
                 dp(12), across - dp(32));
-        petAct.set(left + dp(16), y + dp(72), left + across - dp(16), y + dp(108));
+        // One she has not got is had for pluses, or for treats, which hunts pay: a button for each.
+        int treats = session.tally("run_treats"), asks = PET_TREATS[petOn];
+        petAct.set(left + dp(16), y + dp(72), left + across - dp(16) - (hers ? 0 : across * .44f), y + dp(108));
+        if (!hers) {
+            petTreat.set(petAct.right + dp(8), petAct.top, left + across - dp(16), petAct.bottom);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(treats >= asks ? 0xFF2E9E6E : dark ? 0xFF2F3336 : 0xFFEDEEEE);
+            canvas.drawRoundRect(petTreat, dp(18), dp(18), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(treats >= asks ? Color.WHITE : soft);
+            fitted(canvas, "or " + asks + " treats (has " + treats + ")", petTreat.centerX(), petTreat.centerY() + dp(5), dp(13.5f), petTreat.width() - dp(16));
+        }
         boolean can = hers ? comes || room : bank >= PET_COSTS[petOn];
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(can ? (hers && comes ? (dark ? 0xFF44292E : 0xFFFCE9EB) : CalculatorLayout.CORAL) : dark ? 0xFF2F3336 : 0xFFEDEEEE);
