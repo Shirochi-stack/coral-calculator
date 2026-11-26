@@ -45,6 +45,8 @@ final class FightGame {
     private static final int[] SMASH_FX = {PANEL_FX, BRICK_FX, BURST_FX, TEAR_FX, HEART_FX};
     private static final float HOLD = 1.3f, CAPTION = 2.4f;
     private static final int CYAN = 0xFF35D6E8, GOLD = 0xFFFFC53A;
+    /** The colour of each one's hair where the light is on it, as it is in her frames: pink, light orange-brown, mauve, blue and peach. A side's colour in a clash. */
+    private static final int[] HAIR = {0xFFE2AFB7, 0xFFCB9575, 0xFFAD8892, 0xFFA4C1DB, 0xFFFBBCA6};
 
     private final PlayStage stage;
     private final Context context;
@@ -110,6 +112,12 @@ final class FightGame {
     private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase, seenQuakes, seenDodges, seenClashes;
     /** How long her ultimate's button has been on show, for each side; how long ago the round ended; and where each was a moment ago, for what she leaves behind her as she dodges. */
     private float grandAge = 9, sinceOver, trailAge;
+    /** Whether this device has little memory to spare; and, for testing, how long drawing has taken. */
+    private final boolean tight;
+    private long drawNanos, drawnSince, painting;
+    private final FightTally tally = new FightTally();
+    private final int[] counted = new int[FightTally.COUNT];
+    private int drawn;
     private int slipTest;
     private final float[][] trail = new float[2][6];
     private final int[] seenState = new int[2], seenLanded = new int[2];
@@ -128,6 +136,10 @@ final class FightGame {
     FightGame(PlayStage stage, Context context, boolean dark, boolean haptics, Bitmap still, Bitmap pet) {
         this.stage = stage;
         this.context = context;
+        android.app.ActivityManager manager = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        android.app.ActivityManager.MemoryInfo memory = new android.app.ActivityManager.MemoryInfo();
+        if (manager != null) manager.getMemoryInfo(memory);
+        tight = manager != null && (manager.isLowRamDevice() || memory.totalMem < 3_500_000_000L);
         this.dark = dark;
         this.haptics = haptics;
         session = PlaySession.get(context);
@@ -253,6 +265,8 @@ final class FightGame {
         groundY = landscape ? height * .8f : height * .6f;
         // Her pictures are read in no larger than she is drawn here, in tenths; a change of screen reads them in again.
         float need = Math.max(.5f, Math.min(1, (float) Math.ceil(Fight.TALL * unit / STANDING * 10.4f) / 10));
+        // A device with little memory has them smaller still: two fighters' frames are many.
+        if (tight) need = Math.min(need, .7f);
         if (need != detail) {
             detail = need;
             keepOnly(-1, -1);
@@ -265,6 +279,17 @@ final class FightGame {
         keepOnly(-1, -1);
         if (backdrop != null) backdrop.recycle();
         backdrop = null;
+    }
+
+    /**
+     * Left for the home screen: a fight against her stops on its pause, to be come back to as
+     * it stands. A fight against another device cannot wait: false, and it is closed.
+     */
+    boolean hold() {
+        if (mode != SOLO) return false;
+        if (screen == FIGHT) pause();
+        audio.hush();
+        return true;
     }
 
     /** The Back key: out of a fight to its pause, out of anything else to the fighters; false to leave the game. */
@@ -340,6 +365,8 @@ final class FightGame {
     /** She meets the other four in the order they stand in, starting with the one after her. */
     private void climb() {
         for (int index = 0; index < ladder.length; index++) ladder[index] = (player + 1 + index) % Fight.FIGHTERS;
+        // In a build made for testing, a number kept under this name makes the first of them herself, as two devices may have it.
+        if (BuildConfig.DEBUG && session.tally("fight_mirror") > 0) ladder[0] = player;
         rung = 0;
         versus();
     }
@@ -521,6 +548,8 @@ final class FightGame {
         seenDodges = 0;
         seenClashes = 0;
         grandAge = 9;
+        tally.begin(fight, mode == GUEST ? 1 : 0);
+        java.util.Arrays.fill(counted, 0);
         // In a build made for testing, a number kept under this name starts both of them with their meters full.
         if (BuildConfig.DEBUG && session.tally("fight_full") > 0) for (Fight.Fighter fighter : fight.fighters) fighter.meter = Fight.METER;
         // And a number kept under this one gives the dodge a way to go without a second finger, which a test cannot put down.
@@ -569,6 +598,14 @@ final class FightGame {
 
     private void finish() {
         won = fight.winner() == (mode == GUEST ? 1 : 0);
+        // Kept for the companion: fights played and won as this fighter, whom she has beaten, and fights against another device.
+        int mine = fight.fighters[mode == GUEST ? 1 : 0].kind, theirs = fight.fighters[mode == GUEST ? 0 : 1].kind;
+        session.keep("fight_played_" + mine, session.tally("fight_played_" + mine) + 1);
+        if (won) {
+            session.keep("fight_wins_" + mine, session.tally("fight_wins_" + mine) + 1);
+            session.keep("fight_beat_" + theirs, session.tally("fight_beat_" + theirs) + 1);
+        }
+        if (mode != SOLO) session.keep("fight_net", session.tally("fight_net") + 1);
         java.util.Arrays.fill(held, false);
         screen = RESULT;
         if (mode != SOLO) {
@@ -725,6 +762,13 @@ final class FightGame {
     /** What has just happened in the fight, made into sounds, flashes and words. */
     private void heard() {
         Fight.Fighter[] two = fight.fighters;
+        // What this player has done that the companion keeps count of, as it happens.
+        tally.look(fight);
+        for (int index = 0; index < FightTally.COUNT; index++) {
+            if (tally.counts[index] == counted[index]) continue;
+            session.keep(FightTally.NAMES[index], session.tally(FightTally.NAMES[index]) + tally.counts[index] - counted[index]);
+            counted[index] = tally.counts[index];
+        }
         if (fight.moves() != seenMoves) {
             seenMoves = fight.moves();
             for (int side = 0; side < 2; side++) {
@@ -939,6 +983,23 @@ final class FightGame {
 
     void draw(Canvas canvas) {
         if (width == 0) return;
+        if (BuildConfig.DEBUG) {
+            // In a build made for testing: how long the last few hundred pictures took to draw, and how many there were a second.
+            long now = System.nanoTime();
+            if (drawnSince == 0) drawnSince = now;
+            if (++drawn >= 240) {
+                android.util.Log.d("Fight", "drew " + Math.round(drawn * 1e9 / (now - drawnSince)) + " a second, " + drawNanos / drawn / 1000 + " us each");
+                drawn = 0;
+                drawNanos = 0;
+                drawnSince = now;
+            }
+            painting = now;
+        }
+        paintAll(canvas);
+        if (BuildConfig.DEBUG) drawNanos += System.nanoTime() - painting;
+    }
+
+    private void paintAll(Canvas canvas) {
         if (screen == SELECT) {
             drawSelect(canvas);
         } else if (screen == LOBBY) {
@@ -1114,8 +1175,10 @@ final class FightGame {
             float x = across(fighter.x), y = up(fighter.y);
             // She breathes as she stands, and leans into a blow as it goes out.
             float breath = fighter.state == Fight.IDLE ? 1 + .012f * (float) Math.sin(clock * 3 + fighter.side * 2) : 1;
-            float lunge = fighter.state == Fight.ATTACK && fighter.doing().shot == Fight.NOTHING && fighter.clock >= fighter.doing().startup
-                    && fighter.clock < fighter.doing().startup + .12f ? unit * .18f * (fighter.facingLeft ? -1 : 1) : 0;
+            // The lean goes out with the blow and comes back after it, smoothly: it used to step out and step back.
+            float into = fighter.state == Fight.ATTACK && fighter.doing().shot == Fight.NOTHING
+                    ? (fighter.clock - fighter.doing().startup * .5f) / (fighter.doing().startup * .5f + .2f) : 0;
+            float lunge = into > 0 && into < 1 ? unit * .18f * (float) Math.sin(Math.PI * into) * (fighter.facingLeft ? -1 : 1) : 0;
             // A hop back lifts her off the ground a little; a dodge, a dash or a hop leaves her likeness behind her where she was.
             if (fighter.state == Fight.BACKSTEP) y -= unit * .3f * (float) Math.sin(Math.PI * Math.min(1, fighter.clock / Fight.BACKSTEP_SECONDS));
             if (fighter.state == Fight.DODGE || fighter.state == Fight.DASH || fighter.state == Fight.BACKSTEP) {
@@ -1126,7 +1189,8 @@ final class FightGame {
                 }
             }
             // Getting up, she cannot be hit, and flickers to show it.
-            paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK && (int) (clock * 16) % 2 == 0 ? 120 : 255);
+            // It is a soft pulse: blinking on and off made her look as if the screen were dropping frames.
+            paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK ? Math.round(190 + 65 * (float) Math.sin(clock * 34)) : 255);
             canvas.save();
             canvas.scale(1, breath, x, y);
             frame(canvas, fighter.kind, pose(fighter), x + lunge, y, scale, fighter.facingLeft);
@@ -1265,8 +1329,9 @@ final class FightGame {
             canvas.drawRoundRect(pauseButton.centerX() + dp(2), pauseButton.centerY() - dp(6.5f), pauseButton.centerX() + dp(5.5f), pauseButton.centerY() + dp(6.5f), dp(1.2f), dp(1.2f), paint);
             paint.setColor(Color.BLACK);
         }
-        if (fight.phase() == Fight.FLOURISH) drawFlourish(canvas);
-        else if (fight.phase() == Fight.CLASHING) drawClash(canvas);
+        // A clash stays on show for a moment after it is settled, its bar filling for whoever won, before her greater ultimate is announced.
+        if (fight.phase() == Fight.CLASHING || fight.clashWinner() >= 0 && fight.clashAge() < Fight.CLASH_SHOWN) drawClash(canvas);
+        else if (fight.phase() == Fight.FLOURISH) drawFlourish(canvas);
     }
 
     /** One of Glossarion's panes of light, with what it reads. */
@@ -1489,59 +1554,109 @@ final class FightGame {
         paint.setColor(Color.BLACK);
     }
 
+    /** The colour of a side in a clash: her hair's. With the same fighter on both sides, the one on the right has a darker shade of it. */
+    private int clashColour(int side) {
+        Fight.Fighter[] two = fight.fighters;
+        int colour = HAIR[two[side].kind];
+        if (side == 0 || two[0].kind != two[1].kind) return colour;
+        return Color.rgb(Math.round(Color.red(colour) * .7f), Math.round(Color.green(colour) * .7f), Math.round(Color.blue(colour) * .7f));
+    }
+
     /**
-     * Two ultimates at once: the fight stops, the two faces push against each other across
-     * the screen, and whoever taps the screen faster pushes the other back.
+     * Two ultimates at once: the fight stops, and whoever taps the screen faster wins. A
+     * number counts the time down. A bar shows who is winning: each side's colour fills it
+     * from her own end, and where they meet goes toward whoever is behind. When it is over
+     * the bar fills at once for whoever won.
      */
     private void drawClash(Canvas canvas) {
         Fight.Fighter[] two = fight.fighters;
+        int winner = fight.clashWinner(), mine = mode == GUEST ? 1 : 0;
+        boolean over = winner >= 0;
         canvas.drawColor(0xCC120A22);
-        int left = fight.taps(0), right = fight.taps(1), mine = mode == GUEST ? 1 : 0;
-        // Where the two meet moves toward whoever is behind, gently at first: a tap or two does not throw it across.
-        float share = (left + 4) / (float) (left + right + 8);
-        float meet = safe.left + safe.width() * (.5f + .56f * (share - .5f)) + (float) Math.sin(clock * 60) * dp(3);
-        float middle = safe.centerY() - dp(30), tall = dp(118), lean = dp(26);
-        paint.setStyle(Paint.Style.FILL);
-        for (int side = 0; side < 2; side++) {
-            path.reset();
-            path.moveTo(side == 0 ? 0 : width, middle - tall / 2);
-            path.lineTo(meet + lean, middle - tall / 2);
-            path.lineTo(meet - lean, middle + tall / 2);
-            path.lineTo(side == 0 ? 0 : width, middle + tall / 2);
-            path.close();
-            paint.setColor(FightCast.COLOURS[two[side].kind]);
-            paint.setAlpha(235);
-            canvas.drawPath(path, paint);
-        }
-        paint.setAlpha(255);
-        stroke.setColor(Color.WHITE);
-        stroke.setStrokeWidth(dp(5));
-        canvas.drawLine(meet + lean, middle - tall / 2, meet - lean, middle + tall / 2, stroke);
-        for (int spark = 0; spark < 6; spark++) {
-            float along = (clock * 3 + spark * .37f) % 1, away = (spark % 2 == 0 ? 1 : -1) * dp(10 + 40 * along);
-            thing(canvas, BURST_FX, meet + lean - lean * 2 * ((spark * .19f) % 1) + away, middle - tall / 2 + tall * ((spark * .19f) % 1), dp(34) * (1 - along * .6f), spark * 60, false);
-        }
-        float size = dp(104);
-        face(canvas, two[0].kind, Math.max(safe.left + size * .6f, meet - lean - size * .62f), middle, size, false, true);
-        face(canvas, two[1].kind, Math.min(safe.right - size * .6f, meet + lean + size * .62f), middle, size, true, true);
+        float middle = safe.centerY() - dp(30), size = dp(76), faceY = middle - dp(40);
+        int[] colours = {clashColour(0), clashColour(1)};
+        // What to do, in the colour of whoever is looking; or who has won, in hers.
         text.setTextAlign(Paint.Align.CENTER);
-        text.setTextSize(dp(64) * (1 + .1f * (float) Math.sin(clock * 16)));
-        outlined(canvas, "TAP!", safe.centerX(), middle - tall / 2 - dp(34), GOLD, 1);
-        text.setTextSize(dp(15));
-        outlined(canvas, "Tap anywhere, as fast as you can", safe.centerX(), middle - tall / 2 - dp(10), Color.WHITE, 1);
-        text.setTextSize(dp(34));
+        if (over) {
+            text.setTextSize(dp(40));
+            // With the same fighter on both sides, which of the two it was.
+            String words = FightCast.NAMES[two[winner].kind] + (two[0].kind != two[1].kind ? "" : winner == 0 ? " on the left" : " on the right") + " wins!";
+            float room = safe.width() - dp(24);
+            if (text.measureText(words) > room) text.setTextSize(dp(40) * room / text.measureText(words));
+            outlined(canvas, words, safe.centerX(), faceY - size / 2 - dp(34), colours[winner], 1);
+        } else {
+            text.setTextSize(dp(64) * (1 + .1f * (float) Math.sin(clock * 16)));
+            outlined(canvas, "TAP!", safe.centerX(), faceY - size / 2 - dp(44), colours[mine], 1);
+            text.setTextSize(dp(15));
+            outlined(canvas, "Tap anywhere, as fast as you can", safe.centerX(), faceY - size / 2 - dp(18), Color.WHITE, 1);
+        }
+        // The two of them, each with how often she has tapped, in her colour; and between them the time that is left, a number and nothing more.
+        float leftX = safe.left + dp(18) + size / 2, rightX = safe.right - dp(18) - size / 2;
+        face(canvas, two[0].kind, leftX, faceY, size, false, true);
+        face(canvas, two[1].kind, rightX, faceY, size, true, true);
+        text.setTextSize(dp(38));
         text.setTextAlign(Paint.Align.LEFT);
-        outlined(canvas, String.valueOf(left), safe.left + dp(18), middle + tall / 2 + dp(44), mine == 0 ? GOLD : Color.WHITE, 1);
+        outlined(canvas, String.valueOf(fight.taps(0)), leftX + size / 2 + dp(10), faceY + dp(14), colours[0], 1);
         text.setTextAlign(Paint.Align.RIGHT);
-        outlined(canvas, String.valueOf(right), safe.right - dp(18), middle + tall / 2 + dp(44), mine == 1 ? GOLD : Color.WHITE, 1);
-        // How much of it is left, as a bar running down.
-        float part = Math.max(0, Math.min(1, fight.clashLeft() / Fight.CLASH_SECONDS)), bar = Math.min(safe.width() - dp(140), dp(260));
-        paint.setColor(0x99201A2C);
-        box.set(safe.centerX() - bar / 2, middle + tall / 2 + dp(24), safe.centerX() + bar / 2, middle + tall / 2 + dp(34));
-        canvas.drawRoundRect(box, dp(5), dp(5), paint);
-        paint.setColor(GOLD);
-        box.set(safe.centerX() - bar / 2, middle + tall / 2 + dp(24), safe.centerX() - bar / 2 + bar * part, middle + tall / 2 + dp(34));
-        canvas.drawRoundRect(box, dp(5), dp(5), paint);
+        outlined(canvas, String.valueOf(fight.taps(1)), rightX - size / 2 - dp(10), faceY + dp(14), colours[1], 1);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTextSize(dp(34));
+        float left = Math.max(0, fight.clashLeft());
+        outlined(canvas, over ? "0.0" : String.format(java.util.Locale.US, "%.1f", left), safe.centerX(), faceY + dp(13), Color.WHITE, 1);
+        // The bar: a dark track with a light edge, so that any hair shows against any stage.
+        float barLeft = safe.left + dp(18), barRight = safe.right - dp(18), barTop = faceY + size / 2 + dp(16), barTall = dp(34), round = barTall / 2;
+        float at = fight.clashBar();
+        if (over) at += ((winner == 0 ? 1 : 0) - at) * fight.clashSweep();
+        float meet = barLeft + (barRight - barLeft) * at;
+        box.set(barLeft - dp(3), barTop - dp(3), barRight + dp(3), barTop + barTall + dp(3));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xF0140E20);
+        canvas.drawRoundRect(box, round + dp(3), round + dp(3), paint);
+        box.set(barLeft, barTop, barRight, barTop + barTall);
+        path.reset();
+        path.addRoundRect(box, round, round, Path.Direction.CW);
+        canvas.save();
+        canvas.clipPath(path);
+        paint.setColor(colours[0]);
+        canvas.drawRect(barLeft, barTop, meet, barTop + barTall, paint);
+        paint.setColor(colours[1]);
+        canvas.drawRect(meet, barTop, barRight, barTop + barTall, paint);
+        // A shine along the top of it, and where the middle is.
+        paint.setColor(0x38FFFFFF);
+        canvas.drawRect(barLeft, barTop, barRight, barTop + barTall * .38f, paint);
+        paint.setColor(0x66140E20);
+        canvas.drawRect((barLeft + barRight) / 2 - dp(1), barTop, (barLeft + barRight) / 2 + dp(1), barTop + barTall, paint);
+        if (over) {
+            // It has gone all one way: a flash across it that dies away.
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(230 * Math.max(0, 1 - fight.clashAge() / .2f)));
+            canvas.drawRect(barLeft, barTop, barRight, barTop + barTall, paint);
+            paint.setAlpha(255);
+        }
+        canvas.restore();
+        stroke.setColor(Color.WHITE);
+        stroke.setStrokeWidth(dp(2.5f));
+        canvas.drawRoundRect(box, round, round, stroke);
+        if (!over || fight.clashSweep() < 1) {
+            // Where the two meet: a bright line, and sparks off it.
+            stroke.setStrokeWidth(dp(5));
+            float jolt = over ? 0 : (float) Math.sin(clock * 60) * dp(2);
+            canvas.drawLine(meet + jolt, barTop - dp(7), meet + jolt, barTop + barTall + dp(7), stroke);
+            for (int spark = 0; spark < 4; spark++) {
+                float along = (clock * 3 + spark * .37f) % 1, away = (spark % 2 == 0 ? 1 : -1) * dp(8 + 30 * along);
+                thing(canvas, BURST_FX, meet + away, barTop + barTall * ((spark * .31f + .2f) % 1), dp(30) * (1 - along * .6f), spark * 60, false);
+            }
+        }
+        // Whose end is whose.
+        text.setTextSize(dp(15));
+        text.setTextAlign(Paint.Align.LEFT);
+        outlined(canvas, FightCast.NAMES[two[0].kind] + (mode != SOLO && mine == 0 ? "  you" : ""), barLeft + dp(4), barTop + barTall + dp(24), colours[0], 1);
+        text.setTextAlign(Paint.Align.RIGHT);
+        outlined(canvas, FightCast.NAMES[two[1].kind] + (mode != SOLO && mine == 1 ? "  you" : ""), barRight - dp(4), barTop + barTall + dp(24), colours[1], 1);
+        if (over) {
+            // And the whole screen flashes with it, once.
+            canvas.drawColor(Color.argb(Math.round(120 * Math.max(0, 1 - fight.clashAge() / .2f)), 255, 255, 255));
+        }
         paint.setColor(Color.BLACK);
     }
 
@@ -1549,7 +1664,10 @@ final class FightGame {
     private void drawFlourish(Canvas canvas) {
         int side = fight.flourisher();
         Fight.Fighter fighter = fight.fighters[side];
-        float along = fight.flourish(), in = Math.min(1, along / .18f), out = Math.min(1, (1 - along) / .15f), show = Math.min(in, out);
+        float along = fight.flourish();
+        // The one that follows a clash comes on once the clash's bar has been seen to fill.
+        if (fighter.move == Fight.CLASH) along = (along * Fight.FLOURISH_SECONDS - Fight.CLASH_SHOWN) / (Fight.FLOURISH_SECONDS - Fight.CLASH_SHOWN);
+        float in = Math.min(1, along / .18f), out = Math.min(1, (1 - along) / .15f), show = Math.min(in, out);
         canvas.drawColor(Color.argb(Math.round(150 * show), 12, 8, 24));
         float tall = dp(132) * show, y = Math.min(height * .34f, groundY - Fight.TALL * unit * 1.25f), lean = dp(34);
         path.reset();
@@ -1755,7 +1873,7 @@ final class FightGame {
             paint.setColor(Color.BLACK);
             canvas.save();
             canvas.scale(1, 1 + .012f * (float) Math.sin(clock * 3), x, bandBottom);
-            frame(canvas, player, FightFrames.IDLE1 + (int) (clock / .3f) % 4, x, bandBottom, scale, false);
+            frame(canvas, player, FightPose.breathing(clock), x, bandBottom, scale, false);
             canvas.restore();
         }
         box.set(cardLeft, cardTop, cardRight, cardBottom);

@@ -15,11 +15,14 @@ final class Hair {
     static final int PINK = 0;
     /** In the order Plus run numbers its forms, after her own: {@link PlusRun#RED} is 1 and {@link PlusRun#WHITE} is 8. */
     static final String[] NAMES = {"Pink", "Red", "Blue", "Brown", "Green", "Yellow", "Purple", "Black", "White"};
-    static final int[] COLOURS = {0xFFF4A3BE, 0xFFE0362F, 0xFF3B7BE0, 0xFF8A5A33, 0xFF3FB56A, 0xFFF2C230, 0xFF9A4FD0, 0xFF3A3A44, 0xFFF4F4FA};
+    static final int[] COLOURS = {0xFFF4A3BE, 0xFFE0362F, 0xFF3B7BE0, 0xFFCF987A, 0xFF3FB56A, 0xFFF2C230, 0xFF9A4FD0, 0xFF3A3A44, 0xFFF4F4FA};
     /** Where Plus run keeps the colours won, among what the games remember: bit (colour - 1) is set for each. */
     static final String OWNED = "run_colours";
-    /** For each colour: its hue, how much stronger than her pink it is, how bright, and what is added to the brightness. */
-    private static final float[][] DYES = {{0, 2, .98f, 0}, {.6f, 1.7f, .98f, 0}, {.075f, 1.6f, .58f, 0}, {.37f, 1.5f, .92f, 0}, {.145f, 1.9f, 1.05f, 0},
+    /**
+     * For each colour: its hue, how much stronger than her pink it is, how bright, and what is added to the brightness.
+     * Brown is the shade of Chikuwa's hair, measured from her picture in Plus run.
+     */
+    private static final float[][] DYES = {{0, 2, .98f, 0}, {.6f, 1.7f, .98f, 0}, {.058f, 1.09f, .95f, 0}, {.37f, 1.5f, .92f, 0}, {.145f, 1.9f, 1.05f, 0},
             {.76f, 1.6f, .9f, 0}, {.7f, .5f, .3f, 0}, {.6f, .12f, .5f, .52f}};
 
     /** The pictures of her last made, all in one colour: they are large, and making them takes a moment. */

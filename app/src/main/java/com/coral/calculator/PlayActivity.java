@@ -206,6 +206,11 @@ public final class PlayActivity extends Activity {
         if (stage != null || root.getWidth() == 0) return;
         int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random) : game;
         stage = new PlayStage(this, kind, dark, haptics, art, pet, played -> {
+            // Left for the home screen, a long game waits here on its pause, and is found as it was when the app is come back to.
+            if (stage.wentHome() && stage.hold()) {
+                stage.comeBack();
+                return;
+            }
             root.removeView(stage);
             stage = null;
             if (figure != null) figure.setVisibility(View.VISIBLE);

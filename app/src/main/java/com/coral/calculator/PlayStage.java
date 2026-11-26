@@ -557,9 +557,40 @@ final class PlayStage extends View {
         }
     };
     private boolean listening, wentHome;
+    /** Taken off the screen only to be put back on it later: the game on it is left as it stands, not closed. */
+    private boolean kept;
 
     /** Whether the game was left by going home: then nothing of it is to be put back on the screen. */
     boolean wentHome() { return wentHome; }
+
+    int game() { return game; }
+
+    /**
+     * Left by going home, one of the two long games stops where it stands, on its pause, so
+     * that it can be come back to. False for anything else, and for a fight against another
+     * device: those are done with.
+     */
+    boolean hold() {
+        if (runGame != null) runGame.hold();
+        else if (fightGame == null || !fightGame.hold()) return false;
+        kept = true;
+        return true;
+    }
+
+    /** A game that was held is about to be put back on the screen: it may be left again. */
+    void comeBack() {
+        kept = false;
+        wentHome = false;
+        left = false;
+    }
+
+    /** A game that was held is not coming back: it is closed, as it would have been when it left the screen. */
+    void discard() {
+        if (!kept) return;
+        kept = false;
+        if (runGame != null) runGame.close();
+        if (fightGame != null) fightGame.close();
+    }
 
     // Before Android 13 there is no flag to give: the system is the only sender of this, and the check for the version is above the call.
     @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag")
@@ -595,8 +626,10 @@ final class PlayStage extends View {
         }
         running = false;
         removeCallbacks(frame);
-        if (runGame != null) runGame.close();
-        if (fightGame != null) fightGame.close();
+        if (!kept) {
+            if (runGame != null) runGame.close();
+            if (fightGame != null) fightGame.close();
+        }
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
             OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
             if (dispatcher != null) dispatcher.unregisterOnBackInvokedCallback((OnBackInvokedCallback) backCallback);
