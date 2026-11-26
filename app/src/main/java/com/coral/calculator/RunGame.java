@@ -302,6 +302,11 @@ final class RunGame {
     /** In a build made for testing: frames drawn since a moment, to find how many are drawn a second. */
     private long framesFrom;
     private int frames;
+    /** Pieces seen knocked off shields, shields seen broken, and times she was seen thrown back by one; and how much longer everything is slow. */
+    private int seenCracks, seenShatters, seenThrownBack;
+    private float slow;
+    /** In a build made for testing: how long since a blow was last dealt for her. */
+    private float sinceDeal;
     /** Where a book last burst, in squares, and how long ago. */
     private float blastX, blastY, blastAge = 9;
     /** How long since she last said where a second jump is to be had. */
@@ -1058,7 +1063,8 @@ final class RunGame {
         talk.clear();
         talking = told = false;
         hintMoved = hintJumped = false;
-        seenDrops = seenBeams = seenBlasts = jumpsAtFall = 0;
+        seenDrops = seenBeams = seenBlasts = jumpsAtFall = seenCracks = seenShatters = seenThrownBack = 0;
+        slow = 0;
         goDown = false;
         perks = kept();
         // For looking at what losing looks like in a build made for testing: one heart and one life.
@@ -1322,6 +1328,10 @@ final class RunGame {
     }
 
     private void step(float seconds) {
+        if (slow > 0) {
+            slow -= seconds;
+            seconds *= .3f;
+        }
         talks();
         if (goLeft || goRight) hintMoved = true;
         if (goJump) hintJumped = true;
@@ -1594,7 +1604,11 @@ final class RunGame {
             }
         }
         // (In a build made for testing, with the sweeping on, a blow lands on it whenever one would.)
-        if (BuildConfig.DEBUG && rover != null && session.tally("run_sweep") > 0) run.deal(rover);
+        if (BuildConfig.DEBUG && session.tally("run_sweep") > 0 && (sinceDeal += seconds) > .45f) {
+            sinceDeal = 0;
+            if (rover != null) run.deal(rover);
+            if (boss != null && run.locked()) run.deal(boss);
+        }
         // The wyrm gone for the third time and not beaten: it is driven off.
         if (rover != null && rover.kind == RunLevels.WYRM && !roverOver && run.roused() >= 3 && rover.away && !rover.flat) {
             roverOver = true;
@@ -1634,6 +1648,38 @@ final class RunGame {
             pop(run.foeX(), run.foeY() - 1.4f, run.fizzledAt() == RunLevels.WISP ? "Only water!" : "Only fire!");
         }
         sinceWings += seconds;
+        if (run.cracks() != seenCracks) {
+            // A piece off a shield: it rings, higher the less of it is left, and shards fly.
+            seenCracks = run.cracks();
+            sinceStruck = 0;
+            audio.play("parry", .5f);
+            audio.play("clang", .35f);
+            buzz(false);
+            for (int shard = 0; shard < 7; shard++) {
+                double way = random.nextFloat() * Math.PI * 2;
+                bits.add(new float[]{run.foeX(), run.foeY() - .8f, (float) Math.cos(way) * 6, (float) Math.sin(way) * 6 - 2, .4f, 0});
+            }
+        }
+        if (run.shatters() != seenShatters) {
+            // The last piece: it breaks, with a flash and a burst, and for a beat everything is slow.
+            seenShatters = run.shatters();
+            audio.play("crumble", 1f);
+            audio.play("star", .8f);
+            buzz(true);
+            flash = .3f;
+            shake = Math.max(shake, .35f);
+            slow = .45f;
+            pop(run.foeX(), run.foeY() - 2.2f, "Shield broken!");
+            for (int shard = 0; shard < 26; shard++) {
+                double way = random.nextFloat() * Math.PI * 2;
+                bits.add(new float[]{run.foeX(), run.foeY() - .8f, (float) Math.cos(way) * (5 + random.nextFloat() * 6), (float) Math.sin(way) * 8 - 3, .7f, shard % 3 == 0 ? 1 : 0});
+            }
+        }
+        if (run.thrownBack() != seenThrownBack) {
+            seenThrownBack = run.thrownBack();
+            audio.play("quake", .6f);
+            pop(herX, herY - 1.9f, "Thrown back!");
+        }
         if (run.blasts() != seenBlasts) {
             seenBlasts = run.blasts();
             audio.play("quake", .7f);
@@ -4056,6 +4102,30 @@ final class RunGame {
             box.set(x - swell * .8f, y - swell * .8f, x + swell * .8f, y + swell * .8f);
             canvas.drawArc(box, 200 + (float) Math.sin(clock * 2) * 12, 50, false, stroke);
             stroke.setAlpha(255);
+            // The cracks in it: none while it is whole, and more of them, and longer, the less of it is left to break.
+            float gone = guard == PlusRun.SHIELDED && !run.forming(foe) ? 1 - run.shield(foe) : 0;
+            if (gone > .01f) {
+                stroke.setColor(Color.WHITE);
+                stroke.setStrokeWidth(tile * .05f);
+                int cracks = 1 + Math.round(gone * 5);
+                for (int crack = 0; crack < cracks; crack++) {
+                    double way = crack * 2.399 + foe.kind;
+                    float from = swell * (.15f + .12f * (crack % 3)), to = swell * Math.min(1, from / swell + .35f + .5f * gone);
+                    float bend = (crack % 2 == 0 ? 1 : -1) * .35f;
+                    path.reset();
+                    path.moveTo(x + (float) Math.cos(way) * from, y + (float) Math.sin(way) * from);
+                    path.lineTo(x + (float) Math.cos(way + bend * .5f) * (from + to) / 2, y + (float) Math.sin(way + bend * .5f) * (from + to) / 2);
+                    path.lineTo(x + (float) Math.cos(way - bend * .2f) * to, y + (float) Math.sin(way - bend * .2f) * to);
+                    canvas.drawPath(path, stroke);
+                }
+            }
+            if (run.forming(foe)) {
+                // Forming again: its rim comes round piece by piece.
+                stroke.setColor(Color.WHITE);
+                stroke.setStrokeWidth(tile * .09f);
+                box.set(x - swell, y - swell, x + swell, y + swell);
+                canvas.drawArc(box, -90, 360 * run.shield(foe), false, stroke);
+            }
             // What goes round it is hers: hearts for Illya, coins for Jupan, drops of ink or water for those made of it, noughts for Zero, and pages for the rest.
             int things = 5;
             for (int thing = 0; thing < things && !closing; thing++) {
@@ -4896,9 +4966,9 @@ final class RunGame {
             }
             if (boss != null) {
                 int colour = waitColour(boss.kind), face = waitFace(boss.kind);
-                float wide = Math.min(safe.width() - margin * 2, dp(300)), high = dp(40), from = safe.centerX() - wide / 2;
+                float wide = Math.min(safe.width() - margin * 2, dp(300)), high = dp(48), from = safe.centerX() - wide / 2;
                 box.set(from, under, from + wide, under + high);
-                plate(canvas, box, high / 2, 235);
+                plate(canvas, box, dp(20), 235);
                 float bar = from + dp(16) + (face >= 0 ? dp(30) : 0), end = from + wide - dp(16);
                 if (face >= 0) round(canvas, face, from + dp(22), under + high / 2, dp(15));
                 text.setTextSize(dp(12.5f));
@@ -4916,7 +4986,7 @@ final class RunGame {
                     text.setTextAlign(Paint.Align.RIGHT);
                     text.setTextSize(dp(11));
                     text.setColor(soft);
-                    canvas.drawText("Shielded", end - dp(17), under + dp(15), text);
+                    canvas.drawText(run.forming(boss) ? "Forming" : "Break the shield", end - dp(17), under + dp(15), text);
                 } else if (bare && !closing) {
                     text.setTextAlign(Paint.Align.RIGHT);
                     text.setTextSize(dp(12));
@@ -4943,6 +5013,17 @@ final class RunGame {
                 }
                 paint.setColor(cardColor);
                 for (int third = 1; third < 3; third++) canvas.drawRect(bar + (end - bar) * third / 3 - dp(1), under + dp(21), bar + (end - bar) * third / 3 + dp(1), under + dp(31), paint);
+                // Her shield, under what she has left: how much of it there is still to break. It falls with each blow that lands on it, is
+                // empty while it is broken, and fills as it forms again. Beside it, what it gives way to soonest.
+                float meter = boss.flat ? 0 : run.shield(boss);
+                int weak = PlusRun.weak(boss.kind);
+                float last = weak != 0 ? end - dp(16) : end;
+                paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+                canvas.drawRoundRect(bar, under + dp(36), last, under + dp(41), dp(2.5f), dp(2.5f), paint);
+                paint.setColor(run.forming(boss) ? 0xFFB9BEC2 : sinceStruck < .2f ? Color.WHITE : 0xFF5B9BF0);
+                if (meter > 0) canvas.drawRoundRect(bar, under + dp(36), bar + (last - bar) * meter, under + dp(41), dp(2.5f), dp(2.5f), paint);
+                paint.setColor(Color.BLACK);
+                if (weak != 0) pieceIn(canvas, two, weak == PlusRun.FIRE ? FIRE_ART : DROP_ART, end - dp(5), under + dp(38), dp(14), 0);
                 paint.setColor(Color.BLACK);
                 under += high + dp(8);
             }

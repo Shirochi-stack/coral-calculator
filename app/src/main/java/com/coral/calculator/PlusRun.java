@@ -213,6 +213,13 @@ final class PlusRun {
 
         /** How many times its usual size it is: King Slime loses some of himself with every blow. */
         float size = 1;
+        /**
+         * For those who wait: how many pieces of her shield are left and how many it has
+         * whole; for how much longer it is broken; for how much longer it is forming; and
+         * how many blows have landed on her since it broke.
+         */
+        float shield, shieldMost, broken, forming;
+        int taken;
         /** Whether it was put into a land to make up its numbers: such a one keeps still while she is far off. */
         boolean crowd;
         /**
@@ -359,6 +366,8 @@ final class PlusRun {
                 foe.step = 3;
                 foe.act = .6f;
                 foe.away = level.arena >= 0;
+                foe.shieldMost = strength(spec[0]);
+                foe.shield = foe.shieldMost;
                 // One met in the middle of a land is not there until she comes near; Blot is twice the size of anything.
                 if (RunLevels.rover(spec[0])) {
                     foe.away = true;
@@ -513,6 +522,12 @@ final class PlusRun {
             foe.away = from.away;
             foe.unseen = from.unseen;
             foe.spawned = from.spawned;
+            foe.crowd = from.crowd;
+            foe.shield = from.shield;
+            foe.shieldMost = from.shieldMost;
+            foe.broken = from.broken;
+            foe.forming = from.forming;
+            foe.taken = from.taken;
             foes.add(foe);
         }
         arms.addAll(other.arms);
@@ -895,6 +910,8 @@ final class PlusRun {
         if (kind == RunLevels.OLD_BOOK) {
             foe.left = health(RunLevels.OLD_BOOK);
             foe.most = foe.left;
+            foe.shieldMost = strength(RunLevels.OLD_BOOK);
+            foe.shield = foe.shieldMost;
             foe.step = 3;
             foe.act = .5f;
             // He takes a moment to wake.
@@ -1223,9 +1240,8 @@ final class PlusRun {
                     float at = foe.x + foe.wide() / 2;
                     if (foe.flat || absent(foe) || foe.dazed > 0 || (beamLeft ? at > from || at < from - BEAM_REACH : at < from || at > from + BEAM_REACH)
                             || foe.y > middle + BEAM_WIDE || foe.y + foe.tall() < middle - BEAM_WIDE) continue;
-                    // Whoever waits behind her shield is not touched by it; whoever is spent is.
-                    if (RunLevels.boss(foe.kind) && !open(foe)) continue;
-                    beat(foe, SURE);
+                    // (On a shield it takes three pieces at a time: nothing strips one faster.)
+                    beat(foe, BEAMED);
                 }
                 // And what is thrown at her along it is gone.
                 for (Shot shot : shots) {
@@ -1294,8 +1310,105 @@ final class PlusRun {
         Float left = crumble.get(column * 64 + row);
         return left == null ? 0 : left;
     }
-    /** Whether a sign can be hurt just now: those who wait at the end, only while they are spent after something they have done. */
-    boolean open(Foe foe) { return !RunLevels.boss(foe.kind) || foe.step == 2 && !absent(foe); }
+    /**
+     * Whether a sign can be hurt just now: those who wait, only while their shield is
+     * broken. A shield is not waited out: it is broken by blows. Each blow that lands on it
+     * takes a piece off it; when the last piece is gone it shatters, and she reels, and for
+     * a moment blows land on her, two at the most; then it forms again, and while it is
+     * forming nothing touches it. What she does herself never opens her: she does it to
+     * keep whoever is at her shield off it.
+     */
+    boolean open(Foe foe) { return !RunLevels.boss(foe.kind) || foe.broken > 0 && !absent(foe); }
+
+    /** How many pieces the shield of each of those who wait is made of, to begin with: one more in each later third of the fight. */
+    static int strength(int kind) {
+        switch (kind) {
+            case RunLevels.GUARD:
+            case RunLevels.WYRM:
+            case RunLevels.GECKO:
+                return 2;
+            case RunLevels.BUTLER:
+            case RunLevels.ILLYA:
+            case RunLevels.TSUBAKIEH:
+            case RunLevels.BLOT:
+                return 3;
+            case RunLevels.ZERO:
+            case RunLevels.BYEORU:
+            case RunLevels.GOKHAE:
+            case RunLevels.JUPAN:
+            case RunLevels.MIRI:
+            case RunLevels.GARI:
+            case RunLevels.OLD_BOOK:
+                return 4;
+            case RunLevels.SUMBI:
+            case RunLevels.YEOBAEK:
+            case RunLevels.PADS:
+            case RunLevels.KING:
+            case RunLevels.PARTY:
+                return 5;
+            default:
+                return 6;
+        }
+    }
+
+    /** What the shield of one of them gives way to soonest: fire for those made of paper, water for those of ink and of fire; or nothing in particular. */
+    static int weak(int kind) {
+        return kind == RunLevels.OLD_BOOK || kind == RunLevels.BYEORU || kind == RunLevels.GOKHAE || kind == RunLevels.MIRI || kind == RunLevels.WYRM
+                || kind == RunLevels.PARTY ? FIRE
+                : kind == RunLevels.BUTLER || kind == RunLevels.GARI || kind == RunLevels.MAWANG || kind == RunLevels.PADS || kind == RunLevels.BLOT ? WATER : 0;
+    }
+
+    /** How long she can be hurt for once her shield is broken, and how long it takes to form again: both shorter in each later third. */
+    float opens(Foe foe) { return 2.4f - .35f * phase(foe); }
+    float forms(Foe foe) { return 2.2f - .5f * phase(foe); }
+
+    /** How much of her shield is left, from nothing to one; whether it is forming again; and counts that only go up: pieces knocked off shields, shields broken, and times a breaking shield threw her back. */
+    float shield(Foe foe) { return foe.shieldMost <= 0 ? 0 : Math.max(0, Math.min(1, foe.shield / foe.shieldMost)); }
+    boolean forming(Foe foe) { return foe.forming > 0; }
+    int cracks() { return cracks; }
+    int shatters() { return shatters; }
+    int thrownBack() { return thrownBack; }
+    private int cracks, shatters, thrownBack;
+
+    /** A blow lands on a shield: a piece of it is gone, more for what is heavy and for what it is weak to; the last piece gone, it is broken. */
+    private void chip(Foe foe) {
+        float bite = with == BEAMED || with == BLASTED ? 3 : with == SWORDED || with == PLUNGED || with == BOOK || with == STEAM ? 2 : with == GUN ? .5f : 1;
+        int weak = weak(foe.kind);
+        if (weak != 0 && (with == weak || with == STEAM)) bite += 1;
+        if (absent(foe) || foe.forming > 0 || foe.shieldMost <= 0) {
+            parried++;
+            return;
+        }
+        foeX = foe.x + foe.wide() / 2;
+        foeY = foe.y + foe.tall();
+        foe.shield -= bite;
+        cracks++;
+        if (foe.shield > 0) return;
+        foe.shield = 0;
+        foe.broken = opens(foe);
+        foe.taken = 0;
+        shatters++;
+        // What she was at is broken off; and whatever hid her does not.
+        foe.step = 3;
+        foe.act = .3f;
+        foe.unseen = false;
+        // In the last third it throws whoever broke it back as it goes, if she is near.
+        if (phase(foe) >= 2 && !RunLevels.rover(foe.kind) && Math.abs(x + WIDE / 2 - foeX) < 3) {
+            speedAcross = (x + WIDE / 2 < foeX ? -1 : 1) * 11;
+            speedDown = -6;
+            onGround = false;
+            thrownBack++;
+        }
+    }
+
+    /** Her shield is whole again, as strong as this third of the fight makes it. */
+    private void shielded(Foe foe) {
+        foe.shieldMost = strength(foe.kind) + phase(foe);
+        foe.shield = foe.shieldMost;
+        foe.broken = 0;
+        foe.forming = 0;
+        foe.taken = 0;
+    }
     /**
      * How one of those who wait stands toward a blow just now: bare, when one would land;
      * shielded, when it would be turned aside; reeling, for the moment after one has landed,
@@ -1304,7 +1417,7 @@ final class PlusRun {
      */
     static final int BARE = 0, SHIELDED = 1, REELING = 2, AWAY = 3;
     int guard(Foe foe) { return foe.flat ? REELING : absent(foe) ? AWAY : !open(foe) ? SHIELDED : foe.dazed > 0 ? REELING : BARE; }
-    float bareLeft(Foe foe) { return RunLevels.boss(foe.kind) && foe.step == 2 ? Math.max(0, foe.act) : 0; }
+    float bareLeft(Foe foe) { return RunLevels.boss(foe.kind) ? Math.max(0, foe.broken) : 0; }
     /** Whether one of those who wait is not there to be touched: not come yet, arriving, changing, or out of sight. */
     boolean absent(Foe foe) { return foe.away || foe.enter > 0 || foe.flourish > 0 || foe.unseen; }
     /** How much each of those who wait can take. */
@@ -1444,7 +1557,7 @@ final class PlusRun {
 
     /** Lands a blow on one of them, if one would land: for looking at one met in the middle of a land from its coming to its going, in a build made for testing. */
     void deal(Foe foe) {
-        if (!foe.flat && !absent(foe) && open(foe) && foe.dazed <= 0) beat(foe);
+        if (!foe.flat && !absent(foe) && foe.dazed <= 0 && foe.forming <= 0) beat(foe);
     }
 
     /** Deals with the nearest of a cellar's wave that is there, as if she had: for looking at a cellar from end to end in a build made for testing. */
@@ -1783,7 +1896,7 @@ final class PlusRun {
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
                 offIt = .3f;
                 if (plunged && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
-                beat(foe);
+                beat(foe, plunged ? PLUNGED : PLAIN);
                 // One sign after another without touching the ground: each is worth one plus more than the last.
                 if (foe.flat && ++combo > 1) bonus += combo - 1;
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
@@ -2192,16 +2305,16 @@ final class PlusRun {
     }
 
     /** What the blow being dealt is made with: nothing in particular; something nothing stands against; or the kind of thing thrown. */
-    private static final int PLAIN = -1, SURE = -2;
+    private static final int PLAIN = -1, SURE = -2, BLASTED = -3, BEAMED = -4, SWORDED = -5, PLUNGED = -6;
     private int with = PLAIN;
 
     private void beat(Foe foe) {
         if (!open(foe)) {
-            parried++;
+            chip(foe);
             return;
         }
         // A candle wisp is put out only by water, and a rime flake melted only by fire; steam does for both. Anything else goes through them.
-        if ((foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) && with != SURE && with != STEAM && with != (foe.kind == RunLevels.WISP ? WATER : FIRE)) {
+        if ((foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) && with != SURE && with != BEAMED && with != STEAM && with != (foe.kind == RunLevels.WISP ? WATER : FIRE)) {
             fizzled++;
             fizzledAt = foe.kind;
             foeX = foe.x + foe.wide() / 2;
@@ -2242,6 +2355,7 @@ final class PlusRun {
             return;
         }
         foe.dazed = STUNNED;
+        foe.taken++;
         // And then begins the next thing it does.
         foe.step = 3;
         foe.act = 0;
@@ -2258,6 +2372,7 @@ final class PlusRun {
                 // The Old Book changes by himself, and so does one met in the middle of a land.
                 phases++;
                 foe.flourish = FLOURISH;
+                shielded(foe);
             } else {
                 changed();
             }
@@ -2282,7 +2397,11 @@ final class PlusRun {
             lastShut = longest;
             shuts++;
         }
-        for (Foe other : foes) if (RunLevels.boss(other.kind) && !other.flat) other.flourish = FLOURISH;
+        for (Foe other : foes) {
+            if (!RunLevels.boss(other.kind) || other.flat) continue;
+            other.flourish = FLOURISH;
+            shielded(other);
+        }
         for (Shot shot : shots) if (!shot.hers) shot.left = 0;
     }
 
@@ -2492,7 +2611,7 @@ final class PlusRun {
         float from = facingLeft ? x - ahead : x - behind, to = facingLeft ? x + WIDE + behind : x + WIDE + ahead;
         for (Foe foe : foes) {
             if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x >= to || foe.x + foe.wide() <= from || foe.y >= bottom || foe.y + foe.tall() <= top) continue;
-            beat(foe);
+            beat(foe, swungWith == SWORD ? SWORDED : PLAIN);
         }
         for (int index = 0; index < level.rooms.size() && room < 0; index++) {
             int[] one = level.rooms.get(index);
@@ -2535,8 +2654,8 @@ final class PlusRun {
         for (int index = 0; index < foes.size(); index++) {
             Foe foe = foes.get(index);
             float across = foe.x + foe.wide() / 2 - atX, down = foe.y + foe.tall() / 2 - atY;
-            if (foe.flat || absent(foe) || foe.dazed > 0 || across * across + down * down > BLAST * BLAST || RunLevels.boss(foe.kind) && !open(foe)) continue;
-            beat(foe, BOOK);
+            if (foe.flat || absent(foe) || foe.dazed > 0 || across * across + down * down > BLAST * BLAST) continue;
+            beat(foe, BLASTED);
         }
     }
 
@@ -2918,10 +3037,24 @@ final class PlusRun {
         if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
         if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > 26)) return;
         foe.clock += seconds;
+        if (foe.broken > 0 && !absent(foe)) {
+            if ((foe.broken -= seconds) <= 0 || foe.taken >= 2 && foe.dazed <= seconds) {
+                foe.forming = forms(foe);
+                foe.shieldMost = strength(foe.kind) + phase(foe);
+                foe.shield = 0;
+                foe.broken = 0;
+                foe.taken = 0;
+            }
+        } else if (foe.forming > 0) {
+            foe.forming -= seconds;
+            foe.shield = foe.forming <= 0 ? foe.shieldMost : foe.shieldMost * (1 - foe.forming / forms(foe));
+        }
         if (foe.dazed > 0) {
             foe.dazed -= seconds;
             return;
         }
+        // Her shield broken, she reels: she does nothing until it is forming again.
+        if (foe.broken > 0) return;
         float middle = foe.x + foe.wide() / 2, away = Math.abs(x + WIDE / 2 - middle);
         boolean toLeft = x + WIDE / 2 < middle;
         if (RunLevels.rover(foe.kind)) {

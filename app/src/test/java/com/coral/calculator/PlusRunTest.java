@@ -1454,6 +1454,127 @@ public class PlusRunTest {
         assertEquals(PlusRun.LIVES + 1, run.lives());
     }
 
+    @Test public void aShieldIsBrokenByBlowsAndNotWaitedOutAndFormsAgain() {
+        for (int land : WAITED_IN) {
+            // Left alone, she does all she does and is never bare: what she does herself does not open her.
+            PlusRun idle = shutIn(land, true);
+            PlusRun.Foe she = waiting(idle);
+            for (int step = 0; step < 60 * 40; step++) {
+                park(idle);
+                // (One who flies through where she is kept, with the notes about her, runs her own shield onto them: that is a blow, and not her doing.)
+                for (PlusRun.Foe foe : idle.foes()) if (RunLevels.boss(foe.kind)) assertTrue("land " + land, idle.cracks() > 0 || idle.guard(foe) != PlusRun.BARE && !idle.open(foe));
+            }
+            assertTrue("land " + land, idle.specials() >= 4);
+            if (idle.cracks() == 0) {
+                assertEquals("land " + land, 0, idle.shatters());
+                assertEquals("land " + land, 0, idle.blows());
+                assertEquals("land " + land, 1f, idle.shield(she), 0);
+            }
+            assertTrue("land " + land, idle.shatters() <= idle.cracks());
+
+            // Her shield has as many pieces as its place in the story gives it; each plain blow takes one, and does nothing to her.
+            PlusRun run = shutIn(land, true);
+            PlusRun.Foe foe = waiting(run);
+            int pieces = PlusRun.strength(foe.kind);
+            assertTrue("land " + land + " pieces " + pieces, pieces >= 2 && pieces <= 6);
+            for (int step = 0; step < 60 * 20 && !pressable(run, foe); step++) park(run);
+            for (int piece = 0; piece < pieces; piece++) {
+                assertEquals("land " + land, PlusRun.SHIELDED, run.guard(foe));
+                assertEquals("land " + land, 1 - piece / (float) pieces, run.shield(foe), .001f);
+                touch(run, foe);
+                assertEquals("land " + land, piece + 1, run.cracks());
+                assertEquals("land " + land, 0, run.blows());
+            }
+            // The last piece gone, it is broken: she reels, and is bare for a while; and does nothing while she is.
+            assertEquals("land " + land, 1, run.shatters());
+            assertEquals("land " + land, PlusRun.BARE, run.guard(foe));
+            assertEquals("land " + land, run.opens(foe), run.bareLeft(foe), .05f);
+            int did = run.specials();
+            // A blow lands on her; and when the while is over, with her having done nothing in it, it is over.
+            touch(run, foe);
+            assertEquals("land " + land, 1, run.blows());
+            for (int step = 0; step < 60 * 4 && run.open(foe); step++) {
+                // (Of the twins the other is still at it.)
+                if (foe.kind != RunLevels.MIRI && foe.kind != RunLevels.GARI) assertEquals("land " + land, did, run.specials());
+                park(run);
+            }
+            park(run);
+            // It forms again, piece by piece, and while it is forming nothing touches it or her.
+            assertFalse("land " + land, run.open(foe));
+            assertTrue("land " + land, run.forming(foe) && run.shield(foe) < .5f);
+            int cracks = run.cracks(), blows = run.blows(), turned = run.parried();
+            touch(run, foe);
+            assertEquals("land " + land, cracks, run.cracks());
+            assertEquals("land " + land, blows, run.blows());
+            // (Turned aside, where she is there to be touched at all.)
+            assertTrue("land " + land, run.parried() == turned + 1 || run.absent(foe));
+            for (int step = 0; step < 60 * 5 && run.forming(foe); step++) park(run);
+            assertEquals("land " + land, 1f, run.shield(foe), 0);
+            assertEquals("land " + land, PlusRun.SHIELDED, run.guard(foe));
+        }
+        // Two blows are the most that land on her before it forms again, however much of the while is left.
+        PlusRun twice = shutIn(RunLevels.COUNT, true);
+        PlusRun.Foe zero = waiting(twice);
+        for (int step = 0; step < 60 * 60 && twice.blows() < 2; step++) {
+            if (pressable(twice, zero)) touch(twice, zero);
+            else park(twice);
+        }
+        assertEquals(2, twice.blows());
+        assertEquals(0, twice.phases());
+        for (int step = 0; step < 240 && zero.dazed > 0; step++) park(twice);
+        park(twice);
+        assertTrue(twice.forming(zero) && !twice.open(zero));
+        // Left unbroken for its while, a broken shield forms again all the same.
+        PlusRun run = shutIn(RunLevels.GUARD_LAND, true);
+        PlusRun.Foe guard = waiting(run);
+        for (int step = 0; step < 60 * 20 && !pressable(run, guard); step++) park(run);
+        touch(run, guard);
+        touch(run, guard);
+        assertEquals(PlusRun.BARE, run.guard(guard));
+        for (int step = 0; step < 60 * 3; step++) park(run);
+        assertFalse(run.open(guard));
+        assertEquals(0, run.blows());
+        // What is heavy takes more off it: a sword two pieces at a stroke; and what it is weak to, one more: fire on the Old Book's.
+        assertEquals(PlusRun.FIRE, PlusRun.weak(RunLevels.OLD_BOOK));
+        assertEquals(PlusRun.WATER, PlusRun.weak(RunLevels.MAWANG));
+        assertEquals(0, PlusRun.weak(RunLevels.GUARD));
+        PlusRun armed = shutIn(RunLevels.BUTLER_LAND, true);
+        PlusRun.Foe butler = waiting(armed);
+        armed.arm(PlusRun.SWORD);
+        for (int step = 0; step < 60 * 20 && !pressable(armed, butler); step++) park(armed);
+        float before = armed.shield(butler);
+        for (int step = 0; step < 240 && armed.cracks() == 0; step++) {
+            armed.place(butler.x - .8f, butler.y + butler.tall() - PlusRun.TALL);
+            armed.step(STEP, false, true, false, step % 30 == 0);
+        }
+        assertEquals(1, armed.cracks());
+        assertEquals(before - 2f / PlusRun.strength(RunLevels.BUTLER), armed.shield(butler), .01f);
+        // In brown a touch only stops against it, as before: it takes nothing off.
+        PlusRun brown = shutIn(RunLevels.GUARD_LAND, false);
+        PlusRun.Foe stood = waiting(brown);
+        for (int step = 0; step < 60 * 20 && !pressable(brown, stood); step++) park(brown);
+        brown.lend(PlusRun.BROWN);
+        touch(brown, stood);
+        assertEquals(0, brown.cracks());
+        assertEquals(1f, brown.shield(stood), 0);
+        // In the last third a shield that breaks throws whoever broke it back.
+        PlusRun late = shutIn(RunLevels.GUARD_LAND, true);
+        PlusRun.Foe last = waiting(late);
+        for (int step = 0; step < 60 * 400 && late.phase(last) < 2; step++) {
+            if (pressable(late, last)) touch(late, last);
+            else park(late);
+        }
+        assertEquals(2, late.phase(last));
+        assertEquals(0, late.thrownBack());
+        for (int step = 0; step < 60 * 60 && late.thrownBack() == 0; step++) {
+            if (pressable(late, last) && !late.open(last)) touch(late, last);
+            else park(late);
+        }
+        assertEquals(1, late.thrownBack());
+        assertEquals(PlusRun.strength(RunLevels.GUARD) + 2, Math.round(last.shieldMost));
+        assertTrue(late.opens(last) < 2 && late.forms(last) < 1.5f);
+    }
+
     @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
         int tempted = 0, stashed = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
@@ -1661,9 +1782,15 @@ public class PlusRunTest {
         run.step(STEP, false, false, false);
     }
 
+    /** Whether a blow on one of those who wait would do something just now, to her shield or to her: she is there, not reeling, and her shield is not forming. */
+    private static boolean pressable(PlusRun run, PlusRun.Foe foe) {
+        return !foe.flat && !run.absent(foe) && foe.dazed <= 0 && !run.forming(foe);
+    }
+
     /**
      * Watches the fight until one of them begins to show that a thing of theirs is coming,
-     * with blows whenever one can land for as long as that thing belongs to a later third.
+     * with blows whenever one can land, on her shield and then on her, for as long as that
+     * thing belongs to a later third.
      */
     private static void until(PlusRun run, PlusRun.Foe foe, int mode) {
         for (int step = 0; step < 60 * 300; step++) {
@@ -1675,7 +1802,7 @@ public class PlusRunTest {
             }
             boolean has = false;
             for (int one : PlusRun.does(foe.kind, run.phase(foe))) has |= one == mode;
-            if (!has && run.open(foe) && foe.dazed <= 0 && foe.left > 1) touch(run, foe);
+            if (!has && pressable(run, foe) && foe.left > 1) touch(run, foe);
             else park(run);
         }
         throw new AssertionError("never did " + mode);
@@ -1737,11 +1864,12 @@ public class PlusRunTest {
             }
             assertTrue("land " + land + " takes " + most, most >= 5 && most <= 12);
             java.util.List<Integer> changedAt = new java.util.ArrayList<>();
-            int parried = 0, seen = 0;
+            int parried = 0, seen = 0, chipped = 0;
             for (int step = 0; step < 60 * 600 && run.standing(); step++) {
+                // (Whoever a blow is to be dealt to, on her shield or on her.)
                 PlusRun.Foe open = null;
                 for (PlusRun.Foe foe : all) {
-                    if (foe.flat || !run.open(foe) || foe.dazed > 0) continue;
+                    if (!pressable(run, foe)) continue;
                     // Of the twins, never the one who has taken more: so that both are there to the end.
                     boolean more = false;
                     for (PlusRun.Foe other : all) more |= !other.flat && other.left > foe.left;
@@ -1762,27 +1890,41 @@ public class PlusRunTest {
                     int blows = run.blows(), turned = run.parried(), guard = run.guard(first);
                     PlusRun trial = run.copy();
                     PlusRun.Foe same = waiting(trial);
+                    int onShield = trial.parried() + trial.cracks();
                     touch(trial, same);
                     String shown = "land " + land + " shown " + guard + " at step " + step + " step " + first.step + " enter " + first.enter + " flourish "
                             + first.flourish + " dazed " + first.dazed + " act " + first.act + " mode " + first.mode;
                     assertEquals(shown, guard == PlusRun.BARE, trial.blows() > blows);
-                    assertEquals(shown, guard == PlusRun.SHIELDED, trial.parried() > turned);
+                    // (Shielded, the blow goes onto her shield: a piece off it, or, while it is forming, nothing at all.)
+                    assertEquals(shown, guard == PlusRun.SHIELDED, trial.parried() + trial.cracks() > onShield);
                     if (guard == PlusRun.BARE) assertTrue(shown, run.bareLeft(first) > 0);
                     else assertEquals(shown, 0, guard == PlusRun.SHIELDED ? run.bareLeft(first) : 0, 0);
                 }
-                if (open == null && parried == 0 && !run.absent(first) && first.dazed <= 0 && first.step == 1) {
-                    int blows = run.blows(), turned = run.parried();
-                    assertEquals(PlusRun.SHIELDED, run.guard(first));
+                // What she does herself never opens her: she is bare only when her shield has been broken.
+                for (PlusRun.Foe foe : all) if (!foe.flat && run.guard(foe) == PlusRun.BARE) assertTrue("land " + land, foe.broken > 0 && run.shatters() > 0);
+                if (parried == 0 && pressable(run, first) && first.step == 1 && run.guard(first) == PlusRun.SHIELDED) {
+                    // A blow while she is at something lands on her shield, and not on her.
+                    int blows = run.blows(), cracks = run.cracks();
                     touch(run, first);
-                    if (run.parried() > turned) {
+                    if (run.cracks() > cracks) {
                         assertEquals(blows, run.blows());
                         parried++;
                     }
                 } else if (open != null && (done & wanted) == wanted) {
-                    int phases = run.phases(), blows = run.blows();
-                    assertEquals(PlusRun.BARE, run.guard(open));
+                    int phases = run.phases(), blows = run.blows(), cracks = run.cracks(), guard = run.guard(open);
+                    float shield = run.shield(open);
                     touch(run, open);
-                    assertEquals("land " + land, blows + 1, run.blows());
+                    if (guard == PlusRun.BARE) {
+                        assertEquals("land " + land, blows + 1, run.blows());
+                    } else {
+                        // On her shield: a piece off it, and nothing to her; the last piece gone, it is broken and she is bare.
+                        assertEquals("land " + land, PlusRun.SHIELDED, guard);
+                        assertEquals("land " + land, blows, run.blows());
+                        assertEquals("land " + land, cracks + 1, run.cracks());
+                        assertTrue("land " + land, run.shield(open) < shield);
+                        if (run.shield(open) <= 0) assertEquals("land " + land, PlusRun.BARE, run.guard(open));
+                        chipped++;
+                    }
                     if (run.phases() > phases) {
                         changedAt.add(run.blows());
                         // Changing takes a moment, in which nothing touches them.
@@ -1796,6 +1938,9 @@ public class PlusRunTest {
             assertFalse("land " + land + " still stands after " + run.blows() + " blows", run.standing());
             assertEquals("land " + land, most, run.blows());
             assertTrue("land " + land + " turned nothing aside", parried > 0);
+            // Her shield was broken at least once for every two blows that landed on her, and it took as many pieces at least as it has.
+            assertTrue("land " + land + " broke " + run.shatters(), run.shatters() >= (most + 1) / 2);
+            assertTrue("land " + land + " chipped " + chipped, chipped >= run.shatters() * 2);
             // They changed when a third of what they could take was gone, and again at two thirds.
             assertEquals("land " + land, java.util.Arrays.asList((most + 2) / 3, (2 * most + 2) / 3), changedAt);
             // Everything each of them does was done.
@@ -1805,7 +1950,7 @@ public class PlusRunTest {
                 assertTrue("land " + land + " has " + Integer.bitCount(things) + " things", Integer.bitCount(things) >= 3);
                 assertEquals("land " + land + " sign " + foe.kind, things, foe.did & things);
             }
-            assertTrue("land " + land + " did " + seen, seen >= 6);
+            assertTrue("land " + land + " did " + seen, seen >= 4);
             // Down, they are seen to be for a moment; then both ways open.
             assertTrue("land " + land + " not shut", run.locked());
             assertFalse("land " + land + " gate", run.gateOpen());
@@ -1849,7 +1994,7 @@ public class PlusRunTest {
             int most = foe.kind == RunLevels.MIRI || foe.kind == RunLevels.GARI ? 8 : foe.most, wanted = (most + 2) / 3 + 1;
             for (int step = 0; step < 60 * 300 && run.blows() < wanted; step++) {
                 PlusRun.Foe open = null;
-                for (PlusRun.Foe one : run.foes()) if (RunLevels.boss(one.kind) && !one.flat && run.open(one) && one.dazed <= 0) open = one;
+                for (PlusRun.Foe one : run.foes()) if (RunLevels.boss(one.kind) && pressable(run, one)) open = one;
                 if (open != null) touch(run, open);
                 else park(run);
             }
@@ -1968,7 +2113,7 @@ public class PlusRunTest {
             PlusRun.Foe gari = null;
             for (PlusRun.Foe foe : run.foes()) if (foe.kind == RunLevels.GARI && !foe.flat) gari = foe;
             if (gari == null) break;
-            if (run.open(gari) && gari.dazed <= 0) touch(run, gari);
+            if (pressable(run, gari)) touch(run, gari);
             else park(run);
         }
         assertEquals(PlusRun.health(RunLevels.GARI), run.blows());
@@ -2059,7 +2204,7 @@ public class PlusRunTest {
         for (int step = 0; step < 60 * 300 && !(foe.mode == 4 && foe.step == 0 && foe.act > .2f); step++) {
             boolean has = false;
             for (int one : PlusRun.does(foe.kind, run.phase(foe))) has |= one == 4;
-            if (!has && run.open(foe) && foe.dazed <= 0) {
+            if (!has && pressable(run, foe)) {
                 PlusRun.Foe zero = foe;
                 run.place(zero.x + zero.wide() / 2 - PlusRun.WIDE / 2, zero.y + .1f);
                 run.step(STEP, false, false, false);
@@ -2105,7 +2250,11 @@ public class PlusRunTest {
             armed.step(STEP, false, false, false);
             assertEquals(with, armed.weapon());
             PlusRun.Foe zero = waiting(armed);
-            for (int step = 0; step < 60 * 60 && !(armed.open(zero) && zero.act > .8f); step++) park(armed);
+            // (His shield is broken first: a blow lands on him only then.)
+            for (int step = 0; step < 60 * 60 && !armed.open(zero); step++) {
+                if (pressable(armed, zero)) touch(armed, zero);
+                else park(armed);
+            }
             boolean right = zero.x > level.arena + 11;
             armed.place(right ? zero.x - 1.2f : zero.x + zero.wide() + .6f, floor - PlusRun.TALL);
             armed.step(STEP, !right, right, false);
@@ -2127,7 +2276,11 @@ public class PlusRunTest {
             armed.step(STEP, false, false, false);
             assertEquals(PlusRun.PEN, armed.weapon());
             PlusRun.Foe she = waiting(armed);
-            for (int step = 0; step < 60 * 60 && !(!armed.absent(she) && she.dazed <= 0 && (spent ? armed.open(she) && she.act > .6f : she.step == 0 && she.act > .7f)); step++) park(armed);
+            for (int step = 0; step < 60 * 60 && !(!armed.absent(she) && she.dazed <= 0 && (spent ? armed.open(she) : she.step == 0 && she.act > .7f)); step++) {
+                // (Spent now means her shield broken: it is broken for her.)
+                if (spent && pressable(armed, she)) touch(armed, she);
+                else park(armed);
+            }
             boolean right = she.x > with.arena + 11;
             armed.place(right ? she.x - 3 : she.x + she.wide() + 2.4f, floor - PlusRun.TALL);
             armed.step(STEP, !right, right, false);
@@ -3321,11 +3474,18 @@ public class PlusRunTest {
                 int guard = run.guard(foe);
                 if (guard == PlusRun.SHIELDED) shielded++;
                 if (rover == RunLevels.GECKO && !foe.away && foe.y < foe.ground - 5) hung = true;
-                if (guard == PlusRun.BARE && foe.dazed <= 0) {
-                    int blows = run.blows();
+                boolean shown = rover == RunLevels.WYRM ? run.roused() >= 2 : rover == RunLevels.BLOT ? run.quakes() > quakes && run.thrown() > thrown : hung;
+                if (shown && !foe.away && pressable(run, foe)) {
+                    int blows = run.blows(), cracks = run.cracks();
                     touch(run, foe);
-                    assertEquals(who, blows + 1, run.blows());
-                    spent++;
+                    if (guard == PlusRun.BARE) {
+                        assertEquals(who, blows + 1, run.blows());
+                        spent++;
+                    } else {
+                        // On its shield: a piece off it, nothing to it.
+                        assertEquals(who, blows, run.blows());
+                        assertEquals(who, cracks + 1, run.cracks());
+                    }
                 } else {
                     // Out of its way: in the air over where she keeps.
                     run.place(stand, GROUND - 9);
@@ -3335,7 +3495,7 @@ public class PlusRunTest {
             assertTrue(who + " still up after " + run.blows() + " blows, roused " + run.roused(), foe.flat);
             assertEquals(who, PlusRun.health(rover), run.blows());
             assertEquals(who, PlusRun.health(rover), spent);
-            assertTrue(who, shielded > 30);
+            assertTrue(who + " shielded for " + shielded, shielded >= PlusRun.strength(rover));
             assertTrue(who, run.roused() >= 1);
             assertEquals(who, 0, run.hurts());
             if (rover == RunLevels.WYRM) {
@@ -3393,7 +3553,7 @@ public class PlusRunTest {
         for (int step = 0; step < 60 * 300 && run.phases() == 0; step++) {
             if (run.on(PlusRun.GREEN) < 5) run.lend(PlusRun.GREEN);
             if (run.on(PlusRun.YELLOW) < 2) run.lend(PlusRun.YELLOW);
-            if (run.open(foe) && foe.dazed <= 0) touch(run, foe);
+            if (pressable(run, foe)) touch(run, foe);
             else park(run);
         }
         assertEquals(1, run.phases());
@@ -4034,7 +4194,7 @@ public class PlusRunTest {
             assertTrue("at " + book.x, run.absent(book) || book.x >= one[3] + 1 - .01f && book.x + book.wide() <= one[4] + .01f);
             int wanted = 0;
             for (int thing : PlusRun.does(book.kind, run.phase(book))) wanted |= 1 << thing;
-            if (run.open(book) && book.dazed <= 0 && (book.did & wanted) == wanted) {
+            if (pressable(run, book) && (book.did & wanted) == wanted) {
                 int phases = run.phases();
                 run.place(book.x + book.wide() / 2 - PlusRun.WIDE / 2, book.y + .1f);
                 run.step(STEP, false, false, false);

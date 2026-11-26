@@ -700,8 +700,8 @@ final class RunStory {
                     PLAYER + "She is down to her very last life. Tense, low, steeling herself." + FAST}};
     /** The first time she is shut in with someone whose guard is up. */
     static final String[][] SHIELD = {
-            {"shield1", "See that shield? Nothing lands while it's up. Wait out the attack, then hit Sloppy~♡", "H",
-                    PLAYER + "She is sizing up a boss who is protected by a glowing shield, and working out how to beat her. Sharp, coaching, confident." + FAST}};
+            {"shield1", "See that shield? It won't drop by itself. Hit it till it breaks, then strike Sloppy~♡", "H",
+                    PLAYER + "She is sizing up a boss who is protected by a glowing shield, and has worked out that the shield must be smashed with blows before the boss can be hurt. Sharp, coaching, confident." + FAST}};
     /** About wearing colours together: that the ribbon can be held to mix them; the first mix that has a name; and white. */
     static final String[][] MIX = {
             {"mix1", "Two colours now. Tap the palette and pick what I wear together Sloppy~♡", "H",
