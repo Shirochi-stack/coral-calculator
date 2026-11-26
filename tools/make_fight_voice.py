@@ -44,7 +44,7 @@ VOICES = {
     "h": ("community-5fwhmdpiq45g", 1.0, 1.0),
     "c": ("community-iyfnceehtmbk", 1.0, 1.08),
     "t": ("community-pwotyqkmtlsi", .92, 1.1),
-    "r": ("Pixie", 1.25, .94),
+    "r": ("upbeat-bee-0979__design-voice-02fb12a5", 1.05, 1.0),
     "i": ("community-blcuaurhzmvi", .95, 1.06),
 }
 # Who each of them is, for the voice to know.
@@ -86,7 +86,14 @@ def secret(name):
 def spoken(text):
     """A line as it is to be said: without the heart, which is not a word."""
     # A squeal is said as it is squealed in Japanese, not read out as an English word.
-    return text.replace("♡", "").replace("~", "").replace("Kyaa", "きゃあっ").strip()
+    text = text.replace("♡", "").replace("~", "").replace("Kyaa", "きゃあっ").strip()
+    # Chikuwa's voice does not say "bread" properly from its spelling: it is given the word as it sounds.
+    text = re.sub(r"\bbread", "bred", text)
+    text = re.sub(r"\bBread", "Bred", text)
+    # A sound that is written as a word in what is shown is acted, not said: a sniff is a shaky breath in.
+    text = re.sub(r"\b[Ss]niff(le)?\b[.! ]*", "[breathe] ", text)
+    text = re.sub(r"\b[Hh]ic\b[.! ]*", "[breathe] ", text)
+    return text.replace("Uwaaah", "うわああん").replace("Waah", "うわあん").strip()
 
 
 def scene(name):
@@ -128,7 +135,8 @@ def finished(sound, pitch):
     if not loud.any():
         raise RuntimeError("silence")
     first, last = numpy.argmax(loud), len(loud) - numpy.argmax(loud[::-1])
-    sound = sound[max(0, first - RATE_IN // 50): min(len(sound), last + RATE_IN // 8)]
+    # A soft last sound is quieter than what counts as loud here: a third of a second is kept after it, so no word loses its end.
+    sound = sound[max(0, first - RATE_IN // 25): min(len(sound), last + RATE_IN // 3)]
     # Played back faster, a voice is higher: the recording is squeezed by as much as it is to be raised.
     sound = scipy.signal.resample_poly(sound, round(RATE_OUT / pitch), RATE_IN)
     sound = sound / max(1e-6, numpy.max(numpy.abs(sound))) * .92
