@@ -26,23 +26,14 @@ import java.util.Random;
  */
 final class FightGame {
     private static final int SELECT = 0, VERSUS = 1, FIGHT = 2, PAUSED = 3, RESULT = 4, LOBBY = 5;
-    /** Who plays: one player up the ladder; two on this screen, a half of it each; or two on two devices, this one hosting the fight or joining it. */
-    private static final int SOLO = 0, DUO = 1, HOST = 2, GUEST = 3;
+    /** Who plays: one player up the ladder, or two on two devices, this one hosting the fight or joining it. */
+    private static final int SOLO = 0, HOST = 2, GUEST = 3;
     private static final int RESUME = 0, AGAIN = 1, TO_SELECT = 2, NEXT = 3;
     /** The buttons, in the order their places are kept. */
-    private static final int LEFT = 0, RIGHT = 1, JUMP = 2, GUARD = 3, LIGHT = 4, HEAVY = 5, SPECIAL = 6, BUTTONS = 7;
-    private static final int[] SHEETS = {R.drawable.fight_halgakos, R.drawable.fight_chikuwa, R.drawable.fight_tsubakieh,
-            R.drawable.fight_rune, R.drawable.fight_illya};
+    private static final int LEFT = 0, RIGHT = 1, JUMP = 2, GUARD = 3, LIGHT = 4, HEAVY = 5, SPECIAL = 6, DODGE = 7, ULT = 8, BUTTONS = 9;
     private static final int[] STAGES = {R.drawable.fight_stage1, R.drawable.fight_stage2, R.drawable.fight_stage3};
-    /**
-     * A fighter's pictures: twelve frames, six across and two down, each in a cell with her
-     * feet at one place in it. The first six are her standing, walking, jumping, guarding,
-     * hit and down; the next her quick move, heavy move, special, ultimate, win, and one
-     * more of her special. The numbers are those tools/make_fight_art.py builds them to.
-     */
-    private static final int CELL_WIDE = 720, CELL_TALL = 600, FEET_ACROSS = 300, FEET_DOWN = 588, STANDING = 393, ACROSS = 6;
-    private static final int STAND = 0, STEP = 1, LEAP = 2, SHIELD = 3, REEL = 4, FLOORED = 5, QUICK = 6, STRONG = 7, CAST = 8, GRAND = 9,
-            CHEER = 10, EXTRA = 11;
+    /** How tall a fighter stands in her frames, which {@link FightFrames} knows the places of and {@link FightPose} chooses among. */
+    private static final int STANDING = FightFrames.STAND;
     /** The things that fly and flash, side by side in squares; and how much of its square each fills. */
     private static final int PANEL_FX = 0, KEY_FX = 1, ROLL_FX = 2, BRICK_FX = 3, BAT_FX = 4, TEAR_FX = 5, KNIFE_FX = 6, HEART_FX = 7,
             ORB_FX = 8, BURST_FX = 9;
@@ -50,6 +41,8 @@ final class FightGame {
     private static final float[] FX_TALL = {0.694f, 0.544f, 0.856f, 0.713f, 0.206f, 0.569f, 0.175f, 0.894f, 0.981f, 0.875f};
     /** What each fighter's special button shows. */
     private static final int[] SPECIAL_FX = {PANEL_FX, ROLL_FX, BAT_FX, TEAR_FX, HEART_FX};
+    /** What bursts where each fighter's smash comes down. */
+    private static final int[] SMASH_FX = {PANEL_FX, BRICK_FX, BURST_FX, TEAR_FX, HEART_FX};
     private static final float HOLD = 1.3f, CAPTION = 2.4f;
     private static final int CYAN = 0xFF35D6E8, GOLD = 0xFFFFC53A;
 
@@ -62,7 +55,9 @@ final class FightGame {
     private final Random random = new Random();
     private final float density;
     private final Bitmap faces, fx;
-    private final Bitmap[] sheets = new Bitmap[Fight.FIGHTERS];
+    private final Bitmap[][] atlases = new Bitmap[Fight.FIGHTERS][];
+    /** How much smaller than they are kept her pictures are read in: no larger than this screen has use for. */
+    private float detail = 1;
     private Bitmap backdrop;
     private int backdropOf = -1;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -83,11 +78,11 @@ final class FightGame {
     private final int cardColor, ink, soft;
 
     // Two players
-    private int mode = SOLO, second, picking, twoStage;
-    private final RectF[] buttons2 = new RectF[BUTTONS];
-    private final boolean[] held2 = new boolean[BUTTONS], pressed2 = new boolean[BUTTONS];
+    private int mode = SOLO, second, twoStage;
     private final Fight.Pad pad2 = new Fight.Pad();
-    private final RectF duoButton = new RectF(), hostButton = new RectF(), joinButton = new RectF();
+    private final RectF hostButton = new RectF(), joinButton = new RectF();
+    /** Taps on the screen during a clash: how many this player has made, how many of them the fight has been told of, and the other device's. */
+    private int tapCount, tapsGiven, theirTaps, theirTapSeen, sentTaps = -1;
     /** The line to the other device, how it finds this one, and how far the two have got in meeting. */
     private FightLink link;
     private FightNearby nearby;
@@ -112,7 +107,10 @@ final class FightGame {
 
     // The fight as it is shown
     private float unit, groundY, cameraX, hold, shake;
-    private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase;
+    private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase, seenQuakes, seenDodges, seenClashes;
+    /** How long her ultimate's button has been on show, for each side; how long ago the round ended; and where each was a moment ago, for what she leaves behind her as she dodges. */
+    private float grandAge = 9, sinceOver;
+    private final float[][] trail = new float[2][6];
     private final int[] seenState = new int[2], seenLanded = new int[2];
     private final boolean[] seenCharged = new boolean[2];
     private final float[] shownHealth = new float[2];
@@ -144,10 +142,7 @@ final class FightGame {
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
         stroke.setStrokeJoin(Paint.Join.ROUND);
-        for (int index = 0; index < buttons.length; index++) {
-            buttons[index] = new RectF();
-            buttons2[index] = new RectF();
-        }
+        for (int index = 0; index < buttons.length; index++) buttons[index] = new RectF();
         for (int index = 0; index < tiles.length; index++) tiles[index] = new RectF();
         player = Math.max(0, Math.min(Fight.FIGHTERS - 1, session.tally("fight_last")));
         sheet(player);
@@ -155,19 +150,33 @@ final class FightGame {
 
     private float dp(float value) { return value * density; }
 
-    /** A fighter's pictures, read in when they are first wanted. */
-    private Bitmap sheet(int fighter) {
-        if (sheets[fighter] == null) sheets[fighter] = BitmapFactory.decodeResource(context.getResources(), SHEETS[fighter]);
-        return sheets[fighter];
+    /** One of the pictures a fighter's frames are packed into, read in when it is first wanted, at the size this screen has use for. */
+    private Bitmap atlas(int fighter, int index) {
+        if (atlases[fighter] == null) atlases[fighter] = new Bitmap[FightFrames.ATLASES[fighter].length];
+        if (atlases[fighter][index] == null) {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inScaled = true;
+            options.inDensity = 1000;
+            options.inTargetDensity = Math.round(1000 * detail);
+            atlases[fighter][index] = BitmapFactory.decodeResource(context.getResources(), FightFrames.ATLASES[fighter][index], options);
+        }
+        return atlases[fighter][index];
+    }
+
+    /** The picture a fighter stands in: enough to show her where she is picked. */
+    private void sheet(int fighter) { atlas(fighter, FightFrames.FRAMES[fighter][FightFrames.IDLE1][0]); }
+
+    /** All of a fighter's pictures, read in before a fight so that none has to be in the middle of it. */
+    private void preload(int fighter) {
+        for (int index = 0; index < FightFrames.ATLASES[fighter].length; index++) atlas(fighter, index);
     }
 
     /** Lets go of the pictures of everyone but those named: they are large. */
     private void keepOnly(int one, int other) {
-        for (int fighter = 0; fighter < sheets.length; fighter++) {
-            if (fighter != one && fighter != other && sheets[fighter] != null) {
-                sheets[fighter].recycle();
-                sheets[fighter] = null;
-            }
+        for (int fighter = 0; fighter < atlases.length; fighter++) {
+            if (fighter == one || fighter == other || atlases[fighter] == null) continue;
+            for (Bitmap picture : atlases[fighter]) if (picture != null) picture.recycle();
+            atlases[fighter] = null;
         }
     }
 
@@ -208,37 +217,37 @@ final class FightGame {
         // Over it, the three ways for two to play: on this screen, or on two devices, hosting or joining.
         // On a wide screen they have the left half, beside the button, under whoever is picked.
         float waysLeft = landscape ? safe.left + dp(16) : buttonLeft, waysRight = landscape ? safe.centerX() - dp(8) : fightButton.right;
-        float each = (waysRight - waysLeft - dp(16)) / 3, pillTop = landscape ? fightButton.centerY() - dp(20) : fightButton.top - dp(10) - dp(40);
-        duoButton.set(waysLeft, pillTop, waysLeft + each, pillTop + dp(40));
-        hostButton.set(duoButton.right + dp(8), pillTop, duoButton.right + dp(8) + each, pillTop + dp(40));
+        float each = (waysRight - waysLeft - dp(8)) / 2, pillTop = landscape ? fightButton.centerY() - dp(20) : fightButton.top - dp(10) - dp(40);
+        hostButton.set(waysLeft, pillTop, waysLeft + each, pillTop + dp(40));
         joinButton.set(hostButton.right + dp(8), pillTop, waysRight, pillTop + dp(40));
     }
 
-    /** Sets out a player's seven buttons between two edges: on the left the arrows with the jump and the guard over them, on the right the two blows with the special over them. */
-    private void cluster(RectF[] set, float left, float right, float size) {
-        float gap = size * .34f, low = safe.bottom - dp(24) - size, high = low - size - dp(12);
-        set[LEFT].set(left, low, left + size, low + size);
-        set[RIGHT].set(left + size + gap, low, left + size * 2 + gap, low + size);
-        set[GUARD].set(left, high, left + size, high + size);
-        set[JUMP].set(left + size + gap, high, left + size * 2 + gap, high + size);
-        set[HEAVY].set(right - size, low, right, low + size);
-        set[LIGHT].set(right - size * 2 - gap, low, right - size - gap, low + size);
-        set[SPECIAL].set(right - size * 1.5f - gap / 2, high, right - size * .5f - gap / 2, high + size);
-    }
-
-    /** The buttons, for however many play on this screen: one player has the width of it, two have a half each. */
+    /**
+     * The buttons: on the left the arrows with the guard and the jump over them; on the right
+     * the quick and the heavy blow with the dodge and the special over them, and over those
+     * a place for the ultimate, which is only there while her meter is full.
+     */
     private void arrange() {
         boolean landscape = width > height * 1.15f;
-        float edge = dp(18);
-        if (mode == DUO) {
-            float middle = safe.centerX(), size = Math.min(dp(64), (middle - safe.left - edge - dp(12)) / 4.85f);
-            cluster(buttons, safe.left + edge, middle - dp(12), size);
-            cluster(buttons2, middle + dp(12), safe.right - edge, size);
-            // With both sets of buttons under the stage, the two stand above them, where they can be seen.
-            groundY = Math.min(landscape ? height * .8f : height * .6f, buttons[GUARD].top - dp(6));
-        } else {
-            groundY = landscape ? height * .8f : height * .6f;
-            cluster(buttons, safe.left + edge, safe.right - edge, Math.min(dp(landscape ? 64 : 72), (safe.width() - edge * 2 - dp(64)) / 4.1f));
+        float edge = dp(18), size = Math.min(dp(landscape ? 62 : 68), (safe.width() - edge * 2 - dp(56)) / 4.1f), gap = size * .3f;
+        float low = safe.bottom - dp(24) - size, high = low - size - dp(12);
+        float left = safe.left + edge, right = safe.right - edge;
+        buttons[LEFT].set(left, low, left + size, low + size);
+        buttons[RIGHT].set(left + size + gap, low, left + size * 2 + gap, low + size);
+        buttons[GUARD].set(left, high, left + size, high + size);
+        buttons[JUMP].set(left + size + gap, high, left + size * 2 + gap, high + size);
+        buttons[HEAVY].set(right - size, low, right, low + size);
+        buttons[LIGHT].set(right - size * 2 - gap, low, right - size - gap, low + size);
+        buttons[SPECIAL].set(right - size, high, right, high + size);
+        buttons[DODGE].set(right - size * 2 - gap, high, right - size - gap, high + size);
+        float grand = size * 1.14f, middle = right - size - gap / 2, top = high - grand - dp(12);
+        buttons[ULT].set(middle - grand / 2, top, middle + grand / 2, top + grand);
+        groundY = landscape ? height * .8f : height * .6f;
+        // Her pictures are read in no larger than she is drawn here, in tenths; a change of screen reads them in again.
+        float need = Math.max(.5f, Math.min(1, (float) Math.ceil(Fight.TALL * unit / STANDING * 10.4f) / 10));
+        if (need != detail) {
+            detail = need;
+            keepOnly(-1, -1);
         }
     }
 
@@ -258,8 +267,6 @@ final class FightGame {
             screen = FIGHT;
         } else if (screen == VERSUS || screen == RESULT || screen == LOBBY) {
             toSelect();
-        } else if (picking == 1) {
-            picking = 0;
         } else {
             return false;
         }
@@ -279,7 +286,6 @@ final class FightGame {
         audio.hush();
         unlink();
         mode = SOLO;
-        picking = 0;
         arrange();
         screen = SELECT;
         fight = null;
@@ -338,15 +344,6 @@ final class FightGame {
         keepOnly(player, ladder[rung]);
         backdrop(rung % STAGES.length);
         say(player, which);
-    }
-
-    /** Two players on this screen: the second picks her fighter, and they begin. */
-    private void two() {
-        mode = DUO;
-        twoStage = random.nextInt(STAGES.length);
-        keepOnly(player, second);
-        backdrop(twoStage);
-        begin();
     }
 
     /** Opens a game for another device to join, and waits for it. */
@@ -444,9 +441,15 @@ final class FightGame {
         byte[] state = null;
         for (byte[] message = link.poll(); message != null; message = link.poll()) {
             if (message[0] == FightLink.PAD && mode == HOST && message.length >= 2) {
-                int bits = message[1];
+                // What the other player holds down, in two bytes, and how many times she has tapped the screen, counted round.
+                int bits = (message[1] & 0xFF) | (message.length >= 3 ? (message[2] & 0xFF) << 8 : 0);
                 theirPressed |= bits & ~theirHeld;
                 theirHeld = bits;
+                if (message.length >= 4) {
+                    int count = message[3] & 0xFF;
+                    if (fight.phase() == Fight.CLASHING) theirTaps += (count - theirTapSeen) & 0xFF;
+                    theirTapSeen = count;
+                }
             } else if (message[0] == FightLink.STATE && mode == GUEST) {
                 state = message;
             } else if (message[0] == FightLink.START && mode == GUEST && message.length >= 4) {
@@ -499,12 +502,21 @@ final class FightGame {
         arrange();
         // They may get no further apart than the narrower of the two screens shows.
         fight.setSpan(Math.min(width / unit - 1.5f, mode == HOST ? theirSpan : Fight.WIDE));
-        sheet(fight.fighters[0].kind);
-        sheet(fight.fighters[1].kind);
+        preload(fight.fighters[0].kind);
+        preload(fight.fighters[1].kind);
+        tapCount = 0;
+        tapsGiven = 0;
+        theirTaps = 0;
+        theirTapSeen = 0;
+        sentTaps = -1;
+        seenQuakes = 0;
+        seenDodges = 0;
+        seenClashes = 0;
+        grandAge = 9;
+        // In a build made for testing, a number kept under this name starts both of them with their meters full.
+        if (BuildConfig.DEBUG && session.tally("fight_full") > 0) for (Fight.Fighter fighter : fight.fighters) fighter.meter = Fight.METER;
         java.util.Arrays.fill(held, false);
         java.util.Arrays.fill(pressed, false);
-        java.util.Arrays.fill(held2, false);
-        java.util.Arrays.fill(pressed2, false);
         pad2.clear();
         theirHeld = 0;
         theirPressed = 0;
@@ -532,7 +544,6 @@ final class FightGame {
 
     private void pause() {
         java.util.Arrays.fill(held, false);
-        java.util.Arrays.fill(held2, false);
         screen = PAUSED;
         // On two devices the fight goes on behind the card: there is no stopping the other player's clock.
         pills("Carry on", RESUME, mode == SOLO ? "Fighters" : "Leave", TO_SELECT);
@@ -549,11 +560,10 @@ final class FightGame {
     private void finish() {
         won = fight.winner() == (mode == GUEST ? 1 : 0);
         java.util.Arrays.fill(held, false);
-        java.util.Arrays.fill(held2, false);
         screen = RESULT;
         if (mode != SOLO) {
             // Between two players nothing is kept: whoever won says so, and they may go again.
-            audio.play(won || mode == DUO ? "win" : "lose");
+            audio.play(won ? "win" : "lose");
             say(fight.fighters[fight.winner()].kind, FightCast.WIN);
             pills("Rematch", AGAIN, "Fighters", TO_SELECT);
             return;
@@ -579,8 +589,6 @@ final class FightGame {
         buzz(false);
         if (action == RESUME) {
             screen = FIGHT;
-        } else if (action == AGAIN && mode == DUO) {
-            begin();
         } else if (action == AGAIN && mode == HOST) {
             again();
         } else if (action == AGAIN && mode == GUEST) {
@@ -615,6 +623,15 @@ final class FightGame {
         if (shake > 0) shake -= seconds;
         for (int index = sparks.size() - 1; index >= 0; index--) if ((sparks.get(index)[2] += seconds) > .32f) sparks.remove(index);
         for (int index = slices.size() - 1; index >= 0; index--) if ((slices.get(index)[0] += seconds) > .5f) slices.remove(index);
+        grandAge += seconds;
+        sinceOver = fight.phase() == Fight.ROUND_OVER ? sinceOver + seconds : 0;
+        // Where each of them was a moment ago, and a moment before that.
+        for (int side = 0; side < 2; side++) {
+            float[] was = trail[side];
+            System.arraycopy(was, 0, was, 2, 4);
+            was[0] = fight.fighters[side].x;
+            was[1] = fight.fighters[side].y;
+        }
         // A round is announced before it starts.
         if (fight.round() != seenRound) {
             seenRound = fight.round();
@@ -629,9 +646,10 @@ final class FightGame {
             // What this player holds down goes to the device that runs the fight, whenever it changes and a few times a second besides.
             held(pad, held, pressed);
             int bits = pad.bits();
-            if (bits != sentPad || (sincePad += seconds) > .05f) {
-                link.send(FightLink.PAD, bits);
+            if (bits != sentPad || tapCount != sentTaps || (sincePad += seconds) > .05f) {
+                link.send(FightLink.PAD, bits & 0xFF, bits >> 8, tapCount & 0xFF);
                 sentPad = bits;
+                sentTaps = tapCount;
                 sincePad = 0;
             }
             if (hold > 0) hold -= seconds;
@@ -640,13 +658,16 @@ final class FightGame {
             hold -= seconds;
         } else {
             held(pad, held, pressed);
+            pad.taps = tapCount - tapsGiven;
+            tapsGiven = tapCount;
             if (mode == SOLO) {
                 fight.step(seconds, pad);
             } else {
-                // The other side is played by hand too: on this screen's other half, or on the other device.
-                if (mode == DUO) held(pad2, held2, pressed2);
-                else pad2.set(theirHeld | theirPressed);
+                // The other side is played by hand too, on the other device.
+                pad2.set(theirHeld | theirPressed);
+                pad2.taps = theirTaps;
                 theirPressed = 0;
+                theirTaps = 0;
                 fight.step(seconds, pad, pad2);
             }
             heard();
@@ -672,6 +693,8 @@ final class FightGame {
         into.light = holding[LIGHT] || tapped[LIGHT];
         into.heavy = holding[HEAVY] || tapped[HEAVY];
         into.special = holding[SPECIAL] || tapped[SPECIAL];
+        into.dodge = holding[DODGE] || tapped[DODGE];
+        into.ultimate = holding[ULT] || tapped[ULT];
         java.util.Arrays.fill(tapped, false);
     }
 
@@ -683,12 +706,14 @@ final class FightGame {
             for (int side = 0; side < 2; side++) {
                 Fight.Fighter fighter = two[side];
                 if (fighter.state != Fight.ATTACK || fighter.clock > .05f) continue;
-                if (fighter.move == Fight.ULTIMATE) {
+                if (fighter.move == Fight.ULTIMATE || fighter.move == Fight.CLASH) {
                     audio.play("ultimate", .8f);
                     call(side, FightCast.ULTIMATE);
                     buzz(true);
                 } else if (fighter.doing().shot == Fight.NOTHING) {
-                    audio.play("swing", .4f);
+                    // The last blow of a chain, and the heavier ones, are swung harder.
+                    boolean big = Fight.chainStep(fighter.move) == 5 || fighter.move == Fight.BREAK || fighter.move == Fight.DASH_HEAVY;
+                    audio.play(big ? "whoosh" : "swing", big ? .6f : .4f);
                 } else if (fighter.move == Fight.SPECIAL && captionLeft[side] <= 0 && !audio.speaking() && random.nextInt(3) == 0) {
                     call(side, FightCast.SPECIAL);
                 }
@@ -716,6 +741,26 @@ final class FightGame {
                 call(side, random.nextBoolean() ? FightCast.HIT : FightCast.HIT_TOO);
             }
         }
+        if (fight.quakes() != seenQuakes) {
+            // A smash has come down: the ground shakes, and what she brought down with her bursts where she landed.
+            seenQuakes = fight.quakes();
+            int who = 0;
+            for (int side = 0; side < 2; side++) if (two[side].move == Fight.SMASH && Math.abs(two[side].x - fight.quakeX()) < .01f) who = side;
+            audio.play("smash", .8f);
+            sparks.add(new float[]{fight.quakeX(), 0, 0, 3, SMASH_FX[two[who].kind]});
+            shake = .28f;
+            buzz(true);
+        }
+        if (fight.dodges() != seenDodges) {
+            seenDodges = fight.dodges();
+            audio.play("dodge", .5f);
+        }
+        if (fight.clashes() != seenClashes) {
+            seenClashes = fight.clashes();
+            audio.play("clash", .8f);
+            shake = .3f;
+            buzz(true);
+        }
         if (fight.blocks() != seenBlocks) {
             seenBlocks = fight.blocks();
             audio.play("block", .55f);
@@ -729,14 +774,19 @@ final class FightGame {
             Fight.Fighter fighter = two[side];
             if (fighter.state == Fight.JUMP && seenState[side] != Fight.JUMP) audio.play("jump", .35f);
             seenState[side] = fighter.state;
-            if (fighter.charged() && !seenCharged[side] && side == 0) audio.play("meter", .6f);
+            if (fighter.charged() && !seenCharged[side] && side == (mode == GUEST ? 1 : 0)) {
+                // Her ultimate's button comes on with a flourish.
+                audio.play("meter", .7f);
+                buzz(true);
+                grandAge = 0;
+            }
             seenCharged[side] = fighter.charged();
             // Each chunk of Halgakos's translation cuts where the other stands; each pulse of Illya's beam rings.
-            boolean grand = fighter.state == Fight.ATTACK && fighter.move == Fight.ULTIMATE;
+            boolean grand = fighter.state == Fight.ATTACK && (fighter.move == Fight.ULTIMATE || fighter.move == Fight.CLASH);
             if (grand && fighter.landed != seenLanded[side] && fighter.landed > 0) {
                 if (fighter.kind == Fight.HALGAKOS) {
                     audio.play("slice", .6f);
-                    slices.add(new float[]{0, fighter.landed, two[1 - side].x, two[1 - side].y});
+                    slices.add(new float[]{0, fighter.landed, two[1 - side].x, two[1 - side].y, fighter.doing().times});
                 } else if (fighter.kind == Fight.ILLYA) {
                     audio.play("heart", .5f);
                 }
@@ -764,6 +814,16 @@ final class FightGame {
         int action = event.getActionMasked();
         float x = event.getX(), y = event.getY();
         if (screen == FIGHT) {
+            if (fight.phase() == Fight.CLASHING) {
+                // In a clash every finger that comes down anywhere is a tap.
+                if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+                    tapCount++;
+                    audio.play("tick", .35f);
+                    buzz(false);
+                }
+                java.util.Arrays.fill(held, false);
+                return;
+            }
             if (action == MotionEvent.ACTION_DOWN && pauseButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 pause();
@@ -784,36 +844,19 @@ final class FightGame {
             } else if (fightButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 buzz(false);
-                if (picking == 1) two();
-                else climb();
-            } else if (picking == 0 && duoButton.contains(x, y)) {
-                // The second player picks next, from the same five.
-                audio.play("tap", .5f);
-                buzz(false);
-                picking = 1;
-                second = (player + 1) % Fight.FIGHTERS;
-                sheet(second);
-            } else if (picking == 0 && hostButton.contains(x, y)) {
+                climb();
+            } else if (hostButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 buzz(false);
                 host();
-            } else if (picking == 0 && joinButton.contains(x, y)) {
+            } else if (joinButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 buzz(false);
                 join();
             } else {
                 for (int index = 0; index < tiles.length; index++) {
                     if (tiles[index].contains(x, y)) {
-                        if (picking == 1) {
-                            second = index;
-                            keepOnly(player, second);
-                            sheet(second);
-                            audio.play("pick", .6f);
-                            say(second, FightCast.PICK);
-                            buzz(false);
-                        } else {
-                            pick(index);
-                        }
+                        pick(index);
                         return;
                     }
                 }
@@ -839,35 +882,32 @@ final class FightGame {
     /**
      * Which buttons are held, by however many fingers are down. A finger holds the button
      * it is nearest, if it is near one; a button newly held is also remembered as pressed,
-     * so a tap that is over before the fight next moves on still counts.
+     * so a tap that is over before the fight next moves on still counts. The ultimate's
+     * button is only there to be touched while her meter is full.
      */
     private void holding(MotionEvent event) {
         int action = event.getActionMasked();
-        // With two players on this screen there are two sets of buttons, and a finger may be on either.
-        boolean[] now = new boolean[BUTTONS * 2];
-        int sets = mode == DUO ? 2 : 1;
+        boolean[] now = new boolean[BUTTONS];
+        boolean charged = fight.fighters[mode == GUEST ? 1 : 0].charged();
         if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
             for (int finger = 0; finger < event.getPointerCount(); finger++) {
                 if (action == MotionEvent.ACTION_POINTER_UP && finger == event.getActionIndex()) continue;
-                float x = event.getX(finger), y = event.getY(finger), nearest = Float.MAX_VALUE, wide = 0;
+                float x = event.getX(finger), y = event.getY(finger), nearest = Float.MAX_VALUE;
                 int which = -1;
-                for (int index = 0; index < BUTTONS * sets; index++) {
-                    RectF button = index < BUTTONS ? buttons[index] : buttons2[index - BUTTONS];
-                    float away = (float) Math.hypot(x - button.centerX(), y - button.centerY());
+                for (int index = 0; index < BUTTONS; index++) {
+                    if (index == ULT && !charged) continue;
+                    float away = (float) Math.hypot(x - buttons[index].centerX(), y - buttons[index].centerY());
                     if (away < nearest) {
                         nearest = away;
                         which = index;
-                        wide = button.width();
                     }
                 }
-                if (which >= 0 && nearest < wide * .95f) now[which] = true;
+                if (which >= 0 && nearest < buttons[which].width() * .95f) now[which] = true;
             }
         }
         for (int index = 0; index < BUTTONS; index++) {
             if (now[index] && !held[index]) pressed[index] = true;
             held[index] = now[index];
-            if (now[BUTTONS + index] && !held2[index]) pressed2[index] = true;
-            held2[index] = now[BUTTONS + index];
         }
     }
 
@@ -946,13 +986,13 @@ final class FightGame {
         }
     }
 
-    /** One of a fighter's twelve frames, her feet at a place, so many pixels to each pixel of the frame. */
+    /** One of a fighter's frames, her feet at a place, so many pixels to each pixel of the frame as it is kept. */
     private void frame(Canvas canvas, int fighter, int which, float feetX, float feetY, float scale, boolean leftward) {
-        Bitmap sheet = sheet(fighter);
-        int column = which % ACROSS, row = which / ACROSS;
-        source.set(column * CELL_WIDE, row * CELL_TALL, column * CELL_WIDE + CELL_WIDE, row * CELL_TALL + CELL_TALL);
-        target.set(feetX - FEET_ACROSS * scale, feetY - FEET_DOWN * scale, feetX + (CELL_WIDE - FEET_ACROSS) * scale,
-                feetY + (CELL_TALL - FEET_DOWN) * scale);
+        short[] at = FightFrames.FRAMES[fighter][which];
+        Bitmap sheet = atlas(fighter, at[0]);
+        float kept = sheet.getWidth() / (float) FightFrames.WIDE;
+        source.set(Math.round(at[1] * kept), Math.round(at[2] * kept), Math.round((at[1] + at[3]) * kept), Math.round((at[2] + at[4]) * kept));
+        target.set(feetX - at[5] * scale, feetY - at[6] * scale, feetX + (at[3] - at[5]) * scale, feetY + (at[4] - at[6]) * scale);
         canvas.save();
         // They were drawn facing right, and are turned about to face left.
         if (leftward) canvas.scale(-1, 1, feetX, feetY);
@@ -1001,33 +1041,7 @@ final class FightGame {
     private float up(float y) { return groundY - y * unit; }
 
     /** Which of her frames a fighter shows for what she is doing. */
-    private int pose(Fight.Fighter fighter) {
-        switch (fighter.state) {
-            case Fight.WALK: return (int) (fighter.clock / .17f) % 2 == 0 ? STEP : STAND;
-            case Fight.JUMP: return LEAP;
-            case Fight.BLOCK: return SHIELD;
-            case Fight.HIT: return REEL;
-            case Fight.DOWN: return fighter.y > .05f ? REEL : FLOORED;
-            case Fight.RISE: case Fight.OUT: return FLOORED;
-            case Fight.WON: return CHEER;
-            case Fight.ATTACK: {
-                Fight.Move move = fighter.doing();
-                boolean out = fighter.clock >= move.startup;
-                if (fighter.move == Fight.ULTIMATE) {
-                    // Halgakos cuts with each chunk; Tsubakieh swings through; Chikuwa brings it down.
-                    if (!out) return GRAND;
-                    return fighter.kind == Fight.HALGAKOS ? EXTRA : fighter.kind == Fight.TSUBAKIEH ? EXTRA
-                            : fighter.kind == Fight.CHIKUWA ? STRONG : GRAND;
-                }
-                if (fighter.move == Fight.LIGHT) return out || move.startup < .1f ? QUICK : STAND;
-                if (fighter.move == Fight.HEAVY) return fighter.kind == Fight.TSUBAKIEH && fighter.clock > move.startup + move.active ? EXTRA : STRONG;
-                // Rune wipes a tear and flings it; every third time she throws her knife. Illya's heart alternates with a blown kiss.
-                if (fighter.kind == Fight.RUNE) return fighter.specials % 3 == 0 && out ? CAST : EXTRA;
-                return CAST;
-            }
-            default: return STAND;
-        }
-    }
+    private int pose(Fight.Fighter fighter) { return FightPose.of(fight, fighter, hold, sinceOver); }
 
     private void drawFight(Canvas canvas) {
         Fight.Fighter[] two = fight.fighters;
@@ -1078,6 +1092,15 @@ final class FightGame {
             float breath = fighter.state == Fight.IDLE ? 1 + .012f * (float) Math.sin(clock * 3 + fighter.side * 2) : 1;
             float lunge = fighter.state == Fight.ATTACK && fighter.doing().shot == Fight.NOTHING && fighter.clock >= fighter.doing().startup
                     && fighter.clock < fighter.doing().startup + .12f ? unit * .18f * (fighter.facingLeft ? -1 : 1) : 0;
+            // A hop back lifts her off the ground a little; a dodge, a dash or a hop leaves her likeness behind her where she was.
+            if (fighter.state == Fight.BACKSTEP) y -= unit * .3f * (float) Math.sin(Math.PI * Math.min(1, fighter.clock / Fight.BACKSTEP_SECONDS));
+            if (fighter.state == Fight.DODGE || fighter.state == Fight.DASH || fighter.state == Fight.BACKSTEP) {
+                float[] was = trail[fighter.side];
+                for (int ghost = 2; ghost >= 1; ghost--) {
+                    paint.setAlpha(ghost == 1 ? 110 : 55);
+                    frame(canvas, fighter.kind, pose(fighter), across(was[ghost * 2]) - (x - across(fighter.x)), up(was[ghost * 2 + 1]), scale, fighter.facingLeft);
+                }
+            }
             // Getting up, she cannot be hit, and flickers to show it.
             paint.setAlpha(fighter.safe > 0 && fighter.state != Fight.ATTACK && (int) (clock * 16) % 2 == 0 ? 120 : 255);
             canvas.save();
@@ -1143,7 +1166,7 @@ final class FightGame {
             canvas.drawLine(x - unit * 2.2f * Math.min(1, slice[0] / .1f), y, x + unit * 2.2f * Math.min(1, slice[0] / .1f), y, stroke);
             canvas.restore();
             stroke.setAlpha(255);
-            panel(canvas, x, y - unit * 1.9f, "[CHUNKING] " + (int) slice[1] + " / 3", fade);
+            panel(canvas, x, y - unit * 1.9f, "[CHUNKING] " + (int) slice[1] + " / " + (int) slice[4], fade);
         }
         for (Fight.Fighter fighter : two) {
             if (fighter.kind != Fight.HALGAKOS || fighter.state != Fight.ATTACK || fighter.move != Fight.ULTIMATE) continue;
@@ -1154,7 +1177,22 @@ final class FightGame {
         // Where blows land.
         for (float[] spark : sparks) {
             float fade = 1 - spark[2] / .32f, x = across(spark[0]), y = up(spark[1]);
-            if (spark[3] == 2) {
+            if (spark[3] == 3) {
+                // Where a smash came down: a ring running out along the ground, and what burst there.
+                float grow = spark[2] / .32f;
+                stroke.setColor(Color.WHITE);
+                stroke.setAlpha(Math.round(220 * fade));
+                stroke.setStrokeWidth(unit * .1f);
+                box.set(x - unit * (.6f + grow * 2.4f), groundY - unit * (.1f + grow * .3f), x + unit * (.6f + grow * 2.4f), groundY + unit * (.1f + grow * .3f));
+                canvas.drawOval(box, stroke);
+                stroke.setAlpha(255);
+                paint.setAlpha(Math.round(255 * fade));
+                for (int piece = -1; piece <= 1; piece++) {
+                    thing(canvas, (int) spark[4], x + piece * unit * (.5f + grow), groundY - unit * (.5f + grow * (1.3f - Math.abs(piece) * .5f)), unit * .75f,
+                            piece * 40 * grow, false);
+                }
+                paint.setAlpha(255);
+            } else if (spark[3] == 2) {
                 stroke.setColor(Color.WHITE);
                 stroke.setAlpha(Math.round(230 * fade));
                 stroke.setStrokeWidth(unit * .08f);
@@ -1173,6 +1211,18 @@ final class FightGame {
         }
         canvas.restore();
         drawHud(canvas);
+        // Blows landed one after another without letting her go: how many, and what they have taken off.
+        for (int side = 0; side < 2; side++) {
+            Fight.Fighter fighter = two[side];
+            if (fighter.combo < 2 || fighter.comboAge > 1.1f) continue;
+            float fade = Math.min(1, (1.1f - fighter.comboAge) / .25f), pop = 1 + .35f * Math.max(0, 1 - fighter.comboAge / .12f);
+            float x = side == 0 ? safe.left + dp(18) : safe.right - dp(18), y = safe.top + dp(132);
+            text.setTextAlign(side == 0 ? Paint.Align.LEFT : Paint.Align.RIGHT);
+            text.setTextSize(dp(30) * pop);
+            outlined(canvas, fighter.combo + " hits", x, y, GOLD, fade);
+            text.setTextSize(dp(14));
+            outlined(canvas, Math.round(fighter.comboDamage) + " off", x, y + dp(20), Color.WHITE, fade);
+        }
         if (bannerLeft > 0 && banner != null) {
             float fade = Math.min(1, bannerLeft / .25f);
             text.setTextAlign(Paint.Align.CENTER);
@@ -1183,9 +1233,8 @@ final class FightGame {
             outlined(canvas, bannerUnder, safe.centerX(), y + dp(28), Color.WHITE, fade);
         }
         if (screen == FIGHT) {
-            // Each player's buttons show her own fighter's special; on the device that joined, that is the one on the right.
-            for (int index = 0; index < BUTTONS; index++) button(canvas, index, buttons, held, fight.fighters[mode == GUEST ? 1 : 0]);
-            if (mode == DUO) for (int index = 0; index < BUTTONS; index++) button(canvas, index, buttons2, held2, fight.fighters[1]);
+            // The buttons show her own fighter's special; on the device that joined, that is the one on the right.
+            for (int index = 0; index < BUTTONS; index++) button(canvas, index, fight.fighters[mode == GUEST ? 1 : 0]);
             plate(canvas, pauseButton, pauseButton.height() / 2, 200);
             paint.setColor(ink);
             canvas.drawRoundRect(pauseButton.centerX() - dp(5.5f), pauseButton.centerY() - dp(6.5f), pauseButton.centerX() - dp(2), pauseButton.centerY() + dp(6.5f), dp(1.2f), dp(1.2f), paint);
@@ -1193,6 +1242,7 @@ final class FightGame {
             paint.setColor(Color.BLACK);
         }
         if (fight.phase() == Fight.FLOURISH) drawFlourish(canvas);
+        else if (fight.phase() == Fight.CLASHING) drawClash(canvas);
     }
 
     /** One of Glossarion's panes of light, with what it reads. */
@@ -1292,8 +1342,7 @@ final class FightGame {
             text.setTextSize(dp(12.5f));
             text.setTextAlign(side == 0 ? Paint.Align.LEFT : Paint.Align.RIGHT);
             // With two playing, whose she is goes after her name.
-            String name = FightCast.NAMES[fighter.kind] + (mode == DUO ? side == 0 ? "  P1" : "  P2"
-                    : mode != SOLO && (mode == GUEST) == (side == 1) ? "  you" : "");
+            String name = FightCast.NAMES[fighter.kind] + (mode != SOLO && (mode == GUEST) == (side == 1) ? "  you" : "");
             outlined(canvas, name, side == 0 ? left + dp(2) : right - dp(2), meterTop + low + dp(15), Color.WHITE, 1);
             for (int pip = 0; pip < Fight.ROUNDS; pip++) {
                 float x = inner - way * (dp(7) + pip * dp(14)), y = meterTop + low + dp(10);
@@ -1310,16 +1359,38 @@ final class FightGame {
         outlined(canvas, String.valueOf(Math.max(0, (int) Math.ceil(fight.left()))), middle, top + dp(25), Color.WHITE, 1);
     }
 
-    /** One of the round buttons: see-through, with a soft edge, and filled in while it is held. */
-    private void button(Canvas canvas, int which, RectF[] set, boolean[] holding, Fight.Fighter mine) {
-        RectF where = set[which];
-        boolean down = holding[which], ready = which == SPECIAL && mine.charged();
+    /**
+     * One of the round buttons: see-through, with a soft edge, and filled in while it is
+     * held. The ultimate's is not there at all until her meter is full; then it bursts in,
+     * larger than it will be, with rays of gold turning behind it for as long as it waits.
+     */
+    private void button(Canvas canvas, int which, Fight.Fighter mine) {
+        RectF where = buttons[which];
+        boolean down = held[which], grand = which == ULT;
+        if (grand && !mine.charged()) return;
         float x = where.centerX(), y = where.centerY(), round = where.width() / 2;
+        if (grand) {
+            float pop = Math.max(0, 1 - grandAge / .3f);
+            round *= 1 + .7f * pop + .04f * (float) Math.sin(clock * 7);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(FightCast.COLOURS[mine.kind]);
+            paint.setAlpha(Math.round(150 * pop));
+            canvas.drawCircle(x, y, round * (1.2f + (1 - pop) * 1.6f), paint);
+            stroke.setColor(GOLD);
+            stroke.setAlpha(170);
+            stroke.setStrokeWidth(dp(3));
+            for (int ray = 0; ray < 8; ray++) {
+                double angle = clock * 1.6 + ray * Math.PI / 4;
+                canvas.drawLine(x + (float) Math.cos(angle) * round * 1.12f, y + (float) Math.sin(angle) * round * 1.12f,
+                        x + (float) Math.cos(angle) * round * 1.38f, y + (float) Math.sin(angle) * round * 1.38f, stroke);
+            }
+            stroke.setAlpha(255);
+        }
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0x26000000);
         canvas.drawCircle(x, y + dp(2), round + dp(2), paint);
-        paint.setColor(down ? CalculatorLayout.CORAL : ready ? GOLD : Color.WHITE);
-        paint.setAlpha(down ? 235 : ready ? 215 : 135);
+        paint.setColor(down ? CalculatorLayout.CORAL : grand ? GOLD : Color.WHITE);
+        paint.setAlpha(down ? 235 : grand ? 235 : 135);
         canvas.drawCircle(x, y, round, paint);
         paint.setAlpha(255);
         stroke.setColor(Color.WHITE);
@@ -1352,33 +1423,101 @@ final class FightGame {
             path.quadTo(x - reach * .8f, y + reach * 1.05f, x - reach, y + reach * .1f);
             path.close();
             canvas.drawPath(path, paint);
-        } else if (which == LIGHT || which == HEAVY) {
-            // A burst: small for the quick blow, large and with more points for the heavy one.
-            int points = which == LIGHT ? 4 : 8;
-            float outer = reach * (which == LIGHT ? 1.05f : 1.35f), inner = outer * (which == LIGHT ? .38f : .55f);
+        } else if (which == DODGE) {
+            // Someone slipping aside: a figure leaning into it, with the air she leaves behind her. Fainter while she cannot dodge again yet.
+            paint.setAlpha(mine.dodgeRest > 0 ? 80 : down ? 255 : 215);
+            canvas.drawCircle(x + reach * .7f, y - reach * .85f, reach * .36f, paint);
+            canvas.save();
+            canvas.rotate(24, x + reach * .35f, y + reach * .2f);
+            box.set(x + reach * .02f, y - reach * .5f, x + reach * .68f, y + reach * 1.15f);
+            canvas.drawRoundRect(box, reach * .33f, reach * .33f, paint);
+            canvas.restore();
+            for (int line = 0; line < 3; line++) {
+                float at = y - reach * .7f + line * reach * .7f, far = reach * (line == 1 ? 1.5f : 1.05f);
+                box.set(x - reach * .45f - far, at - reach * .1f, x - reach * .45f, at + reach * .1f);
+                canvas.drawRoundRect(box, reach * .1f, reach * .1f, paint);
+            }
+        } else if (which == LIGHT || which == HEAVY || grand) {
+            // A burst: small for the quick blow, large and with more points for the heavy one, and the largest for the ultimate.
+            int points = which == LIGHT ? 4 : grand ? 12 : 8;
+            float outer = reach * (which == LIGHT ? 1.05f : grand ? 1.5f : 1.35f), inner = outer * (which == LIGHT ? .38f : grand ? .7f : .55f);
             path.reset();
             for (int point = 0; point < points * 2; point++) {
-                double angle = Math.PI * point / points - Math.PI / 2;
+                double angle = Math.PI * point / points - Math.PI / 2 + (grand ? clock * .8 : 0);
                 float far = point % 2 == 0 ? outer : inner;
                 if (point == 0) path.moveTo(x + (float) Math.cos(angle) * far, y + (float) Math.sin(angle) * far);
                 else path.lineTo(x + (float) Math.cos(angle) * far, y + (float) Math.sin(angle) * far);
             }
             path.close();
+            if (grand) paint.setColor(down ? Color.WHITE : FightCast.COLOURS[mine.kind]);
             canvas.drawPath(path, paint);
-        } else {
-            // Her special: what she throws; and the word for it when her ultimate is ready.
-            paint.setAlpha(mine.rest[Fight.SPECIAL] > 0 && !ready ? 110 : 255);
-            int picture = SPECIAL_FX[mine.kind];
-            thing(canvas, picture, x, y - (ready ? round * .16f : 0), round * (picture == BAT_FX ? 1.5f : 1.05f), picture == BAT_FX ? -40 : 0, false);
-            if (ready) {
-                // Small enough to sit inside the button, under the picture.
-                text.setTextSize(round * .27f);
-                text.setTextAlign(Paint.Align.CENTER);
-                text.setColor(0xFF3A3340);
-                canvas.drawText("ULTIMATE", x, y + round * .62f, text);
+            if (grand) {
+                // Her face in the middle of it.
+                face(canvas, mine.kind, x, y, round * 1.5f, false, false);
             }
+        } else {
+            // Her special: what she throws, fainter while it rests.
+            paint.setAlpha(mine.rest[Fight.SPECIAL] > 0 ? 110 : 255);
+            int picture = SPECIAL_FX[mine.kind];
+            thing(canvas, picture, x, y, round * (picture == BAT_FX ? 1.5f : 1.05f), picture == BAT_FX ? -40 : 0, false);
         }
         paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+    }
+
+    /**
+     * Two ultimates at once: the fight stops, the two faces push against each other across
+     * the screen, and whoever taps the screen faster pushes the other back.
+     */
+    private void drawClash(Canvas canvas) {
+        Fight.Fighter[] two = fight.fighters;
+        canvas.drawColor(0xCC120A22);
+        int left = fight.taps(0), right = fight.taps(1), mine = mode == GUEST ? 1 : 0;
+        // Where the two meet moves toward whoever is behind, gently at first: a tap or two does not throw it across.
+        float share = (left + 4) / (float) (left + right + 8);
+        float meet = safe.left + safe.width() * (.5f + .56f * (share - .5f)) + (float) Math.sin(clock * 60) * dp(3);
+        float middle = safe.centerY() - dp(30), tall = dp(118), lean = dp(26);
+        paint.setStyle(Paint.Style.FILL);
+        for (int side = 0; side < 2; side++) {
+            path.reset();
+            path.moveTo(side == 0 ? 0 : width, middle - tall / 2);
+            path.lineTo(meet + lean, middle - tall / 2);
+            path.lineTo(meet - lean, middle + tall / 2);
+            path.lineTo(side == 0 ? 0 : width, middle + tall / 2);
+            path.close();
+            paint.setColor(FightCast.COLOURS[two[side].kind]);
+            paint.setAlpha(235);
+            canvas.drawPath(path, paint);
+        }
+        paint.setAlpha(255);
+        stroke.setColor(Color.WHITE);
+        stroke.setStrokeWidth(dp(5));
+        canvas.drawLine(meet + lean, middle - tall / 2, meet - lean, middle + tall / 2, stroke);
+        for (int spark = 0; spark < 6; spark++) {
+            float along = (clock * 3 + spark * .37f) % 1, away = (spark % 2 == 0 ? 1 : -1) * dp(10 + 40 * along);
+            thing(canvas, BURST_FX, meet + lean - lean * 2 * ((spark * .19f) % 1) + away, middle - tall / 2 + tall * ((spark * .19f) % 1), dp(34) * (1 - along * .6f), spark * 60, false);
+        }
+        float size = dp(104);
+        face(canvas, two[0].kind, Math.max(safe.left + size * .6f, meet - lean - size * .62f), middle, size, false, true);
+        face(canvas, two[1].kind, Math.min(safe.right - size * .6f, meet + lean + size * .62f), middle, size, true, true);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTextSize(dp(64) * (1 + .1f * (float) Math.sin(clock * 16)));
+        outlined(canvas, "TAP!", safe.centerX(), middle - tall / 2 - dp(34), GOLD, 1);
+        text.setTextSize(dp(15));
+        outlined(canvas, "Tap anywhere, as fast as you can", safe.centerX(), middle - tall / 2 - dp(10), Color.WHITE, 1);
+        text.setTextSize(dp(34));
+        text.setTextAlign(Paint.Align.LEFT);
+        outlined(canvas, String.valueOf(left), safe.left + dp(18), middle + tall / 2 + dp(44), mine == 0 ? GOLD : Color.WHITE, 1);
+        text.setTextAlign(Paint.Align.RIGHT);
+        outlined(canvas, String.valueOf(right), safe.right - dp(18), middle + tall / 2 + dp(44), mine == 1 ? GOLD : Color.WHITE, 1);
+        // How much of it is left, as a bar running down.
+        float part = Math.max(0, Math.min(1, fight.clashLeft() / Fight.CLASH_SECONDS)), bar = Math.min(safe.width() - dp(140), dp(260));
+        paint.setColor(0x99201A2C);
+        box.set(safe.centerX() - bar / 2, middle + tall / 2 + dp(24), safe.centerX() + bar / 2, middle + tall / 2 + dp(34));
+        canvas.drawRoundRect(box, dp(5), dp(5), paint);
+        paint.setColor(GOLD);
+        box.set(safe.centerX() - bar / 2, middle + tall / 2 + dp(24), safe.centerX() - bar / 2 + bar * part, middle + tall / 2 + dp(34));
+        canvas.drawRoundRect(box, dp(5), dp(5), paint);
         paint.setColor(Color.BLACK);
     }
 
@@ -1414,11 +1553,12 @@ final class FightGame {
         text.setTextAlign(side == 0 ? Paint.Align.LEFT : Paint.Align.RIGHT);
         float room = (side == 0 ? width - wordsX : wordsX) - dp(12);
         text.setTextSize(dp(27));
-        String name = FightCast.MOVES[fighter.kind][Fight.ULTIMATE];
+        boolean greater = fighter.move == Fight.CLASH;
+        String name = greater ? FightCast.GREATER[fighter.kind] : FightCast.MOVES[fighter.kind][Fight.ULTIMATE];
         if (text.measureText(name) > room) text.setTextSize(dp(27) * room / text.measureText(name));
         outlined(canvas, name, wordsX, y + dp(4), Color.WHITE, 1);
         text.setTextSize(dp(14));
-        outlined(canvas, FightCast.NAMES[fighter.kind] + "'s ultimate", wordsX, y - dp(26), Color.WHITE, 1);
+        outlined(canvas, FightCast.NAMES[fighter.kind] + (greater ? " wins the clash" : "'s ultimate"), wordsX, y - dp(26), greater ? GOLD : Color.WHITE, 1);
     }
 
     /** A white card, as the companion's own popups are, with a soft edge to lift it off the screen. */
@@ -1488,7 +1628,7 @@ final class FightGame {
             // Between two players the card is the winner's, with what she says about it.
             int winner = fight.winner();
             player = fight.fighters[winner].kind;
-            title = mode == DUO ? "Player " + (winner + 1) + " wins" : won ? "You win!" : "You lose";
+            title = won ? "You win!" : "You lose";
             under = FightCast.NAMES[player] + " takes it, " + fight.fighters[winner].wins + " rounds to " + fight.fighters[1 - winner].wins;
             won = true;
         }
@@ -1542,20 +1682,17 @@ final class FightGame {
 
     private void drawSelect(Canvas canvas) {
         boolean landscape = width > height * 1.15f;
-        // With two to play on this screen, the second picks after the first: the same five, and her card.
-        int player = picking == 1 ? second : this.player;
         drawBackdrop(canvas, 0, height * (landscape ? .86f : .62f), (float) Math.sin(clock * .2f) * .3f);
         canvas.drawColor(dark ? 0x8C000000 : 0x59FFFFFF);
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(ink);
         text.setTextSize(dp(26));
-        canvas.drawText(picking == 1 ? "Player two" : FightCast.GAME, safe.left + dp(18), safe.top + dp(40), text);
+        canvas.drawText(FightCast.GAME, safe.left + dp(18), safe.top + dp(40), text);
         int cleared = 0;
         for (int fighter = 0; fighter < Fight.FIGHTERS; fighter++) if (session.tally("fight_cleared_" + fighter) > 0) cleared++;
         text.setColor(soft);
         text.setTextSize(dp(13.5f));
-        canvas.drawText(picking == 1 ? "Pick your fighter. Best with the screen on its side."
-                : "Won " + session.tally("fight_won") + "  ·  Ladder topped with " + cleared + " of " + Fight.FIGHTERS,
+        canvas.drawText("Won " + session.tally("fight_won") + "  ·  Ladder topped with " + cleared + " of " + Fight.FIGHTERS,
                 safe.left + dp(18), safe.top + dp(58), text);
         corner(canvas, closeButton, false);
         corner(canvas, soundButton, true);
@@ -1576,14 +1713,14 @@ final class FightGame {
         text.setTextSize(dp(13.5f));
         List<String> tip = wrap(FightCast.TIPS[player], cardRight - cardLeft - pad * 2);
         List<String> phrase = wrap("“" + shown(player, FightCast.line(player, FightCast.PICK)) + "”", cardRight - cardLeft - pad * 2);
-        float cardBottom = (picking == 1 || landscape ? fightButton.top : duoButton.top) - dp(12);
+        float cardBottom = (landscape ? fightButton.top : hostButton.top) - dp(12);
         // On a short screen what there is no room for is left off the card: first the tip, then what she says.
         float most = landscape ? cardBottom - safe.top - dp(66) : Float.MAX_VALUE, fixed = pad + dp(30) + dp(20) + dp(8) + 4 * dp(19) + dp(8) + dp(6) + pad;
         if (fixed + (tip.size() + phrase.size()) * dp(18) > most) tip = new ArrayList<>();
         if (fixed + (tip.size() + phrase.size()) * dp(18) > most) phrase = new ArrayList<>();
         float tall = fixed + (tip.size() + phrase.size()) * dp(18);
         float cardTop = cardBottom - tall;
-        float bandTop = tiles[0].bottom + dp(8), bandBottom = landscape ? (picking == 1 ? safe.bottom - dp(20) : duoButton.top - dp(8)) : cardTop - dp(4);
+        float bandTop = tiles[0].bottom + dp(8), bandBottom = landscape ? hostButton.top - dp(8) : cardTop - dp(4);
         float standing = Math.min(dp(300), bandBottom - bandTop - dp(6));
         if (standing > dp(70)) {
             float scale = standing / (STANDING * 1.12f), x = landscape ? safe.left + safe.width() * .25f : safe.centerX();
@@ -1594,7 +1731,7 @@ final class FightGame {
             paint.setColor(Color.BLACK);
             canvas.save();
             canvas.scale(1, 1 + .012f * (float) Math.sin(clock * 3), x, bandBottom);
-            frame(canvas, player, STAND, x, bandBottom, scale, false);
+            frame(canvas, player, FightFrames.IDLE1 + (int) (clock / .3f) % 4, x, bandBottom, scale, false);
             canvas.restore();
         }
         box.set(cardLeft, cardTop, cardRight, cardBottom);
@@ -1643,11 +1780,10 @@ final class FightGame {
         text.setColor(Color.WHITE);
         text.setTextSize(dp(18));
         text.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText(picking == 1 ? "Start" : "Fight", fightButton.centerX(), fightButton.centerY() + dp(6.5f), text);
-        if (picking == 1) return;
-        // The ways for two to play: a half of this screen each, or a device each over the same Wi-Fi.
-        RectF[] ways = {duoButton, hostButton, joinButton};
-        String[] names = {"2 players here", "Host a game", "Join a game"};
+        canvas.drawText("Fight", fightButton.centerX(), fightButton.centerY() + dp(6.5f), text);
+        // For two to play: a device each, over the same Wi-Fi.
+        RectF[] ways = {hostButton, joinButton};
+        String[] names = {"Host a game", "Join a game"};
         for (int index = 0; index < ways.length; index++) {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(dark ? 0xFF44292E : 0xFFFCE9EB);

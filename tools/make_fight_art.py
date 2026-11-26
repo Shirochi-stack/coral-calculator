@@ -1,27 +1,32 @@
 """
 Builds the art of Page brawl from the pictures in assets/fight.
 
-    python tools/make_fight_art.py [--preview out.png]
+    python tools/make_fight_art.py [--preview FOLDER] [--only NAME ...]
 
 The pictures were made with an image model (gpt-6-astra, through Glossarion) on transparent
 backgrounds, each fighter drawn from her own non-chibi design sheet of the webtoon:
 
-  * NAME_move.webp and NAME_hits.webp are two sheets of six frames, three across and two
-    down, of each of the five fighters. The first has her standing, walking, jumping,
-    guarding, hit and down; the second her quick move, her heavy one, her special, her
-    ultimate, her win, and one more of her special.
+  * NAME/SHEET.webp are a fighter's frames: sixteen sheets of six, three across and two down.
+    Eight are of how she moves (idle and guard, walking, walking back, dashing, jumping, being
+    hit, going down and getting up, winning and losing) and eight of how she fights (the five
+    blows of her quick chain, of her heavy chain, in the air, the smash, her specials, her
+    other blows, her ultimate, and her dodge and the greater ultimate of a clash).
+  * NAME_move.webp and NAME_hits.webp are the two sheets of six she had at first. A fighter
+    who does not yet have all her new sheets is built from these, the same frame standing in
+    for many.
   * fx.webp is ten things that fly and flash, five across and two down.
-  * stage1.webp and stage2.webp are the two stages.
+  * stage1.webp to stage3.webp are the stages.
   * face_NAME.png is each one's design sheet, made small, from which her portrait is cut.
 
-Each fighter's twelve frames go into res/drawable-nodpi/fight_NAME.webp, six across and two
-down, every frame in a cell of the same size with her feet at the same place in it and all
-twelve at one scale: her two sheets are brought to the same height standing, and so are the
-five fighters. The model does not keep to an exact grid, so a sheet is taken apart by what
-touches what: its largest pieces are the figures, and every smaller piece, a thrown roll or
-a drop of ink, goes with the figure it is nearest. The things that fly go into fight_fx.webp, the portraits into fight_faces.webp,
-and the stages into fight_stage1.webp and fight_stage2.webp. What FightGame.java needs to
-know about them is printed. Needs Pillow, numpy and scipy.
+The model does not keep to an exact grid, so a sheet is taken apart by what touches what:
+its six largest pieces are the figures, and every smaller piece, a thrown roll or a drop of
+ink, goes with the figure it is nearest. Every sheet has a frame in which she stands upright,
+by which the sheet is brought to her height; her hair is brought to one colour across all her
+sheets; each frame is trimmed to what is drawn and the frames are packed close together into
+res/drawable-nodpi/fight_NAME_0.webp, _1 and so on. Where each frame is, and where her feet
+are in it, is written to FightFrames.java, with a name for every frame. The things that fly go
+into fight_fx.webp, the portraits into fight_faces.webp, and the stages into fight_stage1.webp
+and so on. Needs Pillow, numpy and scipy.
 """
 
 import argparse
@@ -34,19 +39,51 @@ from PIL import Image, ImageDraw, ImageFilter
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "fight"
 RES = ROOT / "app" / "src" / "main" / "res" / "drawable-nodpi"
+JAVA = ROOT / "app" / "src" / "main" / "java" / "com" / "coral" / "calculator" / "FightFrames.java"
 FIGHTERS = ("halgakos", "chikuwa", "tsubakieh", "rune", "illya")
-# A fighter's cell, where her feet stand in it, and how tall she is standing.
-# Large enough that a fighter is not stretched to more than about one and a half times her size on a big screen:
-# at two thirds of this she looked soft there.
-CELL = (720, 600)
-FEET = (300, 588)
+# How tall she is standing, in the pixels her frames are kept in: large enough that she is not stretched to more
+# than about one and a half times her size on a big screen.
 STAND = 393
-# The frames of each sheet in which she is upright, from which her height is taken.
-UPRIGHT = {"move": (0, 1, 3, 4), "hits": (0, 1, 2, 4, 5)}
+ATLAS = 2048
 FX_CELL = 240
 FACE = 256
 STAGE_WIDTH = 1920
 STAGES = 3
+
+# The sheets, the names of the six frames of each, and which of them show her upright at her full height.
+SHEETS = [
+    ("idle", "IDLE1 IDLE2 IDLE3 IDLE4 GUARD GUARD_HIT", (0, 1, 2, 3)),
+    ("walk", "WALK1 WALK2 WALK3 WALK4 WALK5 WALK6", (0, 1, 2, 3, 4, 5)),
+    ("back", "BACK1 BACK2 BACK3 BACK4 HOP1 HOP2", (0, 1, 2, 3)),
+    ("dash", "TURN DASH1 DASH2 DASH3 SKID CROUCH", (0,)),
+    ("jump", "READY PREJUMP RISE TOP FALL LAND", (0,)),
+    ("hits", "HIT1 HIT2 BLOWN STAGGER AIR_HIT AIR_GUARD", (0,)),
+    ("down", "FALLING LYING SIT_UP KNEEL_UP DUST KO", (4,)),
+    ("win", "WIN1 WIN2 WIN3 LOSE1 LOSE2 TAUNT", (0,)),
+    ("quick", "QS Q1 Q2 Q3 Q4 Q5", (0,)),
+    ("heavy", "HS H1 H2 H3 H4 H5", (0,)),
+    ("air", "AS A1 A2 A3 AX1 AX2", (0,)),
+    ("smash", "SM_UP SM_FALL SM_HIT SM_REC SM_RISE SM_MISS", (4,)),
+    ("special", "SS S1 S2 S3 S4 S5", (0,)),
+    ("moves", "MS DASH_Q DASH_H BREAK LAUNCH SHOVE", (0,)),
+    ("ult", "U1 U2 U3 U4 CHARGE TAUNT2", (0,)),
+    ("extra", "XS DODGE1 DODGE2 C1 C2 C3", (0,)),
+]
+NAMES = [name for _, names, _ in SHEETS for name in names.split()]
+# Frames that are placed by the middle of what is drawn, not by where her feet are: in the air, and lying down.
+CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2".split())
+# What stands in for the dodge and the clash while a fighter has no sheet of them yet.
+SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U3", "C3": "U4"}
+# For a fighter who has only her first twelve frames (standing, walking, jumping, guarding, hit, down, quick, heavy,
+# special, ultimate, win, and one more), which of them stands in for each frame.
+OLD = dict(zip(NAMES, [
+    0, 0, 0, 0, 3, 3, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 2, 2, 0, 1, 1, 1, 0, 0, 0, 0, 2, 2, 2, 0, 4, 4, 4, 4, 4, 3, 4, 5, 5, 5, 0, 5,
+    10, 10, 10, 5, 5, 10, 0, 6, 6, 6, 6, 6, 0, 7, 7, 7, 7, 7, 0, 6, 6, 6, 8, 8, 2, 7, 7, 0, 0, 0, 8, 8, 11, 8, 11, 8, 0, 6, 7, 7, 7, 6,
+    9, 9, 11, 9, 10, 10, 0, 2, 2, 9, 11, 9]))
+# Roughly the colour of each one's hair, to find it by; what it is exactly is measured from her first sheet.
+HAIR = {"halgakos": (238, 160, 180), "chikuwa": (200, 150, 110), "tsubakieh": (150, 122, 150), "rune": (150, 200, 240), "illya": (245, 190, 150)}
+# A sheet whose upright frame came out a different size from the rest of it is put right by hand here: (fighter, sheet) to a factor.
+RESIZE = {}
 
 
 def clean(image):
@@ -64,7 +101,8 @@ def cells(sheet, across, down):
     """
     The pictures of a sheet, so many across and down, in reading order, each trimmed to what
     is drawn. The largest pieces of the sheet are the pictures; a smaller piece belongs to
-    the picture it is nearest.
+    the picture it is nearest. With each comes where her body is in it, apart from what
+    flies about her: its left, top, right and bottom, and the middle of her feet.
     """
     mask = numpy.array(solid(sheet)) > 0
     # Pieces a few pixels apart are one piece: a sparkle beside a ball of light, a tear beside a cheek.
@@ -90,7 +128,7 @@ def cells(sheet, across, down):
         if sizes[index] < 6:
             continue
         owner[index] = min(main, key=lambda body: away(boxes[index], boxes[body]))
-    # Reading order: rows by how far down their middles are, then left to right.
+
     def middle(index):
         rows, columns = boxes[index]
         return (rows.start + rows.stop) / 2, (columns.start + columns.stop) / 2
@@ -105,51 +143,144 @@ def cells(sheet, across, down):
         mine = numpy.isin(labels, [index + 1 for index, to in owner.items() if to == body])
         piece = pixels.copy()
         piece[~mine] = 0
-        image = Image.fromarray(piece, "RGBA")
-        found.append(image.crop(solid(image).getbbox()))
+        image = Image.fromarray(piece)
+        box = solid(image).getbbox()
+        rows, columns = boxes[body]
+        # Her feet: the middle of what there is of her body in its lowest tenth.
+        tall = rows.stop - rows.start
+        low = labels[rows.stop - max(4, tall // 10):rows.stop, columns] == body + 1
+        across_low = numpy.where(low.any(axis=0))[0]
+        feet = columns.start + (across_low[0] + across_low[-1] + 1) / 2
+        found.append((image.crop(box), (columns.start - box[0], rows.start - box[1], columns.stop - box[0], rows.stop - box[1]), feet - box[0]))
     return found
 
 
-def feet_middle(frame):
-    """Where her feet are across a frame: the middle of what is drawn in its lowest tenth."""
-    mask = solid(frame)
-    tall = frame.size[1]
-    box = mask.crop((0, tall - max(4, tall // 10), frame.size[0], tall)).getbbox()
-    return (box[0] + box[2]) / 2
+def chroma(pixels):
+    total = pixels[..., :3].astype(numpy.float32).sum(axis=-1) + 1e-6
+    return pixels[..., 0] / total, pixels[..., 1] / total, total / 3
 
 
-def hair_colour(frame):
-    """The mean colour of the upper third of a frame's solid pixels: mostly her hair."""
-    pixels = frame.load()
-    total, count = [0, 0, 0], 0
-    for y in range(0, frame.size[1] // 3, 2):
-        for x in range(0, frame.size[0], 2):
-            pixel = pixels[x, y]
-            if pixel[3] >= 235:
-                total = [total[i] + pixel[i] for i in range(3)]
-                count += 1
-    return [round(channel / max(1, count)) for channel in total]
+def hairness(pixels, red, green, radius):
+    """How much each pixel of a picture is of the colour of her hair, from 0 to 1."""
+    r, g, bright = chroma(pixels)
+    weight = numpy.clip(1 - numpy.hypot(r - red, g - green) / radius, 0, 1)
+    return weight * (pixels[..., 3] > 200) * (bright > 55) * (bright < 248)
+
+
+def hair_of(name, frames):
+    """The colour of a fighter's hair as her first sheet has it: where it lies among colours, and its mean."""
+    hint = numpy.array(HAIR[name], dtype=numpy.float32)
+    red, green = hint[0] / hint.sum(), hint[1] / hint.sum()
+    for radius in (.07, .05, .04):
+        r_sum = g_sum = weight_sum = 0.0
+        colour = numpy.zeros(3)
+        for image in frames:
+            pixels = numpy.array(image).astype(numpy.float32)
+            top = pixels[: pixels.shape[0] * 45 // 100]
+            weight = hairness(top, red, green, radius)
+            r, g, _ = chroma(top)
+            r_sum += (r * weight).sum()
+            g_sum += (g * weight).sum()
+            weight_sum += weight.sum()
+            colour += (top[..., :3] * weight[..., None]).sum(axis=(0, 1))
+        red, green = r_sum / weight_sum, g_sum / weight_sum
+    return red, green, colour / weight_sum
+
+
+def matched(frames, hair):
+    """Some frames with her hair brought to the colour it has in her first sheet. Returns them and how far off they were."""
+    red, green, wanted = hair
+    colour, weight_sum = numpy.zeros(3), 0.0
+    for image in frames:
+        pixels = numpy.array(image).astype(numpy.float32)
+        weight = hairness(pixels, red, green, .05)
+        colour += (pixels[..., :3] * weight[..., None]).sum(axis=(0, 1))
+        weight_sum += weight.sum()
+    if weight_sum < 500:
+        return frames, [1, 1, 1]
+    gains = numpy.clip(wanted / (colour / weight_sum), .85, 1.15)
+    if numpy.abs(gains - 1).max() < .02:
+        return frames, [round(float(gain), 3) for gain in gains]
+    out = []
+    for image in frames:
+        pixels = numpy.array(image).astype(numpy.float32)
+        weight = hairness(pixels, red, green, .06)[..., None]
+        pixels[..., :3] = numpy.clip(pixels[..., :3] * (1 + (gains - 1) * weight), 0, 255)
+        out.append(Image.fromarray(pixels.astype(numpy.uint8)))
+    return out, [round(float(gain), 3) for gain in gains]
+
+
+def sized(parts, upright, factor=1.0):
+    """The frames of a sheet brought to her height, by the frames of it in which she stands upright."""
+    scale = STAND / max(parts[index][1][3] - parts[index][1][1] for index in upright) * factor
+    out = []
+    for image, body, feet in parts:
+        size = (max(1, round(image.size[0] * scale)), max(1, round(image.size[1] * scale)))
+        out.append((image.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), [value * scale for value in body], feet * scale))
+    return out, scale
 
 
 def fighter(name, report):
-    """A fighter's twelve frames, six across and two down, at one scale with her feet in one place."""
-    atlas = Image.new("RGBA", (CELL[0] * 6, CELL[1] * 2), (0, 0, 0, 0))
-    for row, sheet_name in enumerate(("move", "hits")):
-        frames = cells(clean(Image.open(SOURCE / f"{name}_{sheet_name}.webp")), 3, 2)
-        scale = STAND / max(frames[index].size[1] for index in UPRIGHT[sheet_name])
-        report[f"{name}_{sheet_name}"] = {"scale": round(scale, 3), "hair": hair_colour(frames[0])}
-        for column, frame in enumerate(frames):
-            size = (max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale)))
-            small = frame.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
-            left = round(FEET[0] - feet_middle(small))
-            top = FEET[1] - size[1]
-            # Kept inside its cell, if it would stick out of it.
-            left = max(0, min(CELL[0] - size[0], left))
-            if size[0] > CELL[0] or top < 0:
-                raise SystemExit(f"{name} {sheet_name} frame {column} is {size}, too large for its cell {CELL}")
-            atlas.alpha_composite(small, (column * CELL[0] + left, row * CELL[1] + top))
-    atlas.save(RES / f"fight_{name}.webp", quality=90, alpha_quality=94, method=6)
-    return atlas
+    """A fighter's frames by name: each a picture, and where in it she stands (across to her feet, down to the ground)."""
+    old = []
+    for sheet_name, upright in (("move", (0, 1, 3, 4)), ("hits", (0, 1, 2, 4, 5))):
+        parts, _ = sized(cells(clean(Image.open(SOURCE / f"{name}_{sheet_name}.webp")), 3, 2), upright)
+        old += parts
+    hair = hair_of(name, [old[0][0], old[1][0]])
+    report[f"{name} hair"] = [round(float(value)) for value in hair[2]]
+    folder = SOURCE / name
+    full = all((folder / f"{sheet}.webp").exists() for sheet, _, _ in SHEETS[:15])
+    frames = {}
+    if not full:
+        for slot, index in OLD.items():
+            image, body, feet = old[index]
+            frames[slot] = (image, feet, body[3], index)
+        return frames, False
+    for sheet, names, upright in SHEETS:
+        path = folder / f"{sheet}.webp"
+        if not path.exists():
+            continue
+        parts, scale = sized(cells(clean(Image.open(path)), 3, 2), upright, RESIZE.get((name, sheet), 1.0))
+        pictures, gains = matched([part[0] for part in parts], hair)
+        report[f"{name} {sheet}"] = {"scale": round(scale, 3), "hair": gains,
+                                    "tall": [round(part[1][3] - part[1][1]) for part in parts]}
+        for slot, picture, (_, body, feet) in zip(names.split(), pictures, parts):
+            across = (body[0] + body[2]) / 2 if slot in CENTRED else feet
+            frames[slot] = (picture, across, body[3], None)
+    for slot, spare in SPARE.items():
+        frames.setdefault(slot, frames[spare])
+    return frames, True
+
+
+def packed(name, frames):
+    """Packs a fighter's frames close together into as few pictures as hold them. Returns those, and where each frame went."""
+    # A frame that stands in for several is kept once.
+    unique = {}
+    for slot in NAMES:
+        unique.setdefault(id(frames[slot][0]), frames[slot][0])
+    order = sorted(unique, key=lambda key: -unique[key].size[1])
+    atlases, where, x, y, row = [], {}, 0, 0, 0
+    sheet = Image.new("RGBA", (ATLAS, ATLAS), (0, 0, 0, 0))
+    for key in order:
+        image = unique[key]
+        if image.size[0] + 2 > ATLAS:
+            raise SystemExit(f"{name}: a frame is {image.size}, too wide")
+        if x + image.size[0] + 2 > ATLAS:
+            x, y, row = 0, y + row + 2, 0
+        if y + image.size[1] + 2 > ATLAS:
+            atlases.append(sheet.crop((0, 0, ATLAS, y)))
+            sheet, x, y, row = Image.new("RGBA", (ATLAS, ATLAS), (0, 0, 0, 0)), 0, 0, 0
+        sheet.alpha_composite(image, (x + 1, y + 1))
+        where[key] = (len(atlases), x + 1, y + 1)
+        x += image.size[0] + 2
+        row = max(row, image.size[1])
+    atlases.append(sheet.crop((0, 0, ATLAS, y + row + 2)))
+    table = []
+    for slot in NAMES:
+        image, across, down, _ = frames[slot]
+        atlas, left, top = where[id(image)]
+        table.append((atlas, left, top, image.size[0], image.size[1], round(across), round(down)))
+    return atlases, table
 
 
 def without_white(image):
@@ -157,7 +288,6 @@ def without_white(image):
     image = image.convert("RGBA")
     if image.getchannel("A").getextrema()[0] == 0:
         return image
-    mask = Image.new("L", image.size, 0)
     grey = image.convert("L").point(lambda value: 255 if value >= 244 else 0)
     # The white that can be reached from the corners is the background; white inside her outline is not.
     for corner in ((0, 0), (image.size[0] - 1, 0), (0, image.size[1] - 1), (image.size[0] - 1, image.size[1] - 1)):
@@ -181,19 +311,94 @@ def face(name):
     return crop.convert("RGBa").resize((FACE, FACE), Image.LANCZOS).convert("RGBA")
 
 
+def preview(name, frames, folder):
+    """Every frame of a fighter standing on a line, a sheet to a row and a half, small: to see that they are one girl at one size."""
+    box, per_row = (300, 250), 12
+    rows = (len(NAMES) + per_row - 1) // per_row
+    board = Image.new("RGBA", (box[0] * per_row, box[1] * rows), (110, 120, 140, 255))
+    draw = ImageDraw.Draw(board)
+    for index, slot in enumerate(NAMES):
+        image, across, down, _ = frames[slot]
+        small = image.resize((max(1, image.size[0] // 2), max(1, image.size[1] // 2)), Image.LANCZOS)
+        left, ground = index % per_row * box[0], index // per_row * box[1] + box[1] - 14
+        draw.line((left, ground, left + box[0], ground), fill=(255, 255, 255, 70))
+        board.alpha_composite(small, (max(left - 40, min(left + box[0] - small.size[0] + 40, round(left + box[0] * .42 - across / 2))),
+                                      round(ground - down / 2)), )
+        draw.text((left + 4, index // per_row * box[1] + 2), slot, fill=(255, 255, 255, 255))
+    board.convert("RGB").save(folder / f"{name}.jpg", quality=80)
+
+
+def java(tables, sizes, full):
+    lines = ["package com.coral.calculator;", "",
+             "/**",
+             " * Where every frame of every fighter of Page brawl is, in the pictures they are packed into. Written by",
+             " * tools/make_fight_art.py: not to be changed by hand. A frame is a picture's number, its place and size in that",
+             " * picture, and where in the frame she stands: across to her feet, down to the ground. They are kept so many",
+             " * pixels to her standing height.",
+             " */",
+             "final class FightFrames {",
+             f"    static final int STAND = {STAND}, COUNT = {len(NAMES)};"]
+    for start in range(0, len(NAMES), 12):
+        lines.append("    static final int " + ", ".join(f"{slot} = {start + index}" for index, slot in enumerate(NAMES[start:start + 12])) + ";")
+    lines.append("    /** The pictures each fighter's frames are in, and how wide each was made. */")
+    lines.append("    static final int[][] ATLASES = {")
+    for name, size in zip(FIGHTERS, sizes):
+        lines.append("            {" + ", ".join(f"R.drawable.fight_{name}_{index}" for index in range(len(size))) + "},")
+    lines.append("    };")
+    lines.append("    static final int[][] HIGH = {" + ", ".join("{" + ", ".join(str(one[1]) for one in size) + "}" for size in sizes) + "};")
+    lines.append(f"    static final int WIDE = {ATLAS};")
+    lines.append("    /** Whether a fighter has all her frames, or only her first twelve standing in for the rest. */")
+    lines.append("    static final boolean[] FULL = {" + ", ".join("true" if one else "false" for one in full) + "};")
+    lines.append("    private static final String[] DATA = {")
+    for table in tables:
+        text = " ".join(" ".join(str(value) for value in row) for row in table)
+        chunks = [text[start:start + 110] for start in range(0, len(text), 110)]
+        lines.append("            " + "\n                    + ".join(f'"{chunk}"' for chunk in chunks) + ",")
+    lines.append("    };")
+    lines.append("    /** Every fighter's frames: the picture, left, top, width, height, across to her feet and down to the ground of each. */")
+    lines.append("    static final short[][][] FRAMES = new short[DATA.length][COUNT][7];")
+    lines.append("")
+    lines.append("    static {")
+    lines.append("        for (int fighter = 0; fighter < DATA.length; fighter++) {")
+    lines.append('            String[] numbers = DATA[fighter].split(" ");')
+    lines.append("            for (int index = 0; index < numbers.length; index++) FRAMES[fighter][index / 7][index % 7] = Short.parseShort(numbers[index]);")
+    lines.append("        }")
+    lines.append("    }")
+    lines.append("")
+    lines.append("    private FightFrames() {}")
+    lines.append("}")
+    JAVA.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=pathlib.Path)
     args = parser.parse_args()
-    report = {}
-    atlases = [fighter(name, report) for name in FIGHTERS]
+    report, tables, sizes, full = {}, [], [], []
+    for old in RES.glob("fight_*.webp"):
+        if old.stem.split("_")[1] in FIGHTERS:
+            old.unlink()
+    for name in FIGHTERS:
+        frames, whole = fighter(name, report)
+        atlases, table = packed(name, frames)
+        for index, atlas in enumerate(atlases):
+            atlas.save(RES / f"fight_{name}_{index}.webp", quality=88, alpha_quality=92, method=6)
+        tables.append(table)
+        sizes.append([atlas.size for atlas in atlases])
+        full.append(whole)
+        pixels = sum(atlas.size[0] * atlas.size[1] for atlas in atlases)
+        report[f"{name} pictures"] = f"{len(atlases)} {'full' if whole else 'first twelve only'}, {pixels * 4 / 1e6:.0f} MB in memory at full size"
+        if args.preview:
+            args.preview.mkdir(parents=True, exist_ok=True)
+            preview(name, frames, args.preview)
+    java(tables, sizes, full)
 
     faces = Image.new("RGBA", (FACE * len(FIGHTERS), FACE), (0, 0, 0, 0))
     for index, name in enumerate(FIGHTERS):
         faces.alpha_composite(face(name), (index * FACE, 0))
     faces.save(RES / "fight_faces.webp", quality=90, alpha_quality=92, method=6)
 
-    things = cells(clean(Image.open(SOURCE / "fx.webp")), 5, 2)
+    things = [part[0] for part in cells(clean(Image.open(SOURCE / "fx.webp")), 5, 2)]
     fx = Image.new("RGBA", (FX_CELL * len(things), FX_CELL), (0, 0, 0, 0))
     wide, tall = [], []
     for index, thing in enumerate(things):
@@ -210,27 +415,11 @@ def main():
         stage = stage.resize((STAGE_WIDTH, round(stage.size[1] * STAGE_WIDTH / stage.size[0])), Image.LANCZOS)
         stage.save(RES / f"fight_stage{number}.webp", quality=88, method=6)
 
-    print("cell", CELL, "feet", FEET, "stand", STAND, "faces", faces.size, "fx", fx.size)
     print("FX_WIDE = {" + ", ".join(f"{value:.3f}f" for value in wide) + "};")
     print("FX_TALL = {" + ", ".join(f"{value:.3f}f" for value in tall) + "};")
     for key, value in report.items():
         print(key, value)
-    for name in list(FIGHTERS) + ["faces", "fx", "stage1", "stage2"]:
-        print(f"fight_{name}.webp", (RES / f"fight_{name}.webp").stat().st_size)
-    if args.preview:
-        grey = (110, 120, 140, 255)
-        half = [atlas.resize((atlas.size[0] // 2, atlas.size[1] // 2), Image.LANCZOS) for atlas in atlases]
-        board = Image.new("RGBA", (half[0].size[0], sum(one.size[1] for one in half) + FACE + FX_CELL), grey)
-        y = 0
-        for one in half:
-            board.alpha_composite(one, (0, y))
-            # A line where their feet stand, to see that they stand on it.
-            for row in range(2):
-                ImageDraw.Draw(board).line((0, y + (row * CELL[1] + FEET[1]) // 2, board.size[0], y + (row * CELL[1] + FEET[1]) // 2), fill=(255, 255, 255, 90))
-            y += one.size[1]
-        board.alpha_composite(faces, (0, y))
-        board.alpha_composite(fx, (0, y + FACE))
-        board.convert("RGB").save(args.preview)
+    print("res", sum(path.stat().st_size for path in RES.glob("fight_*.webp")), "bytes in", len(list(RES.glob("fight_*.webp"))), "files")
 
 
 if __name__ == "__main__":

@@ -122,6 +122,18 @@ SOUNDS = {
     # A fight won, and a fight lost.
     "win": after(note(523, .1), note(659, .1), note(784, .1), note(1047, .14), note(784, .08), note(1047, .4)),
     "lose": after(note(440, .14, "square"), note(370, .14, "square"), note(311, .14, "square"), note(233, .44, "square")),
+    # A harder swing: the last blow of a chain.
+    "whoosh": fade(rise(soft(noise(.24), .16)) + .25 * tone(.24, 260, 900), .03, .09),
+    # A dodge: a quick breath of air going by, upward.
+    "dodge": fade(soft(noise(.14), .4) * numpy.linspace(.3, 1, int(RATE * .14)) + .3 * tone(.14, 900, 2200), .01, .07),
+    # A smash coming down: a boom with rubble after it.
+    "smash": mix(fade(tone(.5, 150, 30), .002), .8 * fade(soft(noise(.3), .12), .002), .3 * fade(tone(.12, 900, 300, "square"), .001),
+                 .3 * after(numpy.zeros(int(RATE * .12)), fade(soft(noise(.3), .5), .01))),
+    # Two ultimates meeting: a clang, and a held, rising hum under it.
+    "clash": mix(fade(mix(tone(.5, 1244, shape="triangle"), tone(.5, 1661, shape="triangle"), .5 * tone(.5, 2489)), .001),
+                 .6 * fade(soft(noise(.1), .7), .001), .5 * fade(rise(tone(.9, 110, 440, "triangle")), .01, .1)),
+    # One tap of a clash: a small bright tick.
+    "tick": fade(tone(.035, 1500, 1900, "triangle"), .001),
 }
 
 
