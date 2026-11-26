@@ -867,10 +867,10 @@ final class RunLevels {
                     }
                 } else {
                     int step = 11;
-                    ledge(from + 5 + (storey - 1) * step, row, 12);
-                    ledge(to - 16 - (storey - 1) * step, row, 12);
-                    if (storey % 2 == 0) ledge(storey % 4 == 0 ? from + 6 : to - 11, row, 6);
-                    else ledge(middle - 4, row, 8);
+                    ledge(from + 5 + (storey - 1) * step, row, 15);
+                    ledge(to - 19 - (storey - 1) * step, row, 15);
+                    // And on every other storey a platform in the middle, by the ledge that rides.
+                    if (storey % 2 == 1) ledge(middle - 4, row, 8);
                 }
             }
             if (style == 1) {
