@@ -62,6 +62,15 @@ final class PlusRun {
     static final int SHOCK = 14, BOOMERANG = 15, DEBRIS = 16, BLADE = 17, DARK = 18, GLOB = 19, CURSE = 20;
     /** And a plus that falls, in the room where they are caught: it hurts no one, and is hers if she is under it. */
     static final int PLUSDROP = 21;
+    /** A cloud of steam, which red and blue worn together throw in place of fire and water: it goes on through whatever it meets. */
+    static final int STEAM = 22;
+    /**
+     * The colours worn together that have a name and something of their own, each a bit:
+     * steam, red and blue; the comet, red and yellow; the tide, blue and green; the mirror,
+     * brown and purple; the gale, green and yellow; the ember, red and brown; the prism,
+     * any three; and white, all seven.
+     */
+    static final int STEAMS = 0, COMET = 1, TIDE = 2, MIRROR = 3, GALE = 4, EMBER = 5, PRISM = 6, WHITEN = 7, MIXES = 8;
     /** How many waves of signs a cellar fills with, how long the pluses fall, and how many of them caught win something more. */
     static final int WAVES = 3, ENOUGH = 8;
     static final float FALLING = 10;
@@ -120,6 +129,8 @@ final class PlusRun {
          */
         int colours;
         float recharge = 10, formLonger = 1;
+        /** How many of the colours that are hers she may wear at once. */
+        int together = 2;
     }
     static final int GUN_SHOTS = 16;
     /** How long a swing of the brush or the sword lasts. */
@@ -152,6 +163,8 @@ final class PlusRun {
 
     /** Something flying through the air: hers, or thrown at her. Its place is its middle. */
     static final class Shot {
+        /** One of hers that goes on through whatever it meets. */
+        boolean through;
         final int kind;
         boolean hers;
         float x, y, across, down, left, age;
@@ -212,8 +225,20 @@ final class PlusRun {
     private float rush, magnet, notes, charmed;
     private boolean shield;
     private int combo, bonus, airJumps, flaps, taken, lastTaken = -1, spared, charms, swings, cause;
-    private int form, formed, inkLeft, doorsUsed, quakes, cleared, parried, censors, riding = -1;
-    private float formLeft, censored, doorWait, offIt;
+    private int formed, inkLeft, doorsUsed, quakes, cleared, parried, censors, riding = -1;
+    private float censored, doorWait, offIt;
+    /**
+     * The colours she wears, by their numbers: how much longer each is on, how long it was
+     * put on for, and how much longer each must wait, once it is gone, before she can call
+     * on it again. Which of them came from a ribbon or were given or lent, and so do not
+     * count against how many of her own she may wear; and which was put on last.
+     */
+    private final float[] worn = new float[WHITE], lasted = new float[WHITE], waits = new float[WHITE];
+    private int lent, last;
+    /** How much longer black that was put on her, which is no colour of hers, lies on her; and how much longer she is white from a ribbon. */
+    private float cursed, pale;
+    /** Which named mixes she wears now and has ever worn in this land, as bits; which was the last to form, and how many have; how many colours have gone; and how many times she has been white of her own colours. */
+    private int mixed, mixes, lastMix = -1, mixings, faded, whitened;
     private int spent, giver, greetings;
     /** Which place off the land she is in, or -1; which she has been into, which she has finished, and which hidden doors she has broken through to. */
     private int room = -1, roomsFound, roomsDone, revealed;
@@ -223,7 +248,7 @@ final class PlusRun {
     private boolean quitting;
     private int heldWeapon = UNARMED, heldRounds, woken, bursts;
     /** In the range, with its gun in her hands; and called on in black, a shadow that nothing touches. */
-    private boolean ranging, shadow;
+    private boolean ranging;
     private int quest, cakes, questGiven, questsDone, questFails, questFlags;
     /** Where whoever asked it stands; how many times it has been handed in, and she has been reminded of it; and whether she has been away from whoever asked. */
     private int questColumn = -1, questRow, questsPaid, reminders;
@@ -232,7 +257,6 @@ final class PlusRun {
     private int stallAt = -1;
     private final java.util.Map<Integer, Integer> stallSold = new java.util.HashMap<>();
     /** How full what she calls a colour on with is, from nothing to 1; and how many times she has. */
-    private float charge = 1;
     private int called;
     private float questLeft;
     private boolean atStall;
@@ -330,9 +354,20 @@ final class PlusRun {
         charms = other.charms;
         swings = other.swings;
         cause = other.cause;
-        form = other.form;
         formed = other.formed;
-        formLeft = other.formLeft;
+        System.arraycopy(other.worn, 0, worn, 0, WHITE);
+        System.arraycopy(other.lasted, 0, lasted, 0, WHITE);
+        System.arraycopy(other.waits, 0, waits, 0, WHITE);
+        lent = other.lent;
+        last = other.last;
+        cursed = other.cursed;
+        pale = other.pale;
+        mixed = other.mixed;
+        mixes = other.mixes;
+        lastMix = other.lastMix;
+        mixings = other.mixings;
+        faded = other.faded;
+        whitened = other.whitened;
         inkLeft = other.inkLeft;
         doorsUsed = other.doorsUsed;
         quakes = other.quakes;
@@ -367,9 +402,7 @@ final class PlusRun {
         woken = other.woken;
         bursts = other.bursts;
         ranging = other.ranging;
-        shadow = other.shadow;
         quest = other.quest;
-        charge = other.charge;
         called = other.called;
         cakes = other.cakes;
         questGiven = other.questGiven;
@@ -575,7 +608,7 @@ final class PlusRun {
      */
     int refusal(int kind, int cost) {
         if (stallSold(kind) >= stock(kind)) return SOLD_OUT;
-        if (kind > FORM && coloured()) return WORN;
+        if (kind > FORM && (coloured() || cursed > 0)) return WORN;
         if (kind == BREAD && halves >= perks.hearts * 2 || kind == SHIELD && shield || kind == ICE && rush > 0) return NEEDLESS;
         return purse() < cost ? POOR : SOLD;
     }
@@ -858,11 +891,49 @@ final class PlusRun {
     /** A life more, won in this land. */
     void spare() { lives++; }
 
-    /** Her form, 0 for her own, and how much longer it lasts. */
-    int form() { return form; }
-    float formLeft() { return formLeft; }
-    /** Whether she has a power, by the form it belongs to: in white she has them all. */
-    boolean has(int power) { return form == power || form == WHITE && power != BLACK; }
+    /**
+     * Her colour, taken all together, 0 for her own: black while black lies on her that was
+     * put there; white when she is white; and otherwise whichever of those she wears was
+     * put on last. And how much longer that lasts.
+     */
+    int form() {
+        if (cursed > 0) return BLACK;
+        if (white()) return WHITE;
+        if (last != 0 && worn[last] > 0) return last;
+        for (int colour = BLACK; colour >= RED; colour--) if (worn[colour] > 0) return colour;
+        return 0;
+    }
+    float formLeft() {
+        int form = form();
+        if (cursed > 0) return cursed;
+        if (form != WHITE) return form == 0 ? 0 : worn[form];
+        float least = pale > 0 ? pale : 99;
+        for (int colour = RED; colour <= BLACK; colour++) if (worn[colour] > 0) least = Math.min(least, worn[colour]);
+        return least;
+    }
+    /** Whether she has a power, by the colour it belongs to: each colour she wears keeps its own, however many she wears. */
+    boolean has(int power) { return power >= RED && power <= BLACK && worn[power] > 0; }
+    /** The colours she wears, a bit for each, the first for red; and how much longer one of them is on, how long it was put on for, and how long it must still wait. */
+    int mix() {
+        int mix = 0;
+        for (int colour = RED; colour <= BLACK; colour++) if (worn[colour] > 0) mix |= 1 << colour - 1;
+        return mix;
+    }
+    float on(int colour) { return worn[colour]; }
+    float lasted(int colour) { return lasted[colour]; }
+    float waiting(int colour) { return waits[colour]; }
+    /** Whether she is white: all seven worn at once, or white from the rare ribbon. */
+    boolean white() { return pale > 0 || mix() == (1 << BLACK) - 1; }
+    /** Which named mixes she wears now and has worn in this land, as bits; which formed last, or -1; and counts that only go up: mixes formed, colours gone, and times white of her own seven. */
+    int mixed() { return mixed; }
+    int mixes() { return mixes; }
+    int lastMix() { return lastMix; }
+    int mixings() { return mixings; }
+    int faded() { return faded; }
+    int whitened() { return whitened; }
+    /** How much longer black that was put on her lies on her. */
+    float cursed() { return cursed; }
+    private boolean named(int which) { return (mixed & 1 << which) != 0; }
     /** Counts that only go up: ribbons taken, doors gone through, landings that shook the ground, signs cleared at a stroke, blows turned aside, the censor's strokes. */
     int formed() { return formed; }
     int doorsUsed() { return doorsUsed; }
@@ -1068,13 +1139,20 @@ final class PlusRun {
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         time += seconds;
         if (safe > 0) safe -= seconds;
-        if (formLeft > 0 && (formLeft -= seconds) <= 0) fade(true);
+        // Each colour she wears has its own time; each that is gone waits its own wait, which begins when it goes.
+        for (int colour = RED; colour <= BLACK; colour++) {
+            if (worn[colour] > 0) {
+                if ((worn[colour] -= seconds) <= 0) end(colour, true);
+            } else if (waits[colour] > 0) {
+                waits[colour] = Math.max(0, waits[colour] - seconds);
+            }
+        }
+        if (cursed > 0) cursed -= seconds;
+        if (pale > 0) pale -= seconds;
         if (censored > 0) censored -= seconds;
         if (doorWait > 0) doorWait -= seconds;
         if (offIt > 0) offIt -= seconds;
         sinceShot += seconds;
-        // What she calls a colour on with fills only while she wears none: black that was put on her is not one.
-        if (charge < 1 && !coloured()) charge = Math.min(1, charge + seconds / perks.recharge);
         if (leaving) leave();
         if (quitting) quit();
         if (quest == ASKED && level.quest == RunLevels.TIME) asked(seconds);
@@ -1118,7 +1196,7 @@ final class PlusRun {
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
         float fast = rush > 0 ? RUN * 1.3f : RUN, leap = rush > 0 ? LEAP * 1.1f : LEAP;
         if (has(YELLOW)) fast = RUN * 1.7f;
-        if (form == BLACK) {
+        if (cursed > 0) {
             fast *= .55f;
             leap *= .85f;
         }
@@ -1151,7 +1229,8 @@ final class PlusRun {
             sinceGround = 1;
             onGround = false;
             jumps++;
-        } else if (pressed && perks.wings && !onGround && airJumps < 1) {
+        } else if (pressed && !onGround && airJumps < (perks.wings ? 1 : 0) + (named(STEAMS) ? 1 : 0)) {
+            // With her wings, one more jump in the air; and in steam, which lifts her, another.
             // With her wings, one more jump in the air.
             speedDown = -LEAP * .88f;
             sinceJump = 1;
@@ -1166,7 +1245,9 @@ final class PlusRun {
         char about = at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL * .6f));
         // A draught lifts her; and with the wind in her hair she flies for as long as the jump is held.
         if (about == RunLevels.DRAUGHT) speedDown = Math.max(-5, speedDown - (GRAVITY + 24) * seconds);
-        else if (has(GREEN) && jump && !onGround && y > 1) speedDown = Math.max(-4.5f, speedDown - (GRAVITY + 24) * seconds);
+        else if (has(GREEN) && jump && !onGround && y > 1) speedDown = Math.max(named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * seconds);
+        // On the tide she does not drop out of the air: let go of, the jump lets her down slowly.
+        else if (named(TIDE) && !onGround) speedDown = Math.min(speedDown, 2.6f);
         // Water she cannot swim in lets her down slowly, and out through the bottom.
         if (about == RunLevels.WATER && !has(BLUE)) {
             speedDown = Math.min(speedDown, 3.5f);
@@ -1256,7 +1337,7 @@ final class PlusRun {
         // carries is used as well: the one is never lost to the other.
         sinceCast += seconds;
         sinceBrace += seconds;
-        if (form == BLACK) {
+        if (cursed > 0) {
             swing = 0;
         } else {
             boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= REST[weapon];
@@ -1311,7 +1392,12 @@ final class PlusRun {
             // Coming down onto a sign deals with it and sends her up again; any other touch knocks her back.
             // A times has a spike on every arm and cannot be landed on at all.
             boolean onto = speedDown > 0 && y + TALL - speedDown * seconds <= foe.y + foe.tall() * .6f;
-            if (notes > 0 || has(BROWN)) {
+            // The comet: at a run in red and yellow, whatever she meets she goes through as she would in brown.
+            boolean comet = named(COMET) && Math.abs(speedAcross) > RUN * 1.4f && !RunLevels.boss(foe.kind);
+            if (comet) {
+                foe.left = 1;
+                beat(foe);
+            } else if (notes > 0 || has(BROWN)) {
                 // With the notes about her, or in brown, whatever she touches is dealt with; one of those who wait, unless spent, only stops against her.
                 if (RunLevels.boss(foe.kind) && !open(foe) && has(BROWN)) {
                     braced(foe.x + foe.wide() / 2);
@@ -1319,6 +1405,8 @@ final class PlusRun {
                     // Any sign, from any side, spikes and all, and however much it can take.
                     foe.left = 1;
                     beat(foe);
+                    // The ember: in red as well, it goes off burning, the way she faces, into whatever is beyond it.
+                    if (named(EMBER)) shoot(FIRE, true, foe.x + foe.wide() / 2, foe.y + foe.tall() * .5f, (facingLeft ? -1 : 1) * 12, 0, .8f);
                 } else if (foe.dazed <= 0) {
                     beat(foe);
                 }
@@ -1327,8 +1415,8 @@ final class PlusRun {
                 airJumps = 0;
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
                 offIt = .3f;
-                // In black she only bounces off it.
-                if (form != BLACK) {
+                // With black put on her she only bounces off it.
+                if (cursed <= 0) {
                     beat(foe);
                     // One sign after another without touching the ground: each is worth one plus more than the last.
                     if (++combo > 1) bonus += combo - 1;
@@ -1361,53 +1449,138 @@ final class PlusRun {
     }
 
     /**
-     * She calls on a colour that is hers to keep: her hair turns to it, for a shorter while
-     * than a ribbon gives, and what she called on it with is empty until it has filled again.
-     * Returns whether she could.
+     * She calls on a colour that is hers to keep, and wears it with whatever else she
+     * wears: each keeps its power, and each has its own time, shorter than a ribbon gives.
+     * She cannot call on one she is wearing, nor one that is waiting since it last went,
+     * nor more of her own at once than she can hold. Black, which is the Mawang's, makes
+     * her a shadow that nothing can touch; it is short, it ends in a burst, and it waits
+     * twice as long. Returns whether she could.
      */
     boolean call(int colour) {
-        if (state != PLAYING || colour < RED || colour > WHITE || (perks.colours & 1 << colour - 1) == 0 || charge < 1 || coloured()) return false;
-        // Black, which is the Mawang's, costs twice the wait when it is over: for it she is a shadow that nothing can touch, and it ends in a burst.
-        shadow = colour == BLACK;
-        form = colour;
-        formLeft = (colour == BLACK ? 5 : 9) * perks.lasting * perks.formLonger;
-        formed++;
+        if (!callable(colour)) return false;
+        put(colour, (colour == BLACK ? 5 : 9) * perks.lasting * perks.formLonger, false);
         called++;
         return true;
     }
 
-    /** A colour is given her there and then, to keep: her hair turns to it at once, and it is hers to call on from now. */
+    /** Whether a colour could be called on now. */
+    boolean callable(int colour) {
+        return state == PLAYING && cursed <= 0 && colour >= RED && colour <= BLACK && (perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0
+                && waits[colour] <= 0 && Integer.bitCount(mix() & ~lent) < perks.together;
+    }
+
+    /** She calls on several at once, those given as bits, in their order, for as far as she can hold them. Returns those she could, as bits. */
+    int callAll(int colours) {
+        int could = 0;
+        for (int colour = RED; colour <= BLACK; colour++) if ((colours & 1 << colour - 1) != 0 && call(colour)) could |= 1 << colour - 1;
+        return could;
+    }
+
+    /** She lets go of a colour she is wearing: it is gone at once, quietly, and its wait begins. */
+    boolean drop(int colour) {
+        if (colour < RED || colour > BLACK || worn[colour] <= 0) return false;
+        end(colour, false);
+        return true;
+    }
+
+    /** How many of her own colours she may wear at once. */
+    int together() { return perks.together; }
+
+    /** A colour is given her there and then, to keep: it is in her hair at once, and it is hers to call on from now. */
     void gift(int colour) {
         perks.colours |= 1 << colour - 1;
         wear(colour, 9 * perks.lasting * perks.formLonger);
     }
 
     /** Whether she wears a colour: black that was put on her, which is no use to her, does not count. */
-    boolean coloured() { return form != 0 && (form != BLACK || shadow); }
+    boolean coloured() { return pale > 0 || mix() != 0; }
 
-    /**
-     * The colour she wears is gone, however that came about, and only now does the wait to
-     * call on another begin, from empty: twice over after the shadow, which also goes in a
-     * burst when it has run its time.
-     */
-    private void fade(boolean ran) {
-        if (coloured()) charge = shadow ? -1 : 0;
-        if (shadow && ran) burst();
-        shadow = false;
-        form = 0;
-        formLeft = 0;
+    /** A colour is put on, with whatever she wears already. */
+    private void put(int colour, float lasts, boolean ribbon) {
+        worn[colour] = lasts;
+        lasted[colour] = lasts;
+        waits[colour] = 0;
+        last = colour;
+        if (ribbon) lent |= 1 << colour - 1;
+        else lent &= ~(1 << colour - 1);
+        formed++;
+        mingle();
     }
 
-    /** Her hair turns to a colour, by a ribbon or by being given it or by having it put on her: whatever she wore before is gone. */
+    /** A colour is gone, however that came about, and only now does its wait begin: twice as long for black, which goes in a burst when it has run its time. */
+    private void end(int colour, boolean ran) {
+        if (worn[colour] <= 0 && !ran) return;
+        worn[colour] = 0;
+        waits[colour] = perks.recharge * (colour == BLACK ? 2 : 1);
+        lent &= ~(1 << colour - 1);
+        faded++;
+        if (colour == BLACK && ran) burst();
+        mingle();
+    }
+
+    /** Everything she wears is gone, quietly. */
+    private void fade(boolean ran) {
+        for (int colour = RED; colour <= BLACK; colour++) if (worn[colour] > 0) end(colour, false);
+        pale = 0;
+    }
+
+    /** What she wears is looked at again for the mixes that have names: one that has just formed is the last to have formed. */
+    private void mingle() {
+        int mix = mix(), now = 0;
+        boolean red = (mix & 1) != 0, blue = (mix & 2) != 0, brown = (mix & 4) != 0, green = (mix & 8) != 0, yellow = (mix & 16) != 0, purple = (mix & 32) != 0;
+        if (red && blue) now |= 1 << STEAMS;
+        if (red && yellow) now |= 1 << COMET;
+        if (blue && green) now |= 1 << TIDE;
+        if (brown && purple) now |= 1 << MIRROR;
+        if (green && yellow) now |= 1 << GALE;
+        if (red && brown) now |= 1 << EMBER;
+        if (Integer.bitCount(mix) >= 3) now |= 1 << PRISM;
+        if (mix == (1 << BLACK) - 1) {
+            now |= 1 << WHITEN;
+            // White of her own seven: of colours that are all hers.
+            if ((mixed & 1 << WHITEN) == 0 && (perks.colours & mix) == mix) whitened++;
+        }
+        for (int which = MIXES - 1; which >= 0; which--) {
+            if ((now & 1 << which) != 0 && (mixed & 1 << which) == 0) {
+                lastMix = which;
+                mixings++;
+                break;
+            }
+        }
+        mixed = now;
+        mixes |= now;
+    }
+
+    /**
+     * Her hair turns to a colour by a ribbon, or by being given it or lent it: it is worn
+     * with whatever she wears already, and does not count against how many of her own she
+     * may wear. The rare white ribbon is the six that have powers, all at once, and she is
+     * white for as long as it lasts. A black one is black put on her, unless black is hers:
+     * then it is her own shadow.
+     */
     private void wear(int colour, float lasts) {
+        if (colour == WHITE) {
+            for (int each = RED; each <= PURPLE; each++) put(each, lasts, true);
+            pale = lasts;
+        } else if (colour == BLACK && (perks.colours & 1 << BLACK - 1) == 0) {
+            curse(lasts);
+        } else {
+            put(colour, colour == BLACK ? Math.min(lasts, 5 * perks.lasting * perks.formLonger) : lasts, true);
+        }
+    }
+
+    /** Black is put on her: every colour she wore is gone, and for a while she is slow and can hurt nothing. */
+    private void curse(float lasts) {
         fade(false);
-        form = colour;
-        formLeft = lasts;
+        cursed = lasts;
         formed++;
     }
 
-    /** How long it will be before she can call on a colour again, in seconds, once she wears none. */
-    float untilCall() { return Math.max(0, 1 - charge) * perks.recharge; }
+    /** How long it will be before she can call on a colour again, in seconds, once it has gone; and the same as a share of the whole wait that is over. */
+    float untilCall(int colour) { return colour >= RED && colour <= BLACK ? waits[colour] : 0; }
+    float charge(int colour) {
+        return colour >= RED && colour <= BLACK ? 1 - waits[colour] / (perks.recharge * (colour == BLACK ? 2 : 1)) : 1;
+    }
 
     /** A ribbon's worth of a colour that is not hers: her hair turns to it for as long as a ribbon lasts. */
     void lend(int colour) { take(FORM + colour); }
@@ -1428,12 +1601,11 @@ final class PlusRun {
     }
 
     /** Whether she is a shadow; how many times one has passed in a burst; and how many times the Old Book has been woken. */
-    boolean shadow() { return shadow; }
+    boolean shadow() { return worn[BLACK] > 0; }
     int bursts() { return bursts; }
     int woken() { return woken; }
 
-    /** How full what she calls a colour on with is, and how many times she has called on one. */
-    float charge() { return Math.max(0, charge); }
+    /** How many times she has called on a colour. */
     int called() { return called; }
 
     /** Something is asked of her: if it is done already it is done; a count begins if it is against one. */
@@ -1754,8 +1926,17 @@ final class PlusRun {
         sinceCast = 0;
         casts++;
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
+        if (named(STEAMS)) {
+            // Red and blue together are steam: a cloud, slower and longer in the air, that goes on through whatever it meets.
+            shoot(STEAM, true, fromX, fromY, way * 8, 0, 1.5f);
+            return;
+        }
         if (has(RED)) shoot(FIRE, true, fromX, fromY, way * 13, 0, .9f);
-        if (has(BLUE)) shoot(WATER, true, fromX, fromY - .1f, way * 10, -1.5f, 1.1f);
+        if (has(BLUE)) {
+            shoot(WATER, true, fromX, fromY - .1f, way * 10, -1.5f, 1.1f);
+            // On the tide the water goes both ways.
+            if (named(TIDE)) shoot(WATER, true, fromX - way, fromY - .1f, -way * 10, -1.5f, 1.1f);
+        }
     }
 
     /** Something is sent at her from a place: at where she is, or at where she will be if she keeps on as she is going. */
@@ -1897,19 +2078,22 @@ final class PlusRun {
                             sinceShot = 0;
                             if (streak > 1) bonus += Math.min(streak - 1, 4);
                         }
-                        // A book and fire go on through, but not through those who wait at the end.
-                        if (shot.kind != BOOK && shot.kind != FIRE || RunLevels.boss(foe.kind)) shots.remove(index);
+                        // A book, fire and steam go on through, and so does what the mirror has sent back, but not through those who wait at the end.
+                        if (shot.kind != BOOK && shot.kind != FIRE && shot.kind != STEAM && !shot.through || RunLevels.boss(foe.kind)) shots.remove(index);
                     }
                     break;
                 }
             } else if (safe <= 0 && !(shot.kind == DEBRIS && shot.age < HANGS) && shot.x > x - .15f && shot.x < x + WIDE + .15f && shot.y > y + .05f
                     && shot.y < y + TALL) {
                 if (has(PURPLE)) {
-                    // In purple, what is thrown at her goes back where it came from.
+                    // In purple, what is thrown at her goes back where it came from; and from the mirror, it goes on through a row of them.
                     shot.hers = true;
+                    shot.through = named(MIRROR);
                     shot.across = -shot.across;
                     shot.down = -shot.down;
                     shot.left = 1.2f;
+                    // And it goes back faster than it came, so that it reaches the row behind whoever threw it.
+                    if (shot.through && Math.abs(shot.across) < 12) shot.across = Math.signum(shot.across) * 12;
                     turned++;
                     continue;
                 }
@@ -1918,7 +2102,7 @@ final class PlusRun {
                     charmed = CHARM;
                     charms++;
                 } else if (shot.kind == CURSE) {
-                    if (!shadow) wear(BLACK, 4);
+                    if (worn[BLACK] <= 0) curse(4);
                 } else {
                     // In brown what is thrown at her still lands, but it costs her half a heart.
                     cause = STRUCK;
@@ -1965,7 +2149,9 @@ final class PlusRun {
      * ball of ink takes one hurt for her. Returns whether anything came of it.
      */
     private boolean hurt(boolean fell, int costs) {
-        if (!fell && (notes > 0 || shadow)) return false;
+        if (!fell && (notes > 0 || worn[BLACK] > 0)) return false;
+        // Three colours and more are a prism, through which whatever lands on her lands by half.
+        if (!fell && named(PRISM)) costs = 1;
         if (shield) {
             if (--inkLeft <= 0) shield = false;
             spared++;
@@ -1989,6 +2175,7 @@ final class PlusRun {
             livesLost++;
             halves = perks.hearts * 2;
             fade(false);
+            cursed = 0;
             // Whatever was in the air is gone by the time she is back.
             shots.clear();
             swing = 0;
