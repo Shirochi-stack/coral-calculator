@@ -103,7 +103,15 @@ While she is on screen, Android posts a notification of its own saying that Halg
 
 **Play with Halgakos**, in her menu, opens a card of small games where the mini calculator opens. The arrow in its corner carries the game on to a full screen in the app, which also opens from **Settings › Play with Halgakos**. Tallies and best results are kept on the device.
 
-On the card:
+**Plus run** has the top of the card to itself, as the game she recommends. It is a run and jump over the whole screen, through thirty lands in five chapters, with a story, *The Lost Output*: someone divided by zero, Zero made off with her output through the equals gate, and she wants it back.
+
+- **Playing.** Hold an arrow to run and the round button to jump; hold it longer to jump higher. Collect the pluses, mind the gaps and the spikes, take to the air off springs, and reach the gate at the far end. Three hearts, and two flags in each land to come back to.
+- **The signs.** A minus walks, and goes flat when you land on it. A times has a spike on every arm and cannot be landed on. A divide hops on the spot. Later a minus stands and throws knives along the ground, to be jumped, and a divide shoots a dot from the top of its hop, to be ducked under. Zero waits in the last land, and the gate stays shut until he is flat.
+- **Things to fight with.** Lying about each land, in a ring of light: a pen and a knife to throw, a book to lob, a brush and a sword to swing, and an ink gun that fires for as long as its button is held until it is empty. A button for whatever she carries appears beside the jump. The sword sends back what is thrown at her and the brush wipes it away; nothing thrown gets through Zero, but something swung does.
+- **Stars.** One for finishing a land, two for most of its pluses, three for nearly all. The map shows every land, the stars won, and which is next.
+- **Sound.** Halgakos tells the story and passes remarks in her own voice, and there are sound effects for everything. The speaker button on the map, or **Sounds in Plus run** in her settings, turns them off. Her voice is heard while she calls you Sloppy.
+
+Also on the card:
 
 - **Tic-tac-toe.** You are the crosses and she is the noughts. She plays well, but not perfectly.
 - **Rock paper scissors.** First to three points takes the match.
@@ -117,7 +125,6 @@ All over the screen, on top of whatever app you are in:
 - **Catch Halgakos.** She runs about the whole screen, faster each time she is caught. Tap her as often as you can in thirty seconds.
 - **Number rain.** Drag anywhere to move her along the bottom. Catch each **+** and keep clear of each **−**; three bumps end the round.
 - **Bubble count.** Ten numbered bubbles drift about. Pop them from the smallest to the largest; a wrong one costs two seconds.
-- **Plus run.** A run and jump across a land of signs, from one end to a gate at the other. Hold an arrow to run and the round button to jump; hold it longer to jump higher. Collect the pluses, land on the minuses that walk about, and mind the gaps. Three hearts, two flags to come back to, and your best time is kept.
 - **Minesweeper.** A minefield as large as the screen allows, with about one mine to every six or seven squares. Tap a square to open it, hold one to flag a mine, or switch the flag button on to flag with a tap. The first square you open is never a mine, and tapping an open number that has all its flags opens the rest round it. Your best time is kept.
 
 The **✕** in the corner, or Back, leaves one of these. They dim the app underneath and take its touches only while they are up.

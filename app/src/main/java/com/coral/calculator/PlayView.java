@@ -44,12 +44,12 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
     private static final int NOT_SHOWN = -1;
     private static final long TICK_MS = 100;
     private static final String[] HANDS = {CompanionIcon.ROCK, CompanionIcon.PAPER, CompanionIcon.SCISSORS};
-    /** The menu's tiles, two to a row: the games they open, and their pictures. */
+    /** The menu's tiles, two to a row under Plus run, which has the top of the menu to itself: the games they open, and their pictures. */
     private static final int[] TILE_GAMES = {PlaySession.TIC, PlaySession.RPS, PlaySession.PAIRS, PlaySession.SUMS,
-            PlaySession.CHESS, PlaySession.LAST_CARD, PlaySession.MINES, PlaySession.RUN, PlaySession.TAG, PlaySession.RAIN,
+            PlaySession.CHESS, PlaySession.LAST_CARD, PlaySession.MINES, PlaySession.TAG, PlaySession.RAIN,
             PlaySession.ORDER, PlaySession.PRANK};
     private static final String[] TILE_ICONS = {CompanionIcon.GRID, CompanionIcon.SCISSORS, CompanionIcon.CARDS,
-            CompanionIcon.SUMS, CompanionIcon.PAWN, CompanionIcon.FAN, CompanionIcon.MINE, CompanionIcon.LEAP,
+            CompanionIcon.SUMS, CompanionIcon.PAWN, CompanionIcon.FAN, CompanionIcon.MINE,
             CompanionIcon.TARGET, CompanionIcon.RAIN, CompanionIcon.BUBBLES, CompanionIcon.SPARK};
     /** The four signs of Last card, as they are written and the colour each is drawn in. */
     private static final String[] SIGNS = {"+", "−", "×", "÷"};
@@ -188,14 +188,42 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
 
     // The menu of games
 
-    /** Twelve tiles: six games played on this card, five all over the screen, and her pranks. */
+    /**
+     * Plus run across the top, as the game she recommends, and eleven tiles under it: six
+     * games played on this card, four all over the screen, and her pranks in a row of their own.
+     */
     private View menu() {
         LinearLayout grid = new LinearLayout(getContext());
         grid.setOrientation(VERTICAL);
+        LinearLayout featured = new LinearLayout(getContext());
+        featured.setGravity(Gravity.CENTER_VERTICAL);
+        featured.setPadding(px(11), 0, px(9), 0);
+        featured.setBackground(tile(CalculatorLayout.CORAL, 13));
+        featured.addView(new CompanionIcon(getContext(), CompanionIcon.LEAP, Color.WHITE, 1f), new LayoutParams(px(22), px(22)));
+        LinearLayout featuredWords = column();
+        TextView featuredName = text(PlaySession.name(PlaySession.RUN), 13, Color.WHITE, true);
+        featuredName.setMaxLines(1);
+        featuredWords.addView(featuredName, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        TextView featuredNote = text("", 9.5f, 0xFFFFE9EA, false);
+        featuredNote.setMaxLines(1);
+        featuredNote.setEllipsize(TextUtils.TruncateAt.END);
+        featuredWords.addView(featuredNote, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        LayoutParams featuredWordsParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
+        featuredWordsParams.leftMargin = px(9);
+        featured.addView(featuredWords, featuredWordsParams);
+        TextView badge = text("Recommended", 8.5f, CalculatorLayout.CORAL, true);
+        badge.setMaxLines(1);
+        badge.setPadding(px(7), px(2.5f), px(7), px(2.5f));
+        badge.setBackground(round(Color.WHITE, 9));
+        featured.addView(badge, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        featured.setFocusable(true);
+        tap(featured, () -> host.onStage(PlaySession.RUN));
+        grid.addView(featured, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.45f));
         TextView[] notes = new TextView[TILE_ICONS.length];
-        for (int row = 0; row < TILE_ICONS.length / 2; row++) {
+        for (int row = 0; row < (TILE_ICONS.length + 1) / 2; row++) {
             LinearLayout line = new LinearLayout(getContext());
-            for (int column = 0; column < 2; column++) {
+            // The last tile, with no other to stand beside, has its row to itself.
+            for (int column = 0; column < 2 && row * 2 + column < TILE_ICONS.length; column++) {
                 int index = row * 2 + column, game = TILE_GAMES[index];
                 // Its picture to the left, its name over a line about it to the right.
                 LinearLayout tile = new LinearLayout(getContext());
@@ -230,10 +258,12 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
                 line.addView(tile, params);
             }
             LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1);
-            if (row > 0) params.topMargin = px(5);
+            params.topMargin = px(5);
             grid.addView(line, params);
         }
         updater = () -> {
+            featuredNote.setText(note(PlaySession.RUN));
+            featured.setContentDescription(PlaySession.name(PlaySession.RUN) + ", recommended. " + featuredNote.getText());
             for (int index = 0; index < notes.length; index++) {
                 notes[index].setText(note(TILE_GAMES[index]));
                 ((View) notes[index].getParent().getParent()).setContentDescription(
@@ -251,8 +281,12 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
             case PlaySession.CHESS: return record(session.tally("chess_won"), session.tally("chess_lost"), session.tally("chess_drawn"));
             case PlaySession.LAST_CARD: return record(session.tally("cards_won"), session.tally("cards_lost"), 0);
             case PlaySession.RUN: {
-                int seconds = session.tally("run_best");
-                return seconds == 0 ? "Whole screen" : "Best: " + PlayStage.clock(seconds);
+                // How far through its thirty lands the player has got, and the stars won on the way.
+                int stars = 0;
+                for (int land = 1; land <= RunLevels.COUNT; land++) stars += session.tally("run_stars_" + land);
+                int open = Math.max(1, Math.min(RunLevels.COUNT, session.tally("run_open")));
+                return stars == 0 ? RunStory.TITLE + " · " + RunLevels.COUNT + " lands"
+                        : "Land " + open + " of " + RunLevels.COUNT + " · " + stars + (stars == 1 ? " star" : " stars");
             }
             case PlaySession.PAIRS: return best("pairs_best", " turns", "On this card");
             case PlaySession.SUMS: return best("sums_best", " right", "On this card");

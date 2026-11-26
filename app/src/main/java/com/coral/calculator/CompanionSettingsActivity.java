@@ -117,9 +117,11 @@ public final class CompanionSettingsActivity extends Activity {
                 });
 
         section(content, "Play with Halgakos");
-        content.addView(text("Small games to play with her: tic-tac-toe, rock paper scissors, pairs and quick sums "
-                + "on a card where the mini calculator opens, and three that have the whole screen, over whatever "
-                + "app you are in. Hold her and choose Play with Halgakos, or start here.", 15, muted()));
+        content.addView(text("Games to play with her. Plus run, at the top of them, is a run and jump through thirty "
+                + "lands, with a story she tells in her own voice and things to fight with along the way. There are "
+                + "also chess, minesweeper, a card game, tic-tac-toe and more, some on a card where the mini "
+                + "calculator opens and some over the whole screen. Hold her and choose Play with Halgakos, or "
+                + "start here.", 15, muted()));
         TextView play = text("Play with Halgakos  ›", 18, CalculatorLayout.CORAL);
         play.setPadding(0, dp(12), 0, dp(12));
         play.setMinHeight(dp(48));
@@ -132,6 +134,10 @@ public final class CompanionSettingsActivity extends Activity {
                         + "most of it is teasing. A tap on the bubble sends it away.",
                 prefs.chatter(), checked -> { prefs.set(CompanionPrefs.CHATTER, checked); apply(); });
         nameField(content);
+        toggle(content, "Sounds in Plus run", "Plus run plays sound effects, and Halgakos tells its story aloud. Switch this "
+                        + "off to play it in silence, with her words on screen only. The speaker button on its map does "
+                        + "the same. Her voice is heard while she calls you Sloppy, the name it was recorded with.",
+                prefs.gameSound(), checked -> prefs.set(CompanionPrefs.GAME_SOUND, checked));
         toggle(content, "Surprise pranks", "Left idle, every several minutes she plays a prank over whatever is on "
                         + "screen: binning one of your apps, shaking them all loose, cracking the screen, turning "
                         + "it off, dropping her ice cream on it and more. In between she plays little ones "

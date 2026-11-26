@@ -276,6 +276,19 @@ final class Chatter {
             "Quick sums. Your thumbs are slow Sloppy~♡",
             "Chess time. Think hard. It won't help Sloppy~♡",
             "Pick any game. I'll win them all Sloppy~♡",
+            // Plus run is the one she would have everybody play.
+            "Plus run is my best game. Thirty lands. Go Sloppy~♡",
+            "I recommend Plus run. It's at the top for a reason Sloppy~♡",
+            "Play Plus run. I do my own voice in it Sloppy~♡",
+            "Zero stole something of mine. Help me in Plus run Sloppy~♡",
+            "Plus run has swords. And an ink gun. Come on Sloppy~♡",
+            "Thirty lands in Plus run. How far did you get Sloppy~♡",
+            "Three stars on every land. I dare you Sloppy~♡",
+            "Plus run. I get a sword. You get to watch Sloppy~♡",
+            "Bored? Plus run. Top of my games Sloppy~♡",
+            "The minus signs throw knives now. Play Plus run Sloppy~♡",
+            "Play Plus run with the sound on. You'll hear me Sloppy~♡",
+            "Zero is waiting in land thirty. Are you Sloppy~♡",
     };
 
     /** A line in Japanese now and then, to tease those who cannot read it. */

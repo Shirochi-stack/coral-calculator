@@ -183,28 +183,8 @@ final class PlayStage extends View {
     private final List<float[]> specks = new ArrayList<>();
     private float sinceSpeck;
 
-    // Plus run: the land, the size of a square of it on screen, where its window is, and how far it has scrolled.
-    private PlusRun run;
-    private float tile, landTop, camera;
-    private final RectF leftButton = new RectF(), rightButton = new RectF(), jumpButton = new RectF();
-    private boolean goLeft, goRight, goJump;
-    /**
-     * The art of Plus run: its painted sky, and nine pictures side by side, each standing on the
-     * bottom of a square of its own: the turf, the soil, a minus on one foot, on the other and
-     * flattened, a plus, a ledge, the flag and the gate. How much of its square each fills is
-     * what tools/make_run_art.py printed when it built them.
-     */
-    private Bitmap runSky, runArt;
-    private static final int TURF = 0, SOIL = 1, MINUS_ART = 2, MINUS_FLAT_ART = 4, PLUS_ART = 5, LEDGE_ART = 6, FLAG_ART = 7,
-            GATE_ART = 8;
-    private static final float[] RUN_ART_WIDE = {1.000f, 1.000f, 1.000f, 1.000f, 1.000f, 1.000f, 1.000f, 0.555f, 1.000f};
-    private static final float[] RUN_ART_TALL = {1.000f, 1.000f, 0.547f, 0.547f, 0.312f, 1.000f, 0.328f, 1.000f, 1.000f};
-    private int seenFlattened, seenHurts, seenLandings, seenCollected;
-    /** How long she stays flattened after a landing, and how much of that is left. */
-    private static final float SQUASH = .14f;
-    private float squash;
-    /** Sparks from a plus and dust from a landing: across, down, their speeds, how long each has left, and which it is. */
-    private final List<float[]> bits = new ArrayList<>();
+    /** Plus run is a game of its own, with its own lands, pictures and sounds: it takes the stage over whole. */
+    private RunGame runGame;
 
     private Object backCallback;
 
@@ -244,10 +224,7 @@ final class PlayStage extends View {
             large = android.graphics.BitmapFactory.decodeResource(context.getResources(),
                     pet != null ? R.drawable.halgakos_pet_large : R.drawable.halgakos_large);
         }
-        if (game == PlaySession.RUN) {
-            runSky = android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_sky);
-            runArt = android.graphics.BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_art);
-        }
+        if (game == PlaySession.RUN) runGame = new RunGame(this, context, dark, haptics, art, pet);
         if (game == SNATCH || game == AVALANCHE) {
             pickApps(context, game == SNATCH ? 1 : SHAKEN);
             loot = icons.get(0);
@@ -335,6 +312,12 @@ final class PlayStage extends View {
     private void layout() {
         play.set(insetLeft, insetTop, getWidth() - insetRight, getHeight() - insetBottom);
         if (play.width() <= 0 || play.height() <= 0) return;
+        if (runGame != null) {
+            // Plus run fits itself to the whole screen, and to what the system bars leave of it.
+            runGame.layout(getWidth(), getHeight(), play);
+            started = true;
+            return;
+        }
         herHeight = Math.max(dp(84), Math.min(dp(136), Math.min(play.width(), play.height()) * .17f));
         herWidth = herHeight * (pet != null ? (pet.getWidth() / PetArt.COLUMNS) / (float) (pet.getHeight() / PetArt.FRAMES.length)
                 : art.getWidth() / (float) art.getHeight());
@@ -355,7 +338,6 @@ final class PlayStage extends View {
             begin();
         } else {
             fitField();
-            fitRun();
             herX = clamp(herX, play.left + herWidth / 2, play.right - herWidth / 2);
             herY = clamp(herY, play.top + herHeight, play.bottom);
             if (game == PlaySession.RAIN) {
@@ -485,7 +467,7 @@ final class PlayStage extends View {
     @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         if (Build.VERSION.SDK_INT >= 33 && !isPrank(game)) {
-            OnBackInvokedCallback callback = this::leave;
+            OnBackInvokedCallback callback = this::back;
             findOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
             backCallback = callback;
         }
@@ -496,6 +478,7 @@ final class PlayStage extends View {
     @Override protected void onDetachedFromWindow() {
         running = false;
         removeCallbacks(frame);
+        if (runGame != null) runGame.close();
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
             OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
             if (dispatcher != null) dispatcher.unregisterOnBackInvokedCallback((OnBackInvokedCallback) backCallback);
@@ -533,6 +516,10 @@ final class PlayStage extends View {
     }
 
     private void advance(float seconds) {
+        if (runGame != null) {
+            runGame.advance(seconds);
+            return;
+        }
         int row = once != NONE ? once : pose;
         frameClock += seconds * 1000;
         while (frameClock >= PetArt.FRAME_MS[row]) {
@@ -553,7 +540,6 @@ final class PlayStage extends View {
         } else if (phase == PLAYING) {
             if (game == PlaySession.TAG) tag(seconds);
             else if (game == PlaySession.MINES) mines(seconds);
-            else if (game == PlaySession.RUN) plusRun(seconds);
             else if (game == PlaySession.RAIN) rain(seconds);
             else bubbles(seconds);
         } else if (card.isEmpty() || runTo(clamp(card.left + herWidth * .65f, play.left + herWidth / 2, play.right - herWidth / 2),
@@ -887,303 +873,6 @@ final class PlayStage extends View {
     /** A length of time in minutes and seconds, as a clock shows it. */
     static String clock(int seconds) { return seconds / 60 + ":" + (seconds % 60 < 10 ? "0" : "") + seconds % 60; }
 
-    // Plus run
-
-    /** Fits the land to the screen: its squares a size that shows ten or so across, over the buttons along the bottom. */
-    private void fitRun() {
-        if (game != PlaySession.RUN) return;
-        float buttons = dp(108), room = play.height() - dp(64) - buttons;
-        tile = Math.max(dp(14), Math.min(dp(40), Math.min(play.width() / 10f, room / PlusRun.ROWS)));
-        landTop = play.bottom - buttons - tile * PlusRun.ROWS;
-        float size = dp(70), y = play.bottom - dp(20) - size, edge = dp(18);
-        leftButton.set(play.left + edge, y, play.left + edge + size, y + size);
-        rightButton.set(leftButton.right + dp(14), y, leftButton.right + dp(14) + size, y + size);
-        jumpButton.set(play.right - edge - size, y, play.right - edge, y + size);
-    }
-
-    private void plusRun(float seconds) {
-        run.step(seconds, goLeft, goRight, goJump);
-        // The window on the land shows more of what is ahead of her than behind, and follows her smoothly.
-        float across = play.width() / tile;
-        float goal = clamp(run.x() + PlusRun.WIDE / 2 - across * (run.facingLeft() ? .58f : .4f), 0, Math.max(0, PlusRun.COLUMNS - across));
-        camera += (goal - camera) * Math.min(1, seconds * 7);
-        facingLeft = run.facingLeft();
-        if (run.onGround()) {
-            keep(run.running() ? (facingLeft ? PetArt.RUN_LEFT : PetArt.RUN_RIGHT) : PetArt.IDLE);
-        } else {
-            // Her jump is shown by where she is in it, not by the clock: leaving the ground, rising, at the top, coming down.
-            float down = run.speedDown();
-            keep(PetArt.JUMP);
-            once = NONE;
-            frameIndex = down < -10 ? 1 : down < -3 ? 2 : down < 5 ? 3 : 4;
-            frameClock = 0;
-        }
-        herX = play.left + (run.x() + PlusRun.WIDE / 2 - camera) * tile;
-        herY = landTop + (run.y() + PlusRun.TALL) * tile;
-        if (squash > 0) squash -= seconds;
-        // A landing flattens her for a moment and kicks up dust; a plus bursts; a flattened minus puffs.
-        if (run.landings() != seenLandings) {
-            seenLandings = run.landings();
-            squash = SQUASH;
-            for (int puff = 0; puff < 5; puff++) {
-                bits.add(new float[]{run.x() + PlusRun.WIDE / 2, run.y() + PlusRun.TALL, (random.nextFloat() - .5f) * 5, -random.nextFloat() * 1.6f, .32f, 1});
-            }
-        }
-        if (run.collected() != seenCollected) {
-            seenCollected = run.collected();
-            for (int spark = 0; spark < 7; spark++) {
-                double way = random.nextFloat() * Math.PI * 2;
-                bits.add(new float[]{run.plusX(), run.plusY(), (float) Math.cos(way) * 4.5f, (float) Math.sin(way) * 4.5f - 2, .38f, 0});
-            }
-        }
-        if (run.flattened() != seenFlattened) {
-            for (int puff = 0; puff < 8; puff++) {
-                bits.add(new float[]{run.minusX(), run.minusY(), (random.nextFloat() - .5f) * 7, -random.nextFloat() * 3, .36f, 1});
-            }
-        }
-        for (int index = bits.size() - 1; index >= 0; index--) {
-            float[] bit = bits.get(index);
-            bit[0] += bit[2] * seconds;
-            bit[1] += bit[3] * seconds;
-            bit[3] += 9 * seconds;
-            if ((bit[4] -= seconds) <= 0) bits.remove(index);
-        }
-        if (run.hurts() != seenHurts) {
-            seenHurts = run.hurts();
-            flash = .16f;
-            if (haptics) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-            if (run.state() == PlusRun.PLAYING) say(1.2f, "Ow! Watch it Sloppy~♡", "Hey! That hurt Sloppy~♡", "Careful with me Sloppy~♡");
-        }
-        if (run.flattened() != seenFlattened) {
-            seenFlattened = run.flattened();
-            buzz();
-            say(1f, "Squish Sloppy~♡", "Flat as a minus Sloppy~♡", "Got one Sloppy~♡");
-        }
-        int time = Math.max(1, Math.round(run.time()));
-        if (run.state() == PlusRun.WON) {
-            boolean record = session.keepBest("run_best", time, true);
-            finish("You made it!", run.collected() + " of " + run.total() + " pluses, in " + clock(time) + (record ? ". A new best!" : "."));
-        } else if (run.state() == PlusRun.LOST) {
-            finish("Out of hearts", "You collected " + run.collected() + " of " + run.total() + " pluses. The gate is further on.");
-        }
-    }
-
-    /** Which buttons are held, by however many fingers are down: one may hold an arrow while another jumps. */
-    private void runTouch(MotionEvent event) {
-        int action = event.getActionMasked();
-        boolean left = false, right = false, jump = false;
-        if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
-            float low = landTop + tile * PlusRun.ROWS * .55f, between = (leftButton.right + rightButton.left) / 2;
-            for (int finger = 0; finger < event.getPointerCount(); finger++) {
-                if (action == MotionEvent.ACTION_POINTER_UP && finger == event.getActionIndex()) continue;
-                float x = event.getX(finger), y = event.getY(finger);
-                // The buttons are easy to hit: the whole lower part of the screen belongs to one or another of them.
-                if (y < low) continue;
-                if (x < between) left = true;
-                else if (x < rightButton.right + dp(26)) right = true;
-                else jump = true;
-            }
-        }
-        goLeft = left;
-        goRight = right;
-        goJump = jump;
-    }
-
-    /** The land as far as the window shows it, her in it, and the three buttons under it. */
-    private void drawRun(Canvas canvas) {
-        float across = play.width() / tile, bottom = landTop + tile * PlusRun.ROWS;
-        // A sky of its own behind the land: whatever is on the screen must not show through it.
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(dark ? 0xFF10161E : 0xFFDCEBFA);
-        canvas.drawRect(play.left, landTop, play.right, bottom, paint);
-        canvas.save();
-        canvas.clipRect(play.left, landTop, play.right, bottom);
-        if (runSky != null) {
-            // The painted sky, as tall as the window, drifting by at a quarter of the land's pace. Each
-            // copy is the mirror of the one before it, so their edges always meet.
-            float tall = bottom - landTop, wide = tall * runSky.getWidth() / runSky.getHeight(), drift = camera * tile * .25f;
-            for (int copy = (int) (drift / wide); play.left + copy * wide - drift < play.right; copy++) {
-                float left = play.left + copy * wide - drift;
-                target.set(left, landTop, left + wide + 1, bottom);
-                canvas.save();
-                if (copy % 2 != 0) canvas.scale(-1, 1, left + wide / 2, 0);
-                canvas.drawBitmap(runSky, null, target, paint);
-                canvas.restore();
-            }
-            // In the dark it is evening there.
-            if (dark) canvas.drawColor(0x8C0B1020);
-        }
-        int first = Math.max(0, (int) camera), last = Math.min(PlusRun.COLUMNS - 1, (int) (camera + across) + 1);
-        int earth = dark ? 0xFF46525F : 0xFF6E8093, turf = CalculatorLayout.CORAL;
-        for (int column = first; column <= last; column++) {
-            float left = play.left + (column - camera) * tile;
-            for (int row = 0; row < PlusRun.ROWS; row++) {
-                char here = run.at(column, row);
-                if (here == PlusRun.AIR) continue;
-                float top = landTop + row * tile;
-                if (runArt != null) {
-                    if (here == PlusRun.BLOCK) {
-                        // The top of a pile has the turf on it; the rest is soil. Every other one is turned
-                        // about, so the same picture side by side does not show as a pattern.
-                        boolean capped = run.at(column, row - 1) != PlusRun.BLOCK;
-                        int side = runArt.getHeight(), which = capped ? TURF : SOIL;
-                        source.set(which * side, 0, which * side + side, side);
-                        target.set(left, top, left + tile + 1, top + tile + 1);
-                        canvas.save();
-                        canvas.scale(column % 2 == 0 ? 1 : -1, capped || row % 2 == 0 ? 1 : -1, left + tile / 2, top + tile / 2);
-                        canvas.drawBitmap(runArt, source, target, paint);
-                        canvas.restore();
-                    } else if (here == PlusRun.LEDGE) {
-                        float tall = tile * RUN_ART_TALL[LEDGE_ART] / RUN_ART_WIDE[LEDGE_ART];
-                        art(canvas, LEDGE_ART, left + tile / 2, top + tall, tile + 1, column % 2 != 0);
-                    } else if (here == PlusRun.FLAG) {
-                        // Grey until she has passed it.
-                        paint.setAlpha(run.x() + PlusRun.WIDE / 2 >= column ? 255 : 120);
-                        art(canvas, FLAG_ART, left + tile / 2, top + tile, tile * 1.9f * RUN_ART_WIDE[FLAG_ART] / RUN_ART_TALL[FLAG_ART], false);
-                        paint.setAlpha(255);
-                    } else if (here == PlusRun.GATE && run.at(column, row + 1) == PlusRun.GATE) {
-                        art(canvas, GATE_ART, left + tile / 2, top + tile * 2, tile * 2.9f * RUN_ART_WIDE[GATE_ART] / RUN_ART_TALL[GATE_ART], false);
-                    }
-                    continue;
-                }
-                if (here == PlusRun.BLOCK) {
-                    paint.setColor(earth);
-                    canvas.drawRect(left, top, left + tile + 1, top + tile + 1, paint);
-                    // The top of a pile of blocks is capped in her colour.
-                    if (run.at(column, row - 1) != PlusRun.BLOCK) {
-                        paint.setColor(turf);
-                        canvas.drawRect(left, top, left + tile + 1, top + tile * .2f, paint);
-                    }
-                } else if (here == PlusRun.LEDGE) {
-                    paint.setColor(dark ? 0xFFE9A0A6 : 0xFFF28D95);
-                    canvas.drawRoundRect(left + 1, top, left + tile - 1, top + tile * .55f, tile * .14f, tile * .14f, paint);
-                } else if (here == PlusRun.FLAG) {
-                    stroke.setColor(ink);
-                    stroke.setStrokeWidth(Math.max(1.5f, tile * .07f));
-                    canvas.drawLine(left + tile * .3f, top - tile * .6f, left + tile * .3f, top + tile, stroke);
-                    path.reset();
-                    path.moveTo(left + tile * .3f, top - tile * .6f);
-                    path.lineTo(left + tile * .95f, top - tile * .32f);
-                    path.lineTo(left + tile * .3f, top - tile * .04f);
-                    path.close();
-                    paint.setColor(run.x() + PlusRun.WIDE / 2 >= column ? turf : cardEdge);
-                    canvas.drawPath(path, paint);
-                } else if (here == PlusRun.GATE && run.at(column, row + 1) == PlusRun.GATE) {
-                    // The gate at the end: an equals sign, the answer to it all, in a frame two squares high.
-                    paint.setColor(0xFFF2B63C);
-                    canvas.drawRoundRect(left - tile * .35f, top - tile * .5f, left + tile * 1.35f, top + tile * 2, tile * .3f, tile * .3f, paint);
-                    paint.setColor(Color.WHITE);
-                    canvas.drawRoundRect(left - tile * .08f, top + tile * .28f, left + tile * 1.08f, top + tile * .62f, tile * .12f, tile * .12f, paint);
-                    canvas.drawRoundRect(left - tile * .08f, top + tile * .98f, left + tile * 1.08f, top + tile * 1.32f, tile * .12f, tile * .12f, paint);
-                }
-            }
-        }
-        // The pluses, each bobbing a little, and the minuses with their eyes.
-        text.setTextAlign(Paint.Align.CENTER);
-        text.setTextSize(tile * .95f);
-        text.setColor(turf);
-        for (int[] plus : run.pluses()) {
-            if (plus[0] < first - 1 || plus[0] > last + 1) continue;
-            float x = play.left + (plus[0] + .5f - camera) * tile;
-            float y = landTop + (plus[1] + .82f) * tile + (float) Math.sin(run.time() * 4 + plus[0]) * tile * .08f;
-            if (runArt != null) {
-                // It turns as it hangs there: its width comes and goes.
-                float turned = Math.max(.18f, Math.abs((float) Math.cos(run.time() * 3 + plus[0] * .7f)));
-                art(canvas, PLUS_ART, x, y + tile * .08f, tile * .78f * turned, false);
-                continue;
-            }
-            canvas.drawText("+", x, y, text);
-        }
-        for (PlusRun.Minus minus : run.minuses()) {
-            float left = play.left + (minus.x - camera) * tile, top = landTop + minus.y * tile;
-            float wide = PlusRun.MINUS_WIDE * tile, tall = PlusRun.MINUS_TALL * tile;
-            if (runArt != null) {
-                // One foot and then the other as it walks; the picture faces left, and is turned about to go right.
-                int which = minus.flat ? MINUS_FLAT_ART : (int) (run.time() * 6 + minus.x) % 2 == 0 ? MINUS_ART : MINUS_ART + 1;
-                art(canvas, which, left + wide / 2, top + tall, wide * 1.3f, !minus.leftward && !minus.flat);
-                continue;
-            }
-            paint.setColor(dark ? 0xFFDCE2E8 : 0xFF2A2F36);
-            if (minus.flat) {
-                canvas.drawRoundRect(left, top + tall * .72f, left + wide, top + tall, tall * .14f, tall * .14f, paint);
-                continue;
-            }
-            canvas.drawRoundRect(left, top + tall * .12f, left + wide, top + tall, tall * .3f, tall * .3f, paint);
-            paint.setColor(dark ? 0xFF10161E : Color.WHITE);
-            float look = minus.leftward ? -wide * .08f : wide * .08f;
-            canvas.drawCircle(left + wide * .32f + look, top + tall * .52f, tall * .15f, paint);
-            canvas.drawCircle(left + wide * .68f + look, top + tall * .52f, tall * .15f, paint);
-        }
-        // Sparks and dust.
-        paint.setStyle(Paint.Style.FILL);
-        for (float[] bit : bits) {
-            paint.setColor(bit[5] == 0 ? turf : dark ? 0xFF8A97A6 : 0xFFB9C4CF);
-            paint.setAlpha(Math.round(255 * Math.min(1, bit[4] / .2f)));
-            canvas.drawCircle(play.left + (bit[0] - camera) * tile, landTop + bit[1] * tile, tile * (bit[5] == 0 ? .09f : .13f), paint);
-        }
-        paint.setAlpha(255);
-        // Her, a square and a half tall: stretched as she rises and falls, flattened as she lands, leaning the way
-        // she is going, and flickering while she cannot be hurt again.
-        float tall = tile * 1.6f, wide = tall * herWidth / herHeight;
-        float air = run.onGround() ? 0 : Math.min(1, Math.abs(run.speedDown()) / 15), flat = Math.max(0, squash) / SQUASH;
-        float taller = 1 + air * .11f - flat * .17f, wider = 1 - air * .07f + flat * .13f;
-        target.set(herX - wide * wider / 2, herY - tall * taller, herX + wide * wider / 2, herY);
-        canvas.save();
-        if (!run.onGround()) canvas.rotate(clamp(run.speedAcross() / 6.2f, -1, 1) * 7, herX, herY - tall / 2);
-        paint.setAlpha(run.safe() && (int) (run.time() * 14) % 2 == 0 ? 90 : 255);
-        drawFrame(canvas);
-        paint.setAlpha(255);
-        canvas.restore();
-        canvas.restore();
-        button(canvas, leftButton, goLeft, 180);
-        button(canvas, rightButton, goRight, 0);
-        button(canvas, jumpButton, goJump, 270);
-    }
-
-    /**
-     * Draws one of the pictures of the run's art: standing on a line, its middle at a place, as
-     * wide as asked and as tall as that makes it, and turned about if it is to face the other way.
-     */
-    private void art(Canvas canvas, int which, float middle, float bottom, float wide, boolean turned) {
-        int side = runArt.getHeight();
-        float across = RUN_ART_WIDE[which], up = RUN_ART_TALL[which];
-        source.set(Math.round(which * side + side * (1 - across) / 2), Math.round(side * (1 - up)),
-                Math.round(which * side + side * (1 + across) / 2), side);
-        target.set(middle - wide / 2, bottom - wide * up / across, middle + wide / 2, bottom);
-        if (turned) {
-            canvas.save();
-            canvas.scale(-1, 1, middle, bottom);
-            canvas.drawBitmap(runArt, source, target, paint);
-            canvas.restore();
-        } else {
-            canvas.drawBitmap(runArt, source, target, paint);
-        }
-    }
-
-    /** A round button with an arrow in it pointing some way round, lit while it is held. */
-    private void button(Canvas canvas, RectF where, boolean held, float turn) {
-        if (held) {
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(CalculatorLayout.CORAL);
-            canvas.drawOval(where, paint);
-        } else {
-            plate(canvas, where, where.width() / 2);
-        }
-        float reach = where.width() * .2f;
-        path.reset();
-        path.moveTo(reach, 0);
-        path.lineTo(-reach * .7f, -reach);
-        path.lineTo(-reach * .7f, reach);
-        path.close();
-        canvas.save();
-        canvas.translate(where.centerX(), where.centerY());
-        canvas.rotate(turn);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(held ? Color.WHITE : ink);
-        canvas.drawPath(path, paint);
-        canvas.restore();
-    }
-
     // Minesweeper
 
     /** Lays out a new field: as many squares as fit the screen at a size a finger can hit, between the bar on top and her below. */
@@ -1310,20 +999,6 @@ final class PlayStage extends View {
             dash = 0;
             pickGoal();
             say(1.4f, "Catch me if you can Sloppy~♡", "You'll never catch me Sloppy~♡", "Too slow already Sloppy~♡");
-        } else if (game == PlaySession.RUN) {
-            run = new PlusRun();
-            goLeft = false;
-            goRight = false;
-            goJump = false;
-            seenFlattened = 0;
-            seenHurts = 0;
-            seenLandings = 0;
-            seenCollected = 0;
-            squash = 0;
-            camera = 0;
-            bits.clear();
-            fitRun();
-            say(1.6f, "Try to keep up Sloppy~♡", "Mind the gaps Sloppy~♡", "Don't make me fall Sloppy~♡");
         } else if (game == PlaySession.MINES) {
             newField();
             say(1.6f, "Mind the mines Sloppy~♡", "One wrong tap and boom Sloppy~♡", "I know where they all are Sloppy~♡");
@@ -1368,6 +1043,14 @@ final class PlayStage extends View {
         keep(PetArt.IDLE);
         perform(PetArt.JUMP);
     }
+
+    /** The Back key or gesture: Plus run may only go back a screen of its own; anything else leaves. */
+    private void back() {
+        if (runGame == null || !runGame.back()) leave();
+    }
+
+    /** The stage is to come down: for a game on it that is done with. */
+    void done() { leave(); }
 
     private void leave() {
         if (left) return;
@@ -2036,6 +1719,10 @@ final class PlayStage extends View {
     // Touches and keys
 
     @Override public boolean onTouchEvent(MotionEvent event) {
+        if (runGame != null) {
+            runGame.touch(event);
+            return true;
+        }
         float x = event.getX(), y = event.getY();
         int action = event.getActionMasked();
         if (isPrank(game)) {
@@ -2050,8 +1737,6 @@ final class PlayStage extends View {
         if (phase == PLAYING) {
             if (game == PlaySession.MINES) {
                 minesTouch(action, x, y);
-            } else if (game == PlaySession.RUN) {
-                runTouch(event);
             } else if (game == PlaySession.RAIN) {
                 if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE)
                     wantedX = clamp(x, fieldLeft + herWidth / 2, fieldRight - herWidth / 2);
@@ -2078,7 +1763,7 @@ final class PlayStage extends View {
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK || event.getKeyCode() == KeyEvent.KEYCODE_ESCAPE) {
-            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) leave();
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) back();
             return true;
         }
         return super.dispatchKeyEvent(event);
@@ -2096,6 +1781,10 @@ final class PlayStage extends View {
 
     @Override protected void onDraw(Canvas canvas) {
         if (!started) return;
+        if (runGame != null) {
+            runGame.draw(canvas);
+            return;
+        }
         if (isPrank(game)) {
             drawPrank(canvas);
             return;
@@ -2104,11 +1793,8 @@ final class PlayStage extends View {
         // The signs fall behind her; the bubbles drift in front, so she never hides one.
         if (phase == PLAYING && game == PlaySession.RAIN) drawRain(canvas);
         if (game == PlaySession.MINES && field != null && phase != INTRO) drawField(canvas);
-        boolean running = game == PlaySession.RUN && run != null && phase == PLAYING;
-        if (running) drawRun(canvas);
         if (flash > 0) canvas.drawColor(Color.argb(Math.round(150 * Math.min(1, flash / .12f)), 255, 255, 255));
-        // In Plus run she is drawn with the land, at its size.
-        if (!running) drawHer(canvas);
+        drawHer(canvas);
         if (phase == PLAYING && game == PlaySession.ORDER) drawBubbles(canvas);
         for (float[] ring : rings) {
             float age = ring[2] / .45f;
@@ -2121,9 +1807,7 @@ final class PlayStage extends View {
         drawSaying(canvas);
         drawHud(canvas);
         if (phase == INTRO) {
-            drawCard(canvas, PlaySession.name(game), game == PlaySession.RUN
-                    ? "Run and jump to the gate at the far end. Hold an arrow to run and the round button to jump: hold it longer to jump higher. Collect the pluses, land on the minuses, and mind the gaps. Three hearts."
-                    : game == PlaySession.MINES
+            drawCard(canvas, PlaySession.name(game), game == PlaySession.MINES
                     ? "Tap a square to open it: its number is how many mines touch it. Hold a square to flag a mine, or tap the flag button to flag with a tap. Open every square that has no mine."
                     : game == PlaySession.TAG
                     ? "She runs all over your screen. Tap her as many times as you can in 30 seconds."
@@ -2148,12 +1832,11 @@ final class PlayStage extends View {
         if (phase != PLAYING) return;
         String status = game == PlaySession.TAG ? "Caught " + caught + "  ·  " + (int) Math.ceil(timeLeft) + "s"
                 : game == PlaySession.MINES ? clock(Math.round(elapsed)) + "  ·  " + (field == null ? 0 : field.left()) + " mines"
-                : game == PlaySession.RUN ? "+ " + (run == null ? 0 : run.collected()) + " of " + (run == null ? 0 : run.total())
                 : game == PlaySession.RAIN ? "Caught " + score
                 : seconds(Math.round(elapsed * 10)) + "s  ·  " + bubbles.size() + " to go";
         text.setTextSize(dp(15));
         text.setTextAlign(Paint.Align.LEFT);
-        boolean hearted = game == PlaySession.RAIN || game == PlaySession.RUN;
+        boolean hearted = game == PlaySession.RAIN;
         float width = text.measureText(status) + dp(28) + (hearted ? dp(22) * HEARTS + dp(6) : 0);
         box.set(play.left + margin, play.top + margin, play.left + margin + width, play.top + margin + size);
         plate(canvas, box, size / 2);
@@ -2161,7 +1844,7 @@ final class PlayStage extends View {
         canvas.drawText(status, box.left + dp(14), box.centerY() + dp(5.5f), text);
         if (hearted) {
             // A dot for each bump she can still take.
-            int left = game == PlaySession.RUN ? (run == null ? 0 : run.hearts()) : hearts;
+            int left = hearts;
             paint.setStyle(Paint.Style.FILL);
             for (int heart = 0; heart < HEARTS; heart++) {
                 paint.setColor(heart < left ? CalculatorLayout.CORAL : cardEdge);

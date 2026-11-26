@@ -154,6 +154,9 @@ final class PlaySession {
         return true;
     }
 
+    /** Keeps a number under a name, whatever was kept there before. */
+    void keep(String key, int value) { preferences.edit().putInt(key, value).apply(); }
+
     /** The menu is to be shown again with its tallies as they now stand, after a game elsewhere. */
     void refresh() { changed(); }
 

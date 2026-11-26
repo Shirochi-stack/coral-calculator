@@ -31,6 +31,8 @@ final class CompanionPrefs {
     static final String CHATTER = "chatter";
     /** Left idle, she plays a prank over whatever is on screen every so often, without being asked. */
     static final String PRANKS = "pranks";
+    /** Plus run plays its sounds and her voice. */
+    static final String GAME_SOUND = "game_sound";
     /** What she calls the user, in place of "Sloppy". */
     static final String NICKNAME = "nickname";
     static final int NICKNAME_LENGTH = 20;
@@ -61,6 +63,7 @@ final class CompanionPrefs {
     boolean closeOutside() { return preferences.getBoolean(CLOSE_OUTSIDE, true); }
     boolean chatter() { return preferences.getBoolean(CHATTER, true); }
     boolean pranks() { return preferences.getBoolean(PRANKS, true); }
+    boolean gameSound() { return preferences.getBoolean(GAME_SOUND, true); }
     int size() { return Math.max(SMALL, Math.min(LARGE, preferences.getInt(SIZE, MEDIUM))); }
     float x() { return clamp(preferences.getFloat(X, 1f)); }
     float y() { return clamp(preferences.getFloat(Y, .58f)); }

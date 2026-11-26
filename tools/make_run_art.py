@@ -1,33 +1,47 @@
 """
-Builds the art of Plus run from four generated pictures.
+Builds the art of Plus run from the pictures in assets/plus-run.
 
-    python tools/make_run_art.py <folder with sky.png, ground.png, minus.png, items.png> [--preview out.png]
+    python tools/make_run_art.py [--preview out.png]
 
-The pictures were made with an image model through Glossarion, from prompts that ask for a
-background, a ground texture, and two sheets of sprites on flat magenta. This cuts them up:
+The pictures were made with an image model (gpt-6-astra, through Glossarion), from prompts
+that ask for backgrounds, ground textures, sheets of sprites on a transparent background, and
+six frames of Halgakos jumping drawn from her own running frames. This cuts them up:
 
-  * sky.png becomes res/drawable-nodpi/plus_run_sky.webp, the background, scaled down.
-  * ground.png gives two square tiles: the top of the ground, with its turf, and the soil.
-  * minus.png gives the minus walking on one foot, on the other, and flattened.
-  * items.png gives the plus, a ledge, the flag and the gate.
+  * sky1.png to sky5.png become res/drawable-nodpi/plus_run_sky1.webp to 5, one a chapter.
+  * ground1.png to ground5.png each give two square tiles: the top of the ground, with its
+    turf, and what lies under it.
+  * minus.png, items.png, things.png, foes.png, zero.png and weapons.png give the sprites.
+  * jump.png gives her six jump frames, brought to the pink and the size of her other frames.
+  * lose.png gives six more of her, for when she is hurt and when she has lost: hit, knocked
+    into the air, falling, sitting dazed, sulking and crying. They are treated the same way.
 
-The nine go side by side into res/drawable-nodpi/plus_run_art.webp, each in a square cell,
-standing on the bottom of it and centred. How much of its cell each one fills is printed, to
-be copied into PlayStage.java as RUN_ART_WIDE and RUN_ART_TALL. Needs Pillow.
+Tiles and sprites go side by side into res/drawable-nodpi/plus_run_art.webp, each in a square
+cell, standing on the bottom of it and centred; how much of its cell each one fills is
+printed, to be copied into RunGame.java. Her jump frames go into halgakos_jump.webp
+and her losing frames into halgakos_lose.webp. Needs Pillow.
 """
 
 import argparse
+import colorsys
 import pathlib
 
 from PIL import Image
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+SOURCE = ROOT / "assets" / "plus-run"
 RES = ROOT / "app" / "src" / "main" / "res" / "drawable-nodpi"
 CELL = 128
 SKY_WIDTH = 1024
-# How far from the sprite sheets' background a colour has to be before it is kept whole, and
-# how near before it is dropped: between the two an edge fades out.
+CHAPTERS = 5
+# How far from a magenta background a colour has to be before it is kept whole, and how near
+# before it is dropped: between the two an edge fades out. Only the first sheet, minus.png,
+# came on magenta; the rest came with nothing behind them.
 KEEP, DROP = 40, 150
+# Her jump frames: the cell each goes in, and how many frames her atlas has across and down,
+# from which the size of her other frames is taken.
+JUMP_CELL = (256, 208)
+LOSE_CELL = (288, 224)
+PET_GRID = (8, 9)
 
 
 def keyed(image):
@@ -37,7 +51,6 @@ def keyed(image):
     for y in range(image.size[1]):
         for x in range(image.size[0]):
             red, green, blue, _ = pixels[x, y]
-            # Magenta is much red and much blue with little green.
             magenta = min(red, blue) - green
             if magenta >= DROP:
                 pixels[x, y] = (0, 0, 0, 0)
@@ -57,30 +70,38 @@ def cleared(image):
     return keyed(image)
 
 
-def sprites(sheet, expected):
-    """The separate sprites of a keyed sheet, left to right, each trimmed to what is drawn."""
-    alpha = sheet.getchannel("A").point(lambda value: 255 if value > 60 else 0)
-    columns = [alpha.crop((x, 0, x + 1, sheet.size[1])).getbbox() is not None for x in range(sheet.size[0])]
-    runs, start, gap = [], None, 0
-    for x, filled in enumerate(columns + [False] * 14):
-        if filled:
+def solid(image):
+    return image.getchannel("A").point(lambda value: 255 if value > 60 else 0)
+
+
+def runs(filled, gap, least):
+    """The stretches of a row of yes and no that are yes, a gap of some length ending each."""
+    found, start, empty = [], None, 0
+    for place, here in enumerate(list(filled) + [False] * gap):
+        if here:
             if start is None:
-                start = x
-            gap = 0
+                start = place
+            empty = 0
         elif start is not None:
-            gap += 1
-            # A gap this wide ends a sprite; a narrower one is a hole in it.
-            if gap >= 14:
-                runs.append((start, x - gap + 1))
+            empty += 1
+            if empty >= gap:
+                found.append((start, place - empty + 1))
                 start = None
-    runs = [run for run in runs if run[1] - run[0] >= 30]
-    if len(runs) != expected:
-        raise SystemExit(f"expected {expected} sprites, found {len(runs)}: {runs}")
-    found = []
-    for left, right in runs:
+    return [run for run in found if run[1] - run[0] >= least]
+
+
+def sprites(sheet, expected):
+    """The separate sprites of a sheet laid out in one row, left to right, each trimmed to what is drawn."""
+    mask = solid(sheet)
+    columns = [mask.crop((x, 0, x + 1, sheet.size[1])).getbbox() is not None for x in range(sheet.size[0])]
+    found = runs(columns, 14, 30)
+    if len(found) != expected:
+        raise SystemExit(f"expected {expected} sprites, found {len(found)}: {found}")
+    pieces = []
+    for left, right in found:
         piece = sheet.crop((left, 0, right, sheet.size[1]))
-        found.append(piece.crop(piece.getchannel("A").point(lambda value: 255 if value > 60 else 0).getbbox()))
-    return found
+        pieces.append(piece.crop(solid(piece).getbbox()))
+    return pieces
 
 
 def cell(sprite):
@@ -93,42 +114,179 @@ def cell(sprite):
     return square, size[0] / CELL, size[1] / CELL
 
 
+# Her jump frames
+
+def pinkness(pixel):
+    """How much a pixel belongs to the pinks of her hair and tail, from 0 to 1: as in tools/make_art.py."""
+    red, green, blue, alpha = pixel
+    if alpha == 0:
+        return 0.0
+    hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+    if hue >= .5:
+        by_hue = min(1.0, max(0.0, (hue - .86) / .04))
+    else:
+        by_hue = min(1.0, max(0.0, (.055 - hue) / .02))
+    return by_hue * min(1.0, max(0.0, (saturation - .12) / .1)) * min(1.0, max(0.0, (value - .35) / .15))
+
+
+def hair_colour(frames):
+    """The mean colour of her hair over some frames: the pinks of the upper part of each."""
+    total, count = [0, 0, 0], 0
+    for frame in frames:
+        box = solid(frame).getbbox()
+        pixels = frame.load()
+        for y in range(box[1], box[1] + (box[3] - box[1]) * 55 // 100):
+            for x in range(box[0], box[2]):
+                if pixels[x, y][3] >= 220 and pinkness(pixels[x, y]) >= 1:
+                    total = [total[i] + pixels[x, y][i] for i in range(3)]
+                    count += 1
+    return [channel / count for channel in total]
+
+
+def recoloured(frame, gains):
+    result = frame.copy()
+    pixels = result.load()
+    for y in range(frame.size[1]):
+        for x in range(frame.size[0]):
+            pixel = pixels[x, y]
+            weight = pinkness(pixel)
+            if weight > 0:
+                pixels[x, y] = tuple(min(255, round(pixel[i] * (1 + (gains[i] - 1) * weight))) for i in range(3)) + (pixel[3],)
+    return result
+
+
+def is_horn(pixel):
+    red, green, blue, alpha = pixel
+    return alpha > 200 and red < 125 and green < 95 and 55 < blue < 135 and blue >= green + 12 and red >= green
+
+
+def horn_span(frame):
+    """How far apart the outer edges of her horns are: a measure of how large she is drawn."""
+    pixels = frame.load()
+    box = solid(frame).getbbox()
+    across = [x for y in range(box[1], box[1] + (box[3] - box[1]) // 2) for x in range(box[0], box[2]) if is_horn(pixels[x, y])]
+    return max(across) - min(across) if across else 0
+
+
+def skirt_middle(frame):
+    """Where her skirt is across the frame: the middle of her body, whatever her hair is doing."""
+    pixels = frame.load()
+    box = solid(frame).getbbox()
+    across = [x for y in range(box[1], box[3]) for x in range(box[0], box[2])
+              if pixels[x, y][3] > 200 and pixels[x, y][2] > pixels[x, y][0] + 22 and pixels[x, y][2] > pixels[x, y][1] + 8
+              and pixels[x, y][2] < 175 and pixels[x, y][0] < 110]
+    return sum(across) / len(across) if across else (box[0] + box[2]) / 2
+
+
+def her_frames(name, box, gap, report):
+    """Six frames of her from a sheet of two rows of three, in a row, in the pink and at the size of her running frames."""
+    sheet = cleared(Image.open(SOURCE / f"{name}.png"))
+    # The faint haze the model leaves round her is taken off, so she has no glow about her in the game.
+    sheet.putalpha(sheet.getchannel("A").point(lambda value: 0 if value < 48 else value))
+    mask = solid(sheet)
+    # For her losing frames the gap is wide enough that the stars over her head stay with her.
+    rows = runs([mask.crop((0, y, sheet.size[0], y + 1)).getbbox() is not None for y in range(sheet.size[1])], gap, 60)
+    if len(rows) != 2:
+        raise SystemExit(f"expected 2 rows of {name} frames, found {len(rows)}")
+    frames = []
+    for top, bottom in rows:
+        strip = sheet.crop((0, top, sheet.size[0], bottom))
+        frames += sprites(strip, 3)
+    pet = Image.open(RES / "halgakos_pet.webp").convert("RGBA")
+    wide, tall = pet.size[0] // PET_GRID[0], pet.size[1] // PET_GRID[1]
+    idle = [pet.crop((0, 0, wide, tall))]
+    running = [pet.crop((column * wide, tall, column * wide + wide, tall * 2)) for column in range(8)]
+    # Her pinks, brought to the idle's as every other row of hers is, three times over.
+    wanted = hair_colour(idle)
+    report[name + "_hair_wanted"] = [round(value, 1) for value in wanted]
+    report[name + "_hair_before"] = [round(value, 1) for value in hair_colour(frames)]
+    for _ in range(3):
+        has = hair_colour(frames)
+        frames = [recoloured(frame, [wanted[i] / has[i] for i in range(3)]) for frame in frames]
+    report[name + "_hair_after"] = [round(value, 1) for value in hair_colour(frames)]
+    report[name + "_hair_running"] = [round(value, 1) for value in hair_colour(running)]
+    # Her size, by how far apart her horns stand, against her running frames.
+    # Measured again once they are small, since a horn's edge blurs as it shrinks, and the size set right by that.
+    def middle(values):
+        ordered = sorted(values)
+        return (ordered[(len(ordered) - 1) // 2] + ordered[len(ordered) // 2]) / 2
+
+    usual = middle(horn_span(frame) for frame in running)
+    scale = usual / middle(horn_span(frame) for frame in frames)
+    for _ in range(3):
+        small = [frame.convert("RGBa").resize((max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale))),
+                                              Image.LANCZOS).convert("RGBA") for frame in frames]
+        scale *= usual / middle(horn_span(frame) for frame in small)
+    report[name + "_horn_span_running"] = usual
+    report[name + "_scale"] = round(scale, 4)
+    strip = Image.new("RGBA", (box[0] * len(frames), box[1]), (0, 0, 0, 0))
+    spans = []
+    for index, frame in enumerate(frames):
+        size = (max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale)))
+        small = frame.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        spans.append(horn_span(small))
+        # Her skirt in the middle of the cell, her lowest point on the bottom of it.
+        left = round(box[0] / 2 - skirt_middle(small))
+        left = max(0, min(box[0] - size[0], left))
+        if size[0] > box[0] or size[1] > box[1]:
+            raise SystemExit(f"{name} frame {index} is {size}, larger than its cell {box}")
+        strip.alpha_composite(small, (index * box[0] + left, box[1] - size[1]))
+    report[name + "_horn_spans"] = spans
+    report[name + "_sizes"] = [(round(frame.size[0] * scale), round(frame.size[1] * scale)) for frame in frames]
+    clear = Image.new("RGBA", strip.size, (0, 0, 0, 0))
+    strip = Image.composite(strip, clear, strip.getchannel("A").point(lambda value: 255 if value else 0))
+    strip.save(RES / f"halgakos_{name}.webp", lossless=True, quality=100, method=6, exact=True)
+    return strip, running
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("folder", type=pathlib.Path)
     parser.add_argument("--preview", type=pathlib.Path)
     args = parser.parse_args()
 
-    sky = Image.open(args.folder / "sky.png").convert("RGB")
-    sky = sky.resize((SKY_WIDTH, round(sky.size[1] * SKY_WIDTH / sky.size[0])), Image.LANCZOS)
-    sky.save(RES / "plus_run_sky.webp", quality=82, method=6)
-
-    ground = Image.open(args.folder / "ground.png").convert("RGBA")
-    side = ground.size[0]
-    # The turf lies along the top fifth: a tile three quarters of the picture high has it as its top quarter.
-    turf = ground.crop((side // 8, 0, side // 8 + side * 3 // 4, side * 3 // 4)).resize((CELL, CELL), Image.LANCZOS)
-    soil = ground.crop((side // 8, side * 3 // 8, side // 8 + side // 2, side * 7 // 8)).resize((CELL, CELL), Image.LANCZOS)
-
-    minus = sprites(cleared(Image.open(args.folder / "minus.png")), 3)
-    items = sprites(cleared(Image.open(args.folder / "items.png")), 4)
-
-    cells, wide, tall = [turf, soil], [1.0, 1.0], [1.0, 1.0]
-    for sprite in minus + items:
-        square, across, up = cell(sprite)
-        cells.append(square)
-        wide.append(across)
-        tall.append(up)
+    cells, wide, tall = [], [], []
+    skies = []
+    for chapter in range(1, CHAPTERS + 1):
+        sky = Image.open(SOURCE / f"sky{chapter}.png").convert("RGB")
+        sky = sky.resize((SKY_WIDTH, round(sky.size[1] * SKY_WIDTH / sky.size[0])), Image.LANCZOS)
+        sky.save(RES / f"plus_run_sky{chapter}.webp", quality=82, method=6)
+        skies.append(sky)
+        ground = Image.open(SOURCE / f"ground{chapter}.png").convert("RGBA")
+        side = ground.size[0]
+        # The turf lies along the top fifth: a tile three quarters of the picture high has it as its top quarter.
+        cells.append(ground.crop((side // 8, 0, side // 8 + side * 3 // 4, side * 3 // 4)).resize((CELL, CELL), Image.LANCZOS))
+        cells.append(ground.crop((side // 8, side * 3 // 8, side // 8 + side // 2, side * 7 // 8)).resize((CELL, CELL), Image.LANCZOS))
+        wide += [1.0, 1.0]
+        tall += [1.0, 1.0]
+    for name, count in (("minus", 3), ("items", 4), ("things", 4), ("foes", 4), ("zero", 3), ("weapons", 6)):
+        for sprite in sprites(cleared(Image.open(SOURCE / f"{name}.png")), count):
+            square, across, up = cell(sprite)
+            cells.append(square)
+            wide.append(across)
+            tall.append(up)
     atlas = Image.new("RGBA", (CELL * len(cells), CELL), (0, 0, 0, 0))
     for index, square in enumerate(cells):
         atlas.alpha_composite(square.convert("RGBA"), (index * CELL, 0))
     atlas.save(RES / "plus_run_art.webp", lossless=True, quality=100, method=6)
-    print("sky", sky.size, "atlas", atlas.size)
-    print("RUN_ART_WIDE = {" + ", ".join(f"{value:.3f}f" for value in wide) + "};")
-    print("RUN_ART_TALL = {" + ", ".join(f"{value:.3f}f" for value in tall) + "};")
+
+    report = {}
+    jump, running = her_frames("jump", JUMP_CELL, 14, report)
+    lose, _ = her_frames("lose", LOSE_CELL, 40, report)
+    print("atlas", atlas.size, "cells", len(cells), "jump", jump.size, "lose", lose.size)
+    print("ART_WIDE = {" + ", ".join(f"{value:.3f}f" for value in wide) + "};")
+    print("ART_TALL = {" + ", ".join(f"{value:.3f}f" for value in tall) + "};")
+    for key, value in report.items():
+        print(key, value)
     if args.preview:
-        board = Image.new("RGBA", (atlas.size[0] * 2, atlas.size[1] * 2 + sky.size[1] // 2), (120, 120, 130, 255))
-        board.alpha_composite(atlas.resize((atlas.size[0] * 2, atlas.size[1] * 2), Image.LANCZOS), (0, 0))
-        board.paste(sky.resize((sky.size[0] // 2, sky.size[1] // 2), Image.LANCZOS), (0, atlas.size[1] * 2))
+        grey = (120, 120, 130, 255)
+        half = atlas.resize((atlas.size[0] // 2, atlas.size[1] // 2), Image.LANCZOS)
+        board = Image.new("RGBA", (max(half.size[0], lose.size[0]), half.size[1] * 1 + JUMP_CELL[1] * 2 + LOSE_CELL[1] + 30), grey)
+        board.alpha_composite(half, (0, 0))
+        board.alpha_composite(jump, (0, half.size[1] + 10))
+        # Her running frames under her jump frames, at the same size, to see that they are one girl.
+        for index, frame in enumerate(running[:6]):
+            board.alpha_composite(frame, (index * JUMP_CELL[0] + (JUMP_CELL[0] - frame.size[0]) // 2, half.size[1] + 10 + JUMP_CELL[1] + (JUMP_CELL[1] - frame.size[1])))
+        board.alpha_composite(lose, (0, half.size[1] + 20 + JUMP_CELL[1] * 2))
         board.convert("RGB").save(args.preview)
 
 
