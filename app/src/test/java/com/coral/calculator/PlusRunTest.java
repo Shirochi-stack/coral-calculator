@@ -1340,11 +1340,13 @@ public class PlusRunTest {
             assertTrue("land " + number + " together " + most, most <= (number <= 12 ? 3 : number <= RunLevels.COUNT ? 4 : 5));
             if (System.getenv("RUN_COUNT") != null && number > 3) short_ += (laid * 5 - laid - more > 0 ? " " + number + ":" + (laid + more) + "/" + laid * 5 : "");
             int times = RunLevels.crowdOf(number);
-            assertEquals("land " + number, number <= 3 ? 2 : 5, times);
-            // Five times what it was laid with, or twice: give or take a tenth, where there was not room for all of them.
-            // (Where someone waits at the end the land is short, and there is room for fewer: twice over at the least.)
+            // Twice in the first three lands; five times after; and one time more with every three levels of the land: ten times in the last.
+            assertEquals("land " + number, number <= 3 ? 2 : 5 + (RunLevels.levelOf(number) - 1) / 3, times);
+            if (number > 3) assertTrue(times >= 5 && times <= 10 && times >= RunLevels.crowdOf(number - 1));
+            // So many times what it was laid with, where there is room for all of them: and never fewer than there were when every land
+            // had five times, which was twice over at the least where someone waits at the end and the land is short.
             assertTrue("land " + number + " laid " + laid + " more " + more, more <= laid * (times - 1)
-                    && more >= (RunLevels.bossOf(number) >= 0 || number <= 12 ? Math.min(laid, laid * (times - 1)) : laid * (times - 1) * 5 / 10));
+                    && more >= (RunLevels.bossOf(number) >= 0 || number <= 12 ? Math.min(laid, laid * (times - 1)) : laid * Math.min(4, times - 1) * 5 / 10));
             whole += laid + more;
             base += laid;
             // In packs, spread along the land: not all in one place.
@@ -1373,6 +1375,32 @@ public class PlusRunTest {
         run.place(80, GROUND);
         hold(run, 1, false, false, false);
         assertTrue(Math.abs(far.x - farAt) > .5f);
+    }
+
+    @Test public void theLandsHaveMoreCreaturesTheHigherTheirLevel() {
+        // What each chapter had when every land had five times what it was laid with, and twice as many again in the air.
+        int[] had = {41, 190, 418, 657, 856, 1530, 1655, 1761, 1815, 2195}, has = new int[RunLevels.ALL_CHAPTERS];
+        int ground = 0, air = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            for (int[] foe : level.foes) {
+                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || foe[0] == RunLevels.TARGET) continue;
+                has[RunLevels.chapterOf(number)]++;
+                if (RunLevels.flier(foe[0])) air++;
+                else ground++;
+            }
+        }
+        int was = 0, is = 0;
+        for (int chapter = 0; chapter < has.length; chapter++) {
+            // No chapter has fewer; and from the fourth chapter on, whose lands are of the higher levels, every one has more.
+            assertTrue("chapter " + chapter + " has " + has[chapter], has[chapter] >= had[chapter]);
+            if (chapter >= 3) assertTrue("chapter " + chapter + " has " + has[chapter], has[chapter] > had[chapter]);
+            was += had[chapter];
+            is += has[chapter];
+        }
+        assertTrue("was " + was + " is " + is + ": ground " + ground + " air " + air, is >= was + 700);
+        // Mostly in the air: on the ground there is no more room for them with room left to come down among them.
+        assertTrue(air >= 2300);
     }
 
     @Test public void theCreaturesOfTheLandsAreFourFifthsTheSizeTheyWereAndWhatIsSeenIsWhatIsTouched() {
@@ -6024,7 +6052,8 @@ public class PlusRunTest {
                 assertEquals("land " + number, 0, here + more);
                 continue;
             }
-            assertTrue("land " + number + " more " + more, more <= RunLevels.fliersIn(number) * 2 * 4);
+            assertTrue("land " + number + " more " + more, more <= RunLevels.fliersIn(number) * RunLevels.flocksOf(number) * 4);
+            assertEquals(2 + (RunLevels.levelOf(number) - 1) / 5, RunLevels.flocksOf(number));
             // As many as the land is to have, give or take what there was no room for; and never fewer than two.
             assertTrue("land " + number + " has " + lines + " of " + RunLevels.fliersIn(number), lines >= Math.max(2, RunLevels.fliersIn(number) / 2) && lines <= RunLevels.fliersIn(number));
             // The land a kind is first met in has three of it before anything else that flies.

@@ -291,15 +291,20 @@ final class RunLevels {
     static boolean flier(int kind) { return kind >= DRIFTER && kind <= RIME; }
 
     /**
-     * How many times as many creatures a land has as it was laid with: five times, and
-     * twice in the first three lands, which are for learning in. Those that make up the
-     * difference are of the kinds the land has already, in packs of two to four, on its
-     * ground and on its ledges, spread along it; and from the twenty-first land on twice as
-     * many again of those that fly as it had. They keep clear of the start, of flags, of
+     * How many times as many creatures a land has as it was laid with: twice in the first
+     * three lands, which are for learning in; five times after them; and one time more with
+     * every three levels of the land, so that the last lands have ten times. Those that make
+     * up the difference are of the kinds the land has already, in packs of two to four, on
+     * its ground and on its ledges, spread along it, as many of them as there is room for
+     * with room left to come down among them; and from the twenty-first land on twice as
+     * many again of those that fly as it had, and once more again with every five levels. They keep clear of the start, of flags, of
      * villages and of doors. They are put in last, with chances of their own, so that the
      * land under them is the land it was; and each is marked as one of them.
      */
-    static int crowdOf(int number) { return number <= 3 ? 2 : 5; }
+    static int crowdOf(int number) { return number <= 3 ? 2 : 5 + (levelOf(number) - 1) / 3; }
+
+    /** How many times as many of those that fly are put in as a land was laid with. */
+    static int flocksOf(int number) { return 2 + (levelOf(number) - 1) / 5; }
 
     /** Whether something of a land was put in to make up its numbers. */
     static boolean crowd(int[] foe) { return foe.length > 4 && foe[4] != 0; }
@@ -396,7 +401,7 @@ final class RunLevels {
         // And in the air.
         int known = 0;
         for (int kind = DRIFTER; kind <= RIME; kind++) if (FLIES_FROM[kind - DRIFTER] <= number) known++;
-        for (int more = 0; more < fliersIn(number) * 2; more++) perch(level, DRIFTER + random.nextInt(known), 18 + random.nextInt(Math.max(1, until - 30)), until - 2, true);
+        for (int more = 0; more < fliersIn(number) * flocksOf(number); more++) perch(level, DRIFTER + random.nextInt(known), 18 + random.nextInt(Math.max(1, until - 30)), until - 2, true);
     }
 
     /**
@@ -554,7 +559,11 @@ final class RunLevels {
                 for (int up = row - 1; up <= row + 1 && clear; up++) clear = level.land[up][beside] == AIR;
             }
             for (int flag : level.flags) clear &= Math.abs(flag - column) > 9;
-            for (int[] foe : level.foes) if (flier(foe[0]) || rover(foe[0])) clear &= Math.abs(foe[1] - column) > (rover(foe[0]) ? 9 : 5);
+            // (One put in to make up a land's numbers may be nearer another that flies where the two keep to different heights: three squares
+            // off, and two up or down, so that there is a way between them.)
+            for (int[] foe : level.foes) {
+                if (flier(foe[0]) || rover(foe[0])) clear &= Math.abs(foe[1] - column) > (rover(foe[0]) ? 9 : crowd && Math.abs(foe[2] - row) >= 2 ? 2 : 5);
+            }
             // (And of villages, and of whoever stands in the land to be spoken to or bought from.)
             for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 12;
             for (int[] item : level.items) if (item[1] < level.main && (item[3] != 0 || item[0] >= PlusRun.CHEST)) clear &= Math.abs(item[1] - column) > 9;

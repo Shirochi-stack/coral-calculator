@@ -2186,6 +2186,33 @@ final class RunGame {
         return villagers;
     }
 
+    /**
+     * The pictures of her with a thing in her hands, in a colour. The whip is a red ribbon,
+     * and red is near enough to her pink that the dye takes it in places: so, for the whip,
+     * whatever was strongly red before the dye is put back as it was. The ribbon is red in
+     * every colour of her hair; and nothing of the dye itself is changed.
+     */
+    private static Bitmap dyedArm(Bitmap from, int weapon, int form) {
+        Bitmap dyed = dyed(from, form);
+        if (weapon != PlusRun.WHIP || dyed == from) return dyed;
+        int wide = from.getWidth(), tall = from.getHeight();
+        if (!dyed.isMutable()) dyed = dyed.copy(Bitmap.Config.ARGB_8888, true);
+        int[] was = new int[wide], now = new int[wide];
+        for (int row = 0; row < tall; row++) {
+            from.getPixels(was, 0, wide, 0, row, wide, 1);
+            dyed.getPixels(now, 0, wide, 0, row, wide, 1);
+            boolean any = false;
+            for (int column = 0; column < wide; column++) {
+                int pixel = was[column], red = pixel >> 16 & 255, green = pixel >> 8 & 255, blue = pixel & 255;
+                if (pixel >>> 24 < 40 || red <= 120 || red - green <= 95 || red - blue <= 75 || now[column] == pixel) continue;
+                now[column] = pixel;
+                any = true;
+            }
+            if (any) dyed.setPixels(now, 0, wide, 0, row, wide, 1);
+        }
+        return dyed;
+    }
+
     /** A picture of her with her hair the colour of a form: every pink of her hair, ears and tail, and nothing else, is turned to it. */
     private static Bitmap dyed(Bitmap from, int form) { return Hair.dyed(from, form); }
 
@@ -2213,7 +2240,7 @@ final class RunGame {
             set[0] = dyed(rows, form);
             set[1] = dyed(jump, form);
             set[2] = dyed(lose, form);
-            if (carried != null) set[3 + weapon] = dyed(carried, form);
+            if (carried != null) set[3 + weapon] = dyedArm(carried, weapon, form);
             stage.post(() -> {
                 // No more than eight are kept: one she is not in, nor was a moment ago, makes room.
                 for (int index = looks.size() - 1; index >= 0 && looks.size() >= 8; index--) {
@@ -2298,7 +2325,7 @@ final class RunGame {
         int form = drawn();
         Bitmap[] set = looks.get(form);
         if (set == null) return armed(weapon);
-        if (set[3 + weapon] == null) set[3 + weapon] = dyed(armed(weapon), form);
+        if (set[3 + weapon] == null) set[3 + weapon] = dyedArm(armed(weapon), weapon, form);
         return set[3 + weapon];
     }
 
