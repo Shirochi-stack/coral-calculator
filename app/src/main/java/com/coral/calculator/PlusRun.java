@@ -90,7 +90,7 @@ final class PlusRun {
      * rest wait their turn, and one comes for each that falls. (It can be set, to find what
      * a phone draws without faltering.)
      */
-    static final int CEILING = 24;
+    static final int CEILING = 32;
     static int ceiling = CEILING;
     static final float FALLING = 10;
     /** How long rubble hangs before it falls, how long someone takes to arrive, and how long they take over changing. */
@@ -425,6 +425,28 @@ final class PlusRun {
         Shot(int kind) { this.kind = kind; }
     }
 
+    /**
+     * The creatures of the lands are four fifths of the size they were drawn at first, so
+     * that there is room for five times as many of them: those that walk, hop, throw, shoot
+     * and fly. Those who wait, those met in the middle of a land, a word that falls and a
+     * paper target are the size they were; and so is an outsized one, which is its kind's
+     * old size and more.
+     */
+    static final float SMALL = .8f;
+    /** How near she must come before one put in to make up a land's numbers is about its business: until then it keeps still. */
+    static final float WAKES = 16;
+
+    static boolean little(int kind) { return !RunLevels.boss(kind) && kind != RunLevels.TARGET && kind != RunLevels.WORD; }
+
+    /**
+     * How much further than it reaches what she throws or swings takes a small one: as far
+     * as the size it used to be, to either side and over it, so that nothing of hers that
+     * would have met it goes by it now.
+     */
+    private static float spare(Foe foe, boolean across) {
+        return foe.size >= 1 ? 0 : (across ? FOE_WIDE[foe.kind] * .5f : FOE_TALL[foe.kind]) * (1 - foe.size);
+    }
+
     /** One of the signs in her way: where it is, which way it is going, and how it stands. */
     static final class Foe {
         final int kind;
@@ -465,7 +487,10 @@ final class PlusRun {
         /** Not come yet; there but not to be seen or touched; and made by one of those who wait. */
         boolean away, unseen, spawned;
 
-        Foe(int kind) { this.kind = kind; }
+        Foe(int kind) {
+            this.kind = kind;
+            if (little(kind)) size = SMALL;
+        }
 
         float wide() { return FOE_WIDE[kind] * size; }
         float tall() { return FOE_TALL[kind] * size; }
@@ -579,9 +604,9 @@ final class PlusRun {
         for (int[] spec : level.foes) {
             Foe foe = new Foe(spec[0]);
             boolean waits = RunLevels.boss(spec[0]);
-            // One that is given more than a blow to take is a big one.
-            if (spec.length > 3 && !waits) foe.size = 1.3f;
-            foe.x = spec[1] + (1 - foe.wide()) / 2;
+            // One that is given more than a blow to take is a big one. (One put in to make up the numbers takes one, and is not.)
+            if (spec.length > 3 && spec[3] > 1 && !waits) foe.size = 1.3f;
+            foe.x = spec[1] + (1 - foe.wide()) / 2 + (spec.length > 4 && spec[4] == 2 ? .5f : 0);
             foe.ground = spec[2] + 1 - foe.tall();
             foe.y = foe.ground;
             foe.home = foe.x;
@@ -2121,11 +2146,14 @@ final class PlusRun {
         if (fly(seconds)) return;
         for (Foe foe : foes) {
             // Whoever is arriving, changing or out of sight is not there to be touched.
-            if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || x >= foe.x + foe.wide() || x + WIDE <= foe.x || y >= foe.y + foe.tall()
+            // (Coming down onto a small one she may be a hair to one side of it: what is forgiven is the landing, never a touch.)
+            boolean falling = speedDown > 0 && y + TALL - speedDown * seconds <= foe.y + foe.tall() * (foe.size < 1 ? .75f : .6f);
+            float hair = falling && foe.size < 1 && foe.kind != RunLevels.TIMES && foe.kind != RunLevels.WISP ? .1f : 0;
+            if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || x >= foe.x + foe.wide() + hair || x + WIDE <= foe.x - hair || y >= foe.y + foe.tall()
                     || y + TALL <= foe.y) continue;
             // Coming down onto a sign deals with it and sends her up again; any other touch knocks her back.
             // A times has a spike on every arm and cannot be landed on at all.
-            boolean onto = speedDown > 0 && y + TALL - speedDown * seconds <= foe.y + foe.tall() * .6f;
+            boolean onto = falling;
             // The comet: at a run in red and yellow, whatever she meets she goes through as she would in brown.
             boolean comet = named(COMET) && Math.abs(speedAcross) > RUN * 1.4f && !RunLevels.boss(foe.kind);
             if (comet) {
@@ -2864,7 +2892,8 @@ final class PlusRun {
         float ahead = brush ? 1.05f : .9f, behind = brush ? .3f : 0, top = y - (brush ? .9f : .15f), bottom = y + TALL;
         float from = facingLeft ? x - ahead : x - behind, to = facingLeft ? x + WIDE + behind : x + WIDE + ahead;
         for (Foe foe : foes) {
-            if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x >= to || foe.x + foe.wide() <= from || foe.y >= bottom || foe.y + foe.tall() <= top) continue;
+            if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x - spare(foe, true) >= to || foe.x + foe.wide() + spare(foe, true) <= from || foe.y - spare(foe, false) >= bottom
+                    || foe.y + foe.tall() <= top) continue;
             beat(foe, swungWith == SWORD ? SWORDED : PLAIN);
         }
         for (int index = 0; index < level.rooms.size() && room < 0; index++) {
@@ -2942,8 +2971,8 @@ final class PlusRun {
                 }
             } else if (shot.hers) {
                 for (Foe foe : foes) {
-                    if (foe.flat || absent(foe) || shot.x < foe.x - .2f || shot.x > foe.x + foe.wide() + .2f || shot.y < foe.y - .2f
-                            || shot.y > foe.y + foe.tall() + .2f) continue;
+                    if (foe.flat || absent(foe) || shot.x < foe.x - .2f - spare(foe, true) || shot.x > foe.x + foe.wide() + .2f + spare(foe, true)
+                            || shot.y < foe.y - .2f - spare(foe, false) || shot.y > foe.y + foe.tall() + .2f) continue;
                     // Nothing thrown gets through Zero: anything times nothing is nothing.
                     if (shot.pets) {
                         // What a pet threw: as a pet's blow; and what a blot does not deal with stands dazed.
@@ -3294,7 +3323,7 @@ final class PlusRun {
             return;
         }
         if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
-        if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > 26)) return;
+        if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > WAKES)) return;
         foe.clock += seconds;
         if (foe.broken > 0 && !absent(foe)) {
             if ((foe.broken -= seconds) <= 0 || foe.taken >= 2 && foe.dazed <= seconds) {
