@@ -103,6 +103,13 @@ final class PlusRun {
         boolean flagHeart;
         /** How many hurts a ball of Rune's ink takes for her. */
         int inkHurts = 1;
+        /**
+         * The colours of hair that are hers to keep, as bits, the first for red: any of them
+         * she may call on herself, once what she calls on them with has filled again, which
+         * takes this many seconds. And how many times as long any form lasts.
+         */
+        int colours;
+        float recharge = 18, formLonger = 1;
     }
     static final int GUN_SHOTS = 16;
     /** How long a swing of the brush or the sword lasts. */
@@ -201,6 +208,9 @@ final class PlusRun {
     private float gameLeft, sinceDrop;
     private boolean quitting;
     private int quest, cakes, questGiven, questsDone, questFails, questFlags;
+    /** How full what she calls a colour on with is, from nothing to 1; and how many times she has. */
+    private float charge = 1;
+    private int called;
     private float questLeft;
     private boolean atStall;
     /** The stalls she has been up to, by the column each stands in: its keeper greets her the first time only. */
@@ -320,6 +330,8 @@ final class PlusRun {
         sinceDrop = other.sinceDrop;
         quitting = other.quitting;
         quest = other.quest;
+        charge = other.charge;
+        called = other.called;
         cakes = other.cakes;
         questGiven = other.questGiven;
         questsDone = other.questsDone;
@@ -839,6 +851,7 @@ final class PlusRun {
         if (doorWait > 0) doorWait -= seconds;
         if (offIt > 0) offIt -= seconds;
         sinceShot += seconds;
+        if (charge < 1) charge = Math.min(1, charge + seconds / perks.recharge);
         if (leaving) leave();
         if (quitting) quit();
         if (quest == ASKED && level.quest == RunLevels.TIME) asked(seconds);
@@ -1076,6 +1089,25 @@ final class PlusRun {
         if (middle >= level.gate && middle < level.main && gateOpen()) state = WON;
     }
 
+    /**
+     * She calls on a colour that is hers to keep: her hair turns to it, for a shorter while
+     * than a ribbon gives, and what she called on it with is empty until it has filled again.
+     * Returns whether she could.
+     */
+    boolean call(int colour) {
+        if (state != PLAYING || colour < RED || colour > WHITE || (perks.colours & 1 << colour - 1) == 0 || charge < 1) return false;
+        charge = 0;
+        form = colour;
+        formLeft = (colour == BLACK ? 5 : 9) * perks.lasting * perks.formLonger;
+        formed++;
+        called++;
+        return true;
+    }
+
+    /** How full what she calls a colour on with is, and how many times she has called on one. */
+    float charge() { return charge; }
+    int called() { return called; }
+
     /** Something is asked of her: if it is done already it is done; a count begins if it is against one. */
     private void ask() {
         quest = ASKED;
@@ -1151,7 +1183,7 @@ final class PlusRun {
             cleared++;
         } else if (kind > FORM) {
             form = kind - FORM;
-            formLeft = form == BLACK ? 7 : (form == WHITE ? 12 : 14) * perks.lasting;
+            formLeft = form == BLACK ? 7 : (form == WHITE ? 12 : 14) * perks.lasting * perks.formLonger;
             formed++;
         } else if (kind == ICE) {
             rush = LASTS[ICE] * perks.lasting;

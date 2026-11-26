@@ -41,6 +41,21 @@ final class RunLevels {
      */
     static final int CAKES = 1, CELLAR = 2, LETTER = 3, TIME = 4, ROOM = 5;
 
+    /**
+     * What getting past whoever waits at the end of a land wins, to keep: a colour of hair,
+     * as the number of its form; or, below nothing, something else. The seven colours are
+     * won one at a time through both volumes, black last, from the Mawang, who is the dark
+     * one; white is not won here. Zero has no colour to give: his ring makes every form last
+     * half as long again.
+     */
+    static final int RING = -1, NOTHING = 0;
+
+    static int prizeOf(int number) {
+        int who = bossOf(number);
+        return who == ILLYA ? PlusRun.RED : who == TSUBAKIEH ? PlusRun.BROWN : who == ZERO ? RING : who == GOKHAE ? PlusRun.PURPLE
+                : who == MIRI ? PlusRun.YELLOW : who == YEOBAEK ? PlusRun.GREEN : who == KING ? PlusRun.BLUE : who == MAWANG ? PlusRun.BLACK : NOTHING;
+    }
+
     /** What is asked in a land: nothing where someone waits at the end, or before the lands have places off them. */
     static int questOf(int number) {
         if (number < SHAPED_FROM || bossOf(number) >= 0) return 0;

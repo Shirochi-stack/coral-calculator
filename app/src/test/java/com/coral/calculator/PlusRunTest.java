@@ -1693,6 +1693,60 @@ public class PlusRunTest {
         for (int kind = RunLevels.CAKES; kind <= RunLevels.ROOM; kind++) assertTrue("never asked: " + kind, kinds[kind] >= 3);
     }
 
+    @Test public void aColourThatIsHersToKeepIsCalledOnWhenItHasFilledAndEachOfThoseWhoWaitGivesOne() {
+        RunLevels.Level level = flat(60);
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.colours = 1 << PlusRun.YELLOW - 1 | 1 << PlusRun.BLACK - 1;
+        PlusRun run = new PlusRun(level, perks);
+        hold(run, .2f, false, false, false);
+        // Not one she has not won.
+        assertFalse(run.call(PlusRun.RED));
+        assertEquals(0, run.form());
+        assertEquals(1, run.charge(), 0);
+        // One she has: her hair turns, for nine seconds, and what she called on it with is empty.
+        assertTrue(run.call(PlusRun.YELLOW));
+        assertEquals(PlusRun.YELLOW, run.form());
+        assertEquals(9, run.formLeft(), .01f);
+        assertEquals(0, run.charge(), 0);
+        assertEquals(1, run.called());
+        assertFalse(run.call(PlusRun.BLACK));
+        // It fills again in eighteen seconds, by which time her hair is her own again.
+        hold(run, 17.5f, false, false, false);
+        assertTrue(run.charge() < 1);
+        assertFalse(run.call(PlusRun.YELLOW));
+        assertEquals(0, run.form());
+        hold(run, .7f, false, false, false);
+        assertEquals(1, run.charge(), 0);
+        assertTrue(run.call(PlusRun.BLACK));
+        assertEquals(PlusRun.BLACK, run.form());
+        assertEquals(5, run.formLeft(), .01f);
+        // With Zero's ring every form lasts half as long again, called on or from a ribbon.
+        perks.formLonger = 1.5f;
+        level.items.add(new int[]{PlusRun.FORM + PlusRun.GREEN, 6, FLOOR - 1, 0});
+        PlusRun ringed = new PlusRun(level, perks);
+        assertTrue(ringed.call(PlusRun.YELLOW));
+        assertEquals(13.5f, ringed.formLeft(), .01f);
+        hold(ringed, .9f, false, true, false);
+        assertEquals(PlusRun.GREEN, ringed.form());
+        assertTrue(ringed.formLeft() > 20);
+        // Whoever waits at the end of a land has something to give that is kept: the seven colours, one each, black last; and Zero his ring.
+        boolean[] won = new boolean[PlusRun.WHITE + 1];
+        int last = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            int prize = RunLevels.prizeOf(number);
+            assertEquals("land " + number, RunLevels.bossOf(number) >= 0, prize != RunLevels.NOTHING);
+            if (prize > 0) {
+                assertFalse("land " + number, won[prize]);
+                won[prize] = true;
+                last = prize;
+            }
+        }
+        for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) assertTrue("no one gives " + colour, won[colour]);
+        assertFalse(won[PlusRun.WHITE]);
+        assertEquals(PlusRun.BLACK, last);
+        assertEquals(RunLevels.RING, RunLevels.prizeOf(RunLevels.COUNT));
+    }
+
     @Test public void aFlagOnHighGroundBringsHerBackOntoIt() {
         RunLevels.Level level = flat(40);
         for (int column = 10; column < 20; column++) for (int row = FLOOR - 3; row < FLOOR; row++) level.land[row][column] = RunLevels.BLOCK;
@@ -1798,7 +1852,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.GAME + 1, RunStory.ROOMS.length);

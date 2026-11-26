@@ -563,6 +563,17 @@ final class RunStory {
     static final String[][] UNDONE = {
             {"undone1", "Ugh. That one's off for this run. Next time Sloppy~♡", "H",
                     PLAYER + "She has just failed a small side quest and shrugs it off, a little annoyed." + FAST}};
+    /** When something is won to keep: a colour of hair, something else that lasts, or a bounty; and the first time she has a colour to call on. */
+    static final String[][] PRIZES = {
+            {"prize1", "A new colour, and it's mine to keep. Look at my hair Sloppy~♡", "H",
+                    PLAYER + "She has just won a new hair colour for good after beating a boss, and shows it off. Thrilled, vain, delighted." + FAST},
+            {"prize2", "That's mine now, for good. Try and keep up Sloppy~♡", "H",
+                    PLAYER + "She has just won a lasting upgrade after beating a boss. Smug, pleased, teasing." + FAST},
+            {"prize3", "A whole bounty. I'm rich. Don't ask for a share Sloppy~♡", "H",
+                    PLAYER + "She has just been paid a big reward of coins. Gleeful, greedy, playful." + FAST},
+            {"prize4", "Tap the ribbon by the arrows and I'll change colour Sloppy~♡", "H",
+                    PLAYER + "She explains that her newly won hair colour can be called on with a button. Helpful, bossy, bright." + FAST},
+    };
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -589,7 +600,7 @@ final class RunStory {
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
-                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE);
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES);
         return groups.toArray(new String[0][][]);
     }
 }
