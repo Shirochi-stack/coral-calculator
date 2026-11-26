@@ -103,6 +103,26 @@ final class RunLevels {
     static final int ON_FLOOR = 0, ON_PLATFORM = 1, ON_PERCH = 2, IN_AIR = 3;
     /** One of the last wave that is outsized is its kind and this much more. */
     static final int GIANT = 100;
+    /** How many times over the troop of a wave comes; and how many outsized ones the last wave ends on. */
+    static final int SWELL = 20, GIANTS = 4;
+
+    /**
+     * Everyone who comes in a wave of a cellar, in the order they come: its troop twenty
+     * times over, mixed as the troop is; and at the end of the last wave four outsized
+     * ones, or, where the Old Book sleeps, three of them and then he.
+     */
+    static int[] host(int number, int wave, boolean den) {
+        int[] troop = wave(number, wave, den), plain = wave(number, wave, false);
+        List<Integer> all = new ArrayList<>();
+        for (int time = 0; time < SWELL; time++) for (int kind : troop) if (kind < GIANT && kind != OLD_BOOK) all.add(kind);
+        if (wave == 3) {
+            for (int giant = 0; giant < (den ? GIANTS - 1 : GIANTS); giant++) all.add(plain[plain.length - 1]);
+            if (den) all.add(OLD_BOOK);
+        }
+        int[] host = new int[all.size()];
+        for (int index = 0; index < host.length; index++) host[index] = all.get(index);
+        return host;
+    }
 
     /**
      * Who comes in a wave of a land's cellar, by kind: three waves, no two alike, each
@@ -199,6 +219,82 @@ final class RunLevels {
     static boolean flier(int kind) { return kind >= DRIFTER && kind <= RIME; }
 
     /**
+     * How many times as many creatures a land has as it was laid with: five times, and
+     * twice in the first three lands, which are for learning in. Those that make up the
+     * difference are of the kinds the land has already, in packs of two to four, on its
+     * ground and on its ledges, spread along it; and from the twenty-first land on twice as
+     * many again of those that fly as it had. They keep clear of the start, of flags, of
+     * villages and of doors. They are put in last, with chances of their own, so that the
+     * land under them is the land it was; and each is marked as one of them.
+     */
+    static int crowdOf(int number) { return number <= 3 ? 2 : 5; }
+
+    /** Whether something of a land was put in to make up its numbers. */
+    static boolean crowd(int[] foe) { return foe.length > 4 && foe[4] != 0; }
+
+    private static void crowd(Level level) {
+        int number = level.number, base = 0, until = level.arena >= 0 ? level.arena - 10 : level.gate - 6;
+        Random random = new Random(31337L * number + 7);
+        List<Integer> walkers = new ArrayList<>(), shooters = new ArrayList<>();
+        for (int[] foe : level.foes) {
+            if (foe[1] >= level.main || boss(foe[0]) || flier(foe[0]) || foe[0] == TARGET) continue;
+            base++;
+            if (foe[0] == THROWER || foe[0] == GUNNER) shooters.add(foe[0]);
+            else if (foe[0] != WORD && foe[0] != DRAGON && foe[0] != ZERO) walkers.add(foe[0]);
+        }
+        if (walkers.isEmpty()) walkers.add(MINUS);
+        // Where one could stand: on the ground, or on a ledge, with room over it and the same to either side.
+        List<int[]> spots = new ArrayList<>();
+        for (int column = 18; column < until; column++) {
+            boolean near = false;
+            for (int flag : level.flags) near |= Math.abs(flag - column) < 6;
+            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 10;
+            for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
+            for (int[] item : level.items) if (item[1] < level.main && (item[3] != 0 || item[0] >= PlusRun.CHEST)) near |= Math.abs(item[1] - column) < 6;
+            for (int[] foe : level.foes) if (rover(foe[0])) near |= Math.abs(foe[1] - column) < 8;
+            if (near) continue;
+            int floor = top(level, column);
+            if (floor > 4 && top(level, column - 1) == floor && top(level, column + 1) == floor && level.land[floor - 1][column] == AIR
+                    && level.land[floor - 2][column] == AIR) spots.add(new int[]{column, floor});
+            for (int row = 4; row < (floor > 0 ? floor - 2 : ROWS - 2); row++) {
+                if (level.land[row][column] == LEDGE && level.land[row][column - 1] == LEDGE && level.land[row][column + 1] == LEDGE
+                        && level.land[row - 1][column] == AIR && level.land[row - 2][column] == AIR) spots.add(new int[]{column, row});
+            }
+        }
+        for (int want = base * (crowdOf(number) - 1); want > 0 && !spots.isEmpty(); ) {
+            int[] spot = spots.get(random.nextInt(spots.size()));
+            int size = Math.min(want, 2 + random.nextInt(3)), put = 0;
+            int kind = !shooters.isEmpty() && random.nextInt(5) == 0 ? shooters.get(random.nextInt(shooters.size())) : walkers.get(random.nextInt(walkers.size()));
+            for (int each = 0; each < size; each++) {
+                boolean stands = false;
+                for (int[] other : spots) stands |= other[0] == spot[0] + each && other[1] == spot[1];
+                if (!stands) break;
+                level.foes.add(new int[]{kind, spot[0] + each, spot[1] - 1, 1, 1});
+                put++;
+            }
+            want -= Math.max(1, put);
+            for (int index = spots.size() - 1; index >= 0; index--) {
+                int[] other = spots.get(index);
+                if (other[1] == spot[1] && other[0] >= spot[0] - 2 && other[0] <= spot[0] + Math.max(1, put) + 1) spots.remove(index);
+            }
+        }
+        // And in the air.
+        int known = 0;
+        for (int kind = DRIFTER; kind <= RIME; kind++) if (FLIES_FROM[kind - DRIFTER] <= number) known++;
+        for (int more = 0; more < fliersIn(number) * 2; more++) perch(level, DRIFTER + random.nextInt(known), 18 + random.nextInt(Math.max(1, until - 30)), until - 2, true);
+    }
+
+    /** One land in three has a book lying in it, and no land more than one: the rest are knives. A book is a find. */
+    private static void shelve(Level level) {
+        boolean one = level.number % 3 != 0;
+        for (int[] weapon : level.weapons) {
+            if (weapon[0] != PlusRun.BOOK) continue;
+            if (one || weapon[1] < 8) weapon[0] = weapon[1] < 8 ? PlusRun.PEN : PlusRun.KNIFE;
+            else one = true;
+        }
+    }
+
+    /**
      * Black, which is a curse, is met from the middle of the first volume on: a black
      * ribbon lies a little past a good one in the land, for whoever takes both without
      * looking, and another in a stash, after its pluses. And from the fifty-first land on
@@ -271,11 +367,11 @@ final class RunLevels {
         }
         for (int index = 0; index < count; index++) {
             int kind = newest >= 0 && index < 3 ? newest : DRIFTER + random.nextInt(known);
-            perch(level, kind, from + (until - from) * (index * 2 + 1) / (count * 2) + random.nextInt(5) - 2, until);
+            perch(level, kind, from + (until - from) * (index * 2 + 1) / (count * 2) + random.nextInt(5) - 2, until, false);
         }
     }
 
-    private static void perch(Level level, int kind, int column, int until) {
+    private static void perch(Level level, int kind, int column, int until, boolean crowd) {
         int high = FLIES_HIGH[kind - DRIFTER], wide = kind == MITE ? 4 : 1;
         for (int tries = 0; tries < 30; tries++, column += 2) {
             // (Past the end of where they may be, it looks again from the start of it.)
@@ -299,7 +395,7 @@ final class RunLevels {
             for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 12;
             for (int[] item : level.items) if (item[1] < level.main && (item[3] != 0 || item[0] >= PlusRun.CHEST)) clear &= Math.abs(item[1] - column) > 9;
             if (!clear) continue;
-            for (int each = 0; each < wide; each++) level.foes.add(new int[]{kind, column + each, row});
+            for (int each = 0; each < wide; each++) level.foes.add(crowd ? new int[]{kind, column + each, row, 1, 1} : new int[]{kind, column + each, row});
             return;
         }
     }
@@ -586,6 +682,8 @@ final class RunLevels {
         rove(level);
         flock(level);
         tempt(level);
+        crowd(level);
+        shelve(level);
         return level;
     }
 
@@ -749,6 +847,8 @@ final class RunLevels {
         rove(level);
         flock(level);
         tempt(level);
+        crowd(level);
+        shelve(level);
         return level;
     }
 
