@@ -4498,8 +4498,8 @@ public class PlusRunTest {
     }
 
     @Test public void everyVillageHasTwoBuildingsSheCanGoIntoOfDifferentSortsAndNothingInThemHurtsHer() {
-        boolean[] sorts = new boolean[5];
-        int shops = 0, halls = 0, homes = 0, smithies = 0, markets = 0;
+        boolean[] sorts = new boolean[6];
+        int shops = 0, halls = 0, homes = 0, smithies = 0, markets = 0, gachas = 0;
         PlusRun inShop = null, inHall = null, inSmithy = null, inMarket = null;
         int[] shop = null, hall = null, smithy = null, market = null;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
@@ -4515,7 +4515,7 @@ public class PlusRunTest {
                 houses++;
                 built.add(one);
                 int sort = one[14];
-                assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.MARKET);
+                assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.GACHA);
                 sorts[sort] = true;
                 assertEquals(RunLevels.LOOKS + sort, one[13]);
                 // Its door is on the ground of the land, where a building stands to be looked at; the land's own squares there are as they were.
@@ -4578,6 +4578,13 @@ public class PlusRunTest {
                         inHall = new PlusRun(level);
                         hall = one;
                     }
+                } else if (sort == RunLevels.GACHA) {
+                    gachas++;
+                    // Its machine, in the middle of it; and no gacha before the fifth land.
+                    assertTrue("land " + number, number >= RunLevels.GACHA_FROM);
+                    assertEquals(1, spots.size());
+                    assertEquals(PlusRun.MACHINE, spots.get(0)[4]);
+                    assertEquals(0, givers);
                 } else if (sort == RunLevels.MARKET) {
                     markets++;
                     // Whoever deals there; and no market before the ninth land.
@@ -4631,7 +4638,8 @@ public class PlusRunTest {
         }
         assertTrue(sorts[RunLevels.PET_SHOP] && sorts[RunLevels.GUILD_HALL] && sorts[RunLevels.HOME] && sorts[RunLevels.SMITHY] && sorts[RunLevels.MARKET]);
         assertTrue("shops " + shops + " halls " + halls + " homes " + homes + " smithies " + smithies + " markets " + markets,
-                shops >= 45 && halls >= 45 && homes >= 45 && smithies >= 45 && markets >= 20 && markets <= 30);
+                shops >= 40 && halls >= 40 && homes >= 40 && smithies >= 40 && markets >= 20 && markets <= 30 && gachas >= 15 && gachas <= 26);
+        assertTrue(sorts[RunLevels.GACHA]);
 
         // Gone into, a pet shop: each pet is walked up to, and Nabi's desk is stood at anywhere along it; nothing hurts her; and out again.
         PlusRun run = inShop;
@@ -5049,6 +5057,180 @@ public class PlusRunTest {
             assertEquals("level " + level, left[level], Math.max(0, big.left));
             assertEquals(level == RunArms.LEVELS, big.flat);
         }
+    }
+
+    // The ribbon gacha, and the pots of black ink
+
+    /** A run of a land that has a ribbon gacha in it, with her standing at its machine; or, not gone in, at its door. The room is put in the array. */
+    private static PlusRun atMachine(int from, boolean in, int[][] found) {
+        for (int number = from; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            for (int[] one : level.rooms) {
+                if (one[0] != RunLevels.HOUSE || one[14] != RunLevels.GACHA) continue;
+                PlusRun run = new PlusRun(level);
+                run.place(one[1] + (1 - PlusRun.WIDE) / 2, one[2] - PlusRun.TALL);
+                run.step(STEP, false, false, false);
+                if (in) {
+                    assertTrue(run.enter());
+                    run.place(one[3] + 7.4f, GROUND);
+                    run.step(STEP, false, false, false);
+                    assertEquals(PlusRun.MACHINE, run.spot());
+                }
+                found[0] = one;
+                return run;
+            }
+        }
+        throw new AssertionError("no gacha from land " + from);
+    }
+
+    /** She leaves the room she is in by its door. */
+    private static void outOf(PlusRun run, int[] room) {
+        run.place(room[6] + (1 - PlusRun.WIDE) / 2, GROUND);
+        hold(run, .2f, false, false, false);
+        assertTrue(run.enter());
+        assertEquals(-1, run.room());
+    }
+
+    @Test public void theRibbonGachaGivesRibbonsByChanceKeepsTheirTimeStillAndBlowsUpOnBlack() {
+        // What a machine holds: four colours early, then five, then all six; never black and never white, which are not chosen.
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            int[] holds = RunLevels.machineOf(number);
+            assertEquals(number <= 20 ? 4 : number <= 40 ? 5 : 6, holds.length);
+            for (int colour : holds) assertTrue(colour >= PlusRun.RED && colour <= PlusRun.PURPLE);
+        }
+        assertEquals(13, PlusRun.blackOdds(5));
+        assertEquals(9, PlusRun.blackOdds(50));
+        int[][] room = new int[1][];
+        // Not gone into, nothing is rolled.
+        PlusRun run = atMachine(RunLevels.GACHA_FROM, false, room);
+        assertFalse(run.canRoll());
+        assertEquals(0, run.roll(0));
+        // In its room a ribbon's time stands still.
+        run = atMachine(RunLevels.GACHA_FROM, true, room);
+        assertTrue(run.level().number <= 20);
+        run.lend(PlusRun.PURPLE);
+        float had = run.on(PlusRun.PURPLE);
+        assertTrue(had > 5);
+        hold(run, 3, false, false, false);
+        assertTrue(run.frozen());
+        assertEquals(had, run.on(PlusRun.PURPLE), .001f);
+        // A roll costs more each time; and gives a ribbon of one of the machine's colours, which is in her hair.
+        assertTrue(run.canRoll());
+        assertEquals(PlusRun.GACHA_FIRST, run.gachaCost());
+        assertEquals(PlusRun.RED, run.roll(0));
+        assertTrue(run.on(PlusRun.RED) > 5);
+        assertEquals(1 << PlusRun.RED - 1, run.gachaHeld());
+        assertEquals(PlusRun.GACHA_FIRST + PlusRun.GACHA_MORE, run.gachaCost());
+        // One she has had from it already is not given again: twice; and after two such the next is one she has not.
+        assertEquals(-PlusRun.RED, run.roll(5));
+        assertEquals(-PlusRun.RED, run.roll(9));
+        assertEquals(2, run.gachaDupes());
+        assertEquals(PlusRun.BLUE, run.roll(0));
+        assertEquals(2, run.gachaDupes());
+        assertEquals(PlusRun.GREEN, run.roll(20));
+        assertFalse(run.white());
+        assertFalse(run.gachaDone());
+        // The last of what it holds: all its colours in one land are a white ribbon, of the kind that is not mastered. And it has no more for her.
+        assertEquals(PlusRun.YELLOW, run.roll(30));
+        assertTrue(run.gachaDone());
+        assertEquals(1, run.gachaWhites());
+        assertTrue(run.white());
+        assertFalse(run.mastered());
+        assertFalse(run.canRoll());
+        assertEquals(0, run.roll(0));
+        assertEquals(6, run.gachaRolls());
+        // Still, all of it, for as long as she stays; and running from the moment she leaves.
+        float blue = run.on(PlusRun.BLUE);
+        hold(run, 4, false, false, false);
+        assertEquals(blue, run.on(PlusRun.BLUE), .001f);
+        outOf(run, room[0]);
+        assertFalse(run.frozen());
+        hold(run, 2, false, false, false);
+        assertEquals(blue - 2, run.on(PlusRun.BLUE), .3f);
+        assertTrue(run.white());
+
+        // A black one: the machine blows up, and is shut; every ribbon she wore is gone; and black lies on her for twice a ribbon's time,
+        // which does not begin to run until she leaves.
+        run = atMachine(RunLevels.GACHA_FROM, true, room);
+        assertEquals(PlusRun.RED, run.roll(3));
+        assertEquals(PlusRun.BLUE, run.roll(13));
+        assertEquals(PlusRun.BLACK, run.roll(40));
+        assertTrue(run.gachaBlown());
+        assertEquals(0, run.gachaHeld());
+        assertFalse(run.coloured());
+        assertEquals(PlusRun.BLACKENED, run.cursed(), .001f);
+        assertFalse(run.canRoll());
+        assertEquals(0, run.roll(0));
+        hold(run, 3, false, false, false);
+        assertEquals(PlusRun.BLACKENED, run.cursed(), .001f);
+        outOf(run, room[0]);
+        hold(run, 2, false, false, false);
+        assertEquals(PlusRun.BLACKENED - 2, run.cursed(), .3f);
+        assertEquals(0, run.hurts());
+        // While black lies on her the machine gives nothing.
+        run = atMachine(RunLevels.GACHA_FROM, false, room);
+        run.lend(PlusRun.BLACK);
+        assertTrue(run.cursed() > 0);
+        assertTrue(run.enter());
+        run.place(room[0][3] + 7.4f, GROUND);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.MACHINE, run.spot());
+        assertFalse(run.canRoll());
+        // A machine of the later lands holds all six: and all six from it are white as well.
+        run = atMachine(41, true, room);
+        assertEquals(6, RunLevels.machineOf(run.level().number).length);
+        for (int index = 0; index < 6; index++) assertTrue(run.roll(index * PlusRun.GACHA_COLOUR) > 0);
+        assertTrue(run.gachaDone() && run.white());
+    }
+
+    @Test public void potsOfBlackInkStandInTheLaterLandsAndThrowTheCurseAtWhoeverIsNear() {
+        int pots = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            int here = 0, was = -99;
+            for (int[] item : level.items) {
+                if (item[0] != PlusRun.INKPOT) continue;
+                here++;
+                // On flat ground of the land itself, in the open, and well apart.
+                assertTrue("land " + number, item[1] < level.main && item[1] >= 40);
+                assertEquals("land " + number, item[2] + 1, RunLevels.top(level, item[1]));
+                assertEquals(RunLevels.AIR, level.land[item[2]][item[1]]);
+                assertEquals(item[2] + 1, RunLevels.top(level, item[1] - 1));
+                assertEquals(item[2] + 1, RunLevels.top(level, item[1] + 1));
+                for (int flag : level.flags) assertTrue(Math.abs(flag - item[1]) > 8);
+                for (int[] other : level.items) if (other != item && other[0] == PlusRun.INKPOT) assertTrue(Math.abs(other[1] - item[1]) > 30);
+            }
+            if (number < RunLevels.POTS_FROM) assertEquals("land " + number, 0, here);
+            else assertTrue("land " + number + " has " + here, here >= 1 && here <= 1 + (number - RunLevels.POTS_FROM) / 15);
+            pots += here;
+        }
+        assertTrue("pots " + pots, pots >= 50);
+        // One swells, and throws: at her, if she is near; black lies on her, and it costs her nothing else.
+        RunLevels.Level level = flat(90);
+        level.items.add(new int[]{PlusRun.INKPOT, 20, FLOOR - 1, 0, 0});
+        PlusRun run = new PlusRun(level);
+        run.place(14, GROUND);
+        run.lend(PlusRun.RED);
+        float least = 1, most = 0;
+        for (float gone = 0; gone < PlusRun.POT_EVERY + 2.5f; gone += STEP) {
+            run.step(STEP, false, false, false);
+            float turn = run.potTurn(level.items.get(0));
+            least = Math.min(least, turn);
+            most = Math.max(most, turn);
+        }
+        assertTrue(least < .05f && most > .95f);
+        assertEquals(1, run.potShots());
+        assertEquals(1, run.curses());
+        assertTrue(run.cursed() > 0);
+        assertFalse(run.coloured());
+        assertEquals(0, run.hurts());
+        assertEquals(PlusRun.HEARTS, run.hearts());
+        // Far from it, nothing is thrown.
+        run = new PlusRun(level);
+        run.place(60, GROUND);
+        hold(run, PlusRun.POT_EVERY * 2 + 1, false, false, false);
+        assertEquals(0, run.potShots());
+        assertEquals(0, run.curses());
     }
 
     // The four won in the black arena

@@ -97,7 +97,7 @@ final class RunLevels {
      * market. Nothing in a building hurts her. A village has two of them, of different
      * sorts, by the land and by which of the land's villages it is.
      */
-    static final int HOUSE = 6, PET_SHOP = 0, GUILD_HALL = 1, HOME = 2, SMITHY = 3, MARKET = 4;
+    static final int HOUSE = 6, PET_SHOP = 0, GUILD_HALL = 1, HOME = 2, SMITHY = 3, MARKET = 4, GACHA = 5;
 
     /**
      * Every land has a level, one more with every five lands. The further on, the tougher
@@ -116,9 +116,54 @@ final class RunLevels {
     /** The sorts of the two buildings of a village that can be gone into. */
     static int[] buildingsOf(int number, int village) {
         int first = (number + village) % 4, second = (first + 1 + (number / 4 + village) % 3) % 4;
+        // In one village in six, from the fifth land on, the second of them is the ribbon gacha.
+        if (number >= GACHA_FROM && (number + village * 2) % 6 == 2) second = GACHA;
         // And in one village in five, from the ninth land on, the second of them is the black market.
         if (number >= MARKET_FROM && (number + village * 3) % 5 == 4) second = MARKET;
         return new int[]{first, second};
+    }
+
+    /**
+     * The ribbon gacha: a machine that gives, for pluses, a ribbon of one of the colours it
+     * holds, by chance, or now and then a black one. It is in some villages from the fifth
+     * land on. The machines of the first twenty lands hold four colours, those of the next
+     * twenty five, and the rest all six.
+     */
+    static final int GACHA_FROM = 5;
+
+    static int[] machineOf(int number) {
+        return number <= 20 ? new int[]{PlusRun.RED, PlusRun.BLUE, PlusRun.GREEN, PlusRun.YELLOW}
+                : number <= 40 ? new int[]{PlusRun.RED, PlusRun.BLUE, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.BROWN}
+                : new int[]{PlusRun.RED, PlusRun.BLUE, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.BROWN, PlusRun.PURPLE};
+    }
+
+    /**
+     * From the forty-first land on, pots of black ink stand here and there in a land: each
+     * swells, as a warning, and throws the black curse at whoever is near. More of them the
+     * further on. They are put in last of all, with chances of their own, on flat ground
+     * clear of everything else: the land under them is the land it was.
+     */
+    static final int POTS_FROM = 41;
+
+    private static void pots(Level level) {
+        int number = level.number;
+        if (number < POTS_FROM) return;
+        Random random = new Random(977L * number + 5);
+        int until = (level.arena >= 0 ? level.arena : level.gate) - 12, want = 1 + (number - POTS_FROM) / 15, placed = 0;
+        for (int tries = 0; tries < 80 && placed < want; tries++) {
+            int column = 40 + random.nextInt(Math.max(1, until - 40)), floor = top(level, column);
+            boolean free = floor > 4 && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR
+                    && top(level, column - 1) == floor && top(level, column + 1) == floor;
+            for (int flag : level.flags) free &= Math.abs(flag - column) > 8;
+            for (int[] thing : level.decor) free &= Math.abs(thing[1] - column) > 10;
+            for (int[] room : level.rooms) free &= Math.abs(room[1] - column) > 5 && Math.abs(room[5] - column) > 5;
+            for (int[] item : level.items) if (item[1] < level.main) free &= Math.abs(item[1] - column) > (item[0] == PlusRun.INKPOT ? 30 : 6);
+            for (int[] weapon : level.weapons) free &= Math.abs(weapon[1] - column) > 3;
+            for (int[] foe : level.foes) if (foe[1] < level.main && (rover(foe[0]) || foe[2] == floor - 1)) free &= Math.abs(foe[1] - column) > (rover(foe[0]) ? 14 : 1);
+            if (!free) continue;
+            level.items.add(new int[]{PlusRun.INKPOT, column, floor - 1, 0, random.nextInt(100)});
+            placed++;
+        }
     }
 
     /** The first land with a black market in it. */
@@ -862,6 +907,7 @@ final class RunLevels {
         shelve(level);
         kennel(level);
         arsenal(level);
+        pots(level);
         return level;
     }
 
@@ -1030,6 +1076,7 @@ final class RunLevels {
         shelve(level);
         kennel(level);
         arsenal(level);
+        pots(level);
         return level;
     }
 
@@ -1273,6 +1320,9 @@ final class RunLevels {
                 // And her board of hunts, between the door and her desk.
                 level.items.add(new int[]{PlusRun.SPOT, from + 7, FLOOR - 1, 0, PlusRun.BOARD});
                 pluses(from + 4, from + 6, FLOOR - 1);
+            } else if (sort == GACHA) {
+                // The machine, in the middle of it.
+                level.items.add(new int[]{PlusRun.SPOT, from + 7, FLOOR - 1, 0, PlusRun.MACHINE});
             } else if (sort == MARKET) {
                 // Whoever deals there, at the back of it.
                 level.items.add(new int[]{PlusRun.SPOT, from + 8, FLOOR - 1, 0, PlusRun.DEALER});
@@ -1839,6 +1889,7 @@ final class RunLevels {
                         else if (sort == GUILD_HALL) stands[0] = 302 + level.number % 2;
                         else if (sort == SMITHY) stands[0] = 304;
                         else if (sort == MARKET) stands[0] = 305;
+                        else if (sort == GACHA) stands[0] = 306;
                         // (Its door is not marked in the land itself, as other doors are: what is laid about a land afterwards is laid as it was.)
                         built.add(new int[]{HOUSE, column, floor, 0, column, floor, sort});
                     }
