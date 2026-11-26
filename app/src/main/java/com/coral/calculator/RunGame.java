@@ -473,9 +473,9 @@ final class RunGame {
         tabs[0].set(safe.left + dp(18), safe.top + dp(80), safe.left + dp(18) + tab, safe.top + dp(114));
         tabs[1].set(tabs[0].right + dp(8), tabs[0].top, tabs[0].right + dp(8) + tab, tabs[0].bottom);
         turnTo(page);
-        // The stall in a land: its button over the arrows, and what it sells, one under another.
+        // The stall in a land: its button under the one that pauses, out of the way of the land.
         float pill = Math.min(dp(210), safe.width() - dp(40));
-        stallButton.set(safe.centerX() - pill / 2, y - dp(58), safe.centerX() + pill / 2, y - dp(14));
+        stallButton.set(pauseButton.right - pill, pauseButton.bottom + dp(8), pauseButton.right, pauseButton.bottom + dp(52));
         // The counter: what can be bought, one under another.
         float high = Math.max(dp(40), Math.min(dp(78), (safe.height() - dp(120)) / wares.length - dp(8)));
         float across = Math.min(safe.width() - dp(28), dp(460));
@@ -608,11 +608,14 @@ final class RunGame {
         perks = kept();
         run = new PlusRun(RunLevels.level(land), perks);
         // For looking at a land's later parts in a build made for testing: she starts by its first flag, its second,
-        // before the place where someone waits, or inside it.
+        // inside the place where someone waits, or, for a number over a thousand, at the column that many over it.
         int from = BuildConfig.DEBUG ? session.tally("run_from") : 0;
         if (from > 0) {
             RunLevels.Level here = run.level();
-            int column = from <= here.flags.size() ? here.flags.get(from - 1) : here.arena >= 0 ? here.arena + 4 : here.gate - 10;
+            int column = from > 1000 ? Math.min(here.columns - 2, from - 1000) : from <= here.flags.size() ? here.flags.get(from - 1)
+                    : here.arena >= 0 ? here.arena + 4 : here.gate - 10;
+            // Over a pit, the first ground to the right of it.
+            while (column < here.columns - 2 && RunLevels.top(here, column) < 0) column++;
             run.place(column, RunLevels.top(here, column) - PlusRun.TALL - .05f);
         }
         idle();
@@ -1284,7 +1287,8 @@ final class RunGame {
         // Each copy is the mirror of the one before it, so their edges always meet.
         for (int copy = (int) (drift / wide); copy * wide - drift < width; copy++) {
             float left = copy * wide - drift;
-            target.set(left, 0, left + wide + 1, height);
+            // A hair over on both sides, so that no line of nothing shows between one copy and the next.
+            target.set(left - 1, 0, left + wide + 1, height);
             canvas.save();
             if (copy % 2 != 0) canvas.scale(-1, 1, left + wide / 2, 0);
             canvas.drawBitmap(sky, null, target, paint);

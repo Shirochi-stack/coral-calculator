@@ -1620,6 +1620,33 @@ public class PlusRunTest {
             found.append("lands ").append(from[part]).append("-").append(to[part]).append(": ").append(signs / (float) lands).append(" signs a land, ")
                     .append(columns / lands).append(" columns, one every ").append(columns / (float) signs).append(" columns\n");
         }
+        // And where there is something to go and look at, in a few of them.
+        for (int number : new int[]{23, 27, 31, 36, 44, 47, 55, 58, 66, 69, 77}) {
+            RunLevels.Level level = RunLevels.level(number);
+            found.append("land ").append(number).append(": arena ").append(level.arena).append(" gate ").append(level.gate);
+            for (int[] item : level.items) if (item[3] >= RunLevels.SOMI) found.append(item[0] == PlusRun.STALL ? " stall " : " who" + item[3] + " ").append(item[1]);
+            for (int[] weapon : level.weapons) if (weapon[0] == PlusRun.GUN) found.append(" gun ").append(weapon[1]);
+            for (int[] item : level.items) if (item[0] > PlusRun.FORM) found.append(" ribbon").append(item[0] - PlusRun.FORM).append(" ").append(item[1]);
+            if (!level.movers.isEmpty()) found.append(" mover ").append(level.movers.get(0)[0]);
+            String seen = "";
+            for (int column = 0; column < level.columns; column++) {
+                for (int row = 0; row < RunLevels.ROWS; row++) {
+                    char here = level.land[row][column];
+                    if ("-c><~uDLw".indexOf(here) >= 0 && seen.indexOf(here) < 0) {
+                        seen += here;
+                        found.append(" ").append(here).append(column);
+                    }
+                }
+            }
+            boolean[] signs = new boolean[20];
+            for (int[] foe : level.foes) {
+                if (foe[0] >= RunLevels.SLIME && foe[0] <= RunLevels.POGO && !signs[foe[0]]) {
+                    signs[foe[0]] = true;
+                    found.append(" sign").append(foe[0]).append(" ").append(foe[1]);
+                }
+            }
+            found.append("\n");
+        }
         throw new AssertionError("COUNT:\n" + found);
     }
 

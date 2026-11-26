@@ -91,7 +91,7 @@ final class RunLevels {
     /** The numbers the lands of the second volume are made from, picked as those of the first were. */
     static final long[] LATER_SEEDS = {
             1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1,
     };
 
     private static final int PLAIN = 0, GAP = 1, STEPS = 2, WALL = 3, BRIDGE = 4, HIGH_ROAD = 5, SPIKES = 6, SPRING_WALL = 7,
@@ -465,6 +465,13 @@ final class RunLevels {
             for (int up = 1; up <= high; up++) level.land[floor - up][column] = BLOCK;
         }
 
+        /**
+         * A low shelf at the near end of a crowd: what walks about inside turns at it as at a
+         * wall, but she walks under it, what she throws goes under it, and from on top of it
+         * the ledge over the crowd is a jump away.
+         */
+        void shelf(int column) { level.land[floor - 1][column] = LEDGE; }
+
         void ledge(int column, int row, int length) {
             for (int along = 0; along < length; along++) level.land[row][column + along] = LEDGE;
         }
@@ -577,23 +584,22 @@ final class RunLevels {
                 }
                 case VILLAGE: {
                     // A village: houses, a lantern and a sign to look at, someone to meet, and a stall.
-                    ground(18);
+                    ground(23);
                     int who = SOMI + (level.number + level.items.size()) % (ALTTEUL - SOMI);
                     if (level.chapter == CHAPTERS && random.nextBoolean()) who = NURI;
                     level.decor.add(new int[]{random.nextInt(3), from + 2, floor - 1});
                     level.decor.add(new int[]{3 + random.nextInt(2), from + 6, floor - 1});
-                    level.decor.add(new int[]{random.nextInt(3), from + 9, floor - 1});
-                    level.decor.add(new int[]{5, from + 13, floor - 1});
-                    level.decor.add(new int[]{6 + random.nextInt(2), from + 16, floor - 1});
-                    level.items.add(new int[]{who == NURI ? PlusRun.NOTES : GIVES[who - SOMI], from + 6, floor - 1, who});
-                    level.items.add(new int[]{PlusRun.STALL, from + 13, floor - 1, ALTTEUL});
-                    break;
+                    level.decor.add(new int[]{random.nextInt(3), from + 12, floor - 1});
+                    level.decor.add(new int[]{5, from + 17, floor - 1});
+                    level.decor.add(new int[]{6 + random.nextInt(2), from + 21, floor - 1});
+                    level.items.add(new int[]{who == NURI ? PlusRun.NOTES : GIVES[who - SOMI], from + 7, floor - 1, who});
+                    level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});                    break;
                 }
                 case PACK: {
                     // Three to five walking together between two blocks, and a ledge over them.
                     int count = 3 + random.nextInt(3);
                     ground(13);
-                    pile(from, 1);
+                    shelf(from);
                     pile(from + 12, 1);
                     ledge(from + 2, floor - 3, 9);
                     for (int which = 0; which < count; which++) foe(which == 2 ? walker() : MINUS, from + 3 + which * 2 - (which == 4 ? 1 : 0));
@@ -602,7 +608,7 @@ final class RunLevels {
                 }
                 case SWARM: {
                     ground(12);
-                    pile(from, 1);
+                    shelf(from);
                     pile(from + 11, 1);
                     ledge(from + 2, floor - 3, 8);
                     for (int column : new int[]{3, 5, 6, 8, 10}) foe(SLIME, from + column);
@@ -631,7 +637,7 @@ final class RunLevels {
                 }
                 case TOUGH: {
                     ground(9);
-                    pile(from, 1);
+                    shelf(from);
                     pile(from + 8, 1);
                     ledge(from + 2, floor - 3, 5);
                     level.foes.add(new int[]{MINUS, from + 5, floor - 1, 3});
@@ -642,7 +648,7 @@ final class RunLevels {
                     // An ink gun, and a long open stretch with a crowd in it to empty it into.
                     ground(21);
                     level.weapons.add(new int[]{PlusRun.GUN, from + 1, floor - 1});
-                    pile(from + 3, 1);
+                    shelf(from + 3);
                     pile(from + 20, 1);
                     ledge(from + 5, floor - 3, 13);
                     for (int column = from + 6; column <= from + 15; column += 3) foe(column == from + 12 ? walker() : MINUS, column);
@@ -656,7 +662,7 @@ final class RunLevels {
                     // A book, and four in a line for it to go through.
                     ground(14);
                     level.weapons.add(new int[]{PlusRun.BOOK, from + 1, floor - 1});
-                    pile(from + 3, 1);
+                    shelf(from + 3);
                     pile(from + 13, 1);
                     ledge(from + 5, floor - 3, 7);
                     for (int column = from + 5; column <= from + 11; column += 2) foe(MINUS, column);
@@ -667,7 +673,7 @@ final class RunLevels {
                     // A brush, and slimes that crowd round whoever comes in.
                     ground(12);
                     level.weapons.add(new int[]{PlusRun.BRUSH, from + 1, floor - 1});
-                    pile(from + 3, 1);
+                    shelf(from + 3);
                     pile(from + 11, 1);
                     ledge(from + 5, floor - 3, 5);
                     for (int column : new int[]{5, 6, 8, 9}) foe(SLIME, from + column);

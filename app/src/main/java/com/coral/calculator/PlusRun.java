@@ -751,12 +751,12 @@ final class PlusRun {
         atStall = false;
         for (int index = items.size() - 1; index >= 0; index--) {
             int[] item = items.get(index);
+            // A stall stays where it is, and she is at it anywhere along its counter.
+            if (item[0] == STALL) {
+                if (x < item[1] + 2.2f && x + WIDE > item[1] - 1.2f && y < item[2] + .9f && y + TALL > item[2] + .1f) atStall = true;
+                continue;
+            }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
-                // A stall stays where it is.
-                if (item[0] == STALL) {
-                    atStall = true;
-                    continue;
-                }
                 items.remove(index);
                 taken++;
                 lastTaken = item[0];
