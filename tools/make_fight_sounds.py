@@ -132,6 +132,11 @@ SOUNDS = {
     # Two ultimates meeting: a clang, and a held, rising hum under it.
     "clash": mix(fade(mix(tone(.5, 1244, shape="triangle"), tone(.5, 1661, shape="triangle"), .5 * tone(.5, 2489)), .001),
                  .6 * fade(soft(noise(.1), .7), .001), .5 * fade(rise(tone(.9, 110, 440, "triangle")), .01, .1)),
+    # A home run: the crack of the bat, the whistle of what was hit going up and away, and a crowd's far cheer.
+    "homer": mix(fade(mix(tone(.07, 2100, 900, "triangle"), soft(noise(.05), .9)), .001),
+                 .5 * fade(tone(.25, 300, 120), .002),
+                 .35 * after(numpy.zeros(int(RATE * .08)), fade(tone(1.1, 1500, 3200, "sine", .01, 9), .05, .5)),
+                 .3 * after(numpy.zeros(int(RATE * .25)), fade(rise(soft(noise(1.3), .09)), .3, .6))),
     # One tap of a clash: a small bright tick.
     "tick": fade(tone(.035, 1500, 1900, "triangle"), .001),
 }

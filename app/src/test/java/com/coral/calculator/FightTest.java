@@ -751,8 +751,74 @@ public class FightTest {
             assertEquals(FightFrames.SHOVE_W, shown(kind, Fight.SHOVE, .01f, 0, 0));
             assertEquals(FightFrames.DASH_QW, shown(kind, Fight.DASH_LIGHT, .01f, 0, 0));
             assertEquals(FightFrames.DASH_HW, shown(kind, Fight.DASH_HEAVY, .01f, 0, 0));
+            if (kind == Fight.TSUBAKIEH) continue;
             assertEquals(FightFrames.U12, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .4f, 0, 0));
             assertEquals(FightFrames.U23, shown(kind, Fight.ULTIMATE, moves[Fight.ULTIMATE].startup * .9f, 0, 0));
+        }
+    }
+
+    @Test public void tsubakiehsHomeRunIsAMoveOfItsOwnAndSendsThemLikeABall() throws Exception {
+        Fight fight = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 5), shown = new Fight(Fight.TSUBAKIEH, Fight.CHIKUWA, -1, -1, 0);
+        fight.fighters[0].meter = Fight.METER;
+        Fight.Pad pad = new Fight.Pad();
+        pad.ultimate = true;
+        java.util.List<Integer> frames = new java.util.ArrayList<>();
+        float highest = 0, furthest = 0;
+        for (int frame = 0; frame < 420; frame++) {
+            fight.step(STEP, pad, null);
+            pad.ultimate = false;
+            Fight.Fighter her = fight.fighters[0], other = fight.fighters[1];
+            highest = Math.max(highest, other.y);
+            furthest = Math.max(furthest, other.x - her.x);
+            // Both devices show the same frame of it.
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            fight.write(new java.io.DataOutputStream(bytes));
+            shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+            int pose = FightPose.of(fight, her, 0, 0);
+            assertEquals(pose, FightPose.of(shown, shown.fighters[0], 0, 0));
+            if (her.state == Fight.ATTACK && (frames.isEmpty() || frames.get(frames.size() - 1) != pose)) frames.add(pose);
+        }
+        // The called shot and the wind-up while it is announced; the swing; the bat meeting; the follow-through; watching it go.
+        assertEquals(java.util.Arrays.asList(FightFrames.HR1, FightFrames.HR2, FightFrames.HR3, FightFrames.HR4, FightFrames.HR5, FightFrames.HR6), frames);
+        // She went up over the stage and came down a long way off, and it took off what it always did.
+        assertTrue("went up " + highest, highest > 6);
+        assertTrue("went " + furthest, furthest > 4);
+        assertEquals(0, fight.fighters[1].y, 0);
+        assertEquals(hurt(Fight.TSUBAKIEH, Fight.ULTIMATE), lost(fight, 1), .01f);
+        // No one else's ultimate, and no other blow of hers, throws anyone so high.
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            if (kind == Fight.TSUBAKIEH) continue;
+            Fight other = apart(kind, Fight.CHIKUWA, 2);
+            other.fighters[0].meter = Fight.METER;
+            pad.ultimate = true;
+            float top = 0;
+            for (int frame = 0; frame < 420; frame++) {
+                other.step(STEP, pad, null);
+                pad.ultimate = false;
+                top = Math.max(top, other.fighters[1].y);
+                assertTrue(FightPose.of(other, other.fighters[0], 0, 0) < FightFrames.HR1);
+            }
+            assertTrue(FightCast.NAMES[kind] + " threw her " + top, top < 2.5f);
+        }
+        // On a guard it costs what a guarded blow costs and drives her most of the way across the stage.
+        Fight guarded = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 3);
+        guarded.fighters[0].meter = Fight.METER;
+        Fight.Pad guard = new Fight.Pad();
+        guard.block = true;
+        pad.ultimate = true;
+        float from = guarded.fighters[1].x;
+        for (int frame = 0; frame < 300; frame++) {
+            guarded.step(STEP, pad, guard);
+            pad.ultimate = false;
+        }
+        assertEquals(1, guarded.blocks());
+        assertEquals(hurt(Fight.TSUBAKIEH, Fight.ULTIMATE) * .2f, lost(guarded, 1), .01f);
+        assertTrue("driven " + (guarded.fighters[1].x - from), guarded.fighters[1].x - from > 2.5f);
+        // Its six frames are pictures of their own.
+        Set<String> places = new HashSet<>();
+        for (int frame = FightFrames.HR1; frame <= FightFrames.HR6; frame++) {
+            short[] at = FightFrames.FRAMES[Fight.TSUBAKIEH][frame];
+            assertTrue(places.add(at[0] + " " + at[1] + " " + at[2]));
         }
     }
 
