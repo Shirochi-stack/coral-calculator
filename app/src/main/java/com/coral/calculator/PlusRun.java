@@ -58,6 +58,11 @@ final class PlusRun {
      * ordinary girl for a while.
      */
     static final int SHOCK = 14, BOOMERANG = 15, DEBRIS = 16, BLADE = 17, DARK = 18, GLOB = 19, CURSE = 20;
+    /** And a plus that falls, in the room where they are caught: it hurts no one, and is hers if she is under it. */
+    static final int PLUSDROP = 21;
+    /** How many waves of signs a cellar fills with, how long the pluses fall, and how many of them caught win something more. */
+    static final int WAVES = 3, ENOUGH = 8;
+    static final float FALLING = 10;
     /** How long rubble hangs before it falls, how long someone takes to arrive, and how long they take over changing. */
     static final float HANGS = .55f, ENTER = 2, FLOURISH = 1.2f;
     /**
@@ -67,6 +72,10 @@ final class PlusRun {
     static final int HOMERUN = 5, COMPLIMENT = 6;
     /** And a stall, which is not picked up: standing at it, what she has collected in this land buys things. */
     static final int STALL = 7;
+    /** And two that have to do with what is asked of her: a rice cake, to be found; and whoever a letter is for, who stays where she is. */
+    static final int CAKE = 8, DROPOFF = 9;
+    /** How what is asked of her stands: not asked yet, being done, done, or not to be done this time. */
+    static final int ASKED = 1, DONE = 2, FAILED = 3;
     /**
      * Her forms, each from a ribbon of its colour, which is the colour her hair turns. Red
      * throws fire and walks on lava. Blue throws water and swims. Brown knocks over whatever
@@ -94,6 +103,13 @@ final class PlusRun {
         boolean flagHeart;
         /** How many hurts a ball of Rune's ink takes for her. */
         int inkHurts = 1;
+        /**
+         * The colours of hair that are hers to keep, as bits, the first for red: any of them
+         * she may call on herself, once what she calls on them with has filled again, which
+         * takes this many seconds. And how many times as long any form lasts.
+         */
+        int colours;
+        float recharge = 18, formLonger = 1;
     }
     static final int GUN_SHOTS = 16;
     /** How long a swing of the brush or the sword lasts. */
@@ -107,9 +123,12 @@ final class PlusRun {
     private static final float LATE = .08f, EARLY = .1f;
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
-    private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3};
-    private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f};
-    private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f};
+    private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
+            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f};
+    private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
+            .9f, .8f, .8f, .9f, .9f, 1.6f, 2};
+    private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
+            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f};
     /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
     private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
@@ -185,8 +204,20 @@ final class PlusRun {
     private int combo, bonus, airJumps, flaps, taken, lastTaken = -1, spared, charms, swings, cause;
     private int form, formed, inkLeft, doorsUsed, quakes, cleared, parried, censors, riding = -1;
     private float formLeft, censored, doorWait, offIt;
-    private int spent, giver;
+    private int spent, giver, greetings;
+    /** Which place off the land she is in, or -1; which she has been into, which she has finished, and which hidden doors she has broken through to. */
+    private int room = -1, roomsFound, roomsDone, revealed;
+    private int entered, reveals, roomWins, wave, caught, dice = 12345;
+    private float gameLeft, sinceDrop;
+    private boolean quitting;
+    private int quest, cakes, questGiven, questsDone, questFails, questFlags;
+    /** How full what she calls a colour on with is, from nothing to 1; and how many times she has. */
+    private float charge = 1;
+    private int called;
+    private float questLeft;
     private boolean atStall;
+    /** The stalls she has been up to, by the column each stands in: its keeper greets her the first time only. */
+    private final java.util.Set<Integer> greeted = new java.util.HashSet<>();
     private boolean locked, leaving;
     private float opening, rearm, sinceShot = 9;
     private int entrances, phases, specials, special, unlocks, streak, wiped;
@@ -287,6 +318,30 @@ final class PlusRun {
         spent = other.spent;
         giver = other.giver;
         atStall = other.atStall;
+        greetings = other.greetings;
+        room = other.room;
+        roomsFound = other.roomsFound;
+        roomsDone = other.roomsDone;
+        revealed = other.revealed;
+        entered = other.entered;
+        reveals = other.reveals;
+        roomWins = other.roomWins;
+        wave = other.wave;
+        caught = other.caught;
+        dice = other.dice;
+        gameLeft = other.gameLeft;
+        sinceDrop = other.sinceDrop;
+        quitting = other.quitting;
+        quest = other.quest;
+        charge = other.charge;
+        called = other.called;
+        cakes = other.cakes;
+        questGiven = other.questGiven;
+        questsDone = other.questsDone;
+        questFails = other.questFails;
+        questFlags = other.questFlags;
+        questLeft = other.questLeft;
+        greeted.addAll(other.greeted);
         locked = other.locked;
         leaving = other.leaving;
         opening = other.opening;
@@ -449,6 +504,8 @@ final class PlusRun {
     int giver() { return giver; }
     /** Whether she stands at a stall; what she has to spend there, which is what she has collected in this land less what she has spent; and what she has spent. */
     boolean atStall() { return atStall; }
+    /** How many stalls she has come up to for the first time: going away and coming back does not count again. */
+    int greetings() { return greetings; }
     int purse() { return collected + bonus - spent; }
     int spent() { return spent; }
 
@@ -459,6 +516,162 @@ final class PlusRun {
         take(kind);
         return true;
     }
+
+    /**
+     * Which of the land's doors she stands at and may use, or -1: outside, either door of
+     * a place; inside, its door or its far door, unless the place is shut until what
+     * happens in it is over.
+     */
+    int door() {
+        if (state != PLAYING || !onGround) return -1;
+        float middle = x + WIDE / 2, feet = y + TALL;
+        if (room >= 0) {
+            int[] in = level.rooms.get(room);
+            if (sealed() || Math.abs(feet - RunLevels.FLOOR) > .3f) return -1;
+            return Math.abs(middle - in[6] - .5f) < .8f || in[8] >= 0 && Math.abs(middle - in[8] - .5f) < .8f ? room : -1;
+        }
+        for (int index = 0; index < level.rooms.size(); index++) {
+            int[] one = level.rooms.get(index);
+            if (Math.abs(middle - one[1] - .5f) < .8f && Math.abs(feet - one[2]) < .3f) return index;
+            if (one[5] != one[1] && Math.abs(middle - one[5] - .5f) < .8f && Math.abs(feet - one[9]) < .3f) return index;
+        }
+        return -1;
+    }
+
+    /**
+     * She uses the door she stands at: into the place it leads to, or out of it again, to
+     * where she went in or, by the far door of a passage, to where it comes out. A hidden
+     * door is first broken through to, and only then gone in by. Returns whether there was
+     * a door to use.
+     */
+    boolean enter() {
+        int at = door();
+        if (at < 0) return false;
+        int[] one = level.rooms.get(at);
+        float middle = x + WIDE / 2;
+        boolean far;
+        if (room < 0) {
+            far = one[5] != one[1] && Math.abs(middle - one[5] - .5f) < .8f;
+            if (!far && one[7] != 0 && (revealed & 1 << at) == 0) {
+                revealed |= 1 << at;
+                reveals++;
+                return true;
+            }
+            room = at;
+            roomsFound |= 1 << at;
+            revealed |= 1 << at;
+            put(far ? one[8] : one[6], RunLevels.FLOOR);
+            if ((roomsDone & 1 << at) == 0) {
+                if (one[0] == RunLevels.ARENA) {
+                    // The cellar shuts, and the first of the signs are in it.
+                    wave = 1;
+                    summon(one);
+                } else if (one[0] == RunLevels.GAME) {
+                    gameLeft = FALLING;
+                    caught = 0;
+                    sinceDrop = 0;
+                } else {
+                    roomsDone |= 1 << at;
+                }
+            }
+        } else {
+            far = one[8] >= 0 && Math.abs(middle - one[8] - .5f) < .8f;
+            room = -1;
+            put(far ? one[5] : one[1], far ? one[9] : one[2]);
+        }
+        entered++;
+        return true;
+    }
+
+    private void put(int column, int floor) {
+        x = column + (1 - WIDE) / 2;
+        y = floor - TALL;
+        speedAcross = 0;
+        speedDown = 0;
+        riding = -1;
+        safe = Math.max(safe, .5f);
+    }
+
+    /** Whether the place she is in is shut until what happens in it is over. */
+    boolean sealed() {
+        return room >= 0 && (level.rooms.get(room)[0] == RunLevels.ARENA && wave > 0 || level.rooms.get(room)[0] == RunLevels.GAME && gameLeft > 0);
+    }
+
+    /** A wave of signs in a cellar: one more in each wave than in the last, spread along it, and a moment before any of them moves. */
+    private void summon(int[] one) {
+        int count = 2 + wave;
+        for (int index = 0; index < count; index++) {
+            int kind = level.chapter >= 2 && index % 2 == 1 ? RunLevels.SLIME : RunLevels.MINUS;
+            Foe foe = new Foe(kind);
+            foe.spawned = true;
+            foe.left = 1;
+            foe.x = one[3] + 3.5f + index * (one[4] - one[3] - 6f) / Math.max(1, count - 1);
+            foe.ground = RunLevels.FLOOR - foe.tall();
+            foe.y = foe.ground;
+            foe.home = foe.x;
+            foe.leftward = index % 2 == 0;
+            foe.dazed = .8f;
+            foes.add(foe);
+        }
+    }
+
+    /** What happens in the place she is in: a cellar's waves, one after another until the last is cleared; and pluses falling for a while. */
+    private void rooms(float seconds) {
+        int[] one = level.rooms.get(room);
+        if (one[0] == RunLevels.ARENA && wave > 0) {
+            for (Foe foe : foes) if (foe.spawned && !foe.flat) return;
+            if (wave < WAVES) {
+                wave++;
+                summon(one);
+                return;
+            }
+            // Cleared: twenty pluses, and a heart if she is short of one.
+            wave = 0;
+            roomsDone |= 1 << room;
+            roomWins++;
+            bonus += 20;
+            if (hearts < perks.hearts) hearts++;
+        } else if (one[0] == RunLevels.GAME && gameLeft > 0) {
+            if ((sinceDrop += seconds) > .42f) {
+                sinceDrop = 0;
+                dice = dice * 1103515245 + 12345;
+                float at = one[3] + 1.5f + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 3);
+                shoot(PLUSDROP, false, at, RunLevels.FLOOR - 7.6f, 0, 5.5f, 2);
+            }
+            if ((gameLeft -= seconds) <= 0) {
+                gameLeft = 0;
+                roomsDone |= 1 << room;
+                roomWins++;
+                if (caught >= ENOUGH) bonus += 10;
+                for (Shot shot : shots) if (shot.kind == PLUSDROP) shot.left = 0;
+            }
+        }
+    }
+
+    /** Out of the place she was in, sent back to the flag: it is as it was before she went in, and what was in it with her is gone. */
+    private void quit() {
+        quitting = false;
+        room = -1;
+        wave = 0;
+        gameLeft = 0;
+        if (!locked) for (int index = foes.size() - 1; index >= 0; index--) if (foes.get(index).spawned) foes.remove(index);
+    }
+
+    /** The place off the land she is in, or -1, and where it begins and ends; which she has been into, finished, and broken through to, as bits. */
+    int room() { return room; }
+    int roomFrom() { return level.rooms.get(room)[3]; }
+    int roomTo() { return level.rooms.get(room)[4]; }
+    int roomsFound() { return roomsFound; }
+    int roomsDone() { return roomsDone; }
+    int revealed() { return revealed; }
+    /** Counts that only go up: doors used, hidden doors broken through to, and cellars cleared or falls of pluses seen out. */
+    int entered() { return entered; }
+    int reveals() { return reveals; }
+    int roomWins() { return roomWins; }
+    /** Which wave a cellar is at, 0 when none; how much longer pluses fall; and how many she has caught. */
+    int wave() { return wave; }
+    float gameLeft() { return gameLeft; }
+    int caught() { return caught; }
 
     /** Her form, 0 for her own, and how much longer it lasts. */
     int form() { return form; }
@@ -508,6 +721,17 @@ final class PlusRun {
             case RunLevels.MIRI:
             case RunLevels.GARI:
                 return 4;
+            case RunLevels.GUARD:
+            case RunLevels.BUTLER:
+                return 5;
+            case RunLevels.BYEORU:
+            case RunLevels.JUPAN:
+                return 6;
+            case RunLevels.SUMBI:
+            case RunLevels.PADS:
+                return 7;
+            case RunLevels.PARTY:
+                return 8;
             case RunLevels.KING:
                 return 9;
             default:
@@ -641,7 +865,11 @@ final class PlusRun {
         if (doorWait > 0) doorWait -= seconds;
         if (offIt > 0) offIt -= seconds;
         sinceShot += seconds;
+        if (charge < 1) charge = Math.min(1, charge + seconds / perks.recharge);
         if (leaving) leave();
+        if (quitting) quit();
+        if (quest == ASKED && level.quest == RunLevels.TIME) asked(seconds);
+        if (room >= 0) rooms(seconds);
         // A moment after the last of them is down, both ways open.
         if (opening > 0 && (opening -= seconds) <= 0) {
             locked = false;
@@ -753,15 +981,32 @@ final class PlusRun {
             int[] item = items.get(index);
             // A stall stays where it is, and she is at it anywhere along its counter.
             if (item[0] == STALL) {
-                if (x < item[1] + 2.2f && x + WIDE > item[1] - 1.2f && y < item[2] + .9f && y + TALL > item[2] + .1f) atStall = true;
+                if (x < item[1] + 2.2f && x + WIDE > item[1] - 1.2f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
+                    atStall = true;
+                    if (greeted.add(item[1])) greetings++;
+                }
+                continue;
+            }
+            // Whoever a letter is for stays too: she has it when it is brought to her.
+            if (item[0] == DROPOFF) {
+                if (quest == ASKED && level.quest == RunLevels.LETTER && x < item[1] + 2.4f && x + WIDE > item[1] - .4f && y < item[2] + .9f
+                        && y + TALL > item[2] + .1f) done();
                 continue;
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 items.remove(index);
+                // A rice cake is only found: found before it was asked for, it still counts.
+                if (item[0] == CAKE) {
+                    cakes++;
+                    if (quest == ASKED && cakes >= 3) done();
+                    continue;
+                }
                 taken++;
                 lastTaken = item[0];
                 giver = item[3];
                 take(item[0]);
+                // Whoever has something to ask of her asks it as she hands over what she holds.
+                if (quest == 0 && level.quest != 0 && item[3] == RunLevels.giverOf(level.quest)) ask();
             }
         }
         // A press of the button uses it, once it has rested; the ink gun goes on for as long as the button is held.
@@ -844,6 +1089,9 @@ final class PlusRun {
         }
         // A flag she has passed, at any height, is where she comes back to; passing the gate is the end.
         float middle = x + WIDE / 2;
+        asked(0);
+        // In a place off the land she is neither further on in it nor at its end.
+        if (room >= 0) return;
         for (int flag : level.flags) {
             if (middle >= flag && startX < flag) {
                 startX = flag + (1 - WIDE) / 2;
@@ -852,8 +1100,83 @@ final class PlusRun {
                 if (perks.flagHeart && hearts < perks.hearts) hearts++;
             }
         }
-        if (middle >= level.gate && gateOpen()) state = WON;
+        if (middle >= level.gate && middle < level.main && gateOpen()) state = WON;
     }
+
+    /**
+     * She calls on a colour that is hers to keep: her hair turns to it, for a shorter while
+     * than a ribbon gives, and what she called on it with is empty until it has filled again.
+     * Returns whether she could.
+     */
+    boolean call(int colour) {
+        if (state != PLAYING || colour < RED || colour > WHITE || (perks.colours & 1 << colour - 1) == 0 || charge < 1) return false;
+        charge = 0;
+        form = colour;
+        formLeft = (colour == BLACK ? 5 : 9) * perks.lasting * perks.formLonger;
+        formed++;
+        called++;
+        return true;
+    }
+
+    /** How full what she calls a colour on with is, and how many times she has called on one. */
+    float charge() { return charge; }
+    int called() { return called; }
+
+    /** Something is asked of her: if it is done already it is done; a count begins if it is against one. */
+    private void ask() {
+        quest = ASKED;
+        questGiven++;
+        questFlags = flagsPassed;
+        if (level.quest == RunLevels.TIME) {
+            // A second for every four squares to the next flag, and five over.
+            float far = level.gate;
+            for (int flag : level.flags) if (flag > x && flag < far) far = flag;
+            questLeft = (far - x) / 4 + 5;
+        }
+        if (level.quest == RunLevels.CAKES && cakes >= 3) done();
+        asked(0);
+    }
+
+    /** How what is asked stands is looked at again: a cellar cleared, the room behind the crack found, the flag reached or the count run out. */
+    private void asked(float seconds) {
+        if (quest != ASKED) return;
+        if (level.quest == RunLevels.CELLAR || level.quest == RunLevels.ROOM) {
+            for (int index = 0; index < level.rooms.size(); index++) {
+                int[] one = level.rooms.get(index);
+                boolean cellar = level.quest == RunLevels.CELLAR;
+                if (cellar ? one[0] == RunLevels.ARENA && (roomsDone & 1 << index) != 0 : one[7] != 0 && (roomsFound & 1 << index) != 0) {
+                    done();
+                    return;
+                }
+            }
+        } else if (level.quest == RunLevels.TIME) {
+            if (flagsPassed > questFlags) done();
+            else if ((questLeft -= seconds) <= 0) fail();
+        }
+    }
+
+    /** It is done: fifteen pluses, and a heart if she is short of one. */
+    private void done() {
+        quest = DONE;
+        questsDone++;
+        questLeft = 0;
+        bonus += 15;
+        if (hearts < perks.hearts) hearts++;
+    }
+
+    private void fail() {
+        quest = FAILED;
+        questFails++;
+        questLeft = 0;
+    }
+
+    /** How what is asked of her stands; how many rice cakes she has found; how much longer a count has to run; and counts that only go up of things asked, done and failed. */
+    int quest() { return quest; }
+    int cakes() { return cakes; }
+    float questLeft() { return questLeft; }
+    int questGiven() { return questGiven; }
+    int questsDone() { return questsDone; }
+    int questFails() { return questFails; }
 
     /** What comes of taking something that helps, picked up or bought. */
     private void take(int kind) {
@@ -874,7 +1197,7 @@ final class PlusRun {
             cleared++;
         } else if (kind > FORM) {
             form = kind - FORM;
-            formLeft = form == BLACK ? 7 : (form == WHITE ? 12 : 14) * perks.lasting;
+            formLeft = form == BLACK ? 7 : (form == WHITE ? 12 : 14) * perks.lasting * perks.formLonger;
             formed++;
         } else if (kind == ICE) {
             rush = LASTS[ICE] * perks.lasting;
@@ -1127,6 +1450,13 @@ final class PlusRun {
             if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x >= to || foe.x + foe.wide() <= from || foe.y >= bottom || foe.y + foe.tall() <= top) continue;
             beat(foe);
         }
+        for (int index = 0; index < level.rooms.size() && room < 0; index++) {
+            int[] one = level.rooms.get(index);
+            if (one[7] != 0 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
+                revealed |= 1 << index;
+                reveals++;
+            }
+        }
         for (int index = shots.size() - 1; index >= 0; index--) {
             Shot shot = shots.get(index);
             if (shot.hers || shot.x < from - .2f || shot.x > to + .2f || shot.y < top - .2f || shot.y > bottom + .2f) continue;
@@ -1160,6 +1490,13 @@ final class PlusRun {
             if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > RunLevels.ROWS
                     || (in == RunLevels.LEDGE ? shot.down > Math.abs(shot.across) : solid(in))) {
                 shots.remove(index);
+            } else if (shot.kind == PLUSDROP) {
+                // A falling plus is hers if she is under it.
+                if (shot.x > x - .3f && shot.x < x + WIDE + .3f && shot.y > y - .2f && shot.y < y + TALL) {
+                    shots.remove(index);
+                    caught++;
+                    bonus++;
+                }
             } else if (shot.hers) {
                 for (Foe foe : foes) {
                     if (foe.flat || absent(foe) || shot.x < foe.x - .2f || shot.x > foe.x + foe.wide() + .2f || shot.y < foe.y - .2f
@@ -1229,6 +1566,8 @@ final class PlusRun {
             if (!fell) return true;
         } else {
             hurts++;
+            // A letter that has been through a hurt is not one to hand over.
+            if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
             if (--hearts <= 0) {
                 state = LOST;
                 return true;
@@ -1245,8 +1584,9 @@ final class PlusRun {
         speedAcross = 0;
         speedDown = 0;
         safe = SAFE;
-        // Out of the place where someone waits, it is as it was before she came in.
+        // Out of the place where someone waits, it is as it was before she came in; and so is a place off the land.
         if (locked) leaving = true;
+        if (room >= 0) quitting = true;
         return true;
     }
 
@@ -1266,7 +1606,7 @@ final class PlusRun {
             speedAcross = 0;
         }
         // A gate that is still shut stops her like a wall.
-        if (!gateOpen() && x + WIDE > level.gate) {
+        if (room < 0 && !gateOpen() && x + WIDE > level.gate) {
             x = level.gate - WIDE;
             speedAcross = 0;
         }
@@ -1516,9 +1856,9 @@ final class PlusRun {
     }
 
     /** What each of those who wait does, in order, in each third of the fight: the later thirds bring in more. */
-    private static final int[][][] PATTERNS = new int[20][][];
+    private static final int[][][] PATTERNS = new int[27][][];
     /** How long each of them is spent after something they have done. */
-    private static final float[] WINDOW = new float[20];
+    private static final float[] WINDOW = new float[27];
     static {
         PATTERNS[RunLevels.ILLYA] = new int[][]{{1, 3}, {1, 2, 3}, {4, 2, 1, 3}};
         PATTERNS[RunLevels.TSUBAKIEH] = new int[][]{{1, 2}, {1, 3, 2}, {4, 1, 3, 2}};
@@ -1529,6 +1869,11 @@ final class PlusRun {
         PATTERNS[RunLevels.YEOBAEK] = new int[][]{{1, 2}, {1, 3, 2}, {4, 3, 2}};
         PATTERNS[RunLevels.KING] = new int[][]{{1, 2}, {1, 3, 2}, {4, 3, 1, 2}};
         PATTERNS[RunLevels.MAWANG] = new int[][]{{1, 3, 2}, {1, 5, 3, 4, 2}, {6, 5, 4, 1, 3, 2}};
+        // The seven others each do three things: two from the first, the third from the second third of the fight on.
+        for (int kind = RunLevels.GUARD; kind <= RunLevels.PARTY; kind++) {
+            PATTERNS[kind] = kind == RunLevels.SUMBI ? new int[][]{{2, 1}, {2, 3, 1}, {3, 1, 2, 1}} : new int[][]{{1, 2}, {1, 3, 2}, {3, 2, 1, 2}};
+            WINDOW[kind] = kind <= RunLevels.BUTLER ? 1.7f : 1.4f;
+        }
         WINDOW[RunLevels.ILLYA] = 1.5f;
         WINDOW[RunLevels.TSUBAKIEH] = .9f;
         WINDOW[RunLevels.ZERO] = 1.3f;
@@ -1617,7 +1962,12 @@ final class PlusRun {
                 foe.leftward = right;
             }
         }
+        // Sumbi dives: she is under the ground until she comes up.
+        if (what == 241) foe.unseen = true;
+        if (foe.kind == RunLevels.GUARD || foe.kind == RunLevels.BUTLER) return 1;
         switch (what) {
+            case 242:
+                return 1.6f;
             case 71:
                 return 1.8f;
             case 63:
@@ -1785,6 +2135,82 @@ final class PlusRun {
             case 191:
                 spread(FEATHER, middle, foe.y + .5f, phase == 2 ? 5 : 3, .32f, 6.5f, 2);
                 return .4f;
+            // The Guild Guard: a thrust of the halberd, a low sweep that runs along the ground, and a march the length of the place.
+            case 201:
+                cut(foe, 1.6f, STRUCK);
+                swings++;
+                return .3f;
+            case 202:
+                shoot(SHOCK, false, middle, floor - .3f, way * 6, 0, 3);
+                thrown++;
+                return .5f;
+            case 203:
+            case 212:
+            case 232:
+            case 252:
+            case 262:
+                foe.leftward = toLeft;
+                return what == 252 ? .7f : 2;
+            // Penchok-jipsa: three blots lobbed, a dash on his nib, and a signature of three drops in a fan.
+            case 211:
+            case 233:
+                for (int which = -1; which <= 1; which++) lob(GLOB, middle, foe.y + .3f, px + which * 2.5f);
+                thrown++;
+                return .5f;
+            case 213:
+                spread(DOT, middle, foe.y + .5f, 3, .24f, 6, 2.2f);
+                return .4f;
+            // Byeoru: two scrolls thrown ahead of her visitor, ink that falls where it is marked, and a censor bar.
+            case 221:
+                aim(SCROLL, middle, foe.y + .3f, 6.5f, 0, 2.2f);
+                aim(SCROLL, middle, foe.y + .3f, 6.5f, away / 6.5f, 2.2f);
+                return .4f;
+            case 222:
+                for (int which = -1; which <= 1; which++) shoot(DEBRIS, false, px + speedAcross * .6f + which * 2, Math.max(.5f, y - 7), 0, 0, 3);
+                thrown++;
+                return .4f;
+            case 223:
+                spawn(RunLevels.BAR, middle + way * 1.5f, floor);
+                return .4f;
+            // Jupan: five coins in a fan, a slide on her abacus, and beads lobbed.
+            case 231:
+                spread(DOT, middle, foe.y + .5f, 5, .22f, 6.5f, 2.2f);
+                return .4f;
+            // Sumbi: up from under her visitor, the crowbar, and a net that turns the arrows round.
+            case 241:
+                foe.x = Math.max(lo, Math.min(hi, px - foe.wide() / 2));
+                foe.y = foe.ground;
+                if (safe <= 0 && onGround && y + TALL > floor - .2f && Math.abs(px - foe.x - foe.wide() / 2) < 1.1f) {
+                    cause = TOUCHED;
+                    hurt(false);
+                }
+                quakes++;
+                return .4f;
+            case 242:
+                cut(foe, 1.7f, BATTED);
+                swings++;
+                return .3f;
+            case 243:
+                spread(HEART, middle, foe.y + .5f, 1, 0, 5.5f, 2.6f);
+                return .4f;
+            // The Brake Pads: brakes slammed on, which runs both ways along the ground; a skid; and sparks.
+            case 251:
+                shoot(SHOCK, false, middle, floor - .3f, -8, 0, 1.8f);
+                shoot(SHOCK, false, middle, floor - .3f, 8, 0, 1.8f);
+                quakes++;
+                thrown++;
+                return .5f;
+            case 253:
+                spread(BLADE, middle, foe.y + .5f, 5, .3f, 7, 2.2f);
+                return .4f;
+            // The Straight-Ahead Party: three arrows, low, high and low; the sword, the length of the place; and the shield, along the ground.
+            case 261:
+                foe.fromX = 0;
+                return 1;
+            case 263:
+                shoot(SHOCK, false, middle, floor - .3f, way * 9, 0, 2.6f);
+                thrown++;
+                return .5f;
             case 192:
                 foe.fromX = px;
                 foe.toX = Math.min(foe.ground, y + TALL - foe.tall());
@@ -1923,6 +2349,33 @@ final class PlusRun {
                 } else if (what == 184 && doing) {
                     foe.x += way * 10 * seconds;
                     if (foe.x <= lo || foe.x >= hi) foe.act = 0;
+                }
+                break;
+            }
+            case RunLevels.GUARD:
+            case RunLevels.BUTLER:
+            case RunLevels.BYEORU:
+            case RunLevels.JUPAN:
+            case RunLevels.SUMBI:
+            case RunLevels.PADS:
+            case RunLevels.PARTY: {
+                if (foe.step == 0) foe.leftward = toLeft;
+                // Each has a way of going the length of the place, at a pace of her own; Sumbi walks up before she swings.
+                float pace = what == 203 ? 4.5f : what == 212 ? 9 : what == 232 ? 10 : what == 252 || what == 262 ? 11 : 0;
+                if (pace > 0 && doing) {
+                    foe.x += way * pace * seconds;
+                    if (foe.x <= lo || foe.x >= hi) foe.act = 0;
+                } else if (what == 242 && foe.step == 0 && foe.act > .5f && away > 1.6f) {
+                    foe.x += (toLeft ? -1 : 1) * 3.2f * seconds;
+                } else if (what == 261 && doing && foe.fromX < 3 && (foe.wait -= seconds) <= 0) {
+                    foe.wait = .33f;
+                    shoot(BLADE, false, middle, floor - (foe.fromX == 1 ? 1.7f : .4f), toLeft ? -9 : 9, 0, 2.4f);
+                    thrown++;
+                    foe.fromX++;
+                } else if (foe.step == 0 && pace == 0 && foe.kind >= RunLevels.BYEORU && foe.kind != RunLevels.SUMBI && foe.kind != RunLevels.PADS) {
+                    // Those who throw keep their distance while they make ready.
+                    float keeps = px + (toLeft ? 5 : -5) - foe.wide() / 2;
+                    foe.x += Math.max(-1.6f * seconds, Math.min(1.6f * seconds, keeps - foe.x));
                 }
                 break;
             }

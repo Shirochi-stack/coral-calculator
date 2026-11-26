@@ -67,6 +67,12 @@ VOICES = {
     "A": ("community-2e7y7ype1d0u", 1.12, 1.1),
     "W": ("community-qdnchfkneudi", .92, 1.0),
     "L": ("community-qj9kc2jtun4a", 1.1, 1.2),
+    # Five more who wait at the ends of lands: the Guild Guard, Penchok-jipsa, Byeoru, Jupan and Sumbi.
+    "D": ("community-2e7y7ype1d0u", .95, .98),
+    "F": ("Felix", 1.0, 1.04),
+    "Q": ("community-qj9kc2jtun4a", .88, 1.06),
+    "V": ("community-mzyrf5zr14rb", 1.1, 1.12),
+    "X": ("community-qdnchfkneudi", 1.12, 1.1),
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
@@ -89,6 +95,11 @@ MANNER = {
     "A": "Nabi is a playful cat-eared girl with a high, giggly, mischievous anime voice. ",
     "W": "Moru is a short-spoken smith girl with a flat, blunt but young and light anime voice. ",
     "L": "Altteul is a thrifty young shopkeeper with a high, brisk, bright anime voice, always selling. ",
+    "D": "The Guild Guard is a small, earnest young knight in full armour with a high, loud, dutiful anime voice. ",
+    "F": "Penchok-jipsa is a living fountain pen who is a prim butler: a light, dry, impeccably polite voice, never old or gruff. ",
+    "Q": "Byeoru is a quiet young court scribe with a soft, high, flat anime voice, precise and unhurried. ",
+    "V": "Jupan is a sly young merchant girl with a high, quick, bright anime voice, always bargaining. ",
+    "X": "Sumbi is a cheerful diver girl with a high, loud, sunny anime voice, daring and out of breath. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
 
