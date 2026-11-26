@@ -73,7 +73,8 @@ SHEETS = [
     # The frames that go between two different poses of something that happens once: the guard coming up and a turn half
     # made; the jump's in-betweens; coming round from a blow and getting up; then for every blow the wind-up before it
     # and the follow-through after it. There are none for what loops or is held: several drawings of one pose never
-    # agree in their small parts, and swapped quickly they flicker. Standing is one frame, a walk its own six.
+    # agree in their small parts, and swapped quickly they flicker. Standing is the four frames of her stance that were
+    # drawn together, a walk its own six.
     ("back2", "BB1 BB2 BB3 BB4 GUARD_UP TURN2", (0, 1, 2, 3)),
     ("jump2", "J_S PUSH RISE2 TOP2 FALL2 LAND2", (0,)),
     ("hits2", "H_S HIT1R HIT2R STAGGER2 PROP HALF_UP", (0,)),
@@ -88,9 +89,9 @@ SHEETS = [
 ]
 # The sheets of in-betweens, which a fighter may be without: what she had before stands in for them.
 MORE = [sheet for sheet, _, _ in SHEETS[17:]]
-# A frame that is only there to give its sheet her height is not kept; nor is one that is no longer shown: the other
-# poses of standing, the halves of the walk backward, and the second stagger.
-DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S IDLE2 IDLE3 IDLE4 BB1 BB2 BB3 BB4 STAGGER2".split()
+# A frame that is only there to give its sheet her height is not kept; nor is one that is no longer shown: the
+# halves of the walk backward, and the second stagger.
+DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S BB1 BB2 BB3 BB4 STAGGER2".split()
 # An in-between is as tall as the two frames it goes between are, taken together: these are the two, for each frame of a sheet.
 BETWEENS = {
     "back2": [(f"BACK{n}", f"BACK{n % 4 + 1}") for n in range(1, 5)],
