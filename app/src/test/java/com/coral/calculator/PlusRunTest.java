@@ -2575,10 +2575,10 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
-        assertEquals(RunLevels.RANGE + 1, RunStory.ROOMS.length);
+        assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);
         assertTrue(line(RunStory.ENTER, "enter14")[2].equals("Z") && line(RunStory.ENTER, "enter15")[2].equals("a"));
         assertEquals(RunLevels.NURI - RunLevels.SOMI + 1, RunStory.MEET.length);
         assertEquals(16, RunStory.ENTER.length);

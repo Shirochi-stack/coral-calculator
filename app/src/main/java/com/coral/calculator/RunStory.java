@@ -597,6 +597,8 @@ final class RunStory {
                     PLAYER + "She has walked into a room where coins rain from above. Excited, urgent." + FAST},
             {"room4", "A range. And an ink gun that never runs dry. Stand back Sloppy~♡", "H",
                     PLAYER + "She has walked into a shooting range and been handed an ink gun with endless shots. Gleeful, trigger-happy." + FAST},
+            {"room5", "They keep coming. Flatten them as fast as they come Sloppy~♡", "H",
+                    PLAYER + "She has walked into a room where little monsters keep appearing, a game of stomping them. Eager, bossy, grinning." + FAST},
     };
     /** When she comes near a crack with a door behind it; and when a cellar is cleared and when the pluses stop falling. */
     static final String[][] CRACK = {
@@ -609,6 +611,10 @@ final class RunStory {
                     PLAYER + "A coin-catching game has just ended. Pleased, a little smug." + FAST},
             {"ranged1", "Time. Count the holes in them Sloppy~♡", "H",
                     PLAYER + "A target-shooting game has just ended. Smug, pleased." + FAST},
+            {"stomped1", "Time. That floor is flat as a page now Sloppy~♡", "H",
+                    PLAYER + "A game of stomping little monsters has just ended. Out of breath, triumphant." + FAST},
+            {"chest1", "The chest. Worth the climb, and it's mine Sloppy~♡", "H",
+                    PLAYER + "She has just climbed up to a treasure chest and opened it. Delighted, greedy, pleased with herself." + FAST},
     };
     /**
      * What is asked of her in a land, said by whoever asks it as she hands over what she
