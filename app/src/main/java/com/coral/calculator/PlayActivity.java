@@ -204,7 +204,7 @@ public final class PlayActivity extends Activity {
     /** She steps out of her picture and has the whole screen, for a game or a prank. */
     private void openStage(int game) {
         if (stage != null || root.getWidth() == 0) return;
-        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random) : game;
+        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random, Unlocks.tricks(PlaySession.get(this))) : game;
         stage = new PlayStage(this, kind, dark, haptics, art, pet, played -> {
             // Left for the home screen, a long game waits here on its pause, and is found as it was when the app is come back to.
             if (stage.wentHome() && stage.hold()) {

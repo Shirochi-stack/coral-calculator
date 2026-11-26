@@ -202,6 +202,8 @@ final class PlayStage extends View {
     private RunGame runGame;
     /** Page brawl likewise. */
     private FightGame fightGame;
+    /** One of the tricks that playing unlocks: a scene of its own, played as a prank is. */
+    private Trick trick;
 
     private Object backCallback;
 
@@ -247,6 +249,7 @@ final class PlayStage extends View {
         }
         if (game == PlaySession.RUN) runGame = new RunGame(this, context, dark, haptics, art, pet);
         if (game == PlaySession.FIGHT) fightGame = new FightGame(this, context, dark, haptics, art, pet);
+        if (Unlocks.isTrick(game)) trick = new Trick(context, game - Unlocks.FIRST_TRICK, dark, art, pet);
         if (game == SNATCH || game == AVALANCHE) {
             pickApps(context, game == SNATCH ? 1 : SHAKEN);
             loot = icons.get(0);
@@ -292,16 +295,20 @@ final class PlayStage extends View {
     }
 
     static boolean isPrank(int game) {
-        return (game >= SNATCH && game <= BUG) || (game >= DRIP && game <= WEBS) || (game >= STICKERS && game <= LASER);
+        return (game >= SNATCH && game <= BUG) || (game >= DRIP && game <= WEBS) || (game >= STICKERS && game <= LASER) || Unlocks.isTrick(game);
     }
 
     /** The pranks she has yet to play this time round, in the order she will play them. */
     private static final List<Integer> NEXT_PRANKS = new ArrayList<>();
 
     /** A prank she has not played since she last got through them all. */
-    static int anyPrank(Random random) {
+    static int anyPrank(Random random) { return anyPrank(random, null); }
+
+    /** The same, with the tricks that have been unlocked among them. */
+    static int anyPrank(Random random, List<Integer> unlocked) {
         if (NEXT_PRANKS.isEmpty()) {
             for (int prank : PRANKS) NEXT_PRANKS.add(prank);
+            if (unlocked != null) NEXT_PRANKS.addAll(unlocked);
             java.util.Collections.shuffle(NEXT_PRANKS, random);
         }
         return NEXT_PRANKS.remove(NEXT_PRANKS.size() - 1);
@@ -332,6 +339,7 @@ final class PlayStage extends View {
     void setHome(float x, float feet, float tall) {
         setHome(x, feet);
         homeTall = tall;
+        if (trick != null) trick.setHome(x, feet, tall);
     }
 
     @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
@@ -342,6 +350,11 @@ final class PlayStage extends View {
     private void layout() {
         play.set(insetLeft, insetTop, getWidth() - insetRight, getHeight() - insetBottom);
         if (play.width() <= 0 || play.height() <= 0) return;
+        if (trick != null) {
+            trick.layout(play);
+            started = true;
+            return;
+        }
         if (fightGame != null) {
             fightGame.layout(getWidth(), getHeight(), play);
             started = true;
@@ -673,6 +686,14 @@ final class PlayStage extends View {
         }
         if (fightGame != null) {
             fightGame.advance(seconds);
+            return;
+        }
+        if (trick != null) {
+            String said = trick.saying();
+            if (trick.advance(seconds)) leave();
+            // Read out as it changes: the view is a live region.
+            String says = trick.saying();
+            if (says != null && !says.equals(said)) setContentDescription(says);
             return;
         }
         int row = once != NONE ? once : pose;
@@ -1966,6 +1987,13 @@ final class PlayStage extends View {
         }
         float x = event.getX(), y = event.getY();
         int action = event.getActionMasked();
+        if (trick != null) {
+            if (action == MotionEvent.ACTION_DOWN) {
+                buzz();
+                if (trick.touch()) leave();
+            }
+            return true;
+        }
         if (isPrank(game)) {
             if (action == MotionEvent.ACTION_DOWN) prankTouch();
             return true;
@@ -2028,6 +2056,10 @@ final class PlayStage extends View {
         }
         if (fightGame != null) {
             fightGame.draw(canvas);
+            return;
+        }
+        if (trick != null) {
+            trick.draw(canvas);
             return;
         }
         if (isPrank(game)) {

@@ -31,8 +31,8 @@ abstract class TrickBase {
     private static final int OPEN = 0, SCENE = 1, OWN = 2, HOME = 3;
     private static final float OPENING = 1.1f, OWNING = 2.5f;
     /** The pictures the scenes borrow from the games: how many frames across each strip has. */
-    static final int FX = R.drawable.fight_fx, PIECES = R.drawable.plus_run_art, FACES = R.drawable.fight_faces, NPC = R.drawable.run_npc;
-    static final int LOSE = R.drawable.halgakos_lose, JUMP = R.drawable.halgakos_jump;
+    static final int FX = TrickArt.fight_fx, PIECES = TrickArt.plus_run_art, FACES = TrickArt.fight_faces, NPC = TrickArt.run_npc;
+    static final int LOSE = TrickArt.halgakos_lose, JUMP = TrickArt.halgakos_jump;
     /** In {@link #FX}: her tablet, a key, a loaf, brick bread, the bat, an ink tear, a paper knife, a heart, pink magic and a burst. */
     static final int TABLET = 0, KEY = 1, LOAF = 2, BRICK = 3, BAT = 4, TEAR = 5, KNIFE = 6, HEART = 7, MAGIC = 8, BURST = 9;
     /** In {@link #PIECES}: a plus, a minus, a flag, a gate, a star, a heart, a times and a divide sign, Zero, and what she picks up. */
@@ -75,7 +75,8 @@ abstract class TrickBase {
     private int phase = OPEN;
     private float clock, fade = 1;
     private boolean owning, herDrawn, started;
-    private int row = PetArt.IDLE, worn, wornFrames, wornFrame;
+    private int row = PetArt.IDLE, wornFrames, wornFrame;
+    private Bitmap worn;
     private float rowClock, wornSize = 1;
     private String saying;
     private float sayLeft;
@@ -195,7 +196,7 @@ abstract class TrickBase {
         spin = 0;
         herAlpha = 1;
         herScale = 1;
-        worn = 0;
+        worn = null;
         hx = clamp(hx, L + wide / 2, R - wide / 2);
         hy = clamp(hy, T + tall, B);
         say(owningUp(), OWNING - .1f);
@@ -206,7 +207,7 @@ abstract class TrickBase {
         herDrawn = false;
         if (phase == SCENE) {
             saying = null;
-            worn = 0;
+            worn = null;
             squash = 1;
             lift = 0;
             spin = 0;
@@ -218,6 +219,12 @@ abstract class TrickBase {
             int layer = canvas.saveLayerAlpha(play, Math.round(255 * fade));
             scene(canvas);
             canvas.restoreToCount(layer);
+            // Whatever the scene would have had her look like, she is herself again.
+            squash = 1;
+            lift = 0;
+            spin = 0;
+            herAlpha = 1;
+            herScale = 1;
             if (clock > .5f && row == PetArt.JUMP) pose(PetArt.IDLE);
         }
         paint.setAlpha(255);
@@ -295,6 +302,12 @@ abstract class TrickBase {
     /** In this frame she is drawn from one of her other strips: knocked over, in the air, or holding something. */
     void wear(int strip, int frames, int frame, float size) {
         if (owning || pet == null) return;
+        wear(sheet(strip), frames, frame, size);
+    }
+
+    /** The same, from a strip of her made for the scene. */
+    void wear(Bitmap strip, int frames, int frame, float size) {
+        if (owning || pet == null || strip == null) return;
         worn = strip;
         wornFrames = frames;
         wornFrame = Math.max(0, Math.min(frames - 1, frame));
@@ -303,8 +316,8 @@ abstract class TrickBase {
 
     /** A frame of her holding what she fights with in Plus run: 0 a pen, then a knife, a book, a brush, a sword and the ink gun. */
     void armed(int weapon, int frame) {
-        int[] strips = {R.drawable.halgakos_arm0, R.drawable.halgakos_arm1, R.drawable.halgakos_arm2, R.drawable.halgakos_arm3,
-                R.drawable.halgakos_arm4, R.drawable.halgakos_arm5};
+        int[] strips = {TrickArt.halgakos_arm0, TrickArt.halgakos_arm1, TrickArt.halgakos_arm2, TrickArt.halgakos_arm3,
+                TrickArt.halgakos_arm4, TrickArt.halgakos_arm5};
         wear(strips[weapon], 8, frame, 1.2f);
     }
 
@@ -315,6 +328,23 @@ abstract class TrickBase {
         drawHer(canvas);
     }
 
+    /** Another of her, as she is drawn in this frame, standing somewhere else. */
+    void copy(Canvas canvas, float x, float feet) {
+        if (owning) return;
+        float wasX = hx, wasY = hy;
+        hx = x;
+        hy = feet;
+        drawHer(canvas);
+        hx = wasX;
+        hy = wasY;
+    }
+
+    /** Her animated frames, or null where she is the still one. */
+    Bitmap pet() { return pet; }
+
+    /** Words with the user called what they asked to be called. */
+    String named(String words) { return names.named(words); }
+
     private void drawHer(Canvas canvas) {
         float height = tall * herScale, width = wide * herScale;
         canvas.save();
@@ -322,8 +352,8 @@ abstract class TrickBase {
         if (spin != 0) canvas.rotate(spin, 0, -height / 2);
         if (squash != 1) canvas.scale(1 + (1 - squash) * .35f, squash);
         paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, herAlpha))));
-        if (pet != null && worn != 0) {
-            Bitmap strip = sheet(worn);
+        if (pet != null && worn != null) {
+            Bitmap strip = worn;
             int cell = strip.getWidth() / wornFrames;
             float high = height * wornSize, across = high * cell / strip.getHeight();
             if (leftward) canvas.scale(-1, 1);
@@ -357,9 +387,9 @@ abstract class TrickBase {
     Bitmap sheet(int resource) {
         Bitmap had = sheets.get(resource);
         if (had != null) return had;
-        boolean hers = resource == LOSE || resource == JUMP || resource == R.drawable.halgakos_arm0 || resource == R.drawable.halgakos_arm1
-                || resource == R.drawable.halgakos_arm2 || resource == R.drawable.halgakos_arm3 || resource == R.drawable.halgakos_arm4
-                || resource == R.drawable.halgakos_arm5 || resource == R.drawable.halgakos_party;
+        boolean hers = resource == LOSE || resource == JUMP || resource == TrickArt.halgakos_arm0 || resource == TrickArt.halgakos_arm1
+                || resource == TrickArt.halgakos_arm2 || resource == TrickArt.halgakos_arm3 || resource == TrickArt.halgakos_arm4
+                || resource == TrickArt.halgakos_arm5 || resource == TrickArt.halgakos_party;
         Bitmap made = hers && hair != Hair.PINK ? Hair.dyed(BitmapFactory.decodeResource(context.getResources(), resource), hair)
                 : BitmapFactory.decodeResource(context.getResources(), resource);
         sheets.put(resource, made);
@@ -481,7 +511,7 @@ abstract class TrickBase {
         paint.setAlpha(Math.round(Color.alpha(colour) * Math.max(0, Math.min(1, alpha))));
     }
 
-    void line(int colour, float width, float alpha) {
+    void pen(int colour, float width, float alpha) {
         stroke.setColor(colour);
         stroke.setStrokeWidth(width);
         stroke.setAlpha(Math.round(Color.alpha(colour) * Math.max(0, Math.min(1, alpha))));
@@ -523,7 +553,7 @@ abstract class TrickBase {
         } catch (RuntimeException | android.content.pm.PackageManager.NameNotFoundException missing) {
             icons.add(new android.graphics.drawable.ColorDrawable(CalculatorLayout.CORAL));
         }
-        labels.add(context.getString(R.string.app_name));
+        labels.add(context.getString(TrickArt.app_name));
     }
 
     // Her words

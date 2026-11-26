@@ -41,6 +41,8 @@ public final class CompanionSettingsActivity extends Activity {
     private TextView masterNote;
     private TextView intro;
     private TextView fadeLabel;
+    /** How much of what playing unlocks has been found: a count, and nothing of what the rest is. */
+    private TextView found;
     /** Shows the hair colours again: which are won, and which is worn. */
     private Runnable showHair;
     /** Set while a switch is moved from code, so that it is not taken for the user's choice. */
@@ -133,6 +135,10 @@ public final class CompanionSettingsActivity extends Activity {
         play.setBackgroundResource(android.R.drawable.list_selector_background);
         play.setOnClickListener(v -> startActivity(new Intent(this, PlayActivity.class)));
         content.addView(play);
+        found = text("", 14, muted());
+        found.setPadding(0, 0, dp(56), dp(8));
+        content.addView(found);
+        describeFound();
         toggle(content, "Speech bubbles", "Now and then she has something to say, in a bubble over her head, and "
                         + "most of it is teasing. A tap on the bubble sends it away.",
                 prefs.chatter(), checked -> { prefs.set(CompanionPrefs.CHATTER, checked); apply(); });
@@ -321,6 +327,7 @@ public final class CompanionSettingsActivity extends Activity {
             if (Settings.canDrawOverlays(this)) prefs.set(CompanionPrefs.ENABLED, true);
         }
         apply();
+        describeFound();
         // A colour may have been won in Plus run since this page was last looked at.
         if (showHair != null) showHair.run();
     }
@@ -572,6 +579,15 @@ public final class CompanionSettingsActivity extends Activity {
         button.setFocusable(true);
         button.setOnClickListener(v -> finish());
         return button;
+    }
+
+    /** Playing unlocks more for her to say and more tricks, in secret: this says only how many have been found. */
+    private void describeFound() {
+        if (found == null) return;
+        PlaySession kept = PlaySession.get(this);
+        Unlocks.check(kept, BuildConfig.DEBUG);
+        found.setText("Things she has to say: " + Unlocks.found(kept) + " of " + Unlocks.lines() + " found. Tricks: "
+                + Unlocks.tricksFound(kept) + " of " + Unlocks.TRICKS + ". Playing finds the rest.");
     }
 
     private void describeFade() {

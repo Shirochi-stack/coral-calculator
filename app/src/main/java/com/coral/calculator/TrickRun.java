@@ -156,7 +156,7 @@ abstract class TrickRun extends TrickBase {
         float row = appRow(), size = dp(52), batter = L + dp(46);
         String[] wrong = {"fish cake", "a brick", "normal app", "not bread", "a Tuesday"};
         float swing = t - 2.6f;
-        strip(c, R.drawable.run_tsubakieh, 6, t < 1.8f ? 0 : t < 2.5f ? 2 : t < 3.3f ? 3 : t < 8.6f ? 1 : 5,
+        strip(c, TrickArt.run_tsubakieh, 6, t < 1.8f ? 0 : t < 2.5f ? 2 : t < 3.3f ? 3 : t < 8.6f ? 1 : 5,
                 L - dp(70) + (batter + dp(70) - L) * out(p(.3f, 1.8f)), row + size * .9f, tall * 1.05f, false, 1);
         // The blow goes along the row; what it passes loses its name, and the name walks off.
         float wave = batter + (R - batter) * p(2.6f, 3.4f);
@@ -204,7 +204,7 @@ abstract class TrickRun extends TrickBase {
                     (float) Math.sin(fell * 2 + which) * 20, Math.min(1, 3.2f - fell));
         }
         float illyaX = R - dp(70), illyaY = cardY + dp(96) + (float) Math.sin(t * 2.2f) * dp(5);
-        strip(c, R.drawable.run_illya, 4, t < 1.3f ? 0 : t < 7.6f ? 1 : t < 9 ? 2 : 1, illyaX + (1 - out(p(.2f, 1.1f))) * dp(160), illyaY, tall * 1.1f, true, 1);
+        strip(c, TrickArt.run_illya, 4, t < 1.3f ? 0 : t < 7.6f ? 1 : t < 9 ? 2 : 1, illyaX + (1 - out(p(.2f, 1.1f))) * dp(160), illyaY, tall * 1.1f, true, 1);
         // The cast list, written a line at a time.
         float shown = p(2.4f, 2.9f), middle = Math.min(cx, illyaX - dp(140) < L + dp(120) ? cx : cx - dp(30));
         if (shown > 0) {
@@ -308,13 +308,13 @@ abstract class TrickRun extends TrickBase {
             act(PetArt.IDLE);
         }
         if (t < 7) {
-            strip(c, R.drawable.run_kingslime, 4, t < 1.6f || hop > dp(30) ? 1 : t >= 4.9f ? 2 : 0, kingX, kingY - hop, high, false, 1);
+            strip(c, TrickArt.run_kingslime, 4, t < 1.6f || hop > dp(30) ? 1 : t >= 4.9f ? 2 : 0, kingX, kingY - hop, high, false, 1);
         } else {
             // In three, and the three hop away.
-            strip(c, R.drawable.run_kingslime, 4, 3, kingX, floor, high * .8f, false, 1 - p(7, 8));
+            strip(c, TrickArt.run_kingslime, 4, 3, kingX, floor, high * .8f, false, 1 - p(7, 8));
             for (int which = 0; which < 3; which++) {
                 float away = t - 7, x = kingX + (which - 1) * away * dp(86);
-                strip(c, R.drawable.run_kingslime, 4, 0, x, floor - (float) Math.abs(Math.sin(away * 5 + which)) * dp(34), high * .36f, which == 0, 1 - p(10, 11.3f));
+                strip(c, TrickArt.run_kingslime, 4, 0, x, floor - (float) Math.abs(Math.sin(away * 5 + which)) * dp(34), high * .36f, which == 0, 1 - p(10, 11.3f));
             }
         }
         her(c);
@@ -352,7 +352,7 @@ abstract class TrickRun extends TrickBase {
         float duck = jumping ? .72f : 1;
         c.save();
         c.scale(1, duck, mirror, floor);
-        strip(c, R.drawable.run_mawang, 8, in(4.8f, 8.3f) ? 5 : t >= 9 ? 0 : 3, mirror, floor, tall * 1.22f, true, ease(p(.6f, 1.5f)));
+        strip(c, TrickArt.run_mawang, 8, in(4.8f, 8.3f) ? 5 : t >= 9 ? 0 : 3, mirror, floor, tall * 1.22f, true, ease(p(.6f, 1.5f)));
         c.restore();
         her(c);
         float thrown = p(8.3f, 9.1f);
@@ -382,7 +382,7 @@ abstract class TrickRun extends TrickBase {
         if (colour != 0 && pet() != null) {
             if (dyedIdle[colour] == null) {
                 if (ownIdle == null) {
-                    Bitmap all = BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_pet);
+                    Bitmap all = BitmapFactory.decodeResource(context.getResources(), TrickArt.halgakos_pet);
                     int high = all.getHeight() / PetArt.FRAMES.length;
                     ownIdle = Bitmap.createBitmap(all, 0, PetArt.IDLE * high, all.getWidth() / PetArt.COLUMNS * PetArt.FRAMES[PetArt.IDLE], high);
                 }
@@ -492,7 +492,7 @@ abstract class TrickRun extends TrickBase {
             frame = 1;
             lunge = (float) Math.sin(p(thrust - .1f, thrust + .5f) * Math.PI) * dp(70);
         }
-        strip(c, R.drawable.run_guard, 4, frame, guardX + (1 - out(p(1.2f, 2.2f))) * dp(200) - lunge, floor, tall * 1.3f, true, 1);
+        strip(c, TrickArt.run_guard, 4, frame, guardX + (1 - out(p(1.2f, 2.2f))) * dp(200) - lunge, floor, tall * 1.3f, true, 1);
         for (int which = 0; which < 3; which++) {
             float asked = t - (thrusts[which] - .7f);
             if (asked >= 0 && asked < .7f) words(c, "?", guardX - dp(10), floor - tall * 1.5f - asked * dp(20), dp(30), 0xFFFFD84D, 1 - asked / .7f * .5f);
@@ -583,8 +583,8 @@ abstract class TrickRun extends TrickBase {
         pickApps(2);
         String[] heads = {named("EXTRA: Sloppy opens " + label(0) + " again"), "SPOILER: the battery dies at 4%", named("SPOILER: Sloppy scrolls for an hour"),
                 "EXTRA: local translator still right", "SPOILER: it was the phone all along"};
-        strip(c, R.drawable.run_miri, 3, 0, L + dp(52), T + dp(150) + (1 - out(p(.2f, 1))) * -dp(220), tall * 1.15f, false, 1);
-        strip(c, R.drawable.run_gari, 3, t < 9 ? 0 : 2, R - dp(64), floor + (1 - out(p(1.6f, 2.4f))) * dp(240), tall * 1.2f, true, 1);
+        strip(c, TrickArt.run_miri, 3, 0, L + dp(52), T + dp(150) + (1 - out(p(.2f, 1))) * -dp(220), tall * 1.15f, false, 1);
+        strip(c, TrickArt.run_gari, 3, t < 9 ? 0 : 2, R - dp(64), floor + (1 - out(p(1.6f, 2.4f))) * dp(240), tall * 1.2f, true, 1);
         for (int which = 0; which < heads.length; which++) {
             float began = 1.2f + which * 1.05f, flown = t - began;
             if (flown < 0) continue;
@@ -630,7 +630,7 @@ abstract class TrickRun extends TrickBase {
         String[] meant = {"You are looking at your screen.", "Left is left.", "You opened " + label(0) + ".", "Nobody asked for a regent."};
         float gokhaeX = R - dp(70), perch = clamp(T + H * .36f, T + dp(210), floor - tall - dp(60));
         boolean hit = t >= 7;
-        strip(c, R.drawable.run_gokhae, 4, hit ? (t < 7.8f ? 2 : 3) : in(5.9f, 7) ? 0 : 1, gokhaeX + (1 - out(p(.2f, 1.1f))) * dp(180), perch + (hit ? p(7, 7.6f) * dp(30) : 0), tall * 1.25f, true, 1);
+        strip(c, TrickArt.run_gokhae, 4, hit ? (t < 7.8f ? 2 : 3) : in(5.9f, 7) ? 0 : 1, gokhaeX + (1 - out(p(.2f, 1.1f))) * dp(180), perch + (hit ? p(7, 7.6f) * dp(30) : 0), tall * 1.25f, true, 1);
         for (int which = 0; which < said.length; which++) {
             float began = 1.2f + which * 1.1f, shown = Math.min(1, Math.max(0, (t - began) / .4f));
             if (shown <= 0) continue;
@@ -685,7 +685,7 @@ abstract class TrickRun extends TrickBase {
             c.drawLine(L + dp(20) + slip, y + twang, R - dp(20) + slip, y + twang, stroke);
         }
         boolean asleep = t < 4.3f || t >= 6.6f;
-        strip(c, R.drawable.run_yeobaek, 8, asleep ? (t < 4.3f ? 3 : 5) : t < 5.2f ? 0 : 2, guardX, floor, tall * 1.2f, false, ease(p(.6f, 1.4f)));
+        strip(c, TrickArt.run_yeobaek, 8, asleep ? (t < 4.3f ? 3 : 5) : t < 5.2f ? 0 : 2, guardX, floor, tall * 1.2f, false, ease(p(.6f, 1.4f)));
         if (asleep && t > 1.4f) {
             for (int which = 0; which < 3; which++) {
                 float rise = (t * .5f + which / 3f) % 1;
@@ -899,7 +899,7 @@ abstract class TrickRun extends TrickBase {
             c.drawLine(L + dp(24), y, R - dp(24) - rnd(which, 1) * W * .3f, y, stroke);
         }
         float under = ease(p(3.6f, 4.4f)) * (1 - ease(p(7.6f, 8.4f)));
-        strip(c, R.drawable.run_sumbi, 4, in(3.4f, 8) ? 1 : 0, diverX + (1 - out(p(.3f, 1.2f))) * dp(180) - under * (diverX - hx - dp(40)), floor + under * dp(120), tall * 1.25f, true, 1 - under * .45f);
+        strip(c, TrickArt.run_sumbi, 4, in(3.4f, 8) ? 1 : 0, diverX + (1 - out(p(.3f, 1.2f))) * dp(180) - under * (diverX - hx - dp(40)), floor + under * dp(120), tall * 1.25f, true, 1 - under * .45f);
         if (t < 3.4f) go(clamp(cx - dp(30), L + wide, R - wide), floor, dp(380));
         // The net comes up under her, and she is in it until it tears.
         float netted = ease(p(5, 5.8f)) * (1 - ease(p(7.4f, 7.9f)));
