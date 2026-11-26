@@ -267,17 +267,24 @@ final class RunLevels {
             // (In the lands of the first two chapters, which are short, they come one or two together; later, two to four.)
             int size = Math.min(want, number <= 12 ? 1 + random.nextInt(2) : 2 + random.nextInt(3)), put = 0;
             int kind = !shooters.isEmpty() && random.nextInt(5) == 0 ? shooters.get(random.nextInt(shooters.size())) : walkers.get(random.nextInt(walkers.size()));
+            // A times, which cannot be landed on, comes alone: never a row of them across the way. The rest of a pack stand a square apart,
+            // so that there is somewhere to come down among them.
+            if (kind == TIMES) {
+                // (And not where one of the others already stands within five squares: there it is a minus.)
+                for (int[] other : level.foes) if (crowd(other) && other[2] == spot[1] - 1 && Math.abs(other[1] - spot[0]) < 5) kind = MINUS;
+            }
+            if (kind == TIMES) size = 1;
             for (int each = 0; each < size; each++) {
                 boolean stands = false;
-                for (int[] other : spots) stands |= other[0] == spot[0] + each && other[1] == spot[1];
+                for (int[] other : spots) stands |= other[0] == spot[0] + each * 2 && other[1] == spot[1];
                 if (!stands) break;
-                level.foes.add(new int[]{kind, spot[0] + each, spot[1] - 1, 1, 1});
+                level.foes.add(new int[]{kind, spot[0] + each * 2, spot[1] - 1, 1, 1});
                 put++;
             }
             want -= Math.max(1, put);
             for (int index = spots.size() - 1; index >= 0; index--) {
                 int[] other = spots.get(index);
-                if (other[1] == spot[1] && other[0] >= spot[0] - 3 && other[0] <= spot[0] + Math.max(1, put) + 2) spots.remove(index);
+                if (other[1] == spot[1] && other[0] >= spot[0] - (kind == TIMES ? 5 : 3) && other[0] <= spot[0] + Math.max(1, put) * 2 + (kind == TIMES ? 5 : 2)) spots.remove(index);
             }
         }
         // And in the air.

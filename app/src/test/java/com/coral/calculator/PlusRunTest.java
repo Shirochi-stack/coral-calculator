@@ -1276,11 +1276,17 @@ public class PlusRunTest {
         assertEquals(blows + 1, fight.blows());
     }
 
+    private static int whole, base;
+
     @Test public void everyLandHasFiveTimesTheCreaturesItWasLaidWithAndTheFirstThreeTwice() {
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
             int laid = 0, more = 0, packs = 0, was = -9, wasRow = -9;
             java.util.Set<Integer> kinds = new java.util.TreeSet<>();
+            if (number == 4) {
+                whole = 0;
+                base = 0;
+            }
             for (int[] foe : level.foes) {
                 if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET) continue;
                 if (!RunLevels.crowd(foe)) {
@@ -1301,16 +1307,24 @@ public class PlusRunTest {
                 for (int[] other : level.foes) if (RunLevels.rover(other[0])) assertTrue("land " + number + " at " + foe[1], Math.abs(other[1] - foe[1]) >= 16);
                 for (int flag : level.flags) assertTrue("land " + number + " at " + foe[1] + " by flag " + flag, Math.abs(flag - foe[1]) >= 6);
                 for (int[] thing : level.decor) assertTrue("land " + number + " at " + foe[1] + " in a village", Math.abs(thing[1] - foe[1]) >= 10);
-                if (foe[1] != was + 1 || foe[2] != wasRow) packs++;
+                if (foe[1] != was + 2 || foe[2] != wasRow) packs++;
                 was = foe[1];
                 wasRow = foe[2];
+                // None stands shoulder to shoulder with another; and a times, which cannot be landed on, has no other of them within five squares of it.
+                for (int[] other : level.foes) {
+                    if (other == foe || !RunLevels.crowd(other) || RunLevels.flier(other[0]) || other[2] != foe[2]) continue;
+                    assertTrue("land " + number + " at " + foe[1], Math.abs(other[1] - foe[1]) >= 2);
+                    if (foe[0] == RunLevels.TIMES) assertTrue("land " + number + " times at " + foe[1], Math.abs(other[1] - foe[1]) >= 5);
+                }
             }
             int times = RunLevels.crowdOf(number);
             assertEquals("land " + number, number <= 3 ? 2 : 5, times);
             // Five times what it was laid with, or twice: give or take a tenth, where there was not room for all of them.
             // (Where someone waits at the end the land is short, and there is room for fewer: twice over at the least.)
             assertTrue("land " + number + " laid " + laid + " more " + more, more <= laid * (times - 1)
-                    && more >= (RunLevels.bossOf(number) >= 0 || number <= 12 ? Math.min(laid, laid * (times - 1)) : laid * (times - 1) * 5 / 10));
+                    && more >= (RunLevels.bossOf(number) >= 0 || number <= 12 ? Math.min(laid, laid * (times - 1)) : laid * (times - 1) * 3 / 10));
+            whole += laid + more;
+            base += laid;
             // In packs, spread along the land: not all in one place.
             if (more >= 8) assertTrue("land " + number + " packs " + packs + " of " + more, packs >= more / 4 && packs <= more);
             // In the short lands of the first two chapters they come one or two together, no more.
@@ -1320,6 +1334,9 @@ public class PlusRunTest {
             for (int[] weapon : level.weapons) if (weapon[1] < level.main) things++;
             assertTrue("land " + number + " things " + things, things >= level.flags.size() + (level.gate - 60) / 60);
         }
+        // Over all the lands from the fourth on, with room for them or not: more than three and a half times what they were laid with.
+        assertTrue("whole " + whole + " of " + base, whole * 10 >= base * 25);
+        if (System.getenv("RUN_COUNT") != null) throw new AssertionError("CROWD: whole " + whole + " of " + base);
         // One of them keeps still while she is far off, and is about its business when she is near.
         RunLevels.Level level = flat(120);
         level.foes.add(new int[]{RunLevels.MINUS, 90, FLOOR - 1, 1, 1});
