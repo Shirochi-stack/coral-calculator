@@ -3,6 +3,7 @@ Makes one clip of a cutscene with the video model Seedance 2.5, on BytePlus Mode
 
     python tools/make_cutscene.py SHOT            says what would be sent and what it would cost, and sends nothing
     python tools/make_cutscene.py SHOT --go       sends it: one task, one clip
+    python tools/make_cutscene.py SHOT --task ID  sends nothing: asks after a task already made, and saves its clip
 
 SHOT is a folder under dist/cutscenes holding shot.json and what it names: the prompt, the
 reference pictures, and a recording, if the shot has one. shot.json is
@@ -102,6 +103,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("shot", help="a folder under dist/cutscenes")
     parser.add_argument("--go", action="store_true", help="send it: this costs money")
+    parser.add_argument("--task", help="a task already made: ask after it and save its clip, sending nothing new")
     args = parser.parse_args()
     folder = SHOTS / args.shot
     shot = json.loads((folder / "shot.json").read_text(encoding="utf-8"))
@@ -111,21 +113,24 @@ def main():
     print(json.dumps(shown, indent=1, ensure_ascii=False))
     print(f"\nOne clip: {body['duration']} s at {wide} x {tall}, about {tokens:,.0f} tokens.")
     print("Estimated cost: " + ("not known for this model and size" if costs is None else f"${costs:.2f} (at ${rate} a million tokens; nothing is charged if it fails)"))
-    if not args.go:
+    if not args.go and not args.task:
         print("\nNothing sent. Run again with --go to make the clip.")
         return
     key = secret()
     if not key:
         raise SystemExit(f"No key: put {KEY_NAMES[0]}=... in {PROJECT / '.env'} (or in the environment).")
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-    reply = requests.post(BASE, headers=headers, json=body, timeout=300)
-    if reply.status_code != 200:
-        raise SystemExit(f"The service refused the request: HTTP {reply.status_code} {reply.text[:600]}")
-    task = reply.json().get("id")
+    if args.task:
+        task = args.task
+    else:
+        reply = requests.post(BASE, headers=headers, json=body, timeout=300)
+        if reply.status_code != 200:
+            raise SystemExit(f"The service refused the request: HTTP {reply.status_code} {reply.text[:600]}")
+        task = reply.json().get("id")
     print("task", task, flush=True)
     answer, began = {}, time.time()
     while time.time() - began < 45 * 60:
-        time.sleep(10)
+        time.sleep(0 if args.task and not answer else 10)
         try:
             answer = requests.get(f"{BASE}/{task}", headers=headers, timeout=60).json()
         except requests.RequestException as error:
