@@ -48,6 +48,8 @@ final class Fight {
     static final float ROUND_SECONDS = 60, FLOURISH_SECONDS = 1.1f, BETWEEN = 2.6f;
     /** How long a clash lasts, and how long after it a last tap still counts. */
     static final float CLASH_SECONDS = 4, CLASH_GRACE = .25f;
+    /** How long the bar of a clash is left on show once it is settled, and how much of that it takes to fill for whoever won. */
+    static final float CLASH_SHOWN = .45f, CLASH_SWEEP = .14f;
     /** How long after a blow the next press still goes on with its chain; how long a dodge lasts, how much of it nothing can touch her, and how long before the next. */
     static final float CHAIN_WINDOW = .3f, DODGE_SECONDS = .34f, DODGE_SAFE = .22f, DODGE_REST = .9f;
     static final float DASH_SECONDS = .26f, BACKSTEP_SECONDS = .24f, LAND_SECONDS = .09f;
@@ -278,6 +280,9 @@ final class Fight {
         float dodgeRest;
         int airMoves;
         boolean airDodged;
+        /** How many dodges of hers have made a blow miss that would have landed; and whether this one has yet. */
+        int slips;
+        private boolean slipped;
         private boolean light, heavy, special, jump, dodge, ultimate, left, right, followed;
         private float sinceLeft = 9, sinceRight = 9;
         /** What she pressed in the middle of a blow, to do as soon as she may: 1 a quick one, 2 a heavy one, 3 her special. */
@@ -323,7 +328,7 @@ final class Fight {
     /** Counts that only go up, for whoever shows the fight to tell what has just happened; and where the last blow landed. */
     private int hits, blocks, throwsMade, falls, moves, quakes, dodges, clashes;
     private float hitX, hitY, quakeX;
-    private boolean hitHard;
+    private boolean hitHard, hitGrand;
     private int hitSide;
     /** How long the fight is held still for a blow that has just landed; and whether what is landing now is to take off all it would alone. */
     private float stop;
@@ -418,7 +423,27 @@ final class Fight {
     float hitX() { return hitX; }
     float hitY() { return hitY; }
     boolean hitHard() { return hitHard; }
+    /** Whether the last blow to land was an ultimate's. */
+    boolean hitGrand() { return hitGrand; }
     int hitSide() { return hitSide; }
+    /**
+     * Where the divider of a clash's bar stands, from 0 at its left end to 1 at its right: the
+     * left side's colour fills up to it and the right side's from it. It starts in the middle
+     * and goes toward whoever is behind, by how many taps the other leads: a tap of a lead is
+     * easily seen, and however far ahead one is it never reaches an end while they still tap.
+     */
+    static float clashBar(int left, int right) { return .5f + .44f * (float) Math.tanh((left - right) / 8f); }
+
+    float clashBar() { return clashBar(taps[0], taps[1]); }
+
+    /** Who won the clash that has just been settled, while her greater ultimate is announced; below zero at any other time. */
+    int clashWinner() { return phase == FLOURISH && flourisher >= 0 && fighters[flourisher].move == CLASH ? flourisher : -1; }
+
+    /** How long ago it was settled, and how far the bar has filled for whoever won it: all of it, quickly. */
+    float clashAge() { return clashWinner() < 0 ? 0 : phaseClock; }
+
+    float clashSweep() { return clashWinner() < 0 ? 0 : Math.min(1, phaseClock / CLASH_SWEEP); }
+
     /** How much of a clash is left, in seconds; how often a side has tapped in it; and who went for her ultimate second. */
     float clashLeft() { return clashLeft; }
     int taps(int side) { return taps[side]; }
@@ -450,6 +475,7 @@ final class Fight {
         out.writeFloat(hitY);
         out.writeFloat(quakeX);
         out.writeBoolean(hitHard);
+        out.writeBoolean(hitGrand);
         out.writeByte(hitSide);
         out.writeFloat(clashLeft);
         out.writeShort(taps[0]);
@@ -487,6 +513,7 @@ final class Fight {
             out.writeBoolean(fighter.backing);
             out.writeBoolean(fighter.guarding);
             out.writeFloat(fighter.dodgeRest);
+            out.writeShort(fighter.slips);
         }
         out.writeByte(shots.size());
         for (Shot shot : shots) {
@@ -524,6 +551,7 @@ final class Fight {
         hitY = in.readFloat();
         quakeX = in.readFloat();
         hitHard = in.readBoolean();
+        hitGrand = in.readBoolean();
         hitSide = in.readByte();
         clashLeft = in.readFloat();
         taps[0] = in.readShort();
@@ -561,6 +589,7 @@ final class Fight {
             fighter.backing = in.readBoolean();
             fighter.guarding = in.readBoolean();
             fighter.dodgeRest = in.readFloat();
+            fighter.slips = in.readShort();
         }
         shots.clear();
         for (int count = in.readUnsignedByte(); count > 0; count--) {
@@ -847,6 +876,7 @@ final class Fight {
         me.clock = 0;
         me.safe = DODGE_SAFE;
         me.dodgeRest = DODGE_REST;
+        me.slipped = false;
         me.across = way * (me.inAir() ? 6 : 9.5f);
         me.chain = 0;
         dodges++;
@@ -1151,6 +1181,11 @@ final class Fight {
      * Both meters fill. Returns whether it landed at all.
      */
     private boolean hurt(Fighter her, Fighter by, float damage, float knock, float stun, boolean floors, float from, Move move) {
+        if (her.state == DODGE && her.safe > 0 && !her.slipped) {
+            // It was on her, and she was not there: a dodge that did what it was for, counted once.
+            her.slipped = true;
+            her.slips++;
+        }
         if (her.safe > 0 || her.state == RISE || her.state == OUT) return false;
         boolean juggle = her.state == DOWN;
         if (juggle && (her.y <= .25f || her.juggled >= 3)) return false;
@@ -1167,6 +1202,7 @@ final class Fight {
             her.blockAge = 0;
             blocks++;
             hitHard = false;
+            hitGrand = false;
             return true;
         }
         boolean grand = whole || by.move == ULTIMATE || by.move == CLASH, chained = her.state == HIT || juggle;
@@ -1180,6 +1216,7 @@ final class Fight {
         her.meter = Math.min(METER, her.meter + damage * .8f);
         hits++;
         hitHard = hard;
+        hitGrand = grand;
         if (!grand) stop = Math.max(stop, hard ? .09f : .04f);
         her.move = -1;
         her.clock = 0;

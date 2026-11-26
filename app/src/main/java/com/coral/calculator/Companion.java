@@ -155,6 +155,13 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private String lastWords;
     /** A game or a prank that has the whole screen, drawn over everything else of hers. */
     private PlayStage stage;
+    /** A long game that was left for the home screen, kept as it stood so that it can be jumped back into, and where its window goes. */
+    private PlayStage parked;
+    private WindowManager.LayoutParams parkedParams;
+    private final Runnable dropParked = this::dropParked;
+    private final Runnable tellParked = this::tellParked;
+    /** A game left waiting is let go after this long. */
+    private static final long PARKED_MS = 30 * 60_000L;
     private WindowManager.LayoutParams stageParams;
     private boolean prankDue;
     /** The small prank she is playing in her own window, where she stood when it began, and her hop. */
@@ -457,7 +464,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (calculator != null) calculator.refresh();
     }
 
-    void serviceStopped() { serviceStarted = false; }
+    void serviceStopped() {
+        serviceStarted = false;
+        dropParked();
+    }
 
     /** Folding, unfolding and turning all change the room she has; wait for it to settle. */
     void screenChanged() {
@@ -872,6 +882,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         card.setPadding(0, dp(6), 0, dp(6));
         card.setBackground(cardBackground(dark, dp(18)));
         card.setClipToOutline(true);
+        if (parked != null) card.addView(menuRow(CompanionIcon.PLAY, "Back to " + PlaySession.name(parked.game()), dark, this::resumeStage));
         card.addView(menuRow(CompanionIcon.CALCULATOR, panel != null && !panelGames ? "Close mini calculator"
                 : "Mini calculator", dark, () -> toggleFromMenu(false)));
         card.addView(menuRow(CompanionIcon.PLAY, panel != null && panelGames ? "Close the games"
@@ -1047,7 +1058,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
      * as long as it takes to read, through whatever is done to her meanwhile: tapped, held or
      * dragged, she keeps talking. Only a touch on the bubble itself sends it away early.
      */
-    private void say(String words) {
+    private void say(String words) { say(words, null); }
+
+    /** As above; and a touch on the bubble does something more than send it away. */
+    private void say(String words, Runnable touched) {
         closeBubble();
         if (sprite == null) return;
         words = prefs.named(words);
@@ -1061,7 +1075,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         text.setPadding(dp(13), dp(9), dp(13), dp(9));
         text.setBackground(cardBackground(dark, dp(16)));
         text.setContentDescription("Halgakos says: " + words);
-        text.setOnClickListener(v -> closeBubble());
+        text.setOnClickListener(v -> {
+            closeBubble();
+            if (touched != null) touched.run();
+        });
         Speech speech = new Speech(ui, text, dark ? 0xFF1D2023 : Color.WHITE, dark ? 0xFF34383C : 0xFFE4E4E4, dp(8));
         speech.measure(View.MeasureSpec.makeMeasureSpec(Math.min(dp(236), span().width()), View.MeasureSpec.AT_MOST),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
@@ -1146,6 +1163,14 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
      * @param game one of the games of {@link PlaySession} that take a stage, or its prank
      */
     private void openStage(int game) {
+        // The game that is waiting is the one asked for: it carries on. Another game takes its place; a prank leaves it waiting.
+        if (parked != null && game != PlaySession.PRANK) {
+            if (parked.game() == game) {
+                resumeStage();
+                return;
+            }
+            dropParked();
+        }
         closeMenu();
         closePanel();
         closeBubble();
@@ -1158,8 +1183,12 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (game == PlaySession.PRANK && PlayStage.isPrank(asked)) kind = asked;
         boolean prank = PlayStage.isPrank(kind);
         PlayStage view = new PlayStage(ui, kind, dark(), haptics(), art, animated() ? pet : null, played -> {
-            // Left by going home, the game leaves nothing behind it on the home screen.
+            // Left by going home, the game leaves nothing behind it on the home screen; a long one waits to be come back to.
             boolean home = stage != null && stage.wentHome();
+            if (home && stage.hold()) {
+                parkStage();
+                return;
+            }
             closeStage();
             // After a game the others are offered again; a prank just ends.
             if (!PlayStage.isPrank(played) && !home) openPanel(true);
@@ -1193,6 +1222,61 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         }
         stage.setSafeInsets(safe.left - screen.left, safe.top - screen.top, screen.right - safe.right, screen.bottom - safe.bottom);
         stage.setHinge(hinge());
+    }
+
+    /** Takes a long game off the screen as it stands, and keeps it: she is back in her window, and says how to get back to it. */
+    private void parkStage() {
+        dropParked();
+        parked = stage;
+        parkedParams = stageParams;
+        closeStage();
+        handler.postDelayed(dropParked, PARKED_MS);
+        handler.postDelayed(tellParked, 700);
+    }
+
+    private void tellParked() {
+        if (parked == null || sprite == null || sprite.away || stage != null) return;
+        say(PlaySession.name(parked.game()) + " is paused. Tap here to jump back in Sloppy~♡", this::resumeStage);
+    }
+
+    /** Puts the game that was waiting back on the screen, as it was left. */
+    private void resumeStage() {
+        if (parked == null) return;
+        closeMenu();
+        closePanel();
+        closeBubble();
+        closeStage();
+        if (sprite == null || sprite.away) return;
+        if (settling != null) settling.cancel();
+        handler.removeCallbacks(dropParked);
+        handler.removeCallbacks(tellParked);
+        PlayStage view = parked;
+        parked = null;
+        stageParams = parkedParams;
+        Rect screen = screen();
+        stageParams.width = screen.width();
+        stageParams.height = screen.height();
+        stageParams.x = screen.left;
+        stageParams.y = screen.top;
+        view.comeBack();
+        if (!add(view, stageParams)) {
+            view.discard();
+            return;
+        }
+        stage = view;
+        fitStage();
+        handler.removeCallbacks(rest);
+        sprite.onStage = true;
+        sprite.invalidate();
+    }
+
+    /** Lets go of a game that was waiting. */
+    private void dropParked() {
+        handler.removeCallbacks(dropParked);
+        handler.removeCallbacks(tellParked);
+        if (parked == null) return;
+        parked.discard();
+        parked = null;
     }
 
     private void closeStage() {

@@ -604,6 +604,12 @@ final class RunGame {
 
     void close() { audio.close(); }
 
+    /** Left for the home screen: a run stops on its pause, and whoever was speaking stops, so that it can be come back to as it stands. */
+    void hold() {
+        if (screen == PLAY) pause();
+        audio.hush();
+    }
+
     /** The Back key: out of a run to its pause, out of the story, the counter or a card to the map; false to leave the game. */
     boolean back() {
         if (screen == PLAY) {
