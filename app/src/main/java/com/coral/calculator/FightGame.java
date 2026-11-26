@@ -1923,7 +1923,7 @@ final class FightGame {
             canvas.drawOval(box, paint);
             paint.setColor(Color.BLACK);
             canvas.save();
-            frame(canvas, player, FightFrames.IDLE1 + (int) (clock / .3f) % 4, x, bandBottom, scale, false);
+            frame(canvas, player, FightFrames.ST1 + (int) (clock / .14f) % 8, x, bandBottom, scale, false);
             canvas.restore();
         }
         box.set(cardLeft, cardTop, cardRight, cardBottom);
