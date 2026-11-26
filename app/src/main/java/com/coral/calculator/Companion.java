@@ -1057,6 +1057,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     private void closePanel() {
         if (panel == null) return;
+        // The card of games is put away: what was played on it may have unlocked something.
+        if (panelGames && stage == null) unlock();
         CalculatorSession.get(app).removeListener(this);
         remove(panel);
         panel = null;

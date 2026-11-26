@@ -233,14 +233,6 @@ final class Trick extends TrickRun {
         strip(c, TrickArt.run_rune, 3, t < 8.6f ? 0 : 2, runeX + (1 - out(p(.2f, 1))) * dp(160), perch, tall * 1.05f, true, 1);
         if (t < 1.4f) go(clamp(cx - dp(40), L + wide, R - wide), floor, dp(380));
         else if (t < 5.4f) go(clamp(cx - dp(40) + (float) Math.sin(t * 2.6f) * W * .22f, L + wide / 2, R - wide / 2), floor, dp(330));
-        // Afloat on a book, once it is over her head.
-        float afloat = Math.max(0, hy - tall * .5f - level);
-        if (afloat > 0) {
-            lift = afloat + (float) Math.sin(t * 3) * dp(4);
-            wear(LOSE, 6, 2, 1.1f);
-            piece(c, BOOK, hx, hy - lift + dp(6), dp(84), (float) Math.sin(t * 3) * 5, 1);
-        }
-        her(c);
         for (int which = 0; which < 34; which++) {
             float began = 1.2f + which * .2f, fell = (t - began) / 1.3f;
             if (fell <= 0 || fell >= 1 || t > 8.4f) continue;
@@ -254,6 +246,14 @@ final class Trick extends TrickRun {
         path.lineTo(R, B);
         path.close();
         if (level < B - dp(2)) c.drawPath(path, paint);
+        // Afloat on a book, once it is up to her knees.
+        float afloat = Math.max(0, hy - tall * .25f - level);
+        if (afloat > 0) {
+            lift = afloat + tall * .3f + (float) Math.sin(t * 3) * dp(4);
+            wear(LOSE, 6, 2, 1.1f);
+            piece(c, BOOK, hx, hy - lift + dp(10), dp(92), (float) Math.sin(t * 3) * 5, 1);
+        }
+        her(c);
         if (in(8.6f, 11)) plate(c, "S-sorry about your screen...", runeX - dp(40), perch - tall * 1.2f, dp(12), 0xFF292B2A, 0xF2FFFFFF, p(8.6f, 8.9f));
         line(.3f, 2.2f, "Don't look now. Rune's crying on your screen Sloppy~♡");
         line(2.6f, 2.2f, "Every third tear is a knife. Don't ask Sloppy~♡");
@@ -310,10 +310,10 @@ final class Trick extends TrickRun {
         float shown = ease(p(.6f, 1.3f)) * (1 - p(9.4f, 10.4f)), y = clamp(T + H * .3f, T + dp(170), floor - tall - dp(120)), half = Math.min(W * .4f, dp(190));
         float left = 5.6f - (t - 1.6f), share = t < 1.6f ? .5f : left > 0 ? Math.min(.86f, .5f + (t - 1.6f) * .06f + (float) Math.sin(t * 9) * .02f) : 1;
         wash(c, 0x99101018, shown * .5f);
-        portrait(c, 0, cx - half - dp(8), y - dp(54), dp(30), shown);
+        portrait(c, 0, cx - half + dp(26), y - dp(54), dp(30), shown);
         fill(0xFF8E97A3, shown);
-        c.drawCircle(cx + half + dp(8), y - dp(54), dp(30), paint);
-        words(c, "?", cx + half + dp(8), y - dp(54), dp(30), Color.WHITE, shown);
+        c.drawCircle(cx + half - dp(26), y - dp(54), dp(30), paint);
+        words(c, "?", cx + half - dp(26), y - dp(54), dp(30), Color.WHITE, shown);
         // The bar: who is winning.
         fill(0xE61B1D22, shown);
         box.set(cx - half - dp(6), y - dp(16), cx + half + dp(6), y + dp(16));

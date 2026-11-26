@@ -115,7 +115,8 @@ abstract class TrickRun extends TrickBase {
     void book(Canvas c) {
         float spot = clamp(cx, L + wide, R - wide), size = Math.min(W * .6f, dp(250));
         if (t < 1.5f) go(spot, floor, dp(430));
-        float lands = floor - tall * .4f, bookY = T - size + (lands - (T - size)) * into(p(1.6f, 2.4f)), since = t - 2.4f;
+        // It comes to rest on top of her: what is left of her shows under it.
+        float lands = floor - tall * .36f - size * .36f, bookY = T - size + (lands - (T - size)) * into(p(1.6f, 2.4f)), since = t - 2.4f;
         c.save();
         c.translate(shake(since, dp(10)), shake(since, dp(6)));
         if (t > 1.2f && t < 6.9f) {
@@ -157,7 +158,7 @@ abstract class TrickRun extends TrickBase {
         String[] wrong = {"fish cake", "a brick", "normal app", "not bread", "a Tuesday"};
         float swing = t - 2.6f;
         strip(c, TrickArt.run_tsubakieh, 6, t < 1.8f ? 0 : t < 2.5f ? 2 : t < 3.3f ? 3 : t < 8.6f ? 1 : 5,
-                L - dp(70) + (batter + dp(70) - L) * out(p(.3f, 1.8f)), row + size * .9f, tall * 1.05f, false, 1);
+                L - dp(70) + (batter + dp(70) - L) * out(p(.3f, 1.8f)), floor, tall * 1.05f, false, 1);
         // The blow goes along the row; what it passes loses its name, and the name walks off.
         float wave = batter + (R - batter) * p(2.6f, 3.4f);
         if (swing >= 0 && swing < .8f) {
@@ -169,7 +170,7 @@ abstract class TrickRun extends TrickBase {
             float jolt = hit >= 0 && hit < .4f ? (float) Math.sin(hit * 50) * dp(5) * (1 - hit / .4f) : 0;
             icon(c, which, x + jolt, row, size, hit >= 0 && fixed < 0 ? (float) Math.sin(t * 3 + which) * 5 : 0, 1);
             if (hit < 0 || fixed >= 0) {
-                plate(c, label(which), x, row + size * .86f, dp(11.5f), 0xFF292B2A, 0xF2FFFFFF, 1);
+                plate(c, tag(which), x, row + size * .86f, dp(11.5f), 0xFF292B2A, 0xF2FFFFFF, 1);
                 if (fixed >= 0 && fixed < .5f) piece(c, STAR, x, row - size * .7f - fixed * dp(40), dp(22), fixed * 300, 1 - fixed / .5f);
             } else {
                 // Its name, wrong now, on two legs.
@@ -183,8 +184,8 @@ abstract class TrickRun extends TrickBase {
                 }
             }
         }
-        if (in(8.7f, 11)) plate(c, "That seems normal.", batter + dp(40), row + size * .9f - tall * 1.25f, dp(12), 0xFF292B2A, 0xF2FFFFFF, p(8.7f, 9));
-        if (t < 5.6f) go(clamp(cx, L + wide, R - wide), floor, dp(360));
+        if (in(8.7f, 11)) plate(c, "That seems normal.", batter + dp(40), floor - tall * 1.25f, dp(12), 0xFF292B2A, 0xF2FFFFFF, p(8.7f, 9));
+        if (t < 5.6f) go(clamp(cx + dp(30), L + wide, R - wide), floor, dp(360));
         else if (t < 8.6f) go(clamp(appX(Math.min(count - 1, (int) ((t - 5.6f) / .62f)), count), L + wide / 2, R - wide / 2), floor, dp(520));
         else act(PetArt.WAVE);
         line(.3f, 2, "Tsubakieh's warming up. Normally. Near your apps Sloppy~♡");
@@ -258,10 +259,10 @@ abstract class TrickRun extends TrickBase {
         for (int which = 0; which < marks.length; which++) {
             float since = t - when[which];
             if (since >= 0 && since < .45f) land = since;
-            stamp(c, marks[which], L + W * (.24f + rnd(which, 4) * .52f), T + H * (.16f + which * .1f + rnd(which, 5) * .05f), dp(19 + rnd(which, 6) * 6),
+            stamp(c, marks[which], L + W * (.24f + rnd(which, 4) * .52f), T + dp(110) + (floor - tall - dp(190) - T) * (which + rnd(which, 5) * .6f) / 5, dp(19 + rnd(which, 6) * 6),
                     -22 + rnd(which, 7) * 44, STAMP_RED, t < 6.6f ? since : -1);
         }
-        if (t >= 6.6f) stamp(c, "APPROVED", cx, T + H * .32f, dp(30), -9, SEAL_GREEN, t - 6.6f);
+        if (t >= 6.6f) stamp(c, "APPROVED", cx, T + dp(110) + (floor - tall - dp(190) - T) * .5f, dp(30), -9, SEAL_GREEN, t - 6.6f);
         c.save();
         c.translate(0, shake(land, dp(5)));
         if (t < 1.6f) go(clamp(desk + dp(150), L + wide, R - wide), floor, dp(380));
@@ -333,7 +334,7 @@ abstract class TrickRun extends TrickBase {
 
     /** The Mawang, as her shadow, does the opposite of whatever she does; until she is offered bread. */
     void shadow(Canvas c) {
-        wash(c, 0x99151020, ease(p(.2f, 1.2f)) * (1 - p(9.2f, 10.6f)) * .55f);
+        wash(c, 0xCC151020, ease(p(.2f, 1.2f)) * (1 - p(9.2f, 10.6f)) * .7f);
         float reach = Math.min(W * .3f, dp(150));
         if (t < 2.6f) go(cx - reach, floor, dp(260));
         else if (in(6.4f, 8)) go(cx - reach * .35f, floor, dp(200));
@@ -352,7 +353,7 @@ abstract class TrickRun extends TrickBase {
         float duck = jumping ? .72f : 1;
         c.save();
         c.scale(1, duck, mirror, floor);
-        strip(c, TrickArt.run_mawang, 8, in(4.8f, 8.3f) ? 5 : t >= 9 ? 0 : 3, mirror, floor, tall * 1.22f, true, ease(p(.6f, 1.5f)));
+        strip(c, TrickArt.run_mawang, 6, in(4.8f, 8.3f) ? 5 : t >= 9 ? 0 : 3, mirror, floor, tall * 1.22f, true, ease(p(.6f, 1.5f)));
         c.restore();
         her(c);
         float thrown = p(8.3f, 9.1f);
@@ -425,8 +426,11 @@ abstract class TrickRun extends TrickBase {
     /** Altteul sets up his stall on the screen and prices the user's apps. */
     void stall(Canvas c) {
         pickApps(4);
-        float up = out(p(.3f, 1.3f)), left = L + dp(18), right = Math.min(R - dp(18), left + dp(300)), top = clamp(floor - tall - dp(120), T + dp(150), floor - dp(150));
-        float counter = top + dp(96), keeper = left + dp(46);
+        float up = out(p(.3f, 1.3f)), left = L + dp(18), right = Math.min(R - dp(18), left + dp(300)), counter = floor - dp(52), top = counter - tall * 1.02f - dp(4);
+        float keeper = left + dp(46);
+        pen(0xFF8A5A33, dp(5), up);
+        c.drawLine(left + dp(4), top - dp(10), left + dp(4), counter, stroke);
+        c.drawLine(right - dp(4), top - dp(10), right - dp(4), counter, stroke);
         // The awning, in stripes.
         for (int stripe = 0; stripe < 8; stripe++) {
             fill(stripe % 2 == 0 ? 0xFFE8554B : 0xFFFFF4E6, up);
@@ -454,7 +458,7 @@ abstract class TrickRun extends TrickBase {
             float atX = hers ? x + (hx - x) * ease(bought) : x, atY = hers ? y + (hy - tall * 1.25f - y) * ease(bought) - (float) Math.sin(bought * Math.PI) * dp(40) : y;
             if (x > right - dp(20)) break;
             icon(c, which, atX, atY, dp(44) * shown, 0, 1);
-            plate(c, hers && bought >= 1 ? "SOLD" : prices[which], x, counter + dp(34), dp(11.5f), hers && bought >= 1 ? Color.WHITE : 0xFF292B2A, hers && bought >= 1 ? 0xF2D8342B : 0xF2FFE9A8, p(2.6f + which * .3f, 2.9f + which * .3f));
+            plate(c, hers && bought >= 1 ? "SOLD" : prices[which], x, counter + dp(30), dp(11.5f), hers && bought >= 1 ? Color.WHITE : 0xFF292B2A, hers && bought >= 1 ? 0xF2D8342B : 0xF2FFE9A8, p(2.6f + which * .3f, 2.9f + which * .3f));
         }
         if (t < 2.2f) go(clamp(right + dp(20), L + wide, R - wide / 2), floor, dp(360));
         else if (in(7.2f, 8.6f)) act(PetArt.JUMP);
@@ -547,7 +551,7 @@ abstract class TrickRun extends TrickBase {
             if (there < 1) words(c, gone < 1 ? "× 0" : "0", x, row, dp(22), Color.WHITE, (1 - there) * (1 - back));
             if (back > 0 && back < 1) piece(c, STAR, x, row - size * .7f, dp(24), back * 200, 1 - back);
         }
-        plate(c, "Apps: " + count + " × 0 = " + (t < 5 ? left : t < 7 ? 0 : left), cx, T + dp(64), dp(13), 0xFF292B2A, 0xF2FFFFFF, p(1.6f, 2));
+        plate(c, t < 7 ? "Apps: " + count + " × 0 = " + (t < 5 ? left : 0) : "Apps: " + left + " of " + count + " back", cx, T + dp(64), dp(13), 0xFF292B2A, 0xF2FFFFFF, p(1.6f, 2));
         // His floor glows before it bites: she is off it by then.
         float glow = t < 5.2f || t > 6.5f ? 0 : (float) Math.abs(Math.sin((t - 5.2f) * 6));
         fill(0xFFFFE066, glow * .55f);
@@ -581,14 +585,14 @@ abstract class TrickRun extends TrickBase {
     /** The Gazette Twins print the user's screen: Miri spoils it, and Gari blacks it out. */
     void gazette(Canvas c) {
         pickApps(2);
-        String[] heads = {named("EXTRA: Sloppy opens " + label(0) + " again"), "SPOILER: the battery dies at 4%", named("SPOILER: Sloppy scrolls for an hour"),
-                "EXTRA: local translator still right", "SPOILER: it was the phone all along"};
-        strip(c, TrickArt.run_miri, 3, 0, L + dp(52), T + dp(150) + (1 - out(p(.2f, 1))) * -dp(220), tall * 1.15f, false, 1);
+        String[] heads = {named("EXTRA: Sloppy opens " + tag(0) + " again"), "SPOILER: the battery dies at 4%", named("SPOILER: Sloppy scrolls for an hour"),
+                "EXTRA: local translator still right"};
+        strip(c, TrickArt.run_miri, 3, 0, L + dp(46), T + dp(128) + (1 - out(p(.2f, 1))) * -dp(220), tall, false, 1);
         strip(c, TrickArt.run_gari, 3, t < 9 ? 0 : 2, R - dp(64), floor + (1 - out(p(1.6f, 2.4f))) * dp(240), tall * 1.2f, true, 1);
         for (int which = 0; which < heads.length; which++) {
             float began = 1.2f + which * 1.05f, flown = t - began;
             if (flown < 0) continue;
-            float y = T + dp(190) + which * Math.min(dp(74), (floor - tall - dp(220) - T) / heads.length), x = L - dp(160) + (cx + dp(160) - L) * out(Math.min(1, flown / .6f));
+            float y = T + dp(158) + which * Math.max(dp(44), Math.min(dp(70), (floor - tall - dp(230) - T) / heads.length)), x = L - dp(160) + (cx + dp(160) - L) * out(Math.min(1, flown / .6f));
             text.setTextSize(dp(12.5f));
             float half = Math.min(W * .46f, text.measureText(heads[which]) / 2 + dp(14));
             c.save();
@@ -606,7 +610,7 @@ abstract class TrickRun extends TrickBase {
             // Gari's bar across it, a moment after it lands.
             float barred = Math.min(1, Math.max(0, (flown - 1.5f) / .4f));
             fill(0xFF0A0A0C, 1);
-            c.drawRect(x + half - (half * 1.6f) * barred, y - dp(5), x + half - dp(4), y + dp(11), paint);
+            c.drawRect(x + half - (half * 1.3f) * barred, y - dp(5), x + half - dp(4), y + dp(11), paint);
             c.restore();
         }
         if (t < 1.6f) go(clamp(cx, L + wide, R - wide), floor, dp(380));
@@ -685,7 +689,7 @@ abstract class TrickRun extends TrickBase {
             c.drawLine(L + dp(20) + slip, y + twang, R - dp(20) + slip, y + twang, stroke);
         }
         boolean asleep = t < 4.3f || t >= 6.6f;
-        strip(c, TrickArt.run_yeobaek, 8, asleep ? (t < 4.3f ? 3 : 5) : t < 5.2f ? 0 : 2, guardX, floor, tall * 1.2f, false, ease(p(.6f, 1.4f)));
+        strip(c, TrickArt.run_yeobaek, 6, asleep ? (t < 4.3f ? 3 : 5) : t < 5.2f ? 0 : 2, guardX, floor, tall * 1.2f, false, ease(p(.6f, 1.4f)));
         if (asleep && t > 1.4f) {
             for (int which = 0; which < 3; which++) {
                 float rise = (t * .5f + which / 3f) % 1;
@@ -827,15 +831,14 @@ abstract class TrickRun extends TrickBase {
         for (int which = 0; which < shots; which++) {
             float shot = 2.3f + which * .31f, flown = t - shot;
             // Each of them comes on from the right until a shot meets it; then it is a blot where it stood.
-            float came = t - (1 + which * .22f), x = R + dp(30) - Math.max(0, came) * dp(54), meet = muzzle + (R - muzzle) * (.3f + rnd(which, 1) * .55f);
-            float reach = (meet - muzzle) / dp(900), hitAt = shot + reach;
-            float atHit = R + dp(30) - Math.max(0, hitAt - (1 + which * .22f)) * dp(54);
+            float came = Math.max(0, t - .8f), reach = .22f, hitAt = shot + reach;
+            float x = L + W * .5f + which * dp(17) - came * dp(38), atHit = Math.max(muzzle + dp(24), L + W * .5f + which * dp(17) - (hitAt - .8f) * dp(38));
             if (flown >= 0) fired++;
             if (t < hitAt) {
-                if (came > 0) walker(c, MINUS, x, floor - dp(18), dp(30), came * 9 + which, 1);
-                if (flown >= 0) piece(c, INK, muzzle + flown * dp(900), floor - tall * .52f + (floor - dp(18) - floor + tall * .52f) * (flown / reach), dp(18), 0, 1);
+                if (x < R + dp(20)) walker(c, MINUS, x, floor - dp(18), dp(30), came * 9 + which, 1);
+                if (flown >= 0) piece(c, INK, muzzle + (atHit - muzzle) * (flown / reach), floor - tall * .52f + (tall * .52f - dp(18)) * (flown / reach), dp(18), 0, 1);
             } else {
-                blot(c, Math.max(atHit, meet), floor - dp(18), dp(15), which, 1);
+                blot(c, atHit, floor - dp(18), dp(11), which, 1 - Math.min(1, (t - hitAt) / 1.6f));
             }
             // And some of it goes on the screen.
             float splat = t - (shot + .15f);
@@ -867,8 +870,8 @@ abstract class TrickRun extends TrickBase {
             // The ribbon streams behind her, and the draughts she rides.
             pen(Hair.COLOURS[PlusRun.GREEN], dp(4), (1 - down) * up);
             path.reset();
-            for (int back = 0; back <= 14; back++) {
-                double then = way - back * .07;
+            for (int back = 0; back <= 9; back++) {
+                double then = way - back * .035;
                 float bx = cx + (float) Math.sin(then) * W * .34f, by = T + H * .36f + (float) Math.sin(then * 2) * H * .16f - tall * .82f + (float) Math.sin(t * 9 + back) * dp(3);
                 if (back == 0) path.moveTo(x, y - tall * .82f);
                 else path.lineTo(start + (bx - start) * up, by);

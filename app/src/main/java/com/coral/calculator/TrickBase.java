@@ -475,6 +475,12 @@ abstract class TrickBase {
 
     String label(int which) { return labels.isEmpty() ? "Calculator" : labels.get(which % labels.size()); }
 
+    /** The same, cut short enough to go under its icon in a row of them. */
+    String tag(int which) {
+        String name = label(which);
+        return name.length() > 10 ? name.substring(0, 9).trim() + "…" : name;
+    }
+
     /** Words about a middle, in a colour. */
     void words(Canvas canvas, String words, float x, float y, float size, int colour, float alpha) {
         text.setTextAlign(Paint.Align.CENTER);
