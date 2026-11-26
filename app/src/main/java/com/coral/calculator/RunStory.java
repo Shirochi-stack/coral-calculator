@@ -432,7 +432,7 @@ final class RunStory {
             {"blow6", "Mm? Ow. I'm up, I'm up.", "Y", "The sleepy swordswoman has just been hit while dozing. Startled awake, groggy, slow."},
             {"blow7", "One chunk off him. Keep cutting Sloppy~♡", "H", PLAYER + "She has just cut a piece off a giant slime. Fierce, pleased." + FAST},
             {"blow8", "...You hit like someone with friends.", "M", "The lonely other self has just been hit, and it stirs something in her. Quiet, surprised, a crack in her coldness."},
-            {"blow9", "Ow! That is a pass mark!", "D", "The little knight has just been hit and has to admit it was a good one. Earnest, startled, loud."},
+            {"blow9", "Ow! That is a pass mark!", "D", "The knight has just been hit and has to admit it was a good one. Earnest, startled, loud."},
             {"blow10", "My nib! Most irregular.", "F", "The fountain-pen butler has just been hit. Affronted, prim, pained."},
             {"blow11", "Oh... that will have to be written down.", "Q", "The quiet scribe has just been hit. Soft, surprised, a little dazed."},
             {"blow12", "That one is going on your bill!", "V", "The merchant girl has just been hit. Indignant, quick, bright."},
@@ -448,7 +448,7 @@ final class RunStory {
             {"aim5", "Censored.", "K", "The shy twin paints black bars across everything her opponent can see. A whisper, nervous."},
             {"aim6", "Excuse my cut. Mmm.", "Y", "The sleepy swordswoman steps out behind her opponent and swings, half asleep. Drowsy, polite, slow."},
             {"aim8", "Alone is easier.", "M", "The lonely other self throws black feathers at the friend who came for her. Cold, tired, hollow."},
-            {"aim9", "Thrusting. Please step back.", "D", "The little knight warns her opponent before she thrusts her halberd. Earnest, polite, loud."},
+            {"aim9", "Thrusting. Please step back.", "D", "The knight warns the opponent before thrusting the halberd. Earnest, formal, loud."},
             {"aim10", "A small correction, if I may.", "F", "The fountain-pen butler flicks ink at his opponent. Polite, dry."},
             {"aim11", "Noted.", "Q", "The quiet scribe throws a scroll at her opponent. Soft, flat."},
             {"aim12", "Catch! Exact change!", "V", "The merchant girl flings coins at her opponent. Bright, gleeful."},
@@ -490,6 +490,12 @@ final class RunStory {
             {"stall1", "Sold! A pleasure doing sums with you!", "L", "The shopkeeper hands over a purchase and flicks her abacus. Delighted, brisk."},
             {"stall2", "Not enough pluses, dear customer. The land is full of them!", "L",
                     "The shopkeeper cheerfully turns down a customer who cannot pay. Bright, teasing, businesslike."},
+            {"stall3", "Sold out, dear customer! That was the last one. My next stall has more!", "L",
+                    "The shopkeeper shows an empty shelf and points down the road to her next stall. Bright, apologetic, businesslike."},
+            {"stall4", "One colour at a time, dear customer! Wear that one out first!", "L",
+                    "The shopkeeper refuses to sell a hair ribbon to someone already wearing one. Bright, firm, amused."},
+            {"stall5", "You don't need that yet, dear customer. I don't sell what won't be used!", "L",
+                    "The shopkeeper waves away a purchase the customer has no use for. Bright, honest, brisk."},
     };
     /**
      * What is said as each of those who wait arrives, once the way back has shut: Zero,
@@ -515,7 +521,7 @@ final class RunStory {
                     "The lonely other self descends on black wings and takes off her mask to begin the last fight. Tired, low, hollow, slow."},
             // And the seven others, in the order they are numbered: for the Brake Pads and the Straight-Ahead Party she says it.
             {"enter9", "Halt! Guild entrance exam. Three questions, and all of them are halberd.", "D",
-                    "A small knight in full armour blocks the way and announces an entrance exam, halberd in hand. Earnest, loud, young, a little muffled by her helmet."},
+                    "A knight in full armour blocks the way and announces an entrance exam, halberd in hand. Earnest, loud, stern, a little muffled by the helmet."},
             {"enter10", "Good evening. Kindly do not smudge the Archive. I should have to blot you.", "F",
                     "A prim butler who is a living fountain pen bars the way with perfect manners and a faint threat. Polite, dry, unhurried."},
             {"enter11", "The court record says you were never here. I am correcting the land to match.", "Q",
@@ -562,8 +568,8 @@ final class RunStory {
                     "The lonely other self, wounded, starts using dark versions of her friend's own powers. Low, tired, bitter, slow."},
             {"phase8b", "Then be ordinary. See how long they stay.", "M",
                     "The lonely other self, nearly beaten, throws a black ribbon that makes her opponent an ordinary girl. Hollow, low, her voice wavering."},
-            {"phase9a", "Second question! It is also halberd, but lower!", "D", "The little knight, hit a few times, announces the next part of her exam. Earnest, loud, flustered."},
-            {"phase9b", "Final question! Forward, march!", "D", "The little knight, nearly beaten, orders herself to charge. Earnest, loud, determined."},
+            {"phase9a", "Second question! It is also halberd, but lower!", "D", "The knight, hit a few times, announces the next part of the exam. Earnest, loud, flustered."},
+            {"phase9b", "Final question! Forward, march!", "D", "The knight, nearly beaten, gives the order to charge. Earnest, loud, determined."},
             {"phase10a", "Permit me to underline that.", "F", "The fountain-pen butler, hit a few times, readies a dash on his nib. Polite, dry, a little sharper."},
             {"phase10b", "This will require my signature.", "F", "The fountain-pen butler, nearly beaten, prepares his finest attack with wounded dignity. Polite, cold, clipped."},
             {"phase11a", "Footnote. See below.", "Q", "The quiet scribe, hit a few times, makes ink fall from above. Soft, flat, precise."},
@@ -646,7 +652,7 @@ final class RunStory {
                     PLAYER + "She has just won a lasting upgrade after beating a boss. Smug, pleased, teasing." + FAST},
             {"prize3", "A whole bounty. I'm rich. Don't ask for a share Sloppy~♡", "H",
                     PLAYER + "She has just been paid a big reward of coins. Gleeful, greedy, playful." + FAST},
-            {"prize4", "Tap the ribbon by the arrows and I'll change colour Sloppy~♡", "H",
+            {"prize4", "Tap the ribbon by my weapon and I'll change colour Sloppy~♡", "H",
                     PLAYER + "She explains that her newly won hair colour can be called on with a button. Helpful, bossy, bright." + FAST},
     };
     /**
@@ -679,6 +685,16 @@ final class RunStory {
     static final String[][] SHADOW = {
             {"shadow1", "Black. For five seconds I'm her shadow, and nothing touches me Sloppy~♡", "H",
                     PLAYER + "She has just turned into a dark, untouchable shadow of herself using her lonely other self's colour. Low, thrilled, a little eerie." + FAST}};
+    /** When her hearts are gone and it has cost her a life: with lives to spare, and down to the last. */
+    static final String[][] LIFE = {
+            {"life1", "That's a life gone. Back to the flag, hearts full Sloppy~♡", "H",
+                    PLAYER + "She has just lost one of her lives and been set back at the last checkpoint. Winded, annoyed, already getting up again." + FAST},
+            {"life2", "Last life. No more mistakes Sloppy~♡", "H",
+                    PLAYER + "She is down to her very last life. Tense, low, steeling herself." + FAST}};
+    /** The first time she is shut in with someone whose guard is up. */
+    static final String[][] SHIELD = {
+            {"shield1", "See that shield? Nothing lands while it's up. Wait out the attack, then hit Sloppy~♡", "H",
+                    PLAYER + "She is sizing up a boss who is protected by a glowing shield, and working out how to beat her. Sharp, coaching, confident." + FAST}};
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -706,7 +722,7 @@ final class RunStory {
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
-                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW);
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD);
         return groups.toArray(new String[0][][]);
     }
 }

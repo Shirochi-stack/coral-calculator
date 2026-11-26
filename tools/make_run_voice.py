@@ -68,13 +68,13 @@ VOICES = {
     "W": ("community-qdnchfkneudi", .92, 1.0),
     "L": ("community-qj9kc2jtun4a", 1.1, 1.2),
     # Five more who wait at the ends of lands: the Guild Guard, Penchok-jipsa, Byeoru, Jupan and Sumbi.
-    "D": ("community-2e7y7ype1d0u", .95, .98),
+    "D": ("upbeat-bee-0979__design-voice-2d592424", 1.0, 1.0),  # a voice designed as a low, firm lady knight, the user's pick of fourteen
     "F": ("Felix", 1.0, 1.04),
     "Q": ("community-qj9kc2jtun4a", .88, 1.06),
     "V": ("community-mzyrf5zr14rb", 1.1, 1.12),
     "X": ("community-qdnchfkneudi", 1.12, 1.1),
     # The Brake Pads, who speak as one; the Straight-Ahead Party, for whom its swordswoman speaks; and the Old Book.
-    "Z": ("community-2e7y7ype1d0u", .98, .92),
+    "Z": ("Ashley", 1.0, .96),
     "a": ("community-qdnchfkneudi", 1.08, .98),
     "b": ("Ambrose", .9, 1.0),
 }
@@ -99,7 +99,7 @@ MANNER = {
     "A": "Nabi is a playful cat-eared girl with a high, giggly, mischievous anime voice. ",
     "W": "Moru is a short-spoken smith girl with a flat, blunt but young and light anime voice. ",
     "L": "Altteul is a thrifty young shopkeeper with a high, brisk, bright anime voice, always selling. ",
-    "D": "The Guild Guard is a small, earnest young knight in full armour with a high, loud, dutiful anime voice. ",
+    "D": "The Guild Guard is a lady knight in full armour who guards the guild's door and takes its entrance exam very seriously: a low, firm, dutiful voice, stern and formal, barking orders with total conviction, in clear American English. ",
     "F": "Penchok-jipsa is a living fountain pen who is a prim butler: a light, dry, impeccably polite voice, never old or gruff. ",
     "Q": "Byeoru is a quiet young court scribe with a soft, high, flat anime voice, precise and unhurried. ",
     "V": "Jupan is a sly young merchant girl with a high, quick, bright anime voice, always bargaining. ",

@@ -78,6 +78,10 @@ final class PlusRun {
     static final int CAKE = 8, DROPOFF = 9;
     /** How what is asked of her stands: not asked yet, being done, done, or not to be done this time. */
     static final int ASKED = 1, DONE = 2, FAILED = 3;
+    /** And handed in: whoever asked it, or whoever it was for, has thanked her and paid her for it. */
+    static final int PAID = 4;
+    /** Why a stall will not sell something: she cannot pay; it has sold what it had of it; she is wearing a colour; or she has no use for it yet. */
+    static final int SOLD = 0, POOR = 1, SOLD_OUT = 2, WORN = 3, NEEDLESS = 4;
     /**
      * Her forms, each from a ribbon of its colour, which is the colour her hair turns. Red
      * throws fire and walks on lava. Blue throws water and swims. Brown knocks over whatever
@@ -218,6 +222,12 @@ final class PlusRun {
     /** In the range, with its gun in her hands; and called on in black, a shadow that nothing touches. */
     private boolean ranging, shadow;
     private int quest, cakes, questGiven, questsDone, questFails, questFlags;
+    /** Where whoever asked it stands; how many times it has been handed in, and she has been reminded of it; and whether she has been away from whoever asked. */
+    private int questColumn = -1, questRow, questsPaid, reminders;
+    private boolean questAway;
+    /** The stall she is at, by its column, and what each stall has sold of each thing it sells. */
+    private int stallAt = -1;
+    private final java.util.Map<Integer, Integer> stallSold = new java.util.HashMap<>();
     /** How full what she calls a colour on with is, from nothing to 1; and how many times she has. */
     private float charge = 1;
     private int called;
@@ -361,6 +371,13 @@ final class PlusRun {
         questsDone = other.questsDone;
         questFails = other.questFails;
         questFlags = other.questFlags;
+        questColumn = other.questColumn;
+        questRow = other.questRow;
+        questsPaid = other.questsPaid;
+        reminders = other.reminders;
+        questAway = other.questAway;
+        stallAt = other.stallAt;
+        stallSold.putAll(other.stallSold);
         questLeft = other.questLeft;
         greeted.addAll(other.greeted);
         locked = other.locked;
@@ -542,10 +559,33 @@ final class PlusRun {
     int purse() { return collected + bonus - spent; }
     int spent() { return spent; }
 
-    /** Buys something at a stall for some of what she has collected: it is hers at once, as if she had picked it up. Returns whether she could pay. */
+    /** How many of a thing one stall has to sell: a ribbon, one; a ball of ink, one; bread and ice cream, two. */
+    static int stock(int kind) { return kind > FORM || kind == SHIELD ? 1 : 2; }
+
+    /**
+     * Whether the stall she is at will sell her something, and if not, why not. Each stall
+     * has only so many of a thing, and the next stall has its own. A ribbon is not sold
+     * while she wears a colour, so that a colour always ends; nor bread while her hearts
+     * are full, a ball of ink while she has one, or ice cream while she is full of it.
+     */
+    int refusal(int kind, int cost) {
+        if (stallSold(kind) >= stock(kind)) return SOLD_OUT;
+        if (kind > FORM && coloured()) return WORN;
+        if (kind == BREAD && halves >= perks.hearts * 2 || kind == SHIELD && shield || kind == ICE && rush > 0) return NEEDLESS;
+        return purse() < cost ? POOR : SOLD;
+    }
+
+    /** How many of a thing the stall she is at has sold. */
+    int stallSold(int kind) {
+        Integer sold = stallSold.get(stallAt * 64 + Math.min(kind, FORM + 1));
+        return sold == null ? 0 : sold;
+    }
+
+    /** Buys something at a stall for some of what she has collected: it is hers at once, as if she had picked it up. Returns whether it was sold. */
     boolean buy(int kind, int cost) {
-        if (purse() < cost) return false;
+        if (refusal(kind, cost) != SOLD) return false;
         spent += cost;
+        stallSold.put(stallAt * 64 + Math.min(kind, FORM + 1), stallSold(kind) + 1);
         take(kind);
         return true;
     }
@@ -940,6 +980,12 @@ final class PlusRun {
         safe = 0;
     }
 
+    /** Puts something in her hands: for checking the rules, and for looking at them. */
+    void arm(int with) {
+        weapon = with;
+        rounds = with == GUN ? perks.shots : 0;
+    }
+
     /** Puts her somewhere, standing still: for checking the rules from a place of one's choosing. */
     void place(float across, float down) {
         x = across;
@@ -1110,6 +1156,7 @@ final class PlusRun {
             if (item[0] == STALL) {
                 if (x < item[1] + 2.2f && x + WIDE > item[1] - 1.2f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                     atStall = true;
+                    stallAt = item[1];
                     if (greeted.add(item[1])) greetings++;
                 }
                 continue;
@@ -1133,7 +1180,11 @@ final class PlusRun {
                 giver = item[3];
                 take(item[0]);
                 // Whoever has something to ask of her asks it as she hands over what she holds.
-                if (quest == 0 && level.quest != 0 && item[3] == RunLevels.giverOf(level.quest)) ask();
+                if (quest == 0 && level.quest != 0 && item[3] == RunLevels.giverOf(level.quest)) {
+                    questColumn = item[1];
+                    questRow = item[2];
+                    ask();
+                }
             }
         }
         // A press of the button uses it, once it has rested; the ink gun goes on for as long as the button is held.
@@ -1200,8 +1251,15 @@ final class PlusRun {
             boolean onto = speedDown > 0 && y + TALL - speedDown * seconds <= foe.y + foe.tall() * .6f;
             if (notes > 0 || has(BROWN)) {
                 // With the notes about her, or in brown, whatever she touches is dealt with; one of those who wait, unless spent, only stops against her.
-                if (RunLevels.boss(foe.kind) && !open(foe) && has(BROWN)) braced(foe.x + foe.wide() / 2);
-                else if (foe.dazed <= 0) beat(foe);
+                if (RunLevels.boss(foe.kind) && !open(foe) && has(BROWN)) {
+                    braced(foe.x + foe.wide() / 2);
+                } else if (has(BROWN) && !RunLevels.boss(foe.kind)) {
+                    // Any sign, from any side, spikes and all, and however much it can take.
+                    foe.left = 1;
+                    beat(foe);
+                } else if (foe.dazed <= 0) {
+                    beat(foe);
+                }
             } else if (onto && foe.kind != RunLevels.TIMES && foe.dazed <= 0) {
                 speedDown = -BOUNCE;
                 airJumps = 0;
@@ -1333,6 +1391,16 @@ final class PlusRun {
 
     /** How what is asked stands is looked at again: a cellar cleared, the room behind the crack found, the flag reached or the count run out. */
     private void asked(float seconds) {
+        // Back with whoever asked it: done, it is handed in; not yet done, she is reminded of it, each time she comes back from somewhere else.
+        if (quest == DONE && byGiver() && state == PLAYING) pay();
+        if (quest == ASKED) {
+            boolean by = byGiver();
+            if (!by && questColumn >= 0 && Math.abs(x - questColumn) > 6) questAway = true;
+            if (by && questAway) {
+                questAway = false;
+                reminders++;
+            }
+        }
         if (quest != ASKED) return;
         if (level.quest == RunLevels.CELLAR || level.quest == RunLevels.ROOM) {
             for (int index = 0; index < level.rooms.size(); index++) {
@@ -1349,14 +1417,43 @@ final class PlusRun {
         }
     }
 
-    /** It is done: fifteen pluses, and a heart if she is short of one. */
+    /**
+     * It is done, and is now to be handed in: to whoever asked it, by going back to her;
+     * or, if she does not go back, when the land is over. A letter is handed to whoever it
+     * was for, there and then; and whoever counted a race has run after her, and is there.
+     */
     private void done() {
         quest = DONE;
         questsDone++;
         questLeft = 0;
+        if (level.quest == RunLevels.LETTER || level.quest == RunLevels.TIME) pay();
+    }
+
+    /** It is handed in: fifteen pluses, and a heart if she is short of one. */
+    private void pay() {
+        quest = PAID;
+        questsPaid++;
         bonus += 15;
         heal();
     }
+
+    /** The land is over, or she is leaving it: what was done and not handed in is handed in now, so that nothing earned is lost. Returns whether there was anything. */
+    boolean settle() {
+        if (quest != DONE) return false;
+        pay();
+        return true;
+    }
+
+    /** Whether she is by whoever asked something of her. */
+    private boolean byGiver() {
+        return questColumn >= 0 && room < 0 && x < questColumn + 2.6f && x + WIDE > questColumn - .6f && Math.abs(y + TALL - questRow - 1) < 1.6f;
+    }
+
+    /** Where whoever asked something of her stands, the column and the row; how many times something has been handed in; and how many times she has come back to be reminded of it. */
+    int questColumn() { return questColumn; }
+    int questRow() { return questRow; }
+    int questsPaid() { return questsPaid; }
+    int reminders() { return reminders; }
 
     /** A heart back, if she is short of one: a whole one, or as much of one as she is short of. */
     private boolean heal() {
