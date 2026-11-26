@@ -26,8 +26,16 @@ final class FightPose {
                 return clock < .05f ? DASH1 : clock > Fight.DASH_SECONDS - .06f ? SKID : (int) (clock / .07f) % 2 == 0 ? DASH2 : DASH3;
             case Fight.BACKSTEP:
                 return clock < .06f ? HOP1 : HOP2;
-            case Fight.DODGE:
-                return clock < Fight.DODGE_SECONDS * .5f ? DODGE1 : DODGE2;
+            case Fight.DODGE: {
+                float part = clock / Fight.DODGE_SECONDS;
+                if (fighter.inAir()) return ADODGE;
+                // Which way she slips, against the way she faces. Away from the other she springs back, lands and settles; toward her
+                // she ducks past and skids to a stop; with no arrow held she only leans out of the way where she stands.
+                float way = fighter.across * (fighter.facingLeft ? -1 : 1);
+                if (way < -.01f) return part < .22f ? BDODGE1 : part < .72f ? BDODGE2 : BDODGE3;
+                if (way > .01f) return part < .72f ? FDODGE : SKID;
+                return part < .5f ? DODGE1 : DODGE2;
+            }
             case Fight.JUMP:
                 return fighter.guarding ? AIR_GUARD : clock < .06f ? PREJUMP : fighter.up > 4 ? RISE : fighter.up > -4 ? TOP : FALL;
             case Fight.LAND:

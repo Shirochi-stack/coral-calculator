@@ -110,6 +110,7 @@ final class FightGame {
     private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase, seenQuakes, seenDodges, seenClashes;
     /** How long her ultimate's button has been on show, for each side; how long ago the round ended; and where each was a moment ago, for what she leaves behind her as she dodges. */
     private float grandAge = 9, sinceOver, trailAge;
+    private int slipTest;
     private final float[][] trail = new float[2][6];
     private final int[] seenState = new int[2], seenLanded = new int[2];
     private final boolean[] seenCharged = new boolean[2];
@@ -522,6 +523,8 @@ final class FightGame {
         grandAge = 9;
         // In a build made for testing, a number kept under this name starts both of them with their meters full.
         if (BuildConfig.DEBUG && session.tally("fight_full") > 0) for (Fight.Fighter fighter : fight.fighters) fighter.meter = Fight.METER;
+        // And a number kept under this one gives the dodge a way to go without a second finger, which a test cannot put down.
+        slipTest = BuildConfig.DEBUG ? session.tally("fight_slip") : 0;
         java.util.Arrays.fill(held, false);
         java.util.Arrays.fill(pressed, false);
         pad2.clear();
@@ -687,6 +690,12 @@ final class FightGame {
         float goal = across >= Fight.WIDE ? (Fight.WIDE - across) / 2
                 : Math.max(0, Math.min(Fight.WIDE - across, (one.x + other.x) / 2 - across / 2));
         cameraX += (goal - cameraX) * Math.min(1, seconds * 8);
+        // However fast one of them goes, neither leaves the screen: whoever is nearest an edge pulls the view along with her.
+        // Each keeps a length of room at her back, or as much as there is when they stand as far apart as the screen lets them.
+        float room = Math.max(0, Math.min(1, (across - Math.abs(one.x - other.x)) / 2));
+        float low = Math.min(one.x, other.x) - room, high = Math.max(one.x, other.x) + room;
+        cameraX = Math.max(high - across, Math.min(low, cameraX));
+        if (across < Fight.WIDE) cameraX = Math.max(0, Math.min(Fight.WIDE - across, cameraX));
         for (int side = 0; side < 2; side++) {
             float now = fight.fighters[side].health / Fight.fullHealth(fight.fighters[side].kind);
             shownHealth[side] = now > shownHealth[side] ? now : Math.max(now, shownHealth[side] - seconds * .45f);
@@ -704,6 +713,11 @@ final class FightGame {
         into.heavy = holding[HEAVY] || tapped[HEAVY];
         into.special = holding[SPECIAL] || tapped[SPECIAL];
         into.dodge = holding[DODGE] || tapped[DODGE];
+        if (slipTest != 0 && into.dodge) {
+            // For testing: the dodge slips away from the other (1) or toward her (2), as if that arrow were held with it.
+            into.left = (slipTest == 1) != fight.fighters[mode == GUEST ? 1 : 0].facingLeft;
+            into.right = !into.left;
+        }
         into.ultimate = holding[ULT] || tapped[ULT];
         java.util.Arrays.fill(tapped, false);
     }

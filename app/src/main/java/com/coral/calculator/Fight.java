@@ -17,8 +17,8 @@ import java.util.Random;
  * three quick ones and a smash, which comes straight down and shakes the ground. A dash, a
  * back-step and a dodge get her about, and there is a blow that breaks a guard, one that
  * launches, and a shove. A special must rest between uses; an ultimate needs a full meter;
- * and when both go for their ultimates at once the two clash, and whoever taps faster has a
- * greater one.
+ * and when one goes for her ultimate before anything of the other's has landed the two clash,
+ * and whoever taps faster has a greater one.
  *
  * Everything is measured in the stage's own lengths and in seconds. Across is from the
  * left; height is up from the floor. This class knows nothing of screens: it is moved on by
@@ -55,6 +55,8 @@ final class Fight {
     static final int LEVELS = 4;
 
     private static final float STEP = 1 / 60f, GRAVITY = 30, LEAP = 11.5f, EDGE = 1.1f, DOUBLE_TAP = .28f, PLUNGE = 24;
+    /** How many times a flood lands as it rolls through. */
+    private static final int FLOOD_LANDS = 3;
     private static final float[] HEALTH = {100, 108, 100, 98, 90};
     private static final float[] SPEED = {4.6f, 4.1f, 5.2f, 4.4f, 4.2f};
     /** How far off each likes to stand, and how near the other must be for her ultimate to be worth using. */
@@ -326,6 +328,10 @@ final class Fight {
     /** How long the fight is held still for a blow that has just landed; and whether what is landing now is to take off all it would alone. */
     private float stop;
     private boolean whole;
+    /** The buttons each pressed while the fight was held still, as bits, to count when it moves again: the jump, the three that hit, the dodge and the ultimate. */
+    private static final int PRESSES = 4 | 16 | 32 | 64 | 128 | 256;
+    private final int[] kept = new int[2];
+    private final Pad[] with = {new Pad(), new Pad()};
     /** A clash: how much of it is left, how often each has tapped, who went for her ultimate second, and when one who plays herself answers an ultimate with her own. */
     private float clashLeft, answer = -1;
     private final int[] taps = new int[2];
@@ -376,6 +382,8 @@ final class Fight {
         phase = FIGHTING;
         phaseClock = 0;
         stop = 0;
+        kept[0] = 0;
+        kept[1] = 0;
         answer = -1;
     }
 
@@ -609,7 +617,8 @@ final class Fight {
             return;
         }
         if (phase == FLOURISH) {
-            // The fight holds its breath while an ultimate is announced. The other may answer it with her own, and then the two clash.
+            // The fight holds its breath while an ultimate is announced. The other may answer it with her own, and then the two clash:
+            // her button held at any moment of the hold is enough, so a press made while nothing moves is not lost.
             Fighter first = fighters[flourisher], second = fighters[1 - flourisher];
             if (first.move == ULTIMATE && second.charged() && second.state != OUT) {
                 Pad hers = held(second.side, pad, other);
@@ -636,14 +645,23 @@ final class Fight {
             return;
         }
         if (stop > 0) {
-            // A blow that has just landed holds everything still for a moment.
+            // A blow that has just landed holds everything still for a moment. What is pressed in that moment is kept for when it is over.
             stop -= seconds;
+            for (int side = 0; side < 2; side++) {
+                Pad mine = held(side, pad, other);
+                if (mine != null) kept[side] |= mine.bits() & PRESSES;
+            }
             return;
         }
         roundClock -= seconds;
         for (int side = 0; side < 2; side++) {
             Fighter me = fighters[side], foe = fighters[1 - side];
             Pad mine = held(side, pad, other);
+            if (mine != null && kept[side] != 0) {
+                with[side].set(mine.bits() | kept[side]);
+                kept[side] = 0;
+                mine = with[side];
+            }
             if (mine == null) mine = level[side] >= 0 ? think(me, foe, seconds) : minds[side];
             act(me, foe, mine, seconds);
             if (phase != FIGHTING) {
@@ -685,6 +703,11 @@ final class Fight {
         boolean twice = left && me.sinceLeft <= DOUBLE_TAP || right && me.sinceRight <= DOUBLE_TAP;
         if (left) me.sinceLeft = 0;
         if (right) me.sinceRight = 0;
+        // Her ultimate, gone for while the other's is under way and has not yet landed, is a clash, whatever she is in the middle of.
+        if (ultimate && me.charged() && me.state != OUT && pending(foe)) {
+            clash(me);
+            return;
+        }
         if (me.state == HIT || me.state == DOWN || me.state == RISE || me.state == OUT || me.state == WON) {
             settle(me, seconds);
             return;
@@ -869,6 +892,21 @@ final class Fight {
         }
     }
 
+    /**
+     * Whether an ultimate of hers is under way and nothing of it has landed yet: announced,
+     * coming out, or thrown and still on its way. Until then the other may meet it with her own.
+     */
+    private boolean pending(Fighter her) {
+        if (her.state == ATTACK && her.move == ULTIMATE) {
+            Move move = her.doing();
+            if (her.hitLanded) return false;
+            if (move.times > 1 ? her.landed < move.times : her.landed == 0 && her.clock <= move.startup + move.active) return true;
+        }
+        // A flood that has not reached anyone yet.
+        for (Shot shot : shots) if (shot.kind == FLOOD && shot.side == her.side && shot.lands == FLOOD_LANDS) return true;
+        return false;
+    }
+
     /** Two ultimates at once: neither goes off, and the two tap for it. */
     private void clash(Fighter second) {
         phase = CLASHING;
@@ -1029,7 +1067,7 @@ final class Fight {
             case KNIFE: speed = 17; shot.left = .9f; break;
             case HEART: speed = 14; shot.left = 1; break;
             case ORB: speed = 5.5f; shot.left = 2.4f; break;
-            default: speed = 7; shot.y = .6f; shot.left = 2.4f; shot.lands = 3; break;
+            default: speed = 7; shot.y = .6f; shot.left = 2.4f; shot.lands = FLOOD_LANDS; break;
         }
         shot.across = way * speed;
         if (air && kind != FLOOD) {
@@ -1333,7 +1371,8 @@ final class Fight {
             }
         } else if (random.nextFloat() > sharp + .2f) {
             // Standing about.
-        } else if (me.charged() && gap <= ULTIMATE_REACH[me.kind]) {
+        } else if (me.charged() && (gap <= ULTIMATE_REACH[me.kind] || pending(foe))) {
+            // Her own ultimate when it would reach, or to meet the other's before it lands.
             pad.ultimate = true;
         } else if (gap > want + .7f) {
             pad.left = toLeft;
