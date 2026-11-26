@@ -170,6 +170,13 @@ Going to the home screen, or to the list of recent apps, closes whichever of the
 - She makes it snow, until the snow lies deep along the bottom.
 - She leaves the tap running, and it fills with water.
 - She lets cobwebs grow in its corners, with a spider on a thread.
+- She covers it in stickers of herself.
+- She breathes on the glass and draws a heart in the mist.
+- She turns down the lights and lowers a mirror ball, with beams of colour going round.
+- She lets go a bunch of balloons that bob against the top.
+- She blows a bubble of gum until it fills the screen and bursts.
+- She turns it into a fish tank, with fish, weed and bubbles.
+- She chases a red dot all over it, and never catches it.
 
 Every one is only a drawing on top of the screen. Nothing is deleted or changed, she owns up within a few seconds, and a tap brings that on at once. Idle is prank time as well: left to herself she plays one every several minutes, announced with a "Watch this Sloppy~♡". In between she plays little ones where she stands, a few seconds each: she turns upside down, twirls, shrinks, hops, dashes to the far side of the screen, slips most of the way off its edge, waves at you, looks all the way round her as if something were behind you, rocks from side to side, ducks flat, or jumps three times on the spot (the wave, the look and the jumps only as the animated Halgakos). A touch ends one of those. Switch **Surprise pranks** off in her settings to stop both kinds and keep pranks to when you ask.
 

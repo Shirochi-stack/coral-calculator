@@ -45,8 +45,11 @@ final class PlayStage extends View {
             NOTES = 17, CONFETTI = 18, CURTAIN = 19, BITE = 20, CROWD = 21, BUG = 22;
     /** More pranks, numbered on from the games that come after the first of them in {@link PlaySession}. */
     static final int DRIP = 27, SNOW = 28, FLOOD = 29, WEBS = 30;
+    /** And seven more, numbered on from Page brawl: stickers of herself, a breath on the glass, a disco, balloons, bubble gum, a fish tank, and a red dot to chase. */
+    static final int STICKERS = 32, FOG = 33, DISCO = 34, BALLOONS = 35, GUM = 36, FISH = 37, LASER = 38;
     private static final int[] PRANKS = {SNATCH, CRACK, SCRIBBLE, LIGHTS, SPLAT, PAWS, AVALANCHE, GIANT, NOTES, CONFETTI,
-            CURTAIN, BITE, CROWD, BUG, DRIP, SNOW, FLOOD, WEBS};
+            CURTAIN, BITE, CROWD, BUG, DRIP, SNOW, FLOOD, WEBS, STICKERS, FOG, DISCO, BALLOONS, GUM, FISH, LASER};
+    private static final int[] BRIGHTS = {0xFFFF5F7E, 0xFFFFC53D, 0xFF4FC3F7, 0xFF7BD88F, 0xFFB388FF, 0xFFFF9A4D};
     /** What she writes on the notes she sticks to the screen, the paper they are on, and her confetti. */
     private static final String[] NOTES_SAY = {"Sloppy was here", "IOU one ice cream", "7 × 8 = 56", "Feed Halgakos", "Do your sums", "Property of Halgakos", "Tap me"};
     private static final int[] PAPER = {0xFFFFF3A0, 0xFFFFC9D6, 0xFFC9F2DD, 0xFFCFE4FF};
@@ -187,6 +190,11 @@ final class PlayStage extends View {
     /** Snowflakes coming down, or bubbles going up: x, y, speed, size, and where in its sway each is. */
     private final List<float[]> specks = new ArrayList<>();
     private float sinceSpeck;
+    /** What one of the later pranks puts on the screen, each thing a few numbers that the prank gives their meaning. */
+    private final List<float[]> props = new ArrayList<>();
+    /** The red dot she chases: where it is, and how long it has been still. */
+    private float dotX, dotY, dotStill;
+    private final Paint wipe = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     /** Plus run is a game of its own, with its own lands, pictures and sounds: it takes the stage over whole. */
     private RunGame runGame;
@@ -277,7 +285,9 @@ final class PlayStage extends View {
         }
     }
 
-    static boolean isPrank(int game) { return (game >= SNATCH && game <= BUG) || (game >= DRIP && game <= WEBS); }
+    static boolean isPrank(int game) {
+        return (game >= SNATCH && game <= BUG) || (game >= DRIP && game <= WEBS) || (game >= STICKERS && game <= LASER);
+    }
 
     /** The pranks she has yet to play this time round, in the order she will play them. */
     private static final List<Integer> NEXT_PRANKS = new ArrayList<>();
@@ -475,6 +485,50 @@ final class PlayStage extends View {
             }
             marksAlpha = 1;
         } else if (game == SNOW || game == FLOOD || game == WEBS) {
+            marksAlpha = 1;
+        } else if (game == STICKERS) {
+            // Stickers of her all over the screen: x, y, tilt, size, and when each is stuck on.
+            for (int i = 0; i < 14; i++) {
+                props.add(new float[]{play.left + dp(40) + random.nextFloat() * Math.max(1, play.width() - dp(80)),
+                        play.top + dp(60) + random.nextFloat() * Math.max(1, play.height() - dp(150)),
+                        (random.nextFloat() - .5f) * 50, dp(64) + random.nextFloat() * dp(40), .2f + i * .13f});
+            }
+            marksAlpha = 1;
+        } else if (game == BALLOONS) {
+            // Balloons: x, how fast each rises, size, colour, where in its sway it is, when it is let go, and how high it stops.
+            for (int i = 0; i < 16; i++) {
+                props.add(new float[]{play.left + dp(30) + random.nextFloat() * Math.max(1, play.width() - dp(60)), dp(200) + random.nextFloat() * dp(160),
+                        dp(30) + random.nextFloat() * dp(16), random.nextInt(BRIGHTS.length), random.nextFloat() * 6.28f, i * .14f,
+                        play.top + dp(50) + random.nextFloat() * play.height() * .45f});
+            }
+            marksAlpha = 1;
+        } else if (game == GUM) {
+            // What is left of the bubble when it bursts: blobs of gum round the edges of the screen, x, y and size.
+            for (int i = 0; i < 18; i++) {
+                boolean side = i % 2 == 0;
+                float along = random.nextFloat();
+                props.add(new float[]{side ? (i % 4 == 0 ? play.left : play.right) : play.left + along * play.width(),
+                        side ? play.top + along * play.height() : (i % 4 == 1 ? play.top : play.bottom), dp(26) + random.nextFloat() * dp(40)});
+            }
+            marksAlpha = 1;
+        } else if (game == FISH) {
+            // Fish: how far down each swims, how fast and which way, size, colour, and where in its wriggle it is.
+            for (int i = 0; i < 9; i++) {
+                props.add(new float[]{play.top + dp(70) + random.nextFloat() * Math.max(1, play.height() - dp(190)),
+                        (random.nextBoolean() ? 1 : -1) * (dp(50) + random.nextFloat() * dp(80)), dp(26) + random.nextFloat() * dp(22),
+                        random.nextInt(BRIGHTS.length), random.nextFloat() * 6.28f, random.nextFloat() * play.width()});
+            }
+            marksAlpha = 1;
+        } else if (game == LASER) {
+            // The places the red dot darts to, the last of them well out of her reach.
+            for (int i = 0; i < 7; i++) {
+                waypoints.add(new float[]{play.left + dp(50) + random.nextFloat() * Math.max(1, play.width() - dp(100)),
+                        play.top + herHeight + dp(30) + random.nextFloat() * Math.max(1, play.height() - herHeight - dp(60))});
+            }
+            dotX = waypoints.get(0)[0];
+            dotY = waypoints.get(0)[1];
+            marksAlpha = 1;
+        } else if (game == FOG || game == DISCO) {
             marksAlpha = 1;
         }
         if (isPrank(game)) {
@@ -1149,7 +1203,51 @@ final class PlayStage extends View {
             case SNOW: specks(seconds, true); show(seconds, 1.6f, "It's snowing in your phone Sloppy~♡"); break;
             case FLOOD: specks(seconds, false); show(seconds, 1.8f, "Oops~ I left the tap running Sloppy~♡"); break;
             case WEBS: show(seconds, 1.4f, "Nobody has dusted in here for ages Sloppy~♡"); break;
+            case STICKERS: show(seconds, 2.2f, "I decorated your screen. With me Sloppy~♡"); break;
+            case FOG: show(seconds, 2.6f, "I breathed on your screen Sloppy~♡"); break;
+            case DISCO: show(seconds, 1.6f, "Party time! Dance Sloppy~♡"); break;
+            case BALLOONS: show(seconds, 2.4f, "I brought balloons. All mine Sloppy~♡"); break;
+            case GUM: show(seconds, 2.3f, "Oops~ my bubble gum popped Sloppy~♡"); break;
+            case FISH: specks(seconds, false); show(seconds, 1.8f, "Your phone is a fish tank now Sloppy~♡"); break;
+            case LASER: laser(seconds); break;
             default: giant(seconds); break;
+        }
+    }
+
+    /** She is part cat: a red dot darts about the screen, and she cannot help running after it. She never catches it. */
+    private void laser(float seconds) {
+        switch (step) {
+            case 0: {
+                if (waypoints.isEmpty() || clock > 9) {
+                    keep(PetArt.IDLE);
+                    perform(PetArt.JUMP);
+                    say("Whose red dot is that?! Sloppy~♡", 2.6f);
+                    next();
+                    break;
+                }
+                float[] spot = waypoints.get(0);
+                // The dot waits for her to come close, then darts off to the next place.
+                dotX += (spot[0] - dotX) * Math.min(1, seconds * 14);
+                dotY += (spot[1] - dotY) * Math.min(1, seconds * 14);
+                boolean close = Math.hypot(herX - dotX, herY - herHeight * .3f - dotY) < dp(46);
+                if (close || (dotStill += seconds) > 1.6f) {
+                    dotStill = 0;
+                    waypoints.remove(0);
+                    if (close) buzz();
+                }
+                runTo(dotX, dotY + herHeight * .3f, dp(470), seconds);
+                break;
+            }
+            case 1:
+                if (stepClock > 2.6f) reveal();
+                break;
+            case 2:
+                marksAlpha = Math.max(0, 1 - stepClock / .5f);
+                if (stepClock > 2.2f) next();
+                break;
+            default:
+                goHome(seconds);
+                break;
         }
     }
 
@@ -1767,6 +1865,13 @@ final class PlayStage extends View {
                     : game == SNOW ? "Just kidding! All melted Sloppy~♡"
                     : game == FLOOD ? "Just kidding! Dry as a bone Sloppy~♡"
                     : game == WEBS ? "Just kidding! Spick and span Sloppy~♡"
+                    : game == STICKERS ? "Just kidding! They peel right off Sloppy~♡"
+                    : game == FOG ? "Just kidding! Wiped clean Sloppy~♡"
+                    : game == DISCO ? "Just kidding! Party's over Sloppy~♡"
+                    : game == BALLOONS ? "Just kidding! They all floated off Sloppy~♡"
+                    : game == GUM ? "Just kidding! Not a bit stuck Sloppy~♡"
+                    : game == FISH ? "Just kidding! Not a fish in it Sloppy~♡"
+                    : game == LASER ? "Just kidding! I wasn't chasing it Sloppy~♡"
                     : "Just kidding! Back to pocket size Sloppy~♡", 2.2f);
         }
         stepClock = 0;
@@ -2158,9 +2263,269 @@ final class PlayStage extends View {
             else if (game == SNOW) drawSnow(canvas);
             else if (game == FLOOD) drawFlood(canvas);
             else if (game == WEBS) drawWebs(canvas);
+            else if (game == STICKERS) drawStickers(canvas);
+            else if (game == FOG) drawFog(canvas);
+            else if (game == DISCO) drawDisco(canvas);
+            else if (game == BALLOONS) drawBalloons(canvas);
+            else if (game == GUM) drawGum(canvas);
+            else if (game == FISH) drawFish(canvas);
+            else if (game == LASER && step == 0) drawDot(canvas);
         }
         drawHer(canvas);
         drawSaying(canvas);
+    }
+
+    /** Stickers of her stuck all over the screen, each on white paper with a tilt, popping on one after another. */
+    private void drawStickers(Canvas canvas) {
+        for (float[] sticker : props) {
+            float since = clock - sticker[4];
+            if (since <= 0) continue;
+            // Each lands a little too large and settles.
+            float pop = since < .18f ? .6f + since / .18f * .55f : Math.max(1, 1.15f - (since - .18f) * 1.5f);
+            float tall = sticker[3] * pop, wide = tall * herWidth / herHeight, edge = dp(5);
+            canvas.save();
+            canvas.rotate(sticker[2], sticker[0], sticker[1]);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0x40000000);
+            paint.setAlpha(Math.round(64 * marksAlpha));
+            canvas.drawRoundRect(sticker[0] - wide / 2 - edge, sticker[1] - tall / 2 - edge + dp(2), sticker[0] + wide / 2 + edge, sticker[1] + tall / 2 + edge + dp(3), dp(10), dp(10), paint);
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(250 * marksAlpha));
+            canvas.drawRoundRect(sticker[0] - wide / 2 - edge, sticker[1] - tall / 2 - edge, sticker[0] + wide / 2 + edge, sticker[1] + tall / 2 + edge, dp(10), dp(10), paint);
+            target.set(sticker[0] - wide / 2, sticker[1] - tall / 2, sticker[0] + wide / 2, sticker[1] + tall / 2);
+            if (pet != null) {
+                int width = pet.getWidth() / PetArt.COLUMNS, height = pet.getHeight() / PetArt.FRAMES.length;
+                source.set(0, 0, width, height);
+                canvas.drawBitmap(pet, source, target, paint);
+            } else {
+                canvas.drawBitmap(art, null, target, paint);
+            }
+            canvas.restore();
+        }
+        paint.setAlpha(255);
+    }
+
+    /** The glass misted over by her breath, and a heart drawn in the mist with a finger: where it has been drawn there is no mist. */
+    private void drawFog(Canvas canvas) {
+        float misted = Math.min(1, clock / 1.3f), drawnSoFar = clamp((clock - 1.2f) / 1.2f, 0, 1);
+        Path mist = new Path();
+        mist.addRect(0, 0, getWidth(), getHeight(), Path.Direction.CW);
+        if (drawnSoFar > 0) {
+            // A heart, traced from its point round to its point again, as far as her finger has got.
+            float size = Math.min(play.width(), play.height()) * .2f, middleX = play.centerX(), middleY = play.centerY() - size * .2f;
+            path.reset();
+            int points = Math.max(1, Math.round(60 * drawnSoFar));
+            for (int point = 0; point <= points; point++) {
+                double turn = Math.PI + point / 60.0 * Math.PI * 2;
+                float x = middleX + size * (float) (16 * Math.pow(Math.sin(turn), 3)) / 17f;
+                float y = middleY - size * (float) (13 * Math.cos(turn) - 5 * Math.cos(2 * turn) - 2 * Math.cos(3 * turn) - Math.cos(4 * turn)) / 17f;
+                if (point == 0) path.moveTo(x, y); else path.lineTo(x, y);
+            }
+            wipe.setStyle(Paint.Style.STROKE);
+            wipe.setStrokeCap(Paint.Cap.ROUND);
+            wipe.setStrokeJoin(Paint.Join.ROUND);
+            wipe.setStrokeWidth(dp(22));
+            // The line her finger left, as a shape, taken out of the mist.
+            Path line = new Path();
+            wipe.getFillPath(path, line);
+            mist.op(line, Path.Op.DIFFERENCE);
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFFECF2F8);
+        paint.setAlpha(Math.round(185 * misted * marksAlpha));
+        canvas.drawPath(mist, paint);
+        paint.setAlpha(255);
+    }
+
+    /** The lights go down, a mirror ball comes down from the top of the screen, and beams of colour sweep round from it. */
+    private void drawDisco(Canvas canvas) {
+        canvas.drawColor(Color.argb(Math.round(150 * Math.min(1, clock / .5f) * marksAlpha), 12, 8, 30));
+        float ballX = play.centerX(), ballY = play.top + Math.min(1, clock / .9f) * play.height() * .16f, round = dp(30);
+        float far = (float) Math.hypot(play.width(), play.height());
+        paint.setStyle(Paint.Style.FILL);
+        for (int beam = 0; beam < 6; beam++) {
+            double turn = clock * .9 + beam * Math.PI / 3, spread = .13;
+            path.reset();
+            path.moveTo(ballX, ballY);
+            path.lineTo(ballX + (float) Math.cos(turn - spread) * far, ballY + (float) Math.abs(Math.sin(turn - spread)) * far);
+            path.lineTo(ballX + (float) Math.cos(turn + spread) * far, ballY + (float) Math.abs(Math.sin(turn + spread)) * far);
+            path.close();
+            paint.setColor(BRIGHTS[beam]);
+            paint.setAlpha(Math.round(70 * marksAlpha));
+            canvas.drawPath(path, paint);
+        }
+        // Spots of light going round the walls.
+        for (int spot = 0; spot < 14; spot++) {
+            double turn = clock * 1.3 + spot * 2.4;
+            paint.setColor(BRIGHTS[spot % BRIGHTS.length]);
+            paint.setAlpha(Math.round(150 * marksAlpha));
+            canvas.drawCircle(play.centerX() + (float) Math.cos(turn) * play.width() * (.2f + spot % 5 * .07f),
+                    play.centerY() + (float) Math.sin(turn * .8 + spot) * play.height() * .4f, dp(7), paint);
+        }
+        // The ball on its string, in little mirrors.
+        stroke.setColor(0xFFB8C0CC);
+        stroke.setAlpha(Math.round(255 * marksAlpha));
+        stroke.setStrokeWidth(dp(2));
+        canvas.drawLine(ballX, 0, ballX, ballY - round, stroke);
+        paint.setColor(0xFFDDE4EE);
+        paint.setAlpha(Math.round(255 * marksAlpha));
+        canvas.drawCircle(ballX, ballY, round, paint);
+        stroke.setColor(0xFF8A94A6);
+        stroke.setAlpha(Math.round(200 * marksAlpha));
+        stroke.setStrokeWidth(dp(1));
+        for (int line = -2; line <= 2; line++) {
+            float away = line * round / 3, half = (float) Math.sqrt(Math.max(0, round * round - away * away));
+            canvas.drawLine(ballX - half, ballY + away, ballX + half, ballY + away, stroke);
+            target.set(ballX - Math.abs(away) - round * .12f, ballY - round, ballX + Math.abs(away) + round * .12f, ballY + round);
+            canvas.drawOval(target, stroke);
+        }
+        paint.setColor(Color.WHITE);
+        paint.setAlpha(Math.round((150 + 100 * (float) Math.sin(clock * 9)) * marksAlpha));
+        canvas.drawCircle(ballX - round * .35f, ballY - round * .35f, round * .16f, paint);
+        stroke.setAlpha(255);
+        paint.setAlpha(255);
+    }
+
+    /** Balloons let go from the bottom of the screen, rising on their strings to bob against the top of it. */
+    private void drawBalloons(Canvas canvas) {
+        for (float[] balloon : props) {
+            float since = clock - balloon[5];
+            if (since <= 0) continue;
+            float size = balloon[2], x = balloon[0] + (float) Math.sin(clock * 1.6f + balloon[4]) * dp(10);
+            float y = Math.max(balloon[6] + (float) Math.sin(clock * 2 + balloon[4]) * dp(5), play.bottom + size * 2 - since * balloon[1]);
+            stroke.setColor(0xFFEDEDED);
+            stroke.setAlpha(Math.round(220 * marksAlpha));
+            stroke.setStrokeWidth(dp(1.3f));
+            path.reset();
+            path.moveTo(x, y + size * 1.2f);
+            path.quadTo(x + dp(8), y + size * 2, x - dp(4), y + size * 2.9f);
+            canvas.drawPath(path, stroke);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(BRIGHTS[(int) balloon[3]]);
+            paint.setAlpha(Math.round(238 * marksAlpha));
+            target.set(x - size * .82f, y - size, x + size * .82f, y + size * 1.1f);
+            canvas.drawOval(target, paint);
+            path.reset();
+            path.moveTo(x, y + size * 1.05f);
+            path.lineTo(x - size * .16f, y + size * 1.3f);
+            path.lineTo(x + size * .16f, y + size * 1.3f);
+            path.close();
+            canvas.drawPath(path, paint);
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(130 * marksAlpha));
+            target.set(x - size * .5f, y - size * .7f, x - size * .18f, y - size * .1f);
+            canvas.drawOval(target, paint);
+        }
+        stroke.setAlpha(255);
+        paint.setAlpha(255);
+    }
+
+    /** A bubble of gum blown from where she stands until it fills the screen; and, once it has burst, what is left of it round the edges. */
+    private void drawGum(Canvas canvas) {
+        paint.setStyle(Paint.Style.FILL);
+        float mouthX = herX, mouthY = herY - herHeight * .42f;
+        if (step == 0) {
+            float blown = Math.min(1, stepClock / 2.3f), round = dp(8) + blown * blown * Math.max(play.width(), play.height()) * .62f;
+            // It grows from her and drifts toward the middle of the screen as it does.
+            float x = mouthX + (play.centerX() - mouthX) * blown, y = mouthY + (play.centerY() - mouthY) * blown;
+            paint.setColor(0xFFFF8FC0);
+            paint.setAlpha(Math.round(190 * marksAlpha));
+            canvas.drawCircle(x, y, round, paint);
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(120 * marksAlpha));
+            target.set(x - round * .6f, y - round * .7f, x - round * .15f, y - round * .25f);
+            canvas.drawOval(target, paint);
+            stroke.setColor(0xFFE0609A);
+            stroke.setAlpha(Math.round(220 * marksAlpha));
+            stroke.setStrokeWidth(dp(2));
+            canvas.drawCircle(x, y, round, stroke);
+            stroke.setAlpha(255);
+        } else {
+            // Burst: blobs along the edges, and strings of it sagging between them.
+            paint.setColor(0xFFFF8FC0);
+            paint.setAlpha(Math.round(235 * marksAlpha));
+            float[] before = props.get(props.size() - 1);
+            stroke.setColor(0xFFFF8FC0);
+            stroke.setAlpha(Math.round(200 * marksAlpha));
+            stroke.setStrokeWidth(dp(5));
+            for (int index = 0; index < props.size(); index++) {
+                float[] blob = props.get(index);
+                canvas.drawCircle(blob[0], blob[1], blob[2], paint);
+                canvas.drawCircle(blob[0] + blob[2] * .7f, blob[1] + blob[2] * .5f, blob[2] * .55f, paint);
+                if (index % 3 == 0) {
+                    path.reset();
+                    path.moveTo(before[0], before[1]);
+                    path.quadTo(play.centerX(), play.centerY() + dp(60), blob[0], blob[1]);
+                    canvas.drawPath(path, stroke);
+                }
+                before = blob;
+            }
+            stroke.setAlpha(255);
+        }
+        paint.setAlpha(255);
+    }
+
+    /** Water over the whole screen, with fish going back and forth through it, weed along the bottom, and bubbles. */
+    private void drawFish(Canvas canvas) {
+        float filled = Math.min(1, clock / 1f);
+        canvas.drawColor(Color.argb(Math.round(120 * filled * marksAlpha), 40, 140, 215));
+        paint.setStyle(Paint.Style.FILL);
+        // Weed, swaying.
+        paint.setColor(0xFF2E9E5B);
+        paint.setAlpha(Math.round(200 * filled * marksAlpha));
+        for (float x = play.left + dp(18); x < play.right; x += dp(46)) {
+            float tall = dp(60) + (x * 7 % dp(50)), sway = (float) Math.sin(clock * 1.5f + x) * dp(10);
+            path.reset();
+            path.moveTo(x - dp(6), play.bottom);
+            path.quadTo(x + sway, play.bottom - tall * .6f, x + sway * 1.6f, play.bottom - tall);
+            path.quadTo(x + sway + dp(8), play.bottom - tall * .5f, x + dp(6), play.bottom);
+            path.close();
+            canvas.drawPath(path, paint);
+        }
+        float span = play.width() + dp(120);
+        for (float[] fish : props) {
+            float size = fish[2], travelled = (fish[5] + clock * Math.abs(fish[1])) % span;
+            boolean rightward = fish[1] > 0;
+            float x = rightward ? play.left - dp(60) + travelled : play.right + dp(60) - travelled;
+            float y = fish[0] + (float) Math.sin(clock * 2 + fish[4]) * dp(8), way = rightward ? 1 : -1;
+            float wag = (float) Math.sin(clock * 9 + fish[4]) * size * .18f;
+            paint.setColor(BRIGHTS[(int) fish[3]]);
+            paint.setAlpha(Math.round(240 * filled * marksAlpha));
+            target.set(x - size * .6f, y - size * .36f, x + size * .6f, y + size * .36f);
+            canvas.drawOval(target, paint);
+            path.reset();
+            path.moveTo(x - way * size * .5f, y);
+            path.lineTo(x - way * size * 1.05f, y - size * .36f + wag);
+            path.lineTo(x - way * size * 1.05f, y + size * .36f + wag);
+            path.close();
+            canvas.drawPath(path, paint);
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(255 * filled * marksAlpha));
+            canvas.drawCircle(x + way * size * .32f, y - size * .08f, size * .1f, paint);
+            paint.setColor(0xFF20242A);
+            paint.setAlpha(Math.round(255 * filled * marksAlpha));
+            canvas.drawCircle(x + way * size * .35f, y - size * .08f, size * .05f, paint);
+        }
+        stroke.setColor(Color.WHITE);
+        stroke.setAlpha(Math.round(200 * filled * marksAlpha));
+        stroke.setStrokeWidth(dp(1.4f));
+        for (float[] bubble : specks) canvas.drawCircle(bubble[0] + (float) Math.sin(bubble[4]) * dp(6), bubble[1], bubble[3] * 1.4f, stroke);
+        stroke.setAlpha(255);
+        paint.setAlpha(255);
+    }
+
+    /** The red dot she chases, with a glow round it. */
+    private void drawDot(Canvas canvas) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFFFF2D2D);
+        paint.setAlpha(Math.round(70 * marksAlpha));
+        canvas.drawCircle(dotX, dotY, dp(16) + (float) Math.sin(clock * 20) * dp(2), paint);
+        paint.setAlpha(Math.round(255 * marksAlpha));
+        canvas.drawCircle(dotX, dotY, dp(6), paint);
+        paint.setColor(Color.WHITE);
+        paint.setAlpha(Math.round(200 * marksAlpha));
+        canvas.drawCircle(dotX - dp(1.5f), dotY - dp(1.5f), dp(1.8f), paint);
+        paint.setAlpha(255);
     }
 
     /** Paint along the top of the screen, running down it in drips of different lengths. */

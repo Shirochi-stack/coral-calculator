@@ -1123,6 +1123,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (sprite == null || sprite.away) return;
         if (settling != null) settling.cancel();
         int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random) : game;
+        // In a build made for testing, a number kept under this name is the prank she plays, to look at one in particular.
+        int asked = BuildConfig.DEBUG ? PlaySession.get(app).tally("prank_next") : 0;
+        if (game == PlaySession.PRANK && PlayStage.isPrank(asked)) kind = asked;
         boolean prank = PlayStage.isPrank(kind);
         PlayStage view = new PlayStage(ui, kind, dark(), haptics(), art, animated() ? pet : null, played -> {
             // Left by going home, the game leaves nothing behind it on the home screen.
