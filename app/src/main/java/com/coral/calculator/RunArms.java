@@ -9,7 +9,9 @@ package com.coral.calculator;
  * gun. One found is hers from then on, in every land: it is in her backpack, and she may
  * change to it whenever she likes. Two are hers to begin a land with: her tablet-book,
  * which she has from the start, and her ring of API keys. A level is how far the smith has
- * worked on a thing, from nothing.
+ * worked on a thing, from nothing: three steps, each of which changes what the thing does,
+ * a wave that flies from a blade, a burst, something that goes on through, and makes its
+ * blows count for more against the tougher creatures of the later lands.
  */
 final class RunArms {
     static final int PEN = 0, KNIFE = 1, BOOK = 2, BRUSH = 3, SWORD = 4, GUN = 5, TABLET = 6, KEYS = 7, COUNT = 8;
@@ -48,8 +50,64 @@ final class RunArms {
     static float heavyRest(int weapon) { return HEAVY_REST[weapon]; }
     static float speed(int weapon) { return SPEED[weapon]; }
     static float reach(int weapon, int level) { return REACH[weapon]; }
-    static float area(int weapon, int level) { return AREA[weapon]; }
-    static float bite(int weapon, int level) { return BITE[weapon]; }
+    static float area(int weapon, int level) { return weapon == BOOK ? burst(BOOK, level) : AREA[weapon]; }
+    /** (The master key, the last the smith makes of the ring, takes a piece more.) */
+    static float bite(int weapon, int level) { return BITE[weapon] + (weapon == KEYS && level >= 3 ? 1 : 0); }
+
+    /** How far the smith can work on a thing. */
+    static final int LEVELS = 3;
+
+    /** How many of a creature's blows one blow of it counts for: one, two from the first step, three at the last. */
+    static int blows(int weapon, int level) { return 1 + (level + 1) / 2; }
+
+    /**
+     * The slash waves the smith puts into a sword, a knife and a brush: how many fly with
+     * a stroke or a throw, how far they go, how tall they are, how fast, and whether they
+     * go on through what they meet.
+     */
+    static int waves(int weapon, int level) {
+        return level < 1 ? 0 : weapon == SWORD ? (level >= 3 ? 2 : 1) : weapon == KNIFE ? (level >= 2 ? 3 : 1) : weapon == BRUSH ? 1 : 0;
+    }
+    static float waveReach(int weapon, int level) {
+        return weapon == SWORD ? (level >= 2 ? 6.5f : 4) : weapon == KNIFE ? (level >= 3 ? 6 : 4.5f) : level >= 3 ? 7 : level == 2 ? 5 : 3;
+    }
+    static float waveTall(int weapon, int level) { return weapon == SWORD ? (level >= 3 ? 2 : 1.35f) : weapon == KNIFE ? .6f : level >= 3 ? 2.6f : 2.1f; }
+    static float waveSpeed(int weapon) { return weapon == SWORD ? 17 : weapon == KNIFE ? 24 : 9; }
+    static boolean waveThrough(int weapon, int level) { return weapon == BRUSH || weapon == SWORD && level >= 2 || weapon == KNIFE && level >= 3; }
+    /** Whether a brush's wave wipes away what is thrown at her as it goes. */
+    static boolean waveWipes(int weapon, int level) { return weapon == BRUSH && level >= 2; }
+
+    /** How many things what is thrown goes on through before it stops: a pen, and a key. Ninety-nine is all of them. */
+    static int pierces(int weapon, int level) { return weapon == PEN ? (level >= 3 ? 99 : level >= 1 ? 1 : 0) : weapon == KEYS && level >= 2 ? 99 : 0; }
+
+    /** How wide the burst of a thing is, in squares from its middle: a book's always; a pen's where it ends, an ink blot's splash, and a page's where it turns, once the smith has made them. */
+    static float burst(int weapon, int level) {
+        return weapon == BOOK ? (level >= 3 ? 3.5f : level >= 1 ? 2.9f : 2.3f) : weapon == PEN ? (level >= 3 ? 2 : level == 2 ? 1.4f : 0)
+                : weapon == GUN ? (level >= 3 ? 1.3f : level >= 1 ? .9f : 0) : weapon == TABLET && level >= 3 ? 1.5f : 0;
+    }
+
+    /** For how long a book's pages burn where it burst; how many times an ink blot jumps on to the next creature; and how many pages the tablet-book flicks. */
+    static float burns(int level) { return level >= 3 ? 2.5f : level == 2 ? 1.5f : 0; }
+    static int chains(int level) { return level >= 3 ? 2 : level == 2 ? 1 : 0; }
+    static int pages(int level) { return level >= 1 ? 2 : 1; }
+    /** The tablet-book's panel, and the keys' fan, as the smith has made them. */
+    static float panelWide(int level) { return level >= 2 ? 3.2f : PANEL_WIDE; }
+    static float panelTall(int level) { return level >= 2 ? 2.4f : PANEL_TALL; }
+    static int fan(int level) { return level >= 1 ? 7 : FAN; }
+
+    /** What each step of the smith's work adds to a thing, in words. */
+    private static final String[][] STEPS = {
+            {"It goes on through the first thing it meets.", "It bursts where it ends.", "It goes through everything, and its burst is wider."},
+            {"A thin slash wave flies with every knife.", "Three waves, in a fan.", "The waves go further, through whatever they meet."},
+            {"A wider burst.", "Its pages burn for a while where it burst.", "Wider again, and it burns longer."},
+            {"Every sweep throws a wide wave of paint.", "The wave goes further, and wipes away what is thrown at her.", "Further and taller again."},
+            {"Every stroke sends a slash wave ahead.", "The wave goes further, through whatever it meets.", "Two waves, and taller."},
+            {"Its blots splash.", "A blot that hits jumps on to the next creature.", "A wider splash, and it jumps twice."},
+            {"Two pages at a time.", "A wider, taller panel.", "A page bursts where it turns back."},
+            {"Seven keys in the fan.", "Keys go on through whatever they meet.", "The master key: a piece more off a shield with every key."}};
+
+    /** What the step that takes a thing to a level adds: for a level from one to three. */
+    static String step(int weapon, int level) { return STEPS[weapon][level - 1]; }
     /** Whether it has something heavy that it does when the button is held. */
     static boolean heavy(int weapon) { return HEAVY_REST[weapon] > 0; }
     /** Whether it is one she begins a land with. */

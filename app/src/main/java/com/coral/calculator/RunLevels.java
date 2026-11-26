@@ -99,11 +99,28 @@ final class RunLevels {
      */
     static final int HOUSE = 6, PET_SHOP = 0, GUILD_HALL = 1, HOME = 2, SMITHY = 3, MARKET = 4;
 
+    /**
+     * Every land has a level, one more with every five lands. The further on, the tougher
+     * its creatures: those of a land take more blows than those of the first lands, and a
+     * hurt costs more of a heart. What the smith makes is what answers it: a thing to fight
+     * with worked on counts for more blows, and what she wears takes some of a hurt off.
+     * Those who wait at the end of a land and those met in the middle of one are as they
+     * were; and so is a land looked at with none of it, with skill enough.
+     */
+    static int levelOf(int number) { return number < 1 ? 1 : 1 + (number - 1) / 5; }
+
+    /** How many more blows a creature of a land takes than one of the first lands; and how many more halves of a heart a hurt costs there. */
+    static int toughOf(int number) { return (levelOf(number) - 1) / 5; }
+    static int biteOf(int number) { return (levelOf(number) - 1) / 6; }
+
     /** The sorts of the two buildings of a village that can be gone into. */
     static int[] buildingsOf(int number, int village) {
-        int first = (number + village) % 3, second = (first + 1 + (number / 3 + village) % 2) % 3;
+        int first = (number + village) % 4, second = (first + 1 + (number / 4 + village) % 3) % 4;
         return new int[]{first, second};
     }
+
+    /** The first land whose smithy is large enough for all three sisters: before it Moru keeps it alone, and does her sisters' work besides. */
+    static final int SISTERS_FROM = 13;
     /** How tall a place off the land is, from its floor to its ceiling. */
     static final int ROOM_TALL = 13;
     /**
@@ -478,9 +495,9 @@ final class RunLevels {
     static final int[] FLOCKS = new int[100];
     static int flockTry = -1;
     static {
-        for (int land : new int[]{40, 41, 46, 53, 54, 57, 61, 63, 68}) FLOCKS[land - 1] = 1;
-        for (int land : new int[]{67, 71, 76}) FLOCKS[land - 1] = 2;
-        FLOCKS[79 - 1] = 3;
+        // (Found again with the creatures of the later lands as tough as their levels make them.)
+        for (int land : new int[]{40, 57, 61, 63}) FLOCKS[land - 1] = 1;
+        for (int land : new int[]{46, 67, 68, 71, 72, 78, 79}) FLOCKS[land - 1] = 2;
     }
 
     static int flierFrom(int kind) { return FLIES_FROM[kind - DRIFTER]; }
@@ -1221,14 +1238,15 @@ final class RunLevels {
         /**
          * The inside of a building of a village. A pet shop: the ten pets, five along its
          * floor and five on a shelf over them, each to be walked up to; and Nabi, who keeps
-         * it, at its far end. The guild hall: Inju at the counter, and her board of hunts. A home: someone in, with
+         * it, at its far end. The guild hall: Inju at the counter, and her board of hunts. The smithy: Moru, and in
+         * the larger villages her two sisters, each at an anvil. A home: someone in, with
          * something for her, and a few pluses on the floor.
          */
         void house(int[] want) {
             int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL;
             wall(2);
             int from = at;
-            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL ? 16 : 14);
+            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL ? 16 : sort == SMITHY ? 18 : 14);
             int to = at - 1;
             wall(2);
             level.land[FLOOR - 1][from + 1] = ENTRY;
@@ -1241,10 +1259,20 @@ final class RunLevels {
                 // And her board of hunts, between the door and her desk.
                 level.items.add(new int[]{PlusRun.SPOT, from + 7, FLOOR - 1, 0, PlusRun.BOARD});
                 pluses(from + 4, from + 6, FLOOR - 1);
+            } else if (sort == SMITHY) {
+                // Moru at her anvil; and, where the village is large enough to keep all three, her sisters, each at her own.
+                level.items.add(new int[]{PlusRun.SPOT, from + 5, FLOOR - 1, 0, PlusRun.SMITH});
+                if (number >= SISTERS_FROM) {
+                    level.items.add(new int[]{PlusRun.SPOT, from + 9, FLOOR - 1, 0, PlusRun.SMITH + 1});
+                    level.items.add(new int[]{PlusRun.SPOT, from + 13, FLOOR - 1, 0, PlusRun.SMITH + 2});
+                }
             } else {
-                // (Not whoever has something to ask of her in this land: she is out in the village.)
-                int who = SOMI + (number * 3 + level.rooms.size()) % (ALTTEUL - SOMI);
+                // (Not whoever has something to ask of her in this land: she is out in the village. Nor whoever keeps the building next door.)
+                int who = SOMI + (number * 3 + level.rooms.size()) % (ALTTEUL - SOMI), next = built.get(built.indexOf(want) ^ 1)[6];
+                int keeper = next == PET_SHOP ? NABI : next == GUILD_HALL ? INJU : next == SMITHY ? MORU : -1;
+                if (who == keeper) who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
                 if (level.quest != 0 && who == giverOf(level.quest)) who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
+                if (who == keeper) who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
                 level.items.add(new int[]{GIVES[who - SOMI], from + 8, FLOOR - 1, who});
                 pluses(from + 3, from + 6, FLOOR - 1);
             }
@@ -1792,6 +1820,7 @@ final class RunLevels {
                         int[] stands = level.decor.get(level.decor.size() - (which == 0 ? 5 : 3));
                         if (sort == PET_SHOP) stands[0] = 300 + level.number % 2;
                         else if (sort == GUILD_HALL) stands[0] = 302 + level.number % 2;
+                        else if (sort == SMITHY) stands[0] = 304;
                         // (Its door is not marked in the land itself, as other doors are: what is laid about a land afterwards is laid as it was.)
                         built.add(new int[]{HOUSE, column, floor, 0, column, floor, sort});
                     }

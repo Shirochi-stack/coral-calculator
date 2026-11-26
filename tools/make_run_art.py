@@ -70,6 +70,7 @@ CAST = {"chikuwa": (1, 3), "rune": (1, 3), "illya": (1, 4), "tsubakieh": (2, 3)}
 CAST_CELL = (288, 248)
 # How tall the first frame of each is made, in the pixels her own frames are measured in: she stands 190 tall.
 CAST_TALL = {"chikuwa": 198, "rune": 190, "illya": 188, "tsubakieh": 190}
+SMITHS = ("moru", "pulmu", "sutdol")
 FACES = ("chikuwa", "rune", "illya", "tsubakieh", "mawang", "gokhae", "miri", "gari", "yeobaek", "nuri")
 # The second volume: how many squares its sheet has to a row; and those who wait in it, with how many rows and
 # frames across the sheet of each has, how tall her first frame is made, and the cell each frame goes in.
@@ -445,6 +446,10 @@ def places():
         town.alpha_composite(building.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * 360 + (360 - size[0]) // 2, 304 - size[1]))
     clear = Image.new("RGBA", town.size, (0, 0, 0, 0))
     Image.composite(town, clear, town.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_town.webp", lossless=True, quality=100, method=6, exact=True)
+    # The three sisters who keep the smithy, each from a sheet of her own and in a file of her own: at ease, her hammer up, her hammer
+    # down, and pleased with her work. Moru is the webtoon's; Pulmu and Sutdol are new.
+    for name in SMITHS:
+        strip_of(pieces(f"smith_{name}", 1, 4), 150, (280, 250), f"smith_{name}")
     # And what stands about in them: two things for each, sixteen in a row, all at one scale, each standing on the bottom of its cell.
     things = pieces("props_a", 2, 4) + pieces("props_b", 2, 4)
     if len(things) != 16:

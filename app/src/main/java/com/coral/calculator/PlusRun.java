@@ -121,6 +121,8 @@ final class PlusRun {
     static final int SPOT = 25;
     /** What the board of hunts in the guild hall is, as something to be walked up to. */
     static final int BOARD = 200;
+    /** And the three who keep a smithy, each at her anvil: Moru, and the two after her. */
+    static final int SMITH = 300;
     private int spot = -1;
 
     /** What she stands at in a building, or -1: a pet on show, by its kind; or a desk, a hundred and the tab of the counter it opens. */
@@ -628,7 +630,36 @@ final class PlusRun {
         float petBrisk = 1;
         int main = UNARMED;
         int[] levels = new int[RunArms.COUNT];
+        /**
+         * What she wears: how many halves of a heart it takes off what a hurt costs, never
+         * the last of it; how many more blows her coming down on a creature counts for; and
+         * how many times as long nothing hurts her again after a hurt.
+         */
+        int defence, stomp;
+        float mercy = 1;
     }
+
+    /** How many more blows a creature of this land takes, and how many more halves of a heart a hurt costs in it: by the land's level. */
+    private int tough, bite;
+
+    int tough() { return tough; }
+    int bite() { return bite; }
+
+    /** A slash wave, from a blade or a brush the smith has worked on. */
+    static final int SLASH = 29;
+    /**
+     * What the smith's work leaves in the air for a moment: bursts, each where it is, how
+     * wide, what made it and how long ago; and where a book's pages burn, each with how
+     * wide, for how much longer and how long until it next takes what stands in it. And
+     * counts that only go up: waves sent, and blots that jumped on.
+     */
+    private final List<float[]> booms = new ArrayList<>(), fires = new ArrayList<>();
+    private int waves, chains;
+
+    List<float[]> booms() { return booms; }
+    List<float[]> fires() { return fires; }
+    int waves() { return waves; }
+    int chains() { return chains; }
 
     /** Her tablet-book and her ring of keys, which are hers to begin a land with; a page of the one, a key of the other, as they fly; and a blow from the panel the tablet-book opens. */
     static final int TABLET = RunArms.TABLET, KEYS = RunArms.KEYS, PAGE = 27, THROWN_KEY = 28;
@@ -754,8 +785,22 @@ final class PlusRun {
         float x, y, across, down, left, age;
         /** How fast a bat was thrown: it slows, stops and comes back at that speed. */
         float spin;
+        /**
+         * What the smith's work has made of one of hers. What the blow it deals is made
+         * with, which for a wave is the thing it flew from; that thing, for a wave; how far
+         * over and under its middle it reaches; how many more things it goes on through;
+         * the last it met, which it does not meet twice; how many more times a blot jumps
+         * on; whether it wipes away what is thrown at her; and whether it has burst.
+         */
+        int by, of = -1, pierce, chain;
+        float high;
+        Foe last;
+        boolean wipes, spent;
 
-        Shot(int kind) { this.kind = kind; }
+        Shot(int kind) {
+            this.kind = kind;
+            by = kind;
+        }
     }
 
     /**
@@ -929,6 +974,8 @@ final class PlusRun {
     PlusRun(RunLevels.Level level, Perks perks) {
         this.level = level;
         this.perks = perks;
+        tough = RunLevels.toughOf(level.number);
+        bite = RunLevels.biteOf(level.number);
         halves = perks.hearts * 2;
         lives = perks.lives;
         // What is in her backpack is with her from the start, and what she begins a land with is in her hands.
@@ -951,7 +998,7 @@ final class PlusRun {
             foe.ground = spec[2] + 1 - foe.tall();
             foe.y = foe.ground;
             foe.home = foe.x;
-            foe.left = waits ? health(spec[0]) : spec.length > 3 ? spec[3] : 1;
+            foe.left = waits ? health(spec[0]) : (spec.length > 3 ? spec[3] : 1) + tougher(spec[0]);
             foe.crowd = RunLevels.crowd(spec);
             if (spec[0] == RunLevels.WORD) foe.y = foe.ground - WORD_HANGS;
             // Each divide starts its hop at a different moment.
@@ -1138,8 +1185,21 @@ final class PlusRun {
             shot.left = from.left;
             shot.age = from.age;
             shot.spin = from.spin;
+            shot.through = from.through;
+            shot.pets = from.pets;
+            shot.by = from.by;
+            shot.of = from.of;
+            shot.pierce = from.pierce;
+            shot.chain = from.chain;
+            shot.high = from.high;
+            shot.wipes = from.wipes;
+            shot.spent = from.spent;
             shots.add(shot);
         }
+        tough = other.tough;
+        bite = other.bite;
+        for (float[] boom : other.booms) booms.add(boom.clone());
+        for (float[] fire : other.fires) fires.add(fire.clone());
         weapon = other.weapon;
         rounds = other.rounds;
         owned = other.owned;
@@ -1515,6 +1575,11 @@ final class PlusRun {
         return best;
     }
 
+    /** How many more blows a creature of a kind takes in this land: none for a paper target, nor for a wisp or a flake, which one thing puts out. */
+    private int tougher(int kind) {
+        return RunLevels.boss(kind) || kind == RunLevels.TARGET || kind == RunLevels.WISP || kind == RunLevels.RIME ? 0 : tough;
+    }
+
     /** One who was marked is there: standing on the place it was marked at, or, a dragon, in the air over it. */
     private void arrive(float[] mark) {
         int kind = (int) mark[0] % RunLevels.GIANT;
@@ -1533,7 +1598,7 @@ final class PlusRun {
             woken++;
         } else {
             // An outsized one is nearly twice the size, and takes six blows.
-            foe.left = giant ? 6 : 1;
+            foe.left = (giant ? 6 : 1) + tougher(kind);
             if (giant) foe.size = 1.9f;
             foe.dazed = .5f;
         }
@@ -1848,6 +1913,11 @@ final class PlusRun {
         perks.main = now.main;
         if (now.main != UNARMED) owned |= 1 << now.main;
         perks.levels = now.levels.clone();
+        // What she wears, put on or taken off: a heart that went with it goes with it.
+        perks.defence = now.defence;
+        perks.stomp = now.stomp;
+        perks.mercy = now.mercy;
+        halves = Math.max(1, Math.min(halves, perks.hearts * 2));
     }
 
     /** Whether she has a second jump in the air to her name. */
@@ -2594,6 +2664,7 @@ final class PlusRun {
             born.clear();
         }
         if (swing > 0) swung();
+        linger(seconds);
         if (fly(seconds)) return;
         for (Foe foe : foes) {
             // Whoever is arriving, changing or out of sight is not there to be touched.
@@ -3054,6 +3125,14 @@ final class PlusRun {
 
     List<int[]> fells() { return fells; }
 
+    /** How many blows the blow being dealt counts for against a creature: by what the smith has made of the thing it is dealt with; or, landed on, by what she wears on her feet. */
+    private int power() {
+        if (with == LANDED || with == PLUNGED) return 1 + perks.stomp;
+        int thing = with == PLAIN ? BRUSH : with == SWORDED ? SWORD : with == BLASTED || with == BOOK ? BOOK : with == PEN || with == KNIFE || with == GUN ? with
+                : with == PAGE || with == PANELLED ? TABLET : with == THROWN_KEY ? KEYS : UNARMED;
+        return thing == UNARMED ? 1 : RunArms.blows(thing, perks.levels[thing]);
+    }
+
     private void fell(Foe foe, int by) {
         int way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : by == PLAIN ? BRUSH + 1 : by == SWORDED ? SWORD + 1 : by == BLASTED || by == BOOK ? BOOK + 1
                 : by == PEN || by == KNIFE || by == GUN ? by + 1 : by == PAGE || by == PANELLED ? TABLET + 1 : by == THROWN_KEY ? KEYS + 1 : -1;
@@ -3084,7 +3163,9 @@ final class PlusRun {
             foe.unlocked = 0;
             doubled++;
         }
-        if (--foe.left <= 0) {
+        // Against a creature a blow counts for as many as the smith has made what dealt it count for; against those who wait, for one.
+        if ((foe.left -= waits ? 1 : power()) <= 0) {
+            foe.left = 0;
             foe.flat = true;
             foe.y = foe.ground;
             foe.act = 0;
@@ -3274,18 +3355,22 @@ final class PlusRun {
         int level = perks.levels[weapon];
         float speed = RunArms.speed(weapon), lasts = speed > 0 ? RunArms.reach(weapon, level) / speed * (boost > 0 ? RunArms.BOOST_FAR : 1) : 0;
         if (weapon == PEN || weapon == KNIFE) {
-            shoot(weapon, true, fromX, fromY, way * speed, 0, lasts);
+            shoot(weapon, true, fromX, fromY, way * speed, 0, lasts).pierce = RunArms.pierces(weapon, level);
+            if (weapon == KNIFE) wave(KNIFE, level, way, fromX, fromY);
         } else if (weapon == BOOK) {
             shoot(BOOK, true, fromX, fromY - .3f, way * speed + speedAcross * .4f, -11, 3);
             if (--books <= 0) emptied();
         } else if (weapon == GUN) {
-            shoot(GUN, true, fromX, fromY, way * speed, 0, lasts);
+            shoot(GUN, true, fromX, fromY, way * speed, 0, lasts).chain = RunArms.chains(level);
             if (--rounds <= 0) emptied();
         } else if (weapon == TABLET) {
             // A page, flicked out and back: it slows as it goes, turns, and comes back through whatever is in its way.
-            Shot page = shoot(PAGE, true, fromX, fromY, way * speed, 0, RunArms.PAGE_TURNS * 2);
-            page.spin = way * speed * (boost > 0 ? RunArms.BOOST_FAR : 1);
-            page.through = true;
+            // (Two of them, one over the other, once the smith has worked on it.)
+            for (int which = 0; which < RunArms.pages(level); which++) {
+                Shot page = shoot(PAGE, true, fromX, fromY - which * .6f, way * speed, 0, RunArms.PAGE_TURNS * 2);
+                page.spin = way * speed * (boost > 0 ? RunArms.BOOST_FAR : 1);
+                page.through = true;
+            }
         } else if (weapon == KEYS) {
             // A key. Once in a while one fails, and nothing leaves her hand: never twice running, never while one of those who wait can
             // be hurt, and the next is ready almost at once.
@@ -3297,10 +3382,100 @@ final class PlusRun {
                 sinceStrike = RunArms.rest(KEYS, level) - .12f;
                 return;
             }
-            shoot(THROWN_KEY, true, fromX, fromY, way * speed, 0, lasts);
+            shoot(THROWN_KEY, true, fromX, fromY, way * speed, 0, lasts).pierce = RunArms.pierces(KEYS, level);
         } else {
             swing = SWING;
             swungWith = weapon;
+            wave(weapon, level, way, fromX, fromY);
+        }
+    }
+
+    /**
+     * The slash waves the smith has put into a sword, a knife or a brush fly from it: a
+     * sword's and a brush's from her feet to as tall as they are, a knife's along its line,
+     * three of them in a fan. Each deals its blow as the thing it flew from does.
+     */
+    private void wave(int of, int level, float way, float fromX, float fromY) {
+        int count = RunArms.waves(of, level);
+        if (count == 0) return;
+        float speed = RunArms.waveSpeed(of), tall = RunArms.waveTall(of, level), lasts = RunArms.waveReach(of, level) / speed;
+        for (int which = 0; which < count; which++) {
+            double turn = of == KNIFE ? (which - (count - 1) / 2f) * .2 : 0;
+            // (A sword's second wave follows a little behind its first.)
+            Shot wave = shoot(SLASH, true, fromX - (of == SWORD ? which * way * 1.3f : 0), of == KNIFE ? fromY : y + TALL - tall / 2, way * (float) Math.cos(turn) * speed,
+                    (float) Math.sin(turn) * speed, lasts + (of == SWORD ? which * 1.3f / speed : 0));
+            wave.by = of == SWORD ? SWORDED : of == KNIFE ? KNIFE : PLAIN;
+            wave.of = of;
+            wave.high = tall / 2;
+            wave.pierce = RunArms.waveThrough(of, level) ? 99 : 0;
+            wave.wipes = RunArms.waveWipes(of, level);
+            waves++;
+        }
+    }
+
+    /** Something of hers has come to its end, against something or where its reach ran out: a pen the smith has worked on bursts there. */
+    private void ended(Shot shot) {
+        float wide = shot.kind == PEN && shot.by == PEN ? RunArms.burst(PEN, perks.levels[PEN]) : 0;
+        if (wide <= 0 || shot.spent || shot.pets || !shot.hers) return;
+        shot.spent = true;
+        blast(shot.x, shot.y, wide, PEN);
+    }
+
+    /** An ink blot the smith has worked on has hit something: it splashes, and jumps on to the nearest creature that still stands. */
+    private void blotted(Shot shot, Foe hit) {
+        float wide = RunArms.burst(GUN, perks.levels[GUN]);
+        if (wide > 0) blast(shot.x, shot.y, wide, GUN);
+        if (shot.chain <= 0) return;
+        Foe next = null;
+        float best = 4.5f * 4.5f;
+        for (Foe foe : foes) {
+            if (foe == hit || foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET) continue;
+            float across = foe.x + foe.wide() / 2 - shot.x, down = foe.y + foe.tall() / 2 - shot.y, far = across * across + down * down;
+            if (far < best) {
+                best = far;
+                next = foe;
+            }
+        }
+        if (next == null) return;
+        float across = next.x + next.wide() / 2 - shot.x, down = next.y + next.tall() / 2 - shot.y, far = Math.max(.3f, (float) Math.hypot(across, down)), speed = RunArms.speed(GUN);
+        Shot jump = shoot(GUN, true, shot.x, shot.y, across / far * speed, down / far * speed, far / speed + .08f);
+        jump.chain = shot.chain - 1;
+        jump.last = hit;
+        chains++;
+    }
+
+    /**
+     * What is left in the air a moment goes on: a burst is seen for a little while; pages
+     * that burn take what stands in them, every so often, for as long as they burn; and a
+     * wave of paint the smith has worked on wipes away what is thrown at her as it goes.
+     */
+    private void linger(float seconds) {
+        for (int index = booms.size() - 1; index >= 0; index--) if ((booms.get(index)[4] += seconds) > .45f) booms.remove(index);
+        for (int index = fires.size() - 1; index >= 0; index--) {
+            float[] fire = fires.get(index);
+            if ((fire[3] -= seconds) <= 0) {
+                fires.remove(index);
+                continue;
+            }
+            if ((fire[4] -= seconds) > 0) continue;
+            fire[4] = .45f;
+            for (int at = 0; at < foes.size(); at++) {
+                Foe foe = foes.get(at);
+                float across = foe.x + foe.wide() / 2 - fire[0], down = foe.y + foe.tall() / 2 - fire[1];
+                if (foe.flat || absent(foe) || foe.dazed > 0 || across * across + down * down > fire[2] * fire[2]) continue;
+                beat(foe, BLASTED);
+            }
+        }
+        for (int index = 0; index < shots.size(); index++) {
+            Shot wave = shots.get(index);
+            if (wave.kind != SLASH || !wave.wipes) continue;
+            for (int other = shots.size() - 1; other >= 0; other--) {
+                Shot thrown = shots.get(other);
+                if (thrown.hers || Math.abs(thrown.x - wave.x) > .7f || Math.abs(thrown.y - wave.y) > wave.high + .2f) continue;
+                shots.remove(other);
+                if (other < index) index--;
+                turned++;
+            }
         }
     }
 
@@ -3312,15 +3487,16 @@ final class PlusRun {
         if (weapon == KEYS) {
             fans++;
             float fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f, speed = RunArms.speed(KEYS), lasts = RunArms.reach(KEYS, perks.levels[KEYS]) / speed;
-            for (int key = 0; key < RunArms.FAN; key++) {
-                double turn = (key - (RunArms.FAN - 1) / 2f) * RunArms.FAN_APART * 2 * Math.PI / 6;
-                shoot(THROWN_KEY, true, fromX, fromY, way * (float) Math.cos(turn) * speed, (float) Math.sin(turn) * speed, lasts);
+            int count = RunArms.fan(perks.levels[KEYS]);
+            for (int key = 0; key < count; key++) {
+                double turn = (key - (count - 1) / 2f) * RunArms.FAN_APART * 2 * Math.PI / 6;
+                shoot(THROWN_KEY, true, fromX, fromY, way * (float) Math.cos(turn) * speed, (float) Math.sin(turn) * speed, lasts).pierce = RunArms.pierces(KEYS, perks.levels[KEYS]);
             }
             return;
         }
         panels++;
-        float wide = RunArms.PANEL_WIDE + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - wide : x + WIDE, to = from + wide;
-        float top = y + TALL - RunArms.PANEL_TALL, bottom = y + TALL;
+        float wide = RunArms.panelWide(perks.levels[TABLET]) + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - wide : x + WIDE, to = from + wide;
+        float top = y + TALL - RunArms.panelTall(perks.levels[TABLET]), bottom = y + TALL;
         panelX = facingLeft ? x : x + WIDE;
         panelY = top;
         panelLeft = facingLeft;
@@ -3466,13 +3642,25 @@ final class PlusRun {
         blasts++;
         blastX = atX;
         blastY = atY;
+        int level = perks.levels[BOOK];
+        blast(atX, atY, RunArms.burst(BOOK, level), BLASTED);
+        // Its pages burn for a while where it burst, once the smith has worked on it.
+        if (RunArms.burns(level) > 0) fires.add(new float[]{atX, atY, RunArms.burst(BOOK, level) * .8f, RunArms.burns(level), .45f});
+    }
+
+    /** A burst of some width, dealt as with something: everything within it is dealt a blow, whoever waits behind her shield excepted. */
+    private void blast(float atX, float atY, float wide, int by) {
+        booms.add(new float[]{atX, atY, wide, by, 0});
         for (int index = 0; index < foes.size(); index++) {
             Foe foe = foes.get(index);
             float across = foe.x + foe.wide() / 2 - atX, down = foe.y + foe.tall() / 2 - atY;
-            if (foe.flat || absent(foe) || foe.dazed > 0 || across * across + down * down > BLAST * BLAST) continue;
-            beat(foe, BLASTED);
+            if (foe.flat || absent(foe) || foe.dazed > 0 || across * across + down * down > wide * wide) continue;
+            beat(foe, by);
         }
     }
+
+    /** How wide the last book's burst was. */
+    float blastWide() { return RunArms.burst(BOOK, perks.levels[BOOK]); }
 
     /** Moves on everything in the air, and sees what it has met. Returns whether she was hurt by it. */
     private boolean fly(float seconds) {
@@ -3486,14 +3674,21 @@ final class PlusRun {
             else if (shot.kind == SAYING) shot.down = (float) Math.cos(shot.age * 7) * 3.2f;
             else if (shot.kind == GLOB) shot.down += BOOK_WEIGHT * seconds;
             else if (shot.kind == BOOMERANG) shot.across = shot.spin * (1 - shot.age);
-            else if (shot.kind == PAGE) shot.across = shot.spin * (1 - shot.age / RunArms.PAGE_TURNS);
-            else if (shot.kind == DEBRIS) shot.down = shot.age < HANGS ? 0 : 13;
+            else if (shot.kind == PAGE) {
+                shot.across = shot.spin * (1 - shot.age / RunArms.PAGE_TURNS);
+                // Where it turns back it bursts, once the smith has made it do so.
+                if (shot.hers && !shot.spent && shot.age >= RunArms.PAGE_TURNS && RunArms.burst(TABLET, perks.levels[TABLET]) > 0) {
+                    shot.spent = true;
+                    blast(shot.x, shot.y, RunArms.burst(TABLET, perks.levels[TABLET]), PAGE);
+                }
+            } else if (shot.kind == DEBRIS) shot.down = shot.age < HANGS ? 0 : 13;
             // A ledge is thin: it stops only what comes down on it, which makes it somewhere to shelter.
             char in = at((int) Math.floor(shot.x), (int) Math.floor(shot.y));
             if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > (room >= 0 ? level.land.length : RunLevels.ROWS)
                     || (in == RunLevels.LEDGE ? shot.down > Math.abs(shot.across) : solid(in))) {
                 // A book of hers bursts where it lands, on the ground, a ledge or a wall, or where it falls out of the air.
                 if (shot.kind == BOOK && shot.hers && !shot.pets) blast(shot.x, shot.y);
+                else ended(shot);
                 shots.remove(index);
             } else if (shot.kind == PLUSDROP) {
                 // A falling plus is hers if she is under it.
@@ -3504,8 +3699,8 @@ final class PlusRun {
                 }
             } else if (shot.hers) {
                 for (Foe foe : foes) {
-                    if (foe.flat || absent(foe) || shot.x < foe.x - .2f - spare(foe, true) || shot.x > foe.x + foe.wide() + .2f + spare(foe, true)
-                            || shot.y < foe.y - .2f - spare(foe, false) || shot.y > foe.y + foe.tall() + .2f) continue;
+                    if (foe.flat || absent(foe) || foe == shot.last || shot.x < foe.x - .2f - spare(foe, true) || shot.x > foe.x + foe.wide() + .2f + spare(foe, true)
+                            || shot.y < foe.y - .2f - spare(foe, false) - shot.high || shot.y > foe.y + foe.tall() + .2f + shot.high) continue;
                     // Nothing thrown gets through Zero: anything times nothing is nothing.
                     if (shot.pets) {
                         // What a pet threw: as a pet's blow; and what a blot does not deal with stands dazed.
@@ -3527,7 +3722,7 @@ final class PlusRun {
                         foe.left = 2;
                         drunk++;
                     } else if (foe.dazed <= 0) {
-                        beat(foe, shot.kind);
+                        beat(foe, shot.by);
                         if (shot.kind == THROWN_KEY && !foe.flat) foe.unlocked = RunArms.UNLOCKS;
                         // One sign after another dealt with by what she throws: each is worth one plus more than the last, up to four.
                         if (foe.flat && !RunLevels.boss(foe.kind)) {
@@ -3536,8 +3731,18 @@ final class PlusRun {
                             sinceShot = 0;
                             if (streak > 1) bonus += Math.min(streak - 1, 4);
                         }
+                        // What the smith has made of an ink gun: its blot splashes, and jumps on.
+                        if (shot.kind == GUN) blotted(shot, foe);
                         // A book, fire and steam go on through, and so does what the mirror has sent back, but not through those who wait at the end.
-                        if (shot.kind != BOOK && shot.kind != FIRE && shot.kind != STEAM && !shot.through || RunLevels.boss(foe.kind)) shots.remove(index);
+                        // And so does what the smith has made go through: a wave or a key through all it meets, a pen through so many, none of them twice.
+                        boolean on = (shot.kind == BOOK || shot.kind == FIRE || shot.kind == STEAM || shot.through || shot.pierce > 0) && !RunLevels.boss(foe.kind);
+                        if (on) {
+                            if (shot.kind == SLASH || shot.pierce > 0) shot.last = foe;
+                            if (shot.pierce > 0 && shot.pierce < 99) shot.pierce--;
+                        } else {
+                            ended(shot);
+                            shots.remove(index);
+                        }
                     }
                     break;
                 }
@@ -3628,12 +3833,14 @@ final class PlusRun {
      */
     private boolean hurt(boolean fell, int costs) {
         if (!fell && (notes > 0 || worn[BLACK] > 0)) return false;
+        // The further on the land, the more a hurt costs; and what she wears takes some of it off again, never the last half.
+        if (!fell) costs = Math.max(1, costs + bite - perks.defence);
         // Three colours and more are a prism, through which whatever lands on her lands by half.
-        if (!fell && named(PRISM)) costs = 1;
+        if (!fell && named(PRISM)) costs = (costs + 1) / 2;
         if (shield) {
             if (--inkLeft <= 0) shield = false;
             spared++;
-            safe = SAFE;
+            safe = SAFE * perks.mercy;
             // From a fall she still has to be put back, but she keeps her heart.
             if (!fell) return true;
         } else {
@@ -3643,7 +3850,7 @@ final class PlusRun {
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
             halves -= costs;
         }
-        safe = SAFE;
+        safe = SAFE * perks.mercy;
         if (halves <= 0) {
             halves = 0;
             if (--lives <= 0) {

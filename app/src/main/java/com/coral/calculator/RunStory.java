@@ -23,11 +23,12 @@ final class RunStory {
     /** The second volume, which falls on her head as the first did. */
     static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
-    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZab";
+    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZabcd";
     static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang", "Gokhae", "Miri", "Gari", "Yeobaek",
             "Nuri-yeowang",
             "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul",
-            "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi", "The Brake Pads", "The Straight-Ahead Party", "The Old Book"};
+            "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi", "The Brake Pads", "The Straight-Ahead Party", "The Old Book",
+            "Pulmu", "Sutdol"};
 
     private static final String PLAYER = "She is talking to the player who controls her in a platform game, whom she calls Sloppy. ";
 
@@ -664,6 +665,26 @@ final class RunStory {
             {"hunt5", "Hunting for pay. I like the pay part Sloppy~♡", "H",
                     PLAYER + "She looks over a noticeboard of paid monster hunts for the first time. Greedy, amused, pleased." + FAST},
     };
+    /**
+     * In the smithy, which three sisters keep. Each has a word the first time she is walked
+     * up to, and one when she has made something: Moru, who forges what Halgakos fights
+     * with; Pulmu, who makes what she wears; and Sutdol, who trades in what a smith works
+     * with and undoes her sisters' work.
+     */
+    static final String[][] SMITHS = {
+            {"smith1", "Smithy's hot. Hand it over. I'll hit it till it's better.", "W",
+                    "A blunt, short-spoken dwarf smith girl greets a customer at her forge, hammer in hand. Flat, gruff for a girl, secretly pleased."},
+            {"smith2", "Done. Sharper. Don't thank me. Swing it.", "W",
+                    "The blunt smith girl hands back a weapon she has just improved. Flat, short, proud underneath."},
+            {"smith3", "Welcome, welcome! I'm Pulmu, I do the armour! Stand still, I'll measure you!", "c",
+                    "A loud, sunny dwarf armourer girl greets a customer, tongs in hand. Big, warm, laughing."},
+            {"smith4", "There! Fits like a book cover! Go on, get hit, see if I care!", "c",
+                    "The cheerful armourer girl has just finished a piece of armour and is delighted with it. Loud, laughing, proud."},
+            {"smith5", "Sutdol. I trade in metal, and I undo my sisters' work. Precisely.", "d",
+                    "A calm, exact dwarf jeweller-smith girl introduces herself, studying a whetstone through her loupe. Quiet, level, dry."},
+            {"smith6", "Weighed twice. The scales agree with me.", "d",
+                    "The calm, exact smith girl completes a trade of metal, or takes a weapon apart again. Quiet, satisfied, dry."},
+    };
     /** When what was asked cannot be done this time: a letter creased, a count run out. */
     static final String[][] UNDONE = {
             {"undone1", "Ugh. That one's off for this run. Next time Sloppy~♡", "H",
@@ -823,7 +844,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS, HUNTS, SMITHS);
         return groups.toArray(new String[0][][]);
     }
 }

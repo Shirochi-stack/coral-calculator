@@ -77,6 +77,9 @@ VOICES = {
     "Z": ("Ashley", 1.0, .96),
     "a": ("community-qdnchfkneudi", 1.08, .98),
     "b": ("Ambrose", .9, 1.0),
+    # Moru's two sisters, who keep the smithy with her: library voices of young women, each raised a little toward the others' register.
+    "c": ("Zoe", 1.05, 1.08),
+    "d": ("Camille", .95, 1.06),
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
@@ -107,6 +110,8 @@ MANNER = {
     "Z": "The Brake Pads are two hard-working little brake pads who speak as one: a tomboyish, gruff but young and cheerful anime voice. ",
     "a": "The leader of the Straight-Ahead Party is a brash red-haired swordswoman with a loud, proud, hot-blooded anime voice. ",
     "b": "The Old Book is a very old, sleepy, bearded book: a slow, warm, grumbling grandfather's voice. ",
+    "c": "Pulmu is a young dwarf armourer, Moru's sister: a loud, sunny, warm young woman's voice, laughing easily, big-hearted, in clear American English. ",
+    "d": "Sutdol is a young dwarf jeweller-smith, Moru's sister: a calm, level, exact young woman's voice, quiet and dry, never old or deep, in clear American English. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
 

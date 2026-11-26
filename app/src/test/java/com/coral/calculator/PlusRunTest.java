@@ -3126,7 +3126,10 @@ public class PlusRunTest {
             touched(run);
             assertEquals("land " + land, 1, run.hurts());
             hold(run, .1f, false, false, false);
-            assertEquals("land " + land, PlusRun.HEARTS - 1, run.hearts());
+            // (A heart; and in the later lands, by the land's level, half a heart or a heart more.)
+            int costs = 2 + RunLevels.biteOf(land);
+            assertEquals(costs - 2, run.bite());
+            assertEquals("land " + land, PlusRun.HEARTS * 2 - costs, run.halves());
             assertEquals("land " + land, PlusRun.LIVES, run.lives());
             assertTrue("land " + land, run.locked());
             assertTrue("land " + land, run.x() > level.arena);
@@ -3136,7 +3139,7 @@ public class PlusRunTest {
             assertEquals(1, run.entrances());
             // Twice more, and her hearts are gone: that is a life.
             while (run.livesLost() == 0 && run.hurts() < 9) touched(run);
-            assertEquals("land " + land, PlusRun.HEARTS, run.hurts());
+            assertEquals("land " + land, (PlusRun.HEARTS * 2 + costs - 1) / costs, run.hurts());
             hold(run, .1f, false, false, false);
             assertEquals("land " + land, PlusRun.LIVES - 1, run.lives());
             assertEquals("land " + land, PlusRun.HEARTS, run.hearts());
@@ -4467,10 +4470,10 @@ public class PlusRunTest {
     }
 
     @Test public void everyVillageHasTwoBuildingsSheCanGoIntoOfDifferentSortsAndNothingInThemHurtsHer() {
-        boolean[] sorts = new boolean[3];
-        int shops = 0, halls = 0, homes = 0;
-        PlusRun inShop = null, inHall = null;
-        int[] shop = null, hall = null;
+        boolean[] sorts = new boolean[4];
+        int shops = 0, halls = 0, homes = 0, smithies = 0;
+        PlusRun inShop = null, inHall = null, inSmithy = null;
+        int[] shop = null, hall = null, smithy = null;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
             int villages = number > RunLevels.COUNT ? 2 : 1, houses = 0;
@@ -4484,7 +4487,7 @@ public class PlusRunTest {
                 houses++;
                 built.add(one);
                 int sort = one[14];
-                assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.HOME);
+                assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.SMITHY);
                 sorts[sort] = true;
                 assertEquals(RunLevels.LOOKS + sort, one[13]);
                 // Its door is on the ground of the land, where a building stands to be looked at; the land's own squares there are as they were.
@@ -4547,6 +4550,20 @@ public class PlusRunTest {
                         inHall = new PlusRun(level);
                         hall = one;
                     }
+                } else if (sort == RunLevels.SMITHY) {
+                    smithies++;
+                    // Moru at her anvil; and from the thirteenth land her two sisters, each at her own, well apart.
+                    assertEquals("land " + number, number >= RunLevels.SISTERS_FROM ? 3 : 1, spots.size());
+                    for (int which = 0; which < spots.size(); which++) {
+                        assertEquals(PlusRun.SMITH + which, spots.get(which)[4]);
+                        assertEquals(0, spots.get(which)[3]);
+                        assertEquals(one[3] + 5 + which * 4, spots.get(which)[1]);
+                    }
+                    assertEquals(0, givers);
+                    if (inSmithy == null && spots.size() == 3) {
+                        inSmithy = new PlusRun(level);
+                        smithy = one;
+                    }
                 } else {
                     homes++;
                     assertEquals(0, spots.size());
@@ -4561,10 +4578,20 @@ public class PlusRunTest {
                 assertTrue(wanted[0] != wanted[1]);
                 assertEquals("land " + number, wanted[0], built.get(village * 2)[14]);
                 assertEquals("land " + number, wanted[1], built.get(village * 2 + 1)[14]);
+                // (Whoever is in a home is not whoever keeps the building next door.)
+                for (int which = 0; which < 2; which++) {
+                    int[] home = built.get(village * 2 + which);
+                    int next = built.get(village * 2 + 1 - which)[14];
+                    if (home[14] != RunLevels.HOME) continue;
+                    for (int[] item : level.items) {
+                        if (item[1] < home[3] || item[1] > home[4] || item[3] < RunLevels.SOMI) continue;
+                        assertTrue("land " + number, item[3] != (next == RunLevels.PET_SHOP ? RunLevels.NABI : next == RunLevels.GUILD_HALL ? RunLevels.INJU : RunLevels.MORU));
+                    }
+                }
             }
         }
-        assertTrue(sorts[RunLevels.PET_SHOP] && sorts[RunLevels.GUILD_HALL] && sorts[RunLevels.HOME]);
-        assertTrue("shops " + shops + " halls " + halls + " homes " + homes, shops >= 60 && halls >= 60 && homes >= 60);
+        assertTrue(sorts[RunLevels.PET_SHOP] && sorts[RunLevels.GUILD_HALL] && sorts[RunLevels.HOME] && sorts[RunLevels.SMITHY]);
+        assertTrue("shops " + shops + " halls " + halls + " homes " + homes + " smithies " + smithies, shops >= 45 && halls >= 45 && homes >= 45 && smithies >= 45);
 
         // Gone into, a pet shop: each pet is walked up to, and Nabi's desk is stood at anywhere along it; nothing hurts her; and out again.
         PlusRun run = inShop;
@@ -4610,6 +4637,370 @@ public class PlusRunTest {
         run.place(hall[3] + 7.2f, GROUND);
         run.step(STEP, false, false, false);
         assertEquals(PlusRun.BOARD, run.spot());
+        // And the smithy: each of the three at her anvil.
+        run = inSmithy;
+        run.place(smithy[1] + (1 - PlusRun.WIDE) / 2, smithy[2] - PlusRun.TALL);
+        run.step(STEP, false, false, false);
+        assertTrue(run.enter());
+        for (int which = 0; which < 3; which++) {
+            run.place(smithy[3] + 5.6f + which * 4, GROUND);
+            run.step(STEP, false, false, false);
+            assertEquals(PlusRun.SMITH + which, run.spot());
+        }
+        hold(run, 2, true, false, false);
+        assertEquals(0, run.hurts());
+    }
+
+    // The smithy: what is forged, what is worn, and how tough the lands are
+
+    /** Flat ground that is a land of some number, and so as tough as that land's level makes it. */
+    private static RunLevels.Level flatOf(int number, int columns) {
+        RunLevels.Level level = new RunLevels.Level(number, columns);
+        for (int column = 0; column < columns; column++) {
+            for (int row = FLOOR; row < RunLevels.ROWS; row++) level.land[row][column] = RunLevels.BLOCK;
+        }
+        level.gate = columns - 3;
+        return level;
+    }
+
+    /** She stands at the start of flat ground holding a thing the smith has worked on as far as a level, with minus signs at some columns. */
+    private static PlusRun forged(int weapon, int level, int... columns) {
+        RunLevels.Level land = flat(80);
+        for (int column : columns) land.foes.add(new int[]{RunLevels.MINUS, column, FLOOR - 1});
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.levels[weapon] = level;
+        PlusRun run = new PlusRun(land, perks);
+        run.arm(weapon);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 0;
+        return run;
+    }
+
+    /** Time goes by, with every sign that still stands kept where it began. */
+    private static void still(PlusRun run, float seconds) {
+        for (float gone = 0; gone < seconds; gone += STEP) {
+            for (PlusRun.Foe foe : run.foes()) if (!foe.flat) foe.x = foe.home;
+            run.step(STEP, false, false, false);
+        }
+    }
+
+    private static int flying(PlusRun run, int kind) {
+        int count = 0;
+        for (PlusRun.Shot shot : run.shots()) if (shot.kind == kind && shot.hers) count++;
+        return count;
+    }
+
+    /** She walks into a times sign with nothing to keep her from it: one hurt. Returns how many halves of a heart it cost. */
+    private static int bitten(PlusRun run) {
+        PlusRun.Foe foe = run.foes().get(0);
+        int had = run.halves(), hurts = run.hurts();
+        run.bare();
+        for (int step = 0; step < 120 && run.hurts() == hurts; step++) {
+            run.place(foe.x, GROUND);
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(hurts + 1, run.hurts());
+        return had - run.halves();
+    }
+
+    @Test public void theLaterLandsAreTougherByTheirLevelsAndWhatSheWearsAnswersIt() {
+        // A level more with every five lands; a blow more with every five levels, and half a heart more to a hurt with every six.
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            assertEquals(1 + (number - 1) / 5, RunLevels.levelOf(number));
+            assertEquals(number <= 25 ? 0 : number <= 50 ? 1 : number <= 75 ? 2 : 3, RunLevels.toughOf(number));
+            assertEquals(number <= 30 ? 0 : number <= 60 ? 1 : 2, RunLevels.biteOf(number));
+        }
+        assertEquals(16, RunLevels.levelOf(RunLevels.TOTAL));
+        // In the lands themselves: every creature takes as many more as its land's level says; those who wait, a paper target, a wisp and a flake do not.
+        for (int number : new int[]{5, 30, 55, 80}) {
+            RunLevels.Level level = RunLevels.level(number);
+            PlusRun run = new PlusRun(level);
+            assertEquals(RunLevels.toughOf(number), run.tough());
+            assertEquals(RunLevels.biteOf(number), run.bite());
+            assertEquals(level.foes.size(), run.foes().size());
+            int tougher = 0;
+            for (int index = 0; index < level.foes.size(); index++) {
+                int[] spec = level.foes.get(index);
+                PlusRun.Foe foe = run.foes().get(index);
+                assertEquals(spec[0], foe.kind);
+                if (RunLevels.boss(spec[0])) continue;
+                boolean spared = spec[0] == RunLevels.TARGET || spec[0] == RunLevels.WISP || spec[0] == RunLevels.RIME;
+                assertEquals("land " + number, (spec.length > 3 ? spec[3] : 1) + (spared ? 0 : run.tough()), foe.left);
+                if (!spared) tougher++;
+            }
+            assertTrue("land " + number + " has " + tougher, tougher > 5);
+        }
+        // One that takes two: landed on, it stands; landed on again, it is flat. In boots, once is enough.
+        RunLevels.Level level = flatOf(26, 80);
+        level.foes.add(new int[]{RunLevels.MINUS, 20, FLOOR - 1});
+        PlusRun run = new PlusRun(level);
+        PlusRun.Foe foe = run.foes().get(0);
+        assertEquals(1, run.tough());
+        assertEquals(2, foe.left);
+        run.bare();
+        run.place(foe.x + foe.wide() / 2 - PlusRun.WIDE / 2, foe.y - PlusRun.TALL - .4f);
+        for (int step = 0; step < 30 && foe.left == 2; step++) run.step(STEP, false, false, false);
+        assertEquals(1, foe.left);
+        assertFalse(foe.flat);
+        assertTrue(run.fells().isEmpty());
+        foe.dazed = 0;
+        assertTrue(stomp(run, foe));
+        assertEquals(1, run.fells().size());
+        assertEquals(0, run.hurts());
+        PlusRun.Perks booted = new PlusRun.Perks();
+        booted.stomp = 1;
+        run = new PlusRun(level, booted);
+        assertTrue(stomp(run, run.foes().get(0)));
+        // A hurt: a heart in the early lands; a heart and a half from the thirty-first, two from the sixty-first. A helm takes half a heart
+        // off for each of its three sets, and never the last half.
+        int[][] costs = {{1, 0, 2}, {31, 0, 3}, {61, 0, 4}, {31, 1, 2}, {61, 1, 3}, {61, 3, 1}, {1, 3, 1}, {1, 1, 1}};
+        for (int[] one : costs) {
+            level = flatOf(one[0], 60);
+            level.foes.add(new int[]{RunLevels.TIMES, 20, FLOOR - 1});
+            PlusRun.Perks worn = new PlusRun.Perks();
+            worn.defence = one[1];
+            run = new PlusRun(level, worn);
+            assertEquals("land " + one[0] + " helm " + one[1], one[2], bitten(run));
+        }
+        // A coat: nothing hurts her again for so much longer after a hurt.
+        float[] lasted = new float[2];
+        for (int coat = 0; coat < 2; coat++) {
+            level = flat(60);
+            level.foes.add(new int[]{RunLevels.TIMES, 20, FLOOR - 1});
+            PlusRun.Perks worn = new PlusRun.Perks();
+            worn.mercy = coat == 0 ? 1 : 1.5f;
+            run = new PlusRun(level, worn);
+            bitten(run);
+            run.place(40, GROUND);
+            while (run.safe() && lasted[coat] < 5) {
+                run.step(STEP, false, false, false);
+                lasted[coat] += STEP;
+            }
+        }
+        assertEquals(1.5f, lasted[1] / lasted[0], .06f);
+
+        // What is worn, as it is kept: a bit for each piece made, and the set of the piece in each place.
+        int made = RunGear.bit(RunGear.HELM, 1) | RunGear.bit(RunGear.HELM, 3) | RunGear.bit(RunGear.COAT, 2) | RunGear.bit(RunGear.BOOTS, 3) | RunGear.bit(RunGear.CHARM, 3);
+        assertEquals(12, Integer.bitCount((1 << RunGear.SLOTS * RunGear.TIERS) - 1));
+        int on = 0;
+        on = RunGear.wear(on, RunGear.HELM, 3);
+        on = RunGear.wear(on, RunGear.COAT, 2);
+        on = RunGear.wear(on, RunGear.BOOTS, 3);
+        on = RunGear.wear(on, RunGear.CHARM, 3);
+        assertEquals(on, RunGear.sound(on, made));
+        assertEquals(3, RunGear.defence(on));
+        assertEquals(1.5f, RunGear.mercy(on), 0);
+        assertEquals(3, RunGear.stomp(on));
+        assertEquals(30, RunGear.luck(on));
+        assertFalse(RunGear.whole(on));
+        // What has not been made is not on her; and all four of one set are a set.
+        int taken = RunGear.sound(RunGear.wear(on, RunGear.COAT, 3), made);
+        assertEquals(0, RunGear.worn(taken, RunGear.COAT));
+        assertEquals(3, RunGear.worn(taken, RunGear.HELM));
+        assertTrue(RunGear.whole(RunGear.wear(on, RunGear.COAT, 3)));
+        assertFalse(RunGear.whole(0));
+        assertEquals(0, RunGear.defence(0));
+        assertEquals(1f, RunGear.mercy(0), 0);
+        assertEquals("Type-steel helm", RunGear.name(RunGear.HELM, 3));
+        // What things cost rises with the set and with the step; and what went into a thing is what re-forging it gives back.
+        for (int tier = 1; tier <= RunGear.TIERS; tier++) {
+            if (tier > 1) assertTrue(RunGear.piecePluses(tier) > RunGear.piecePluses(tier - 1) && RunGear.stepPluses(tier) > RunGear.stepPluses(tier - 1));
+            assertTrue(RunGear.pieceNeeds(tier)[0] > 0 && RunGear.stepNeeds(tier)[0] > 0);
+            for (int slot = 0; slot < RunGear.SLOTS; slot++) assertFalse(RunGear.does(slot, tier).isEmpty());
+        }
+        int[] back = RunGear.spent(RunArms.LEVELS);
+        for (int index = 0; index < 3; index++) {
+            assertEquals(RunGear.stepNeeds(1)[index] + RunGear.stepNeeds(2)[index] + RunGear.stepNeeds(3)[index], back[index]);
+            assertTrue(RunGear.BUYS[index] > RunGear.SELLS[index] * 2);
+        }
+        assertArrayEquals0(new int[]{0, 0, 0}, RunGear.spent(0));
+        assertTrue(RunGear.affords(120, new int[]{2, 0, 0}, RunGear.stepPluses(1), RunGear.stepNeeds(1)));
+        assertFalse(RunGear.affords(119, new int[]{2, 0, 0}, RunGear.stepPluses(1), RunGear.stepNeeds(1)));
+        assertFalse(RunGear.affords(900, new int[]{1, 9, 9}, RunGear.stepPluses(1), RunGear.stepNeeds(1)));
+        assertEquals("+ 300  \u00B7  4 type metal  \u00B7  2 ink crystal", RunGear.price(RunGear.stepPluses(2), RunGear.stepNeeds(2)));
+    }
+
+    private static void assertArrayEquals0(int[] wanted, int[] found) { org.junit.Assert.assertArrayEquals(wanted, found); }
+
+    @Test public void whatTheSmithMakesOfAThingChangesWhatItDoesAndNothingOfItIsThereBeforeSheHas() {
+        // As found, everything is as it was: no waves, nothing goes on through, only a book bursts, one page, five keys; and a blow is a blow.
+        for (int weapon = 0; weapon < RunArms.COUNT; weapon++) {
+            assertEquals(0, RunArms.waves(weapon, 0));
+            assertEquals(0, RunArms.pierces(weapon, 0));
+            assertEquals(weapon == RunArms.BOOK ? PlusRun.BLAST : 0, RunArms.burst(weapon, 0), 0);
+            assertEquals(1, RunArms.blows(weapon, 0));
+            assertEquals(2, RunArms.blows(weapon, 1));
+            assertEquals(2, RunArms.blows(weapon, 2));
+            assertEquals(3, RunArms.blows(weapon, 3));
+            for (int level = 1; level <= RunArms.LEVELS; level++) assertFalse(RunArms.step(weapon, level).isEmpty());
+        }
+        assertEquals(0, RunArms.chains(0));
+        assertEquals(0, RunArms.burns(0), 0);
+        assertEquals(1, RunArms.pages(0));
+        assertEquals(RunArms.PANEL_WIDE, RunArms.panelWide(0), 0);
+        assertEquals(RunArms.PANEL_TALL, RunArms.panelTall(0), 0);
+        assertEquals(RunArms.FAN, RunArms.fan(0));
+        assertEquals(RunArms.bite(RunArms.KEYS, 0) + 1, RunArms.bite(RunArms.KEYS, 3), 0);
+
+        // A sword. As found, a stroke takes what is at arm's length and nothing beyond it. Worked on once, every stroke sends a wave ahead,
+        // which takes the first thing it meets; twice, the wave goes further and through; three times, there are two of them.
+        PlusRun run = forged(PlusRun.SWORD, 0, 6, 8);
+        strike(run);
+        still(run, .5f);
+        assertEquals(0, run.waves());
+        assertFalse(run.foes().get(0).flat);
+        run = forged(PlusRun.SWORD, 1, 6, 8);
+        strike(run);
+        assertEquals(1, run.waves());
+        assertEquals(1, flying(run, PlusRun.SLASH));
+        still(run, .5f);
+        assertTrue(run.foes().get(0).flat);
+        assertFalse(run.foes().get(1).flat);
+        org.junit.Assert.assertArrayEquals(new int[]{RunLevels.MINUS, PlusRun.SWORD + 1}, run.fells().get(0));
+        assertEquals(0, flying(run, PlusRun.SLASH));
+        run = forged(PlusRun.SWORD, 2, 6, 8);
+        strike(run);
+        still(run, .6f);
+        assertTrue(run.foes().get(0).flat && run.foes().get(1).flat);
+        run = forged(PlusRun.SWORD, 3, 6, 8);
+        strike(run);
+        assertEquals(2, run.waves());
+        // A knife: a thin wave with every throw; then three, in a fan.
+        run = forged(PlusRun.KNIFE, 0);
+        strike(run);
+        assertEquals(0, flying(run, PlusRun.SLASH));
+        assertEquals(1, flying(run, PlusRun.KNIFE));
+        run = forged(PlusRun.KNIFE, 1);
+        strike(run);
+        assertEquals(1, flying(run, PlusRun.SLASH));
+        run = forged(PlusRun.KNIFE, 2);
+        strike(run);
+        assertEquals(3, flying(run, PlusRun.SLASH));
+        float up = 0, down = 0;
+        for (PlusRun.Shot shot : run.shots()) {
+            if (shot.kind != PlusRun.SLASH) continue;
+            up = Math.min(up, shot.down);
+            down = Math.max(down, shot.down);
+            assertEquals(PlusRun.KNIFE, shot.by);
+        }
+        assertTrue(up < 0 && down > 0);
+        // A brush: a wave of paint, as tall as its sweep, that takes what is beyond its bristles; and, worked on again, wipes away what is thrown.
+        run = forged(PlusRun.BRUSH, 0, 5);
+        strike(run);
+        still(run, .6f);
+        assertFalse(run.foes().get(0).flat);
+        run = forged(PlusRun.BRUSH, 1, 5);
+        strike(run);
+        assertEquals(1, flying(run, PlusRun.SLASH));
+        still(run, .6f);
+        assertTrue(run.foes().get(0).flat);
+        org.junit.Assert.assertArrayEquals(new int[]{RunLevels.MINUS, PlusRun.BRUSH + 1}, run.fells().get(0));
+        assertFalse(RunArms.waveWipes(RunArms.BRUSH, 1));
+        assertTrue(RunArms.waveWipes(RunArms.BRUSH, 2));
+        // A pen: as found it stops in the first thing it meets; worked on, it goes on through that one; again, it bursts where it ends.
+        run = forged(PlusRun.PEN, 0, 6, 8);
+        strike(run);
+        still(run, .8f);
+        assertTrue(run.foes().get(0).flat);
+        assertFalse(run.foes().get(1).flat);
+        run = forged(PlusRun.PEN, 1, 6, 8, 9);
+        run.foes().get(2).home = 8.6f;
+        strike(run);
+        still(run, .8f);
+        assertTrue(run.foes().get(0).flat && run.foes().get(1).flat);
+        assertFalse(run.foes().get(2).flat);
+        assertTrue(run.booms().isEmpty());
+        run = forged(PlusRun.PEN, 2, 6, 8, 9);
+        run.foes().get(2).home = 8.6f;
+        strike(run);
+        boolean burst = false;
+        for (int step = 0; step < 50; step++) {
+            still(run, STEP);
+            for (float[] boom : run.booms()) burst |= boom[3] == PlusRun.PEN && boom[2] == RunArms.burst(RunArms.PEN, 2);
+        }
+        assertTrue(burst);
+        assertTrue(run.foes().get(0).flat && run.foes().get(1).flat && run.foes().get(2).flat);
+        // An ink gun: its blot splashes; and, worked on again, jumps on to the next creature.
+        run = forged(PlusRun.GUN, 0, 8, 11);
+        strike(run);
+        still(run, .8f);
+        assertTrue(run.foes().get(0).flat);
+        assertFalse(run.foes().get(1).flat);
+        assertEquals(0, run.chains());
+        run = forged(PlusRun.GUN, 1, 8, 11);
+        strike(run);
+        boolean splashed = false;
+        for (int step = 0; step < 50; step++) {
+            still(run, STEP);
+            for (float[] boom : run.booms()) splashed |= boom[3] == PlusRun.GUN && boom[2] == RunArms.burst(RunArms.GUN, 1);
+        }
+        assertTrue(splashed);
+        assertFalse(run.foes().get(1).flat);
+        run = forged(PlusRun.GUN, 2, 8, 11);
+        strike(run);
+        still(run, .8f);
+        assertEquals(1, run.chains());
+        assertTrue(run.foes().get(0).flat && run.foes().get(1).flat);
+        // A tablet-book: two pages at a time; a wider, taller panel; and a page that bursts where it turns back.
+        run = forged(PlusRun.TABLET, 0);
+        strike(run);
+        assertEquals(1, flying(run, PlusRun.PAGE));
+        run = forged(PlusRun.TABLET, 1);
+        strike(run);
+        assertEquals(2, flying(run, PlusRun.PAGE));
+        assertTrue(RunArms.panelWide(2) > RunArms.PANEL_WIDE && RunArms.panelTall(2) > RunArms.PANEL_TALL);
+        run = forged(PlusRun.TABLET, 3);
+        strike(run);
+        boolean turned = false;
+        for (int step = 0; step < 60; step++) {
+            still(run, STEP);
+            for (float[] boom : run.booms()) turned |= boom[3] == PlusRun.PAGE;
+        }
+        assertTrue(turned);
+        // The keys: seven in the fan; and keys that go on through.
+        run = forged(PlusRun.KEYS, 2);
+        run.place(20, GROUND);
+        for (int step = 0; step < 60 && run.fans() == 0; step++) {
+            run.shots().clear();
+            run.step(STEP, false, false, false, true);
+        }
+        assertEquals(1, run.fans());
+        assertEquals(7, run.shots().size());
+        for (PlusRun.Shot key : run.shots()) assertEquals(99, key.pierce);
+        // A book: a wider burst; and its pages burn for a while where it burst, and take what walks into them.
+        for (int level = 0; level <= 2; level++) {
+            run = forged(PlusRun.BOOK, level);
+            run.place(30, GROUND);
+            strike(run);
+            for (int step = 0; step < 240 && run.blasts() == 0; step++) run.step(STEP, false, false, false);
+            assertEquals(1, run.blasts());
+            assertEquals(level == 0 ? PlusRun.BLAST : 2.9f, run.blastWide(), 0);
+            assertEquals(level == 2 ? 1 : 0, run.fires().size());
+            if (level == 2) {
+                float[] fire = run.fires().get(0);
+                assertEquals(RunArms.burns(2), fire[3], .01f);
+                hold(run, RunArms.burns(2) + .1f, false, false, false);
+                assertTrue(run.fires().isEmpty());
+            }
+        }
+        // And a blow of a thing that has been worked on counts for more against a creature that takes several: three, then two at a time, then all three.
+        int[] left = {2, 1, 1, 0};
+        for (int level = 0; level <= RunArms.LEVELS; level++) {
+            RunLevels.Level land = flat(80);
+            land.foes.add(new int[]{RunLevels.MINUS, 8, FLOOR - 1, 3});
+            PlusRun.Perks perks = new PlusRun.Perks();
+            perks.levels[PlusRun.KNIFE] = level;
+            run = new PlusRun(land, perks);
+            run.arm(PlusRun.KNIFE);
+            PlusRun.Foe big = run.foes().get(0);
+            big.dazed = 0;
+            assertEquals(3, big.left);
+            run.step(STEP, false, false, false, true);
+            // (Only the knife itself: its waves are taken out of the air.)
+            for (int index = run.shots().size() - 1; index >= 0; index--) if (run.shots().get(index).kind == PlusRun.SLASH) run.shots().remove(index);
+            still(run, .6f);
+            assertEquals("level " + level, left[level], Math.max(0, big.left));
+            assertEquals(level == RunArms.LEVELS, big.flat);
+        }
     }
 
     // The hunts of the guild hall
@@ -6104,7 +6495,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);
