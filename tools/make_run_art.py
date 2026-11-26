@@ -24,6 +24,10 @@ six frames of Halgakos jumping drawn from her own running frames. This cuts them
     defeat; and gokhae.png, twins.png, yeobaek.png, kingslime.png and mawang.png, who wait at
     the ends of its chapters. All but the skies and those five go into a second sheet of
     squares, plus_run_art2.webp, eight to a row.
+  * For the villages and for those who wait at the end: village.png, eight things that stand
+    in a village, and arena.png, eight things of the places where someone waits, go into a
+    third sheet, plus_run_art3.webp, four to a row in squares twice the size; and npc_*.png,
+    one each of those met in the villages, into run_npc.webp, standing in a row.
   * lose.png gives six more of her, for when she is hurt and when she has lost: hit, knocked
     into the air, falling, sitting dazed, sulking and crying. They are treated the same way.
 
@@ -69,6 +73,11 @@ FACES = ("chikuwa", "rune", "illya", "tsubakieh", "mawang", "gokhae", "miri", "g
 LATER_ACROSS = 8
 LATER_CAST = {"gokhae": (1, 4, 198, (320, 264)), "twins": (2, 3, 180, (320, 264)), "yeobaek": (2, 3, 192, (352, 264)),
               "kingslime": (1, 4, 190, (400, 300)), "mawang": (2, 3, 196, (352, 264))}
+# Those met in the villages, in the order the game numbers them; the cell each stands in, and how tall she is made.
+VILLAGERS = ("somi", "inju", "boksun", "ttosun", "galpi", "yeseo", "nabi", "moru", "altteul")
+VILLAGER_CELL = (224, 288)
+VILLAGER_TALL = 272
+PLACE_CELL = 256
 FACE_TALL = 520
 PET_GRID = (8, 9)
 
@@ -353,6 +362,39 @@ def later():
     return atlas, len(squares), strips
 
 
+def places():
+    """What stands in the villages and in the places where someone waits, and those met in the villages."""
+    squares = together(pieces("village", 2, 4), PLACE_CELL) + [None] * 0
+    # Each thing of the second sheet at its own size: they are not all one thing.
+    squares = []
+    for name in ("village", "arena"):
+        for piece in pieces(name, 2, 4):
+            scale = (PLACE_CELL - 4) / max(piece.size)
+            size = (max(1, round(piece.size[0] * scale)), max(1, round(piece.size[1] * scale)))
+            small = piece.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+            square = Image.new("RGBA", (PLACE_CELL, PLACE_CELL), (0, 0, 0, 0))
+            square.alpha_composite(small, ((PLACE_CELL - size[0]) // 2, PLACE_CELL - size[1]))
+            squares.append(square)
+    sheet = Image.new("RGBA", (PLACE_CELL * 4, PLACE_CELL * 4), (0, 0, 0, 0))
+    for index, square in enumerate(squares):
+        sheet.alpha_composite(square, (index % 4 * PLACE_CELL, index // 4 * PLACE_CELL))
+    sheet.save(RES / "plus_run_art3.webp", quality=92, method=6)
+    row = Image.new("RGBA", (VILLAGER_CELL[0] * len(VILLAGERS), VILLAGER_CELL[1]), (0, 0, 0, 0))
+    for index, name in enumerate(VILLAGERS):
+        figure = cleared(Image.open(SOURCE / f"npc_{name}.png"))
+        figure.putalpha(figure.getchannel("A").point(lambda value: 0 if value < 48 else value))
+        figure = figure.crop(solid(figure).getbbox())
+        scale = min(VILLAGER_TALL / figure.size[1], (VILLAGER_CELL[0] - 4) / figure.size[0])
+        size = (max(1, round(figure.size[0] * scale)), max(1, round(figure.size[1] * scale)))
+        small = figure.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        feet = solid(small).crop((0, size[1] * 9 // 10, size[0], size[1])).getbbox()
+        middle = (feet[0] + feet[2]) / 2 if feet else size[0] / 2
+        left = max(0, min(VILLAGER_CELL[0] - size[0], round(VILLAGER_CELL[0] / 2 - middle)))
+        row.alpha_composite(small, (index * VILLAGER_CELL[0] + left, VILLAGER_CELL[1] - size[1]))
+    row.save(RES / "run_npc.webp", quality=92, method=6)
+    return sheet, row
+
+
 def her_frames(name, source, box, gap, across, report):
     """Frames of her from a sheet of two rows, in one row, in the pink and at the size of her running frames."""
     sheet = cleared(Image.open(SOURCE / f"{source}.png"))
@@ -460,6 +502,8 @@ def main():
         print(key, value)
     second, count, _ = later()
     print("second sheet", second.size, "squares", count)
+    third, villagers = places()
+    print("third sheet", third.size, "villagers", villagers.size)
     if args.preview:
         grey = (120, 120, 130, 255)
         half = atlas.resize((atlas.size[0] // 2, atlas.size[1] // 2), Image.LANCZOS)
@@ -479,6 +523,10 @@ def main():
                 sheet.alpha_composite(strip, (0, down + 4))
                 down += strip.size[1] + 4
             sheet.convert("RGB").save(args.later)
+            both = Image.new("RGBA", (max(third.size[0], villagers.size[0]), third.size[1] + villagers.size[1]), grey)
+            both.alpha_composite(third, (0, 0))
+            both.alpha_composite(villagers, (0, third.size[1]))
+            both.convert("RGB").save(args.later.with_name(args.later.stem + "_places.png"))
         board.alpha_composite(lose, (0, half.size[1] + 20 + JUMP_CELL[1] * 2))
         down = half.size[1] + 30 + JUMP_CELL[1] * 2 + LOSE_CELL[1]
         for strip in armed:

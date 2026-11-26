@@ -276,9 +276,14 @@ public class PlusRunTest {
         level.foes.add(new int[]{RunLevels.TIMES, 9, FLOOR - 1});
         PlusRun run = new PlusRun(level);
         hold(run, .5f, false, true, false);
+        // No further than the blade is drawn to reach: something a little beyond it is not touched.
         run.place(run.foes().get(0).x - 1.2f - PlusRun.WIDE, GROUND);
         run.step(STEP, false, false, false, true);
         assertTrue(run.swinging() >= 0);
+        assertEquals(0, run.flattened());
+        hold(run, .4f, false, false, false);
+        run.place(run.foes().get(0).x - .7f - PlusRun.WIDE, GROUND);
+        run.step(STEP, false, false, false, true);
         assertEquals(1, run.flattened());
 
         level = armed(PlusRun.BOOK);
@@ -1432,7 +1437,14 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86, lines);
+        assertEquals(95 + 86 + 37, lines);
+        assertEquals(RunLevels.NURI - RunLevels.SOMI + 1, RunStory.MEET.length);
+        assertEquals(8, RunStory.ENTER.length);
+        assertEquals(16, RunStory.PHASES.length);
+        for (int kind : new int[]{RunLevels.ZERO, RunLevels.ILLYA, RunLevels.TSUBAKIEH, RunLevels.GOKHAE, RunLevels.MIRI, RunLevels.YEOBAEK, RunLevels.KING,
+                RunLevels.MAWANG}) {
+            assertTrue(RunStory.waiting(kind) >= 0 && RunStory.waiting(kind) < 8);
+        }
         assertEquals(RunLevels.ALL_CHAPTERS, RunStory.CHAPTERS.length);
         assertEquals(PlusRun.WHITE, RunStory.FORMS.length);
         assertEquals(RunLevels.MAWANG - RunLevels.GOKHAE + 1, RunStory.BLOWS_LATER.length);

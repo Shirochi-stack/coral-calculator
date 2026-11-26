@@ -1114,13 +1114,14 @@ final class PlusRun {
     }
 
     /**
-     * What a swing reaches: the signs in front of her, and whatever has been thrown at her.
-     * The brush reaches over her head and a little behind, and wipes away what is thrown; the
-     * sword reaches further in front, and sends it back the way it came.
+     * What a swing reaches: the signs in front of her, and whatever has been thrown at her,
+     * as far as the blade or the bristles are drawn to reach and no further. The brush goes
+     * over her head and a little behind, and wipes away what is thrown; the sword is the
+     * quicker, and sends it back the way it came.
      */
     private void swung() {
         boolean brush = swungWith == BRUSH;
-        float ahead = brush ? 1.3f : 1.8f, behind = brush ? .3f : 0, top = y - (brush ? .9f : .15f), bottom = y + TALL;
+        float ahead = brush ? 1.05f : .9f, behind = brush ? .3f : 0, top = y - (brush ? .9f : .15f), bottom = y + TALL;
         float from = facingLeft ? x - ahead : x - behind, to = facingLeft ? x + WIDE + behind : x + WIDE + ahead;
         for (Foe foe : foes) {
             if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x >= to || foe.x + foe.wide() <= from || foe.y >= bottom || foe.y + foe.tall() <= top) continue;

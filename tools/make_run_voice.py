@@ -43,8 +43,8 @@ MODEL = "inworld-tts-2"
 # The Mawang is Halgakos herself, sixty years on: her voice, slower and lower.
 VOICES = {
     "H": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "C": ("community-iyfnceehtmbk", .95, 1.06),
-    "R": ("community-ae0qjkqan5hx", .96, 1.05),
+    "C": ("community-iyfnceehtmbk", 1.0, 1.08),
+    "R": ("Pixie", 1.3, .94),
     "I": ("community-blcuaurhzmvi", .95, 1.06),
     "T": ("community-pwotyqkmtlsi", .92, 1.1),
     "M": ("community-5fwhmdpiq45g", 1.0, .84),
@@ -55,11 +55,21 @@ VOICES = {
     "K": ("community-2e7y7ype1d0u", .88, .97),
     "Y": ("community-qdnchfkneudi", .82, 1.12),
     "N": ("community-qj9kc2jtun4a", .95, 1.15),
+    # Those met in the villages: the same few voices, each said in her own manner, faster or slower, higher or lower.
+    "S": ("community-2e7y7ype1d0u", 1.0, 1.05),
+    "U": ("community-qdnchfkneudi", .98, 1.08),
+    "B": ("Eileen", .95, 1.0),
+    "O": ("community-mzyrf5zr14rb", 1.08, 1.14),
+    "P": ("community-qj9kc2jtun4a", .9, 1.1),
+    "E": ("community-mzyrf5zr14rb", .98, 1.08),
+    "A": ("community-2e7y7ype1d0u", 1.12, 1.1),
+    "W": ("community-qdnchfkneudi", .92, 1.0),
+    "L": ("community-qj9kc2jtun4a", 1.1, 1.2),
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
-    "C": "Chikuwa is a sunny, bubbly girl with a high, bright, cute anime voice. ",
-    "R": "Rune is a shy girl who is always crying: a high, fragile, tearful anime voice, sniffling and sad. ",
+    "C": "Chikuwa is a sunny, bubbly girl voiced like a Japanese anime voice actress playing the cheerful, energetic one: high, bright and cute, bouncy and sing-song, with big exaggerated reactions and drawn-out happy vowels. ",
+    "R": "Rune is a little crybaby with a small, soft, breathy, childlike anime voice, wobbling with tears. She sobs, sniffles and hiccups through every line, whiny, with simple words. Soft and tearful, not shrill or squeaky; never calm, eloquent or grown-up. ",
     "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
     "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
     "M": "The Mawang is Halgakos herself from another volume, after sixty years alone: the same girl's voice, but tired, low and gloomy. ",
@@ -68,6 +78,15 @@ MANNER = {
     "K": "Gari is Miri's shy twin sister, with the same high anime voice, hushed and timid, almost a whisper. ",
     "Y": "Yeobaek is a sleepy young swordswoman with a soft, high, drowsy anime voice, drawling and yawning. ",
     "N": "Nuri is a young queen with a clear, high, earnest anime voice, formal and brave. ",
+    "S": "Somi is a cheerful young adventurer with a high, bright, eager anime voice. ",
+    "U": "Inju is the guild's receptionist: a young woman with a light, polite, pleasant anime voice. ",
+    "B": "Boksun is a kind old baker granny with a warm, gentle, elderly voice. ",
+    "O": "Ttosun is a lively, sporty guild girl with a high, loud, cheerful anime voice. ",
+    "P": "Galpi is a quiet young witch with a soft, high, dreamy anime voice. ",
+    "E": "Yeseo is the careful young leader of an adventuring party, with a clear, high, earnest anime voice. ",
+    "A": "Nabi is a playful cat-eared girl with a high, giggly, mischievous anime voice. ",
+    "W": "Moru is a short-spoken smith girl with a flat, blunt but young and light anime voice. ",
+    "L": "Altteul is a thrifty young shopkeeper with a high, brisk, bright anime voice, always selling. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
 
@@ -96,14 +115,26 @@ def story():
             for name, words, who, with_player, scene, quick in found]
 
 
+# A squeal, a yelp or a wail is said as it is in Japanese, whatever letters it is shown in.
+SOUNDS = (("Kyaa", "\u304d\u3083\u3042\u3063"), ("waaah", "\u3046\u308f\u3042\u3042\u3093"), ("Waaah", "\u3046\u308f\u3042\u3042\u3093"), ("Uu...", "\u3046\u3045..."),
+          ("Eep", "\u3072\u3083\u3063"))
+
+
 def spoken(text):
-    """A line as it is to be said: without the heart, which is not a word."""
-    return text.replace("♡", "").strip()
+    """A line as it is to be said: without the heart, which is not a word, and with its squeals as they are squealed."""
+    text = text.replace("\u2661", "").strip()
+    for shown, said in SOUNDS:
+        text = text.replace(shown, said)
+    return text
 
 
 def speak(key, text, who, scene):
     voice, rate, _ = VOICES[who]
-    body = {"text": spoken(text), "voiceId": voice, "modelId": MODEL, "deliveryMode": "CREATIVE",
+    said = spoken(text)
+    # Rune's pauses, written out, made her longer lines take a quarter of a minute: in those they are only commas.
+    if who == "R" and len(said) > 60:
+        said = said.replace("... ", ", ")
+    body = {"text": said, "voiceId": voice, "modelId": MODEL, "deliveryMode": "CREATIVE",
             "audioConfig": {"audioEncoding": "PCM", "sampleRateHertz": RATE_IN, "speakingRate": rate},
             "synthesisContext": {"reasoning": "REASONING_ON", "reasoningContext": scene[:600]}}
     headers = {"Authorization": f"Basic {key}", "Content-Type": "application/json", "Accept": "application/json"}
