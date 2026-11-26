@@ -387,6 +387,16 @@ final class RunGame {
      * has been seen to do, so that each thing is heard and shown once.
      */
     private static final int NO_FINALE = 0, FLIGHT = 1, FLOWN = 2, UNMADE = 3;
+    /**
+     * And what comes after the flight, which nothing announces: the Mother Tongue rising; the ride, Halgakos on Lucy's back; and the
+     * beat after it is won. What the Mother's blocks say, and the names she has for someone.
+     */
+    private static final int ARISING = 4, RIDE = 5, RIDDEN = 6;
+    private static final String[] BLOCK_WORDS = {"Mr.", "Miss", "Sir", "Madam"}, NAME_WORDS = {"Missy", "young lady", "little one", "dear girl", "Lulu"};
+    private RunRide ride;
+    private Bitmap rideArt, motherArt, pagesSky;
+    private boolean goBreath;
+    private int seenRideHits, seenRideHurts, seenRideBeams, seenRideStages, seenRideSent, seenRidePuffs, seenRideChips, seenRideOpens;
     private static final int LUCY_FACE = 30;
     private static final String[] READ = {"Onii-tan", "...wait for me", "Onii-tan!", "...read it to me", "Onii-tan...", "...don't change it"};
     private final Bitmap[] lucyArt = new Bitmap[3], whiteArt = new Bitmap[2];
@@ -2911,6 +2921,8 @@ final class RunGame {
         hammerer = -1;
         finale = NO_FINALE;
         flight = null;
+        ride = null;
+        goBreath = false;
         flightNote = null;
         flightWords.clear();
         seenRibboned = beamWas = false;
@@ -3025,6 +3037,7 @@ final class RunGame {
         // And, in the last land, the flight or the land unmade at once, for looking at them.
         if (BuildConfig.DEBUG && land == RunLevels.TOTAL && session.tally("run_finale") == 1) takeOff();
         else if (BuildConfig.DEBUG && land == RunLevels.TOTAL && session.tally("run_finale") == 2) unmake();
+        else if (BuildConfig.DEBUG && land == RunLevels.TOTAL && session.tally("run_finale") == 3) rise();
         // The first time she has a colour of her own to call on, she says how; after that, something about setting off.
         if (greeted && perks.colours != 0 && session.tally("run_hint_call") == 0) {
             session.keep("run_hint_call", 1);
@@ -3035,7 +3048,7 @@ final class RunGame {
     }
 
     private void idle() {
-        goLeft = goRight = goJump = goStrike = false;
+        goLeft = goRight = goJump = goStrike = goBreath = false;
         jumpPressed = strikePressed = false;
         ribbonFinger = -1;
         fanOpen = false;
@@ -3150,6 +3163,418 @@ final class RunGame {
         if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "flight");
     }
 
+    /** Whether there is anything after the flight: there is once what is read from the book is there to be told. (In a build made for testing it can be said to be so.) */
+    private boolean fourth() { return RunStory.REVEAL.length > 0 || BuildConfig.DEBUG && session.tally("run_fourth") > 0; }
+
+    /** After the flight, and after what the book says has been read: the sky is another sky, and the Mother Tongue rises into it. That it has been seen is kept. */
+    private void rise() {
+        screen = PLAY;
+        finale = ARISING;
+        finaleAge = 0;
+        ride = null;
+        flightNote = null;
+        flightWords.clear();
+        talk.clear();
+        captionLeft = 0;
+        idle();
+        dye(PlusRun.WHITE);
+        session.keep("run_ending", session.tally("run_ending") | 4);
+        audio.play("quake", .8f);
+        shake = .5f;
+        buzz(true);
+    }
+
+    /** Halgakos is on Lucy's back, with every heart she has, and the ride begins: from here on a life lost begins it again. */
+    private void mount() {
+        ride = new RunRide(run.maxHearts() * 2, Math.max(1, 2 + run.bite() - perks.defence), random.nextLong());
+        seenRideHits = seenRideHurts = seenRideBeams = seenRideStages = seenRideSent = seenRidePuffs = seenRideChips = seenRideOpens = 0;
+        cheerAge = 9;
+        flash = .4f;
+        audio.play("flap", .9f);
+    }
+
+    private void rideTick(float seconds) {
+        // (In a build made for testing it can be ridden by itself, to be looked at: at her, with both buttons held.)
+        if (BuildConfig.DEBUG && session.tally("run_sweep") == 1) {
+            // (To the way through whatever arrives soonest, or clear of it; and otherwise at her.)
+            float toX = ride.herX(), toY = ride.herY(), soonest = 1.6f;
+            for (RunRide.Thing thing : ride.things()) {
+                float until = thing.far / thing.speed;
+                if (thing.gone || thing.kind == RunRide.NAME || until > soonest) continue;
+                soonest = until;
+                toX = thing.kind == RunRide.BLOCKS ? thing.x : thing.kind == RunRide.PASS ? (thing.x < 0 ? .3f : -.3f) : ride.x();
+                toY = thing.kind == RunRide.PRESS ? thing.y : ride.y();
+            }
+            ride.step(seconds, toX < ride.x() - .05f, toX > ride.x() + .05f, toY < ride.y() - .05f, toY > ride.y() + .05f, soonest >= 1.6f, true);
+        } else {
+            ride.step(seconds, goLeft, goRight, goJump, goDown, goStrike, goBreath);
+        }
+        if (ride.beams() != seenRideBeams) {
+            seenRideBeams = ride.beams();
+            audio.play("form", .7f);
+        }
+        if (ride.puffs() != seenRidePuffs) {
+            seenRidePuffs = ride.puffs();
+            audio.play("flap", .5f);
+        }
+        if (ride.sent() != seenRideSent) {
+            seenRideSent = ride.sent();
+            audio.play("page", .5f);
+        }
+        if (ride.chips() != seenRideChips) {
+            seenRideChips = ride.chips();
+            audio.play("parry", .6f);
+        }
+        if (ride.opens() != seenRideOpens) {
+            seenRideOpens = ride.opens();
+            audio.play("crumble", .7f);
+            flash = .3f;
+            buzz(true);
+        }
+        if (ride.hits() != seenRideHits) {
+            if (ride.hits() % 4 == 1) audio.play("page", .4f);
+            seenRideHits = ride.hits();
+        }
+        if (ride.hurts() != seenRideHurts) {
+            seenRideHurts = ride.hurts();
+            audio.play("hurt");
+            buzz(true);
+            shake = .25f;
+        }
+        if (ride.stages() != seenRideStages) {
+            seenRideStages = ride.stages();
+            flash = .5f;
+            shake = .4f;
+            cheerAge = 0;
+            audio.play("star", .8f);
+            buzz(true);
+        }
+        if (ride.state() == RunRide.WON) {
+            finale = RIDDEN;
+            finaleAge = 0;
+            flash = 1;
+            idle();
+            talk.clear();
+            audio.play("star", 1);
+            audio.play("win", .6f);
+            buzz(true);
+        } else if (ride.state() == RunRide.FELL) {
+            audio.play("lose", .5f);
+            if (run.spend()) {
+                flightNote = run.lives() == 1 ? "Last life: back on Lucy's back" : "A life lost, " + run.lives() + " left: back on Lucy's back";
+                flightNoteAge = 0;
+                mount();
+            } else {
+                finish(false);
+            }
+        }
+    }
+
+    /**
+     * The ride: the sky of pages; the Mother Tongue far ahead, with her shield about her in pieces, or open; what she sends, each
+     * thing with a mark where it will arrive: a row of blocks with a way through, a press closing on one height, a name that
+     * follows, and her own pass down one side; Lucy's breath crossing the sky; and Halgakos on Lucy's back, from behind, with the
+     * beam going away from them. Before it, the Mother rising; and after it, the Mother made small, and listening.
+     */
+    private void drawRide(Canvas canvas) {
+        if (pagesSky == null) pagesSky = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_sky13);
+        if (rideArt == null) rideArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ride_back);
+        if (motherArt == null) motherArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_mother);
+        float fit = Math.max(width / (float) pagesSky.getWidth(), height / (float) pagesSky.getHeight()) * 1.04f;
+        target.set(width / 2f - pagesSky.getWidth() * fit / 2 + (float) Math.sin(clock * .23f) * dp(8), height / 2f - pagesSky.getHeight() * fit / 2 + (float) Math.cos(clock * .19f) * dp(8),
+                width / 2f + pagesSky.getWidth() * fit / 2 + (float) Math.sin(clock * .23f) * dp(8), height / 2f + pagesSky.getHeight() * fit / 2 + (float) Math.cos(clock * .19f) * dp(8));
+        paint.setAlpha(255);
+        canvas.drawBitmap(pagesSky, null, target, paint);
+        float cx = safe.centerX(), cy = safe.top + safe.height() * .6f, wide = safe.width() * .4f, high = safe.height() * .17f;
+        float farY = safe.top + safe.height() * .36f, far = .5f, riders = tile * 4.4f, grand = tile * 5.4f;
+        canvas.save();
+        if (shake > 0) canvas.translate((random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4), (random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4));
+        paint.setStyle(Paint.Style.FILL);
+        for (int page = 0; page < 16; page++) {
+            float along = (clock * (.3f + page % 5 * .05f) + page * .137f) % 1, turn = page * 2.399f, reach = along * along * Math.max(width, height) * .75f;
+            float x = cx + (float) Math.cos(turn) * reach, y = farY + (float) Math.sin(turn) * reach, half = tile * .18f * (.3f + along);
+            canvas.save();
+            canvas.rotate(page * 47 + clock * 90, x, y);
+            paint.setColor(0xFFFFF7E6);
+            paint.setAlpha(Math.round(170 * along));
+            canvas.drawRect(x - half, y - half * 1.35f, x + half, y + half * 1.35f, paint);
+            canvas.restore();
+        }
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        if (finale != RIDE || ride == null) {
+            // Before: she rises out of the pages, vast, and her name with her. After: she is small, and listens; and the two of them hang there.
+            boolean after = finale == RIDDEN;
+            float age = finaleAge, come = Math.min(1, age / 2.2f), ease = come * come * (3 - 2 * come), bob = (float) Math.sin(clock * 2) * tile * .1f;
+            if (after) {
+                float small = Math.max(0, 1 - age / 1.4f);
+                if (small > 0) {
+                    paint.setAlpha(Math.round(255 * small));
+                    cell(canvas, motherArt, 5, 7, cx, farY + grand * .5f, grand * (.4f + .6f * small), false);
+                }
+                paint.setAlpha(Math.round(255 * Math.min(1, Math.max(0, (age - 1) / .8f))));
+                cell(canvas, motherArt, 6, 7, cx, farY + grand * .85f + bob * .5f, grand * 1.9f, false);
+                paint.setAlpha(255);
+                cell(canvas, rideArt, (int) (clock * 6) % 4, 6, cx, cy + riders * .55f - bob, riders, false);
+                if (age > 1.6f) word(canvas, "Every tongue, as it is spoken", cx, cy + riders * .75f, Math.min(dp(22), safe.width() / 16f), 0xFFB9862C, Math.min(1, (age - 1.6f) / .6f));
+            } else {
+                paint.setAlpha(Math.round(255 * Math.min(1, age / .8f)));
+                cell(canvas, motherArt, age > 2.6f ? 3 : 0, 7, cx, farY + grand * .5f + (1 - ease) * tile * 7, grand * (1.15f - .15f * ease), false);
+                paint.setAlpha(255);
+                cell(canvas, rideArt, (int) (clock * 7) % 4, 6, cx, cy + riders * .55f + bob, riders, false);
+                if (age > 1.2f) word(canvas, "THE MOTHER TONGUE", cx, safe.top + safe.height() * .2f, Math.min(dp(26), safe.width() / 12f), 0xFFB9862C, Math.min(1, Math.min((age - 1.2f) / .4f, (4 - age) / .5f)));
+            }
+            canvas.restore();
+            if (flash > 0) canvas.drawColor(Color.argb(Math.round(255 * Math.min(1, flash / .5f)), 255, 255, 255));
+            flightHud(canvas, false);
+            return;
+        }
+        // The Mother, far ahead: serene; ordering, as she sends something; cracked, while she is open; recoiling, as she is read and as a stage ends.
+        float herX = cx + ride.herX() * wide * far, herY = farY + ride.herY() * high * far;
+        boolean open = ride.open() > 0, away = ride.passing();
+        int pose = ride.reel() > 0 && ride.stages() > 0 || ride.sinceRead() < .22f ? 5 : open ? 2 : ride.sinceSent() < .5f ? 4 : ride.sinceChip() < .3f ? 1 : 0;
+        if (pose == 5) herX += (float) Math.sin(clock * 40) * tile * .07f;
+        paint.setAlpha(away ? 70 : 255);
+        cell(canvas, motherArt, pose, 7, herX, herY + grand * .5f, grand, false);
+        paint.setAlpha(255);
+        // Her shield: a ring of gilt pieces about her, as many as are left; gone, a light on her for as long as she is open.
+        if (!away) {
+            box.set(herX - grand * .5f, herY - grand * .36f, herX + grand * .5f, herY + grand * .36f);
+            int pieces = ride.shieldMost();
+            stroke.setStrokeWidth(tile * .13f);
+            for (int piece = 0; piece < pieces; piece++) {
+                boolean there = piece < ride.shield();
+                if (!there && !ride.forming()) continue;
+                stroke.setColor(ride.sinceChip() < .2f ? Color.WHITE : 0xFFE9C96A);
+                stroke.setAlpha(there ? 235 : Math.round(90 + 60 * (float) Math.sin(clock * 18)));
+                canvas.drawArc(box, -90 + clock * 20 + piece * 360f / pieces + 5, 360f / pieces - 10, false, stroke);
+            }
+            stroke.setAlpha(255);
+            if (open) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFFFE9A8);
+                paint.setAlpha(Math.round((ride.open() < 1 ? 40 : 70) + 40 * (float) Math.sin(clock * (ride.open() < 1 ? 24 : 9))));
+                canvas.drawOval(box, paint);
+                paint.setColor(Color.BLACK);
+                paint.setAlpha(255);
+            }
+        }
+        // What is on its way.
+        text.setTextAlign(Paint.Align.CENTER);
+        for (RunRide.Thing thing : ride.things()) {
+            if (thing.gone) continue;
+            float near = 1 - Math.max(0, thing.far), scale = far + (1 - far) * near, level = farY + (cy - farY) * near;
+            int warn = Math.round((50 + 130 * near) * (.75f + .25f * (float) Math.sin(clock * 16)));
+            paint.setStyle(Paint.Style.FILL);
+            if (thing.kind == RunRide.BLOCKS) {
+                // A row of blocks, each with a word on it, and one way through: the ways that are shut are marked where they will arrive.
+                float gap = RunRide.GAP * wide, tall = high * 1.15f;
+                for (int side = -1; side <= 1; side += 2) {
+                    float from = side < 0 ? -1.35f * wide : thing.x * wide + gap, to = side < 0 ? thing.x * wide - gap : 1.35f * wide;
+                    if (to - from < wide * .05f) continue;
+                    paint.setColor(0xFFE0362F);
+                    paint.setAlpha(warn / 2);
+                    canvas.drawRect(cx + from, cy - tall, cx + to, cy + tall, paint);
+                    paint.setColor(0xFFF4EBD2);
+                    paint.setAlpha(Math.round(120 + 135 * near));
+                    box.set(cx + from * scale, level - tall * scale, cx + to * scale, level + tall * scale);
+                    canvas.drawRoundRect(box, tile * .12f, tile * .12f, paint);
+                    stroke.setColor(0xFF8A6A3A);
+                    stroke.setAlpha(Math.round(120 + 135 * near));
+                    stroke.setStrokeWidth(tile * .05f);
+                    canvas.drawRoundRect(box, tile * .12f, tile * .12f, stroke);
+                    text.setColor(0xFF5A4A3A);
+                    text.setAlpha(Math.round(120 + 135 * near));
+                    text.setTypeface(Typeface.DEFAULT_BOLD);
+                    fitted(canvas, BLOCK_WORDS[(thing.word + (side < 0 ? 0 : 1)) % BLOCK_WORDS.length], box.centerX(), level + tile * .2f * scale, tile * .9f * scale, box.width() * .8f);
+                    text.setTypeface(Typeface.DEFAULT);
+                }
+                stroke.setAlpha(255);
+                text.setAlpha(255);
+            } else if (thing.kind == RunRide.PRESS) {
+                // A press: two plates closing from above and below on one height, where the only room is.
+                float slit = RunRide.SLIT * high, at = thing.y * high;
+                paint.setColor(0xFFE0362F);
+                paint.setAlpha(warn / 2);
+                canvas.drawRect(0, cy - high * 1.15f, width, cy + at - slit, paint);
+                canvas.drawRect(0, cy + at + slit, width, cy + high * 1.15f, paint);
+                paint.setColor(0xFFF4EBD2);
+                paint.setAlpha(Math.round(110 + 130 * near));
+                float reach = safe.width() * (.3f + .35f * near);
+                canvas.drawRoundRect(cx - reach, level - high * 1.15f * scale, cx + reach, level + (at - slit) * scale, tile * .1f, tile * .1f, paint);
+                canvas.drawRoundRect(cx - reach, level + (at + slit) * scale, cx + reach, level + high * 1.15f * scale, tile * .1f, tile * .1f, paint);
+                stroke.setColor(0xFF8A6A3A);
+                stroke.setAlpha(Math.round(110 + 130 * near));
+                stroke.setStrokeWidth(tile * .04f);
+                for (int line = 1; line <= 3; line++) {
+                    canvas.drawLine(cx - reach * .85f, level + (at - slit) * scale - line * tile * .16f * scale, cx + reach * .85f, level + (at - slit) * scale - line * tile * .16f * scale, stroke);
+                    canvas.drawLine(cx - reach * .85f, level + (at + slit) * scale + line * tile * .16f * scale, cx + reach * .85f, level + (at + slit) * scale + line * tile * .16f * scale, stroke);
+                }
+                stroke.setAlpha(255);
+            } else if (thing.kind == RunRide.PASS) {
+                // Her pass: its side of the sky is marked, and she comes down it, vast, as it arrives.
+                paint.setColor(0xFFE0362F);
+                paint.setAlpha(warn / 2);
+                canvas.drawRect(cx + (thing.x - RunRide.PASS_WIDE) * wide, safe.top, cx + (thing.x + RunRide.PASS_WIDE) * wide, cy + high * 1.3f, paint);
+                paint.setColor(Color.BLACK);
+                paint.setAlpha(Math.round(255 * Math.min(1, near * 2)));
+                cell(canvas, motherArt, 3, 7, cx + thing.x * wide * scale, farY - grand * .2f + near * near * (cy + high - farY + grand * 1.3f), grand * (1 + 1.3f * near), false);
+            } else {
+                // A name: a tag with the word on it, which comes after them; a ring where it would arrive.
+                float x = cx + thing.x * wide * scale, size = tile * (.34f + .5f * near);
+                stroke.setColor(0xFFE0362F);
+                stroke.setAlpha(warn);
+                stroke.setStrokeWidth(tile * .06f);
+                canvas.drawOval(cx + thing.x * wide - wide * RunRide.NEAR, cy + thing.y * high - high * RunRide.NEAR, cx + thing.x * wide + wide * RunRide.NEAR, cy + thing.y * high + high * RunRide.NEAR,
+                        stroke);
+                stroke.setAlpha(255);
+                String name = NAME_WORDS[thing.word % NAME_WORDS.length];
+                text.setTextSize(size);
+                float half = text.measureText(name) / 2 + size * .4f, y = level + thing.y * high * scale;
+                paint.setColor(0xFFFDF6EE);
+                paint.setAlpha(240);
+                canvas.drawRoundRect(x - half, y - size * .8f, x + half, y + size * .5f, size * .4f, size * .4f, paint);
+                stroke.setColor(0xFFC0392B);
+                stroke.setStrokeWidth(tile * .05f);
+                canvas.drawRoundRect(x - half, y - size * .8f, x + half, y + size * .5f, size * .4f, size * .4f, stroke);
+                text.setColor(0xFFC0392B);
+                canvas.drawText(name, x, y + size * .15f, text);
+            }
+        }
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        // Where they are; where the beam and the breath would reach, far off: a ring there, gold while she is before it.
+        float atX = cx + ride.x() * wide, atY = cy + ride.y() * high, aimX = cx + ride.x() * wide * far, aimY = farY + ride.y() * high * far;
+        boolean before = !away && Math.abs(ride.x() - ride.herX()) < RunRide.TRUE && Math.abs(ride.y() - ride.herY()) < RunRide.TRUE;
+        stroke.setColor(before ? 0xFFFFD24A : Color.WHITE);
+        stroke.setAlpha(before ? 255 : 150);
+        stroke.setStrokeWidth(tile * (before ? .08f : .05f));
+        canvas.drawCircle(aimX, aimY, tile * (before ? .5f + .06f * (float) Math.sin(clock * 14) : .4f), stroke);
+        stroke.setAlpha(255);
+        // Lucy's breath, crossing: a cloud of her mist, smaller as it goes.
+        paint.setStyle(Paint.Style.FILL);
+        for (RunRide.Breath puff : ride.breaths()) {
+            float gone = Math.min(1, puff.gone), scale = 1 - (1 - far) * gone, x = cx + puff.x * wide * scale, y = cy + (farY - cy) * gone + puff.y * high * scale - riders * .3f * (1 - gone);
+            for (int part = 0; part < 4; part++) {
+                double turn = clock * 6 + part * 1.57;
+                paint.setColor(part == 0 ? 0xFFBFF3EA : 0xFF8FE0D2);
+                paint.setAlpha(190);
+                canvas.drawCircle(x + (float) Math.cos(turn) * tile * .2f * scale, y + (float) Math.sin(turn) * tile * .16f * scale, tile * (.44f - part * .05f) * scale, paint);
+            }
+        }
+        if (ride.beam() > 0) {
+            float life = ride.beam() / RunRide.LASTS, swell = (float) Math.sin(Math.min(1, (1 - life) * 6) * Math.PI / 2) * Math.min(1, life * 5);
+            for (int layer = 0; layer < 3; layer++) {
+                float nearHalf = tile * .6f * swell * (1.25f - layer * .42f) * (1 + .08f * (float) Math.sin(clock * 40 + layer)), farHalf = nearHalf * .34f;
+                path.reset();
+                path.moveTo(atX - nearHalf, atY - riders * .3f);
+                path.lineTo(atX + nearHalf, atY - riders * .3f);
+                path.lineTo(aimX + farHalf, aimY);
+                path.lineTo(aimX - farHalf, aimY);
+                path.close();
+                paint.setColor(layer == 0 ? 0xFFFFE9A8 : layer == 1 ? 0xFFFFF7DE : Color.WHITE);
+                paint.setAlpha(layer == 0 ? 110 : layer == 1 ? 190 : 255);
+                canvas.drawPath(path, paint);
+                canvas.drawCircle(aimX, aimY, farHalf, paint);
+            }
+            if (ride.reads()) {
+                paint.setColor(Color.WHITE);
+                paint.setAlpha(Math.round(110 + 80 * (float) Math.sin(clock * 30)));
+                canvas.drawCircle(herX, herY, tile * 1.6f, paint);
+            }
+        }
+        paint.setColor(Color.BLACK);
+        // One of her friends, taking a piece off the Mother's shield: her face, going up the sky to her.
+        if (ride.sinceHelp() < .9f && ride.helps() > 0) {
+            float gone = ride.sinceHelp() / .9f;
+            canvas.saveLayerAlpha(0, 0, width, height, Math.round(255 * Math.min(1, (1 - gone) * 3)));
+            round(canvas, RunStory.speaker(RunStory.PLEDGES[(ride.helps() - 1) % RunLevels.FRIENDS]), atX + (herX - atX) * gone + (ride.helps() % 2 == 0 ? 1 : -1) * tile * 1.4f * (1 - gone),
+                    atY + (herY - atY) * gone, tile * (.5f - .2f * gone));
+            canvas.restore();
+        }
+        // The two of them, from behind: Lucy's wings going; her head forward as she breathes; and Halgakos up on her back with the book out while the beam is gathered or out.
+        paint.setAlpha(ride.safe() && (int) (clock * 14) % 2 == 0 ? 90 : 255);
+        cell(canvas, rideArt, ride.charge() > 0 || ride.beam() > 0 ? 5 : ride.wind() < .3f ? 4 : (int) (clock * 7) % 4, 6, atX, atY + riders * .5f, riders, false);
+        paint.setAlpha(255);
+        if (cheerAge < 2.6f && ride.stages() > 0) {
+            float in = Math.min(1, cheerAge / .35f), out = Math.max(0, (cheerAge - 2.1f) / .5f);
+            word(canvas, ride.stage() == 1 ? "She is cracking: keep reading" : "The last of her: all together", cx, cy + high * 1.25f, Math.min(dp(16), safe.width() / 20f), 0xFFB9862C, in * (1 - out));
+        }
+        canvas.restore();
+        if (flash > 0) canvas.drawColor(Color.argb(Math.round(255 * Math.min(1, flash / .5f)), 255, 255, 255));
+        flightHud(canvas, true);
+    }
+
+    /** Over the ride: who she is, how much more of her there is to read, the pieces of her shield, and what is to be done about her just now. Returns where what is under it begins. */
+    private float rideBar(Canvas canvas, float under) {
+        int colour = 0xFFB9862C;
+        float margin = dp(10), wide = Math.min(safe.width() - margin * 2, dp(300)), high = dp(48), from = safe.centerX() - wide / 2;
+        box.set(from, under, from + wide, under + high);
+        plate(canvas, box, dp(20), 235);
+        float bar = from + dp(16), end = from + wide - dp(16);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(dark ? 0xFFF3F3F3 : colour);
+        fitted(canvas, "The Mother Tongue", bar, under + dp(15), dp(12.5f), dp(110));
+        text.setTextAlign(Paint.Align.RIGHT);
+        text.setTextSize(dp(11));
+        boolean urgent = ride.open() > 0;
+        text.setColor(urgent ? 0xFFE0A21A : soft);
+        fitted(canvas, ride.passing() ? "Out of reach: fly clear" : ride.finishing() ? "Beam and breath, together!" : urgent ? "Open: the beam reads her" : ride.forming() ? "Her shield forms"
+                : "Lucy's breath breaks her shield", end, under + dp(15), dp(11), end - bar - dp(116));
+        text.setTextAlign(Paint.Align.LEFT);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+        canvas.drawRoundRect(bar, under + dp(21), end, under + dp(31), dp(5), dp(5), paint);
+        paint.setColor(colour);
+        paint.setAlpha(urgent ? 255 : 120);
+        if (ride.left() > 0) canvas.drawRoundRect(bar, under + dp(21), bar + (end - bar) * ride.left(), under + dp(31), dp(5), dp(5), paint);
+        paint.setAlpha(255);
+        paint.setColor(cardColor);
+        for (int third = 1; third < 3; third++) canvas.drawRect(bar + (end - bar) * third / 3 - dp(1), under + dp(21), bar + (end - bar) * third / 3 + dp(1), under + dp(31), paint);
+        // The pieces of her shield, under the bar.
+        for (int piece = 0; piece < ride.shieldMost(); piece++) {
+            paint.setColor(piece < ride.shield() ? 0xFFE9C96A : dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+            canvas.drawRoundRect(bar + piece * dp(16), under + dp(35), bar + piece * dp(16) + dp(12), under + dp(40), dp(2), dp(2), paint);
+        }
+        paint.setColor(Color.BLACK);
+        under += high + dp(8);
+        if (flightNote != null && flightNoteAge < 3.2f) {
+            word(canvas, flightNote, safe.centerX(), under + dp(18), Math.min(dp(15), safe.width() / 24f), 0xFFE0362F, Math.min(1, Math.min(flightNoteAge / .2f, (3.2f - flightNoteAge) / .5f)));
+            under += dp(30);
+        }
+        return under;
+    }
+
+    /** What is held on the ride: the arrows; the beam; and, over the jump, Lucy's breath, with how far she has her wind back. */
+    private void rideControls(Canvas canvas) {
+        control(canvas, leftButton, goLeft, 180, false);
+        control(canvas, rightButton, goRight, 0, false);
+        control(canvas, jumpButton, goJump, 270, false);
+        control(canvas, downButton, goDown, 90, false);
+        RectF where = strikeButton;
+        button(canvas, where, goStrike, CalculatorLayout.CORAL);
+        stroke.setColor(0xFFE9C96A);
+        stroke.setStrokeWidth(dp(3));
+        canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2 - dp(2), stroke);
+        box.set(where.left - dp(3), where.top - dp(3), where.right + dp(3), where.bottom + dp(3));
+        stroke.setColor(Color.WHITE);
+        stroke.setStrokeWidth(dp(3.5f));
+        canvas.drawArc(box, -90, 360 * (ride.beam() > 0 ? ride.beam() / RunRide.LASTS : ride.charge() > 0 ? ride.charge() : ride.rested()), false, stroke);
+        paint.setAlpha(ride.rested() >= 1 || ride.beam() > 0 ? 255 : 110);
+        artIn(canvas, STAR_ART, where.centerX(), where.centerY(), where.width() * (.44f + .1f * ride.charge()));
+        paint.setAlpha(255);
+        // Lucy's breath: her own face on it, and her wind coming back round it.
+        where = stallButton;
+        button(canvas, where, goBreath, 0xFF2FA89A);
+        round(canvas, LUCY_FACE, where.centerX(), where.centerY() - dp(7), where.width() * .26f);
+        box.set(where.left - dp(3), where.top - dp(3), where.right + dp(3), where.bottom + dp(3));
+        stroke.setColor(0xFFBFF3EA);
+        stroke.setStrokeWidth(dp(3.5f));
+        canvas.drawArc(box, -90, 360 * ride.wind(), false, stroke);
+        label(canvas, where, "Breath");
+        if (ride.puffs() == 0 && finaleAge > 1.5f) glow(canvas, stallButton);
+    }
+
     /** The black ribbon lay on her for good: the land is unmade, and what follows is watched, not played. */
     private void unmake() {
         finale = UNMADE;
@@ -3232,7 +3657,26 @@ final class RunGame {
                 }
             }
         } else if (finale == FLOWN) {
-            if (finaleAge > 4.4f) {
+            if (finaleAge > 4.4f && fourth()) {
+                // What the book says is read, as it was written; and then she comes.
+                if (RunStory.REVEAL.length > 0) tell(RunStory.REVEAL, RunLevels.chapterOf(number), this::rise);
+                else rise();
+            } else if (finaleAge > 4.4f) {
+                run.flown();
+                finish(true);
+            }
+        } else if (finale == ARISING) {
+            if (finaleAge > 4) {
+                finale = RIDE;
+                finaleAge = 0;
+                mount();
+            }
+        } else if (finale == RIDE) {
+            rideTick(seconds);
+        } else if (finale == RIDDEN) {
+            if (finaleAge > 6) {
+                // The true ending: reached, and kept.
+                session.keep("run_ending", session.tally("run_ending") | 2);
                 run.flown();
                 finish(true);
             }
@@ -3503,7 +3947,8 @@ final class RunGame {
 
     /** Over the flight: her hearts and her lives; how much more Lucy can take, of which two thirds went on the ground; a word when a life is lost; and what is said. */
     private void flightHud(Canvas canvas, boolean flying) {
-        int hearts = (flight.most() + 1) / 2, halves = flight.halves();
+        int most = ride != null ? ride.most() : flight != null ? flight.most() : run.maxHearts() * 2;
+        int hearts = (most + 1) / 2, halves = ride != null ? ride.halves() : flight != null ? flight.halves() : most;
         float tall = dp(44), margin = dp(10), heart = hearts > 5 ? dp(15) : hearts > 3 ? dp(18) : dp(22);
         text.setTextSize(dp(15));
         text.setTextAlign(Paint.Align.LEFT);
@@ -3542,7 +3987,9 @@ final class RunGame {
         canvas.drawRoundRect(pauseButton.centerX() + dp(2.5f), pauseButton.centerY() - dp(8), pauseButton.centerX() + dp(7), pauseButton.centerY() + dp(8), dp(1.5f), dp(1.5f), paint);
         paint.setColor(Color.BLACK);
         float under = safe.top + margin + tall + dp(8);
-        if (flying) {
+        if (flying && ride != null) {
+            under = rideBar(canvas, under);
+        } else if (flying) {
             int colour = waitColour(RunLevels.LUCY);
             float wide = Math.min(safe.width() - margin * 2, dp(300)), high = dp(48), from = safe.centerX() - wide / 2;
             box.set(from, under, from + wide, under + high);
@@ -3605,6 +4052,10 @@ final class RunGame {
 
     /** What is held in the flight: the arrows, all four of them; and the beam, with how far it is gathered, or how far through its rest it is. */
     private void flightControls(Canvas canvas) {
+        if (finale == RIDE) {
+            rideControls(canvas);
+            return;
+        }
         if (finale != FLIGHT) return;
         control(canvas, leftButton, goLeft, 180, false);
         control(canvas, rightButton, goRight, 0, false);
@@ -5542,8 +5993,8 @@ final class RunGame {
     /** Which buttons are held, by however many fingers are down: one may hold an arrow while another jumps. */
     private void held(MotionEvent event) {
         int action = event.getActionMasked();
-        boolean left = false, right = false, up = false, strike = false, down = false;
-        boolean carrying = finale == FLIGHT || run != null && (run.weapon() != PlusRun.UNARMED || run.has(PlusRun.RED) || run.has(PlusRun.BLUE));
+        boolean left = false, right = false, up = false, strike = false, down = false, breath = false;
+        boolean carrying = finale == FLIGHT || finale == RIDE || run != null && (run.weapon() != PlusRun.UNARMED || run.has(PlusRun.RED) || run.has(PlusRun.BLUE));
         // (Held, it is held: the beam is gathered by holding it.)
         if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
             float low = height * .45f, between = (leftButton.right + rightButton.left) / 2;
@@ -5557,6 +6008,11 @@ final class RunGame {
                 if (perks.colours != 0 && (colourButton.contains(x, y) || nextButton.contains(x, y))) continue;
                 if (run != null && (run.atStall() || run.door() >= 0 || run.petOffer() >= 0 || run.spot() >= 0) && stallButton.contains(x, y)) continue;
                 if (run != null && run.nextUp() != PlusRun.UNARMED && swapButton.contains(x, y)) continue;
+                // (On Lucy's back, the button over the jump is her breath.)
+                if (finale == RIDE && x > stallButton.left - dp(10) && x < stallButton.right + dp(10) && y > stallButton.top - dp(10) && y < stallButton.bottom + dp(6)) {
+                    breath = true;
+                    continue;
+                }
                 if (x > downButton.left - dp(8) && x < downButton.right + dp(8) && y > downButton.top - dp(10) && y < downButton.bottom + dp(4)) {
                     down = true;
                     continue;
@@ -5575,6 +6031,7 @@ final class RunGame {
         goJump = up;
         goStrike = strike;
         goDown = down;
+        goBreath = breath;
     }
 
     // Drawing
@@ -6159,6 +6616,8 @@ final class RunGame {
     private void drawLand(Canvas canvas) {
         if (finale == FLIGHT || finale == FLOWN) {
             drawFlight(canvas);
+        } else if (finale >= ARISING) {
+            drawRide(canvas);
         } else if (finale == UNMADE) {
             drawUnmade(canvas);
         } else {
@@ -9658,7 +10117,7 @@ final class RunGame {
                 : boss == RunLevels.KING ? "King Slime is a puddle" : boss == RunLevels.MAWANG ? "The Mawang comes home" : boss == RunLevels.GUARD ? "Exam passed"
                 : boss == RunLevels.BUTLER ? "The butler bows out" : boss == RunLevels.BYEORU ? "Written back in" : boss == RunLevels.JUPAN ? "The toll is refunded"
                 : boss == RunLevels.SUMBI ? "Sumbi comes up for air" : boss == RunLevels.PADS ? "The brakes are off" : boss == RunLevels.PARTY ? "Straight home they go"
-                : boss == RunLevels.LUCY ? "Lucy is read, as written" : "Land " + number + " cleared";
+                : boss == RunLevels.LUCY ? (finale == RIDDEN ? "The Mother Tongue listens" : "Lucy is read, as written") : "Land " + number + " cleared";
         float prizeTall = prizeWon != RunLevels.NOTHING ? dp(78) : 0;
         float top = card(canvas, title, "+ " + run.collected() + " of " + run.total() + "  ·  " + PlayStage.clock(Math.max(1, Math.round(run.time())))
                 + "  ·  " + kept, star + dp(10) + prizeTall);
@@ -10235,7 +10694,7 @@ final class RunGame {
             }
             if (bought(1) == 0 && bank() >= UP_COSTS[1][0]) afford = UP_NAMES[1];
             String words = names.named(afford != null && open > 1 ? "Pluses enough for " + afford.toLowerCase(java.util.Locale.ROOT).replace("chikuwa", "Chikuwa") + ". The counter Sloppy~♡"
-                    : starsOf(RunLevels.OPEN_TO) > 0 ? "Ninety-nine lands read. The last page isn't written yet Sloppy~♡"
+                    : starsOf(RunLevels.OPEN_TO) > 0 ? "A hundred lands, read to the end Sloppy~♡"
                     : open == RunLevels.SECOND + 1 ? "Volume Three fell on us. Land 81 Sloppy~♡"
                     : open == 1 ? "Pick the first land. Go on Sloppy~♡" : open == RunLevels.COUNT + 1 ? "Volume Two fell on us. Land 31 Sloppy~♡"
                     : waiting == RunLevels.TSUBAKIEH ? "Tsubakieh and her bat are in land " + open + " Sloppy~♡"
@@ -10247,13 +10706,17 @@ final class RunGame {
                     : "Land " + open + " is waiting Sloppy~♡");
             text.setTextSize(dp(14));
             text.setTextAlign(Paint.Align.LEFT);
-            // Her words are made smaller if that is what it takes to fit them beside her.
-            float wide = Math.min(text.measureText(words), safe.right - middle - tall * .5f - dp(40));
-            box.set(middle + tall * .5f, feet - tall * .62f, middle + tall * .5f + wide + dp(24), feet - tall * .62f + dp(36));
-            float bubbleLeft = box.left, bubbleMiddle = box.centerY();
+            // Her words go onto as many lines as it takes to fit them beside her at a size that can be read: they are never made small.
+            float room = safe.right - middle - tall * .5f - dp(40);
+            List<String> said = wrap(words, room);
+            float wide = 0;
+            for (String one : said) wide = Math.max(wide, Math.min(room, text.measureText(one)));
+            float bubbleTall = dp(17) + said.size() * dp(19);
+            box.set(middle + tall * .5f, feet - tall * .62f - (said.size() - 1) * dp(9.5f), middle + tall * .5f + wide + dp(24), feet - tall * .62f - (said.size() - 1) * dp(9.5f) + bubbleTall);
+            float bubbleLeft = box.left, bubbleTop = box.top;
             plate(canvas, box, dp(14), 245);
             text.setColor(ink);
-            fitted(canvas, words, bubbleLeft + dp(12), bubbleMiddle + dp(5), dp(14), wide);
+            for (int index = 0; index < said.size(); index++) fitted(canvas, said.get(index), bubbleLeft + dp(12), bubbleTop + dp(8.5f) + dp(19) * (index + .74f), dp(14), wide);
         }
     }
 

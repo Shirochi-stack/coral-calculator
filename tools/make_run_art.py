@@ -415,6 +415,47 @@ def finale(report):
     return strip.size, white.size, back.size
 
 
+def centred(frames, box, scale, target, low=False):
+    """Frames of something in a row of cells, all at one scale, each in the middle of its cell; or, if asked, standing on the bottom of it."""
+    strip = Image.new("RGBA", (box[0] * len(frames), box[1]), (0, 0, 0, 0))
+    for index, frame in enumerate(frames):
+        size = (max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale)))
+        if size[0] > box[0] or size[1] > box[1]:
+            raise SystemExit(f"{target} frame {index} is {size}, larger than its cell {box}")
+        small = frame.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        strip.alpha_composite(small, (index * box[0] + (box[0] - size[0]) // 2, box[1] - size[1] if low else (box[1] - size[1]) // 2))
+    clear = Image.new("RGBA", strip.size, (0, 0, 0, 0))
+    Image.composite(strip, clear, strip.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / f"run_{target}.webp", lossless=True, quality=100, method=6, exact=True)
+    return strip.size
+
+
+def ride():
+    """
+    What comes after the flight. Halgakos, in white, on Lucy's back: six frames from behind (four of a wing beat, Lucy's breath, and
+    Halgakos up on her back with the book out), each standing on the bottom of its cell so that Lucy's tail stays where it is; and four
+    from the side (three of a wing beat, and the breath). The Mother Tongue, who is new, seven frames from the front, the first six at
+    one scale: serene, speaking, startled, commanding, ordering, and recoiling; and, the seventh, made small. And the sky of pages.
+    """
+    back = pieces("ride_back", 1, 6)
+    sizes = [centred(back, (400, 470), 330 / back[0].size[1], "ride_back", low=True)]
+    side = pieces("ride_side", 1, 4)
+    sizes.append(centred(side, (480, 420), 250 / side[1].size[1], "ride_side"))
+    first, more = pieces("mother_tongue", 1, 3), pieces("mother_more", 1, 4)
+    grand = first + more[:3]
+    scale = 330 / max(frame.size[1] for frame in first)
+    strip = Image.new("RGBA", (600 * 7, 400), (0, 0, 0, 0))
+    for index, frame in enumerate(grand + more[3:]):
+        size = (max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale)))
+        if size[0] > 600 or size[1] > 400:
+            raise SystemExit(f"mother frame {index} is {size}")
+        strip.alpha_composite(frame.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * 600 + (600 - size[0]) // 2, (400 - size[1]) // 2))
+    clear = Image.new("RGBA", strip.size, (0, 0, 0, 0))
+    Image.composite(strip, clear, strip.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_mother.webp", lossless=True, quality=100, method=6, exact=True)
+    sky = Image.open(SOURCE / "sky13.png").convert("RGB")
+    sky.resize((720, round(sky.size[1] * 720 / sky.size[0])), Image.LANCZOS).save(RES / "plus_run_sky13.webp", quality=82, method=6)
+    return sizes, strip.size
+
+
 def gacha():
     """The ribbon gacha's building, its inside, and its machine as it stands and as it is when it has blown up."""
     house = pieces("gacha_house", 1, 1)[0]
@@ -667,6 +708,8 @@ def main():
     her_frames("party", "party", PARTY_CELL, 14, 3, report)
     # The end of the third volume: Lucy in her three looks, and Halgakos in white, from the side and from behind.
     finale(report)
+    # And what comes after it: the ride, the Mother Tongue, and the sky of pages.
+    ride()
     others = [cast_frames(name) for name in CAST]
     faces = [face(name) for name in FACES]
     print("atlas", atlas.size, "cells", len(cells), "jump", jump.size, "lose", lose.size, "armed", armed[0].size,
