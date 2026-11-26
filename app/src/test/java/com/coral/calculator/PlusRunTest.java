@@ -3730,7 +3730,7 @@ public class PlusRunTest {
                 int way = -1;
                 for (int seed = 0; seed <= (number > RunLevels.COUNT ? 24 : 120) && chosen < 0; seed++) {
                     long with = seed == 0 ? now : seed;
-                    for (int flock = 0; flock < 3 && chosen < 0; flock++) {
+                    for (int flock = 0; flock < (seed == 0 ? 12 : 3) && chosen < 0; flock++) {
                         RunLevels.flockTry = flock;
                         PlusRun run = cross(unguarded(RunLevels.level(number, with)), number > RunLevels.COUNT ? 400 : 240);
                         if (run.state() == PlusRun.WON && run.hearts() == PlusRun.HEARTS) {
@@ -3813,6 +3813,21 @@ public class PlusRunTest {
         }
         // And how a stretch of one of them lies, with what walks in it.
         String show = System.getenv("RUN_SHOW");
+        if (show != null && show.equals("where")) {
+            // Where, in each land, the things worth going to look at are.
+            found.setLength(0);
+            for (int number = 1; number <= RunLevels.TOTAL; number++) {
+                RunLevels.Level level = RunLevels.level(number);
+                found.append(number).append(" gate ").append(level.gate).append(" flags ").append(level.flags);
+                for (int[] room : level.rooms) if (room[0] == RunLevels.ARENA) found.append(" arena door ").append(room[1]).append(" style ").append(number / 3 % 3);
+                for (int[] foe : level.foes) {
+                    if (RunLevels.rover(foe[0])) found.append(" rover ").append(foe[0]).append("@").append(foe[1]);
+                    if (RunLevels.flier(foe[0])) found.append(" f").append(foe[0]).append("@").append(foe[1]);
+                }
+                found.append("\n");
+            }
+            throw new AssertionError("WHERE:\n" + found);
+        }
         if (show != null) {
             String[] parts = show.split(",");
             RunLevels.Level level = RunLevels.level(Integer.parseInt(parts[0]));

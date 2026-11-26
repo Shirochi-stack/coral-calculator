@@ -207,16 +207,16 @@ final class RunLevels {
     static final int[] FLOCKS = new int[100];
     static int flockTry = -1;
     static {
-        for (int land : new int[]{41, 59, 66, 72}) FLOCKS[land - 1] = 1;
-        FLOCKS[69 - 1] = 2;
+        for (int land : new int[]{34, 41, 50, 53, 55, 56, 57, 58, 61, 63, 64, 66, 68, 70}) FLOCKS[land - 1] = 1;
+        for (int land : new int[]{69, 79}) FLOCKS[land - 1] = 2;
     }
 
     static int flierFrom(int kind) { return FLIES_FROM[kind - DRIFTER]; }
 
-    /** How many of them, or lines of them, a land has: three in the twenty-first, one more every five lands, two more in the second volume; fewer where someone waits. */
+    /** How many of them, or lines of them, a land has: five in the twenty-first, one more every three lands, two more in the second volume; one fewer where someone waits. */
     static int fliersIn(int number) {
         if (number < FLIERS_FROM) return 0;
-        return Math.min(14, 3 + (number - FLIERS_FROM) / 5 + (number > COUNT ? 2 : 0) - (bossOf(number) >= 0 ? 1 : 0));
+        return Math.min(18, 5 + (number - FLIERS_FROM) / 3 + (number > COUNT ? 2 : 0) - (bossOf(number) >= 0 ? 1 : 0));
     }
 
     /**
@@ -366,7 +366,7 @@ final class RunLevels {
     };
     /** The numbers the lands of the second volume are made from, picked as those of the first were. */
     static final long[] LATER_SEEDS = {
-            1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1,
+            1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1,
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1,
     };
 
