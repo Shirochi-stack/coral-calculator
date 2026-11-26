@@ -6,7 +6,7 @@ Builds the art of Page brawl from the pictures in assets/fight.
 The pictures were made with an image model (gpt-6-astra, through Glossarion) on transparent
 backgrounds, each fighter drawn from her own non-chibi design sheet of the webtoon:
 
-  * NAME/SHEET.webp are a fighter's frames: sixteen sheets of six, three across and two down.
+  * NAME/SHEET.webp are a fighter's frames: seventeen sheets of six, three across and two down.
     Eight are of how she moves (idle and guard, walking, walking back, dashing, jumping, being
     hit, going down and getting up, winning and losing) and eight of how she fights (the five
     blows of her quick chain, of her heavy chain, in the air, the smash, her specials, her
@@ -68,18 +68,22 @@ SHEETS = [
     ("moves", "MS DASH_Q DASH_H BREAK LAUNCH SHOVE", (0,)),
     ("ult", "U1 U2 U3 U4 CHARGE TAUNT2", (0,)),
     ("extra", "XS DODGE1 DODGE2 C1 C2 C3", (0,)),
+    # Her dodges that go somewhere: back away from the other (its start, its furthest, its end), forward past her, and in the air.
+    ("slip", "SLIP_S BDODGE1 BDODGE2 BDODGE3 FDODGE ADODGE", (0,)),
 ]
 NAMES = [name for _, names, _ in SHEETS for name in names.split()]
-# Frames that are placed by the middle of what is drawn, not by where her feet are: in the air, and lying down.
-CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2".split())
+# Frames that are placed by the middle of what is drawn, not by where her feet are: in the air, lying down, and
+# leaning far out of a dodge.
+CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2 ADODGE BDODGE2 FDODGE".split())
 # What stands in for the dodge and the clash while a fighter has no sheet of them yet.
-SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U3", "C3": "U4"}
+SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U3", "C3": "U4",
+         "SLIP_S": "XS", "BDODGE1": "HOP1", "BDODGE2": "HOP2", "BDODGE3": "HOP1", "FDODGE": "DODGE1", "ADODGE": "DODGE2"}
 # For a fighter who has only her first twelve frames (standing, walking, jumping, guarding, hit, down, quick, heavy,
 # special, ultimate, win, and one more), which of them stands in for each frame.
 OLD = dict(zip(NAMES, [
     0, 0, 0, 0, 3, 3, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 2, 2, 0, 1, 1, 1, 0, 0, 0, 0, 2, 2, 2, 0, 4, 4, 4, 4, 4, 3, 4, 5, 5, 5, 0, 5,
     10, 10, 10, 5, 5, 10, 0, 6, 6, 6, 6, 6, 0, 7, 7, 7, 7, 7, 0, 6, 6, 6, 8, 8, 2, 7, 7, 0, 0, 0, 8, 8, 11, 8, 11, 8, 0, 6, 7, 7, 7, 6,
-    9, 9, 11, 9, 10, 10, 0, 2, 2, 9, 11, 9]))
+    9, 9, 11, 9, 10, 10, 0, 2, 2, 9, 11, 9, 0, 2, 2, 2, 2, 2]))
 # Roughly the colour of each one's hair, to find it by; what it is exactly is measured from her first sheet.
 HAIR = {"halgakos": (238, 160, 180), "chikuwa": (200, 150, 110), "tsubakieh": (150, 122, 150), "rune": (150, 200, 240), "illya": (245, 190, 150)}
 # A sheet whose upright frame came out a different size from the rest of it is put right by hand here: (fighter, sheet) to a factor.

@@ -355,6 +355,24 @@ public class FightTest {
         assertEquals(0, Fight.chainStep(Fight.SPECIAL));
     }
 
+    @Test public void aPressMadeWhileABlowHoldsTheFightStillIsNotLost() {
+        Fight fight = apart(Fight.CHIKUWA, Fight.HALGAKOS, 1.2f);
+        Fight.Pad pad = new Fight.Pad();
+        pad.heavy = true;
+        fight.step(STEP, pad, null);
+        pad.heavy = false;
+        // Her brick bread lands, and everything stops for a moment: the button is tapped and let go inside that moment.
+        while (fight.hits() == 0) fight.step(STEP, pad, null);
+        float time = fight.left();
+        pad.heavy = true;
+        fight.step(STEP, pad, null);
+        pad.heavy = false;
+        assertEquals(time, fight.left(), 0);
+        rest(fight, .6f);
+        assertEquals(2, fight.moves());
+        assertEquals(Fight.HEAVY2, fight.fighters[0].move);
+    }
+
     /** The frame a fighter shows in the middle of a move. */
     private static int shown(int kind, int move, float clock, int landed, int specials) {
         Fight fight = apart(kind, Fight.HALGAKOS, 3);
@@ -641,6 +659,79 @@ public class FightTest {
         assertTrue(air.fighters[1].y > 0);
     }
 
+    /** The frames a fighter shows through a dodge begun with an arrow held or none, on the ground or in the air: each once, in order. */
+    private static java.util.List<Integer> slipped(int kind, int side, boolean left, boolean right, boolean air) throws Exception {
+        Fight fight = side == 0 ? apart(kind, Fight.CHIKUWA, 5) : apart(Fight.CHIKUWA, kind, 5);
+        Fight shown = new Fight(fight.fighters[0].kind, fight.fighters[1].kind, -1, -1, 0);
+        Fight.Pad pad = new Fight.Pad(), none = new Fight.Pad();
+        if (air) {
+            pad.jump = true;
+            fight.step(STEP, side == 0 ? pad : none, side == 0 ? none : pad);
+            pad.jump = false;
+            hold(fight, .2f, side == 0 ? pad : none, side == 0 ? none : pad);
+        }
+        pad.dodge = true;
+        pad.left = left;
+        pad.right = right;
+        java.util.List<Integer> frames = new java.util.ArrayList<>();
+        for (int frame = 0; frame < 40; frame++) {
+            fight.step(STEP, side == 0 ? pad : none, side == 0 ? none : pad);
+            Fight.Fighter her = fight.fighters[side];
+            if (her.state != Fight.DODGE) break;
+            int pose = FightPose.of(fight, her, 0, 0);
+            // A device that is only shown the fight shows the same frame of her.
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            fight.write(new java.io.DataOutputStream(bytes));
+            shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+            assertEquals(pose, FightPose.of(shown, shown.fighters[side], 0, 0));
+            if (frames.isEmpty() || frames.get(frames.size() - 1) != pose) frames.add(pose);
+        }
+        assertEquals(1, fight.dodges());
+        return frames;
+    }
+
+    @Test public void aDodgeAwayShowsHerSpringingBackAndADodgeTowardShowsHerSlippingPast() throws Exception {
+        java.util.List<Integer> back = java.util.Arrays.asList(FightFrames.BDODGE1, FightFrames.BDODGE2, FightFrames.BDODGE3);
+        java.util.List<Integer> forward = java.util.Arrays.asList(FightFrames.FDODGE, FightFrames.SKID);
+        java.util.List<Integer> still = java.util.Arrays.asList(FightFrames.DODGE1, FightFrames.DODGE2);
+        java.util.List<Integer> air = java.util.Collections.singletonList(FightFrames.ADODGE);
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            String name = FightCast.NAMES[kind];
+            // On the left she faces right: left is away. On the right she faces left: right is away.
+            assertEquals(name, back, slipped(kind, 0, true, false, false));
+            assertEquals(name, forward, slipped(kind, 0, false, true, false));
+            assertEquals(name, back, slipped(kind, 1, false, true, false));
+            assertEquals(name, forward, slipped(kind, 1, true, false, false));
+            assertEquals(name, still, slipped(kind, 0, false, false, false));
+            assertEquals(name, still, slipped(kind, 1, false, false, false));
+            // In the air it is the dodge of the air, whichever way.
+            assertEquals(name, air, slipped(kind, 0, true, false, true));
+            assertEquals(name, air, slipped(kind, 0, false, true, true));
+            assertEquals(name, air, slipped(kind, 1, false, false, true));
+            if (!FightFrames.FULL[kind]) continue;
+            // Each of them a picture of its own, and none the hop back's.
+            Set<String> places = new HashSet<>();
+            for (int frame : new int[]{FightFrames.BDODGE1, FightFrames.BDODGE2, FightFrames.BDODGE3, FightFrames.FDODGE, FightFrames.ADODGE, FightFrames.DODGE1,
+                    FightFrames.DODGE2, FightFrames.HOP1, FightFrames.HOP2, FightFrames.SKID}) {
+                short[] at = FightFrames.FRAMES[kind][frame];
+                assertTrue(name + ": two frames in one place: " + frame, places.add(at[0] + " " + at[1] + " " + at[2]));
+                assertTrue(at[3] > 40 && at[4] > 40);
+            }
+        }
+        // She goes the way she was asked: back, away from the other; forward, past her.
+        Fight away = apart(Fight.RUNE, Fight.CHIKUWA, 5), toward = apart(Fight.RUNE, Fight.CHIKUWA, 1.2f);
+        Fight.Pad pad = new Fight.Pad();
+        pad.dodge = true;
+        pad.left = true;
+        hold(away, Fight.DODGE_SECONDS - .05f, pad, null);
+        assertTrue(away.fighters[0].x < Fight.WIDE / 2 - 2.5f - 2);
+        assertFalse(away.fighters[0].facingLeft);
+        pad.left = false;
+        pad.right = true;
+        hold(toward, Fight.DODGE_SECONDS - .05f, pad, null);
+        assertTrue(toward.fighters[0].x > toward.fighters[1].x);
+    }
+
     // The clash
 
     /** Two played by hand with their meters full: the left goes for her ultimate, and the right for hers so long after. */
@@ -745,17 +836,93 @@ public class FightTest {
         assertEquals(0, last.flourisher());
     }
 
-    @Test public void anUltimateAnsweredTooLateIsNoClash() {
-        Fight fight = answered(Fight.FLOURISH_SECONDS + .1f);
-        assertEquals(0, fight.clashes());
-        // Hers was simply begun in its turn: the first is not stopped by it.
-        assertEquals(Fight.FLOURISH, fight.phase());
-        assertEquals(1, fight.flourisher());
-        rest(fight, 5);
-        assertEquals(0, fight.clashes());
-        // And nothing touches her in the middle of her own: most of both of them is wasted.
-        assertEquals(0, lost(fight, 1), 0);
-        assertTrue(lost(fight, 0) < hurt(Fight.ILLYA, Fight.ULTIMATE) * 4);
+    @Test public void anUltimateMetBeforeAnyOfItLandsIsAClashAndAfterItIsNot() {
+        // While it is announced; and after that, while it is still coming out.
+        assertEquals(1, answered(.5f).clashes());
+        Fight coming = answered(Fight.FLOURISH_SECONDS + .1f);
+        assertEquals(Fight.CLASHING, coming.phase());
+        assertEquals(1, coming.clashes());
+        assertEquals(1, coming.clashSecond());
+        assertEquals(0, lost(coming, 1), 0);
+        tapped(coming, 9, 20);
+        assertEquals(1, coming.flourisher());
+        rest(coming, 4);
+        // Neither of the two that met went off: only the greater one of whoever won.
+        assertEquals(0, lost(coming, 1), 0);
+        assertEquals(Fight.MOVES[Fight.ILLYA][Fight.CLASH].damage * 5, lost(coming, 0), .01f);
+
+        // A flood is thrown and on its way: until it reaches her it can still be met.
+        Fight flood = apart(Fight.RUNE, Fight.TSUBAKIEH, 7);
+        flood.fighters[0].meter = Fight.METER;
+        flood.fighters[1].meter = Fight.METER;
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        one.ultimate = true;
+        flood.step(STEP, one, two);
+        one.ultimate = false;
+        hold(flood, Fight.FLOURISH_SECONDS + Fight.MOVES[Fight.RUNE][Fight.ULTIMATE].startup + .3f, one, two);
+        assertEquals(1, flood.shots().size());
+        assertEquals(Fight.FLOOD, flood.shots().get(0).kind);
+        assertEquals(Fight.IDLE, flood.fighters[1].state);
+        two.ultimate = true;
+        flood.step(STEP, one, two);
+        two.ultimate = false;
+        assertEquals(Fight.CLASHING, flood.phase());
+        tapped(flood, 5, 30);
+        // The flood is gone with the clash, and she has her greater one.
+        assertTrue(flood.shots().isEmpty());
+        rest(flood, 4);
+        assertEquals(0, lost(flood, 1), 0);
+        assertEquals(Fight.MOVES[Fight.TSUBAKIEH][Fight.CLASH].damage * 5, lost(flood, 0), .01f);
+
+        // She need not be standing ready: in the middle of a jump she may meet it all the same.
+        Fight jumping = apart(Fight.CHIKUWA, Fight.HALGAKOS, 6);
+        jumping.fighters[0].meter = Fight.METER;
+        jumping.fighters[1].meter = Fight.METER;
+        one.ultimate = true;
+        jumping.step(STEP, one, two);
+        one.ultimate = false;
+        hold(jumping, Fight.FLOURISH_SECONDS, one, two);
+        two.jump = true;
+        hold(jumping, .15f, one, two);
+        two.jump = false;
+        assertEquals(Fight.JUMP, jumping.fighters[1].state);
+        two.ultimate = true;
+        jumping.step(STEP, one, two);
+        two.ultimate = false;
+        assertEquals(Fight.CLASHING, jumping.phase());
+
+        // Once the first of it has landed, even on her guard, it is too late: hers is simply begun in its turn.
+        Fight late = apart(Fight.HALGAKOS, Fight.ILLYA, 5);
+        late.fighters[0].meter = Fight.METER;
+        late.fighters[1].meter = Fight.METER;
+        one.ultimate = true;
+        two.block = true;
+        late.step(STEP, one, two);
+        one.ultimate = false;
+        hold(late, Fight.FLOURISH_SECONDS + Fight.MOVES[Fight.HALGAKOS][Fight.ULTIMATE].startup + .1f, one, two);
+        assertEquals(1, late.blocks());
+        two.block = false;
+        two.ultimate = true;
+        late.step(STEP, one, two);
+        two.ultimate = false;
+        assertEquals(0, late.clashes());
+        assertEquals(Fight.FLOURISH, late.phase());
+        assertEquals(1, late.flourisher());
+        assertEquals(Fight.ULTIMATE, late.fighters[1].move);
+        // And a flood that has already rolled into her is not to be met either.
+        Fight wet = apart(Fight.RUNE, Fight.TSUBAKIEH, 3);
+        wet.fighters[0].meter = Fight.METER;
+        wet.fighters[1].meter = Fight.METER;
+        one.ultimate = true;
+        two.block = true;
+        wet.step(STEP, one, two);
+        one.ultimate = false;
+        for (int frame = 0; frame < 300 && wet.blocks() == 0; frame++) wet.step(STEP, one, two);
+        assertEquals(1, wet.blocks());
+        two.block = false;
+        two.ultimate = true;
+        wet.step(STEP, one, two);
+        assertEquals(0, wet.clashes());
     }
 
     @Test public void oneWhoPlaysHerselfTapsFasterTheBetterSheIsAndCanBeOutTappedAtHerBest() {
