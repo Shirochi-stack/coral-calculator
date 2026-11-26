@@ -659,6 +659,8 @@ final class RunGame {
                 : most >= 30 || all.contains("ribbon") ? 1 : 0;
         toastX = run == null ? 0 : run.x() + PlusRun.WIDE / 2;
         toastY = run == null ? 0 : run.y() + PlusRun.TALL * .4f;
+        if (run != null && all.contains("piece of a heart")) flyTo((toastX - cameraX) * tile, (toastY - cameraY) * tile, true, 1);
+        else if (run != null && most >= 10) flyTo((toastX - cameraX) * tile, (toastY - cameraY) * tile, false, Math.min(10, most / 10 + 2));
         audio.play("star", toastRarity == 2 ? .9f : .6f);
         if (toastRarity == 2) audio.play("win", .5f);
         // And it bursts out of where she is: coins for the plain, light for the rest.
@@ -1079,6 +1081,8 @@ final class RunGame {
         hintMoved = hintJumped = false;
         seenDrops = seenBeams = seenBlasts = jumpsAtFall = seenCracks = seenShatters = seenThrownBack = 0;
         seenPetJoined = seenPetStrikes = seenPetKills = 0;
+        flights.clear();
+        chestAge = 9;
         petGlad = 9;
         slow = 0;
         goDown = false;
@@ -1973,10 +1977,15 @@ final class RunGame {
                 && (int) (sincePhase / 1.2f) != (int) ((sincePhase - seconds) / 1.2f)) run.sweep();
         // A chest opened: ten pluses in it. The one by a passage's far door has a purse in it besides, the first time; a stash's is the
         // doing of the stash, and is told with that.
+        chestAge += seconds;
         if (run.chests() != seenChests) {
             seenChests = run.chests();
             audio.play("unlock");
             buzz(true);
+            chestAge = 0;
+            chestX = run.tookX();
+            chestY = run.tookY();
+            flyTo((chestX - cameraX) * tile, (chestY - cameraY) * tile, false, 8);
             pop(herX, herY - 1.6f, "+ 10");
             seenBonus = run.bonus();
             for (int spark = 0; spark < 12; spark++) {
@@ -2785,6 +2794,7 @@ final class RunGame {
             drawHud(canvas);
             if (screen == PLAY && run.wavePhase() != 0) drawWave(canvas);
             if (screen == PLAY) drawRover(canvas);
+            drawFlights(canvas, screen == PLAY ? 1 / 60f : 0);
             if (screen == PLAY && (roomCardAge >= 0 || roomResultAge >= 0)) drawRoomCards(canvas);
             if (screen == PLAY) {
                 // Charmed, the arrows are the wrong way round, and show it.
@@ -3015,12 +3025,14 @@ final class RunGame {
                     canvas.restore();
                 } else if (here == RunLevels.LEDGE) {
                     art(canvas, LEDGE_ART, left + tile / 2, y + tile * artTall[LEDGE_ART] / artWide[LEDGE_ART], tile + 1, column % 2 != 0);
+                    if (column % 3 == 1) lets(canvas, left + tile / 2, y + tile * .42f, row);
                 } else if (here == RunLevels.THIN || here == RunLevels.CRUMBLE) {
                     int which = here == RunLevels.THIN ? THIN_ART : CRUMBLE_ART;
                     two.get();
                     // A ledge that has begun to crumble shivers until it goes.
                     float shiver = here == RunLevels.CRUMBLE && run.crumbling(column, row) > 0 ? (float) Math.sin(clock * 70 + column) * tile * .05f : 0;
                     piece(canvas, two, which, left + tile / 2 + shiver, y + (tile + 1) * two.tall[which] / two.wide[which], tile + 1, column % 2 != 0);
+                    if (here == RunLevels.THIN && column % 3 == 1) lets(canvas, left + tile / 2, y + tile * .42f, row);
                 } else if (here == RunLevels.BELT_RIGHT || here == RunLevels.BELT_LEFT) {
                     square(canvas, BELT_ART, left, y, here == RunLevels.BELT_LEFT, false);
                     // Arrowheads running along it the way it goes.
@@ -3406,6 +3418,7 @@ final class RunGame {
         }
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);
+        drawChest(canvas);
         drawPet(canvas);
         drawHer(canvas);
         // What has just been won, rising from where it was won.
@@ -4832,6 +4845,90 @@ final class RunGame {
         cell(canvas, petArt(kind), pose, 6, x, y + tile * .04f - hop, tall, !run.petLeftward());
     }
 
+    /** The mark under a thin ledge that says she can be let down through it: a small arrowhead, pointing down. */
+    private void lets(Canvas canvas, float x, float y, int row) {
+        boolean hers = run.onGround() && (int) Math.floor(run.y() + PlusRun.TALL + .05f) == row;
+        float size = tile * .13f, bob = hers ? Math.abs((float) Math.sin(clock * 5)) * tile * .06f : 0;
+        stroke.setStrokeWidth(tile * .05f);
+        stroke.setColor(0xFF20242A);
+        stroke.setAlpha(hers || run.dark() ? 200 : 90);
+        path.reset();
+        path.moveTo(x - size, y + bob);
+        path.lineTo(x, y + size + bob);
+        path.lineTo(x + size, y + bob);
+        canvas.drawPath(path, stroke);
+        stroke.setStrokeWidth(tile * .028f);
+        stroke.setColor(Color.WHITE);
+        stroke.setAlpha(hers || run.dark() ? 255 : 150);
+        canvas.drawPath(path, stroke);
+        stroke.setAlpha(255);
+    }
+
+    /**
+     * What has just been won flies to its place at the top: pluses to the count of them, a
+     * piece of a heart to her hearts. Each is a small picture on an arc.
+     */
+    private final List<float[]> flights = new ArrayList<>();
+
+    private void flyTo(float fromX, float fromY, boolean heart, int many) {
+        float toX = safe.left + dp(heart ? 44 : 150), toY = safe.top + dp(32);
+        for (int one = 0; one < many; one++) flights.add(new float[]{fromX + (random.nextFloat() - .5f) * tile, fromY + (random.nextFloat() - .5f) * tile * .6f, toX, toY, -one * .06f, heart ? 1 : 0});
+    }
+
+    private void drawFlights(Canvas canvas, float seconds) {
+        for (int index = flights.size() - 1; index >= 0; index--) {
+            float[] one = flights.get(index);
+            one[4] += seconds;
+            if (one[4] < 0) continue;
+            float through = one[4] / .7f;
+            if (through >= 1) {
+                flights.remove(index);
+                continue;
+            }
+            float eased = through * through * (3 - 2 * through);
+            float x = one[0] + (one[2] - one[0]) * eased, y = one[1] + (one[3] - one[1]) * eased - (float) Math.sin(eased * Math.PI) * dp(60);
+            if (one[5] > 0) artIn(canvas, HEART_ART, x, y, dp(22));
+            else artIn(canvas, PLUS_ART, x, y, dp(16));
+        }
+    }
+
+    /**
+     * A chest opens where it stood: it jumps, its lid flies off turning, light comes out
+     * of it in rays, and what was in it goes up to the count at the top.
+     */
+    private float chestAge = 9, chestX, chestY;
+
+    private void drawChest(Canvas canvas) {
+        if (chestAge > .9f) return;
+        float x = (chestX - cameraX) * tile, y = (chestY - cameraY) * tile, through = chestAge / .9f, hop = (float) Math.sin(Math.min(1, through * 2.5f) * Math.PI) * tile * .35f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFFFFD24A);
+        for (int ray = 0; ray < 8; ray++) {
+            double turn = clock * 1.6f + ray * Math.PI / 4;
+            path.reset();
+            path.moveTo(x, y - hop);
+            path.lineTo(x + (float) Math.cos(turn - .16) * tile * 1.7f * through, y - hop + (float) Math.sin(turn - .16) * tile * 1.7f * through);
+            path.lineTo(x + (float) Math.cos(turn + .16) * tile * 1.7f * through, y - hop + (float) Math.sin(turn + .16) * tile * 1.7f * through);
+            path.close();
+            paint.setAlpha(Math.round(130 * (1 - through)));
+            canvas.drawPath(path, paint);
+        }
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(Math.round(255 * Math.min(1, (1 - through) * 3)));
+        pieceIn(canvas, four, CHEST_PICTURE, x, y - hop, tile * 1.1f * (1 + .15f * (float) Math.sin(through * Math.PI)), 0);
+        // Its lid, off and away.
+        canvas.save();
+        float lidX = x + tile * 1.2f * through, lidY = y - hop - tile * (.5f + 2.2f * (float) Math.sin(through * Math.PI * .75f));
+        canvas.rotate(through * 420, lidX, lidY);
+        paint.setColor(0xFF8A4B2A);
+        canvas.drawRoundRect(lidX - tile * .45f, lidY - tile * .14f, lidX + tile * .45f, lidY + tile * .14f, tile * .12f, tile * .12f, paint);
+        paint.setColor(0xFFE0B13A);
+        canvas.drawRect(lidX - tile * .08f, lidY - tile * .14f, lidX + tile * .08f, lidY + tile * .14f, paint);
+        canvas.restore();
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+    }
+
     /** A ring of light that beats about a button: here is the thing that was just spoken of. */
     private void glow(Canvas canvas, RectF button) {
         float beat = .5f + .5f * (float) Math.sin(clock * 6), round = Math.min(button.width(), button.height()) / 2;
@@ -5136,7 +5233,7 @@ final class RunGame {
             text.setTextSize(dp(14));
             float title = text.measureText(toastTitle);
             text.setTextSize(dp(11.5f));
-            float wide = Math.min(safe.width() - margin * 2, Math.max(title, text.measureText(toastWords)) + dp(66)), from = safe.left + margin - (1 - in) * dp(46);
+            float wide = Math.min(safe.width() - margin * 2 - (run.pet() >= 0 ? dp(50) : 0), Math.max(title, text.measureText(toastWords)) + dp(66)), from = safe.left + margin - (1 - in) * dp(46);
             int rim = toastRarity == 2 ? 0xFF8E5BE8 : toastRarity == 1 ? 0xFFE0A21A : 0xFFB9BEC2;
             canvas.saveLayerAlpha(from - dp(8), under - dp(8), from + wide + dp(8), under + high + dp(10), Math.round(255 * fade));
             box.set(from, under, from + wide, under + high);
@@ -5300,7 +5397,8 @@ final class RunGame {
         if (captionLeft > 0 && caption != null && (screen == PLAY || screen == STALL)) {
             float fade = Math.min(1, captionLeft / .3f), face = dp(17);
             text.setTextSize(dp(14));
-            float room = Math.min(safe.width() - dp(48) - face * 2 - dp(8), dp(300));
+            // (Kept clear of the pet's plate at the top right, when there is one.)
+            float room = Math.min(safe.width() - dp(48) - face * 2 - dp(8) - (run.pet() >= 0 ? dp(50) : 0), dp(300));
             List<String> lines = wrap(caption, room);
             // No more than two lines at once: what is longer is said in two bubbles in turn, parted where a sentence ends, each for its
             // share of the time.

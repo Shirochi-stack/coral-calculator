@@ -129,6 +129,11 @@ final class PlusRun {
     private Foe petAt;
 
     /** Which pet is with her, or -1; where its feet are; which way it faces; how much longer it is busy with what it is at; and counts that only go up. */
+    /** Where the last thing she took lay: the middle of its square. */
+    float tookX() { return tookX; }
+    float tookY() { return tookY; }
+    private float tookX, tookY;
+
     int pet() { return pet; }
     float petX() { return petX; }
     float petY() { return petY; }
@@ -1558,6 +1563,7 @@ final class PlusRun {
             case RunLevels.GECKO:
                 return 2;
             case RunLevels.BUTLER:
+                return 2;
             case RunLevels.ILLYA:
             case RunLevels.TSUBAKIEH:
             case RunLevels.BLOT:
@@ -1589,8 +1595,16 @@ final class PlusRun {
     }
 
     /** How long she can be hurt for once her shield is broken, and how long it takes to form again: both shorter in each later third. */
-    float opens(Foe foe) { return 2.4f - .35f * phase(foe); }
-    float forms(Foe foe) { return 2.2f - .5f * phase(foe); }
+    float opens(Foe foe) { return 2.4f - .35f * stage(foe); }
+    float forms(Foe foe) { return 2.2f - .5f * stage(foe); }
+
+    /**
+     * How far through the fight she is, for what her shield does: the Guild Guard and
+     * Penchok-jipsa, who are the first anyone meets, are as they began all the way through:
+     * their shields get no stronger, break for as long, form as slowly, and throw no one
+     * back.
+     */
+    private int stage(Foe foe) { return foe.kind == RunLevels.GUARD || foe.kind == RunLevels.BUTLER ? 0 : phase(foe); }
 
     /** How much of her shield is left, from nothing to one; whether it is forming again; and counts that only go up: pieces knocked off shields, shields broken, and times a breaking shield threw her back. */
     float shield(Foe foe) { return foe.shieldMost <= 0 ? 0 : Math.max(0, Math.min(1, foe.shield / foe.shieldMost)); }
@@ -1623,7 +1637,7 @@ final class PlusRun {
         foe.act = .3f;
         foe.unseen = false;
         // In the last third it throws whoever broke it back as it goes, if she is near.
-        if (phase(foe) >= 2 && !RunLevels.rover(foe.kind) && Math.abs(x + WIDE / 2 - foeX) < 3) {
+        if (stage(foe) >= 2 && !RunLevels.rover(foe.kind) && Math.abs(x + WIDE / 2 - foeX) < 3) {
             speedAcross = (x + WIDE / 2 < foeX ? -1 : 1) * 11;
             speedDown = -6;
             onGround = false;
@@ -1633,7 +1647,7 @@ final class PlusRun {
 
     /** Her shield is whole again, as strong as this third of the fight makes it. */
     private void shielded(Foe foe) {
-        foe.shieldMost = strength(foe.kind) + phase(foe);
+        foe.shieldMost = strength(foe.kind) + stage(foe);
         foe.shield = foe.shieldMost;
         foe.broken = 0;
         foe.forming = 0;
@@ -2013,6 +2027,8 @@ final class PlusRun {
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST) continue;
                 items.remove(index);
+                tookX = item[1] + .5f;
+                tookY = item[2] + .5f;
                 // A pet that lay waiting goes with her from here on, in place of any that was with her.
                 if (item[0] >= PET && item[0] < PET + PETS) {
                     adopt(item[0] - PET);
@@ -2136,7 +2152,7 @@ final class PlusRun {
                 if (plunged && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
                 beat(foe, plunged ? PLUNGED : PLAIN);
                 // One sign after another without touching the ground: each is worth one plus more than the last.
-                if (foe.flat && ++combo > 1) bonus += combo - 1;
+                if (foe.flat && ++combo > 1) bonus += Math.min(4, combo - 1);
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
                 knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
@@ -3283,7 +3299,7 @@ final class PlusRun {
         if (foe.broken > 0 && !absent(foe)) {
             if ((foe.broken -= seconds) <= 0 || foe.taken >= 2 && foe.dazed <= seconds) {
                 foe.forming = forms(foe);
-                foe.shieldMost = strength(foe.kind) + phase(foe);
+                foe.shieldMost = strength(foe.kind) + stage(foe);
                 foe.shield = 0;
                 foe.broken = 0;
                 foe.taken = 0;
