@@ -116,7 +116,7 @@ final class PlayStage extends View {
 
     // Catch Halgakos
     private float goalX, goalY, rest, dash, timeLeft;
-    private int caught;
+    private int caught, missed;
 
     // Number rain: each sign is x, y, speed, and 1 for a plus or 0 for a minus.
     private final List<float[]> signs = new ArrayList<>();
@@ -137,6 +137,8 @@ final class PlayStage extends View {
     private int pressed = Mines.NONE;
     private float pressX, pressY;
     private boolean planted, digging;
+    /** How many flags have gone up on this field. */
+    private int flagsPlanted;
     /** How much longer the field is left on show, mines and all, before the card comes up. */
     private float showing;
     private final Runnable plant = this::plant;
@@ -200,6 +202,8 @@ final class PlayStage extends View {
     private RunGame runGame;
     /** Page brawl likewise. */
     private FightGame fightGame;
+    /** One of the tricks that playing unlocks: a scene of its own, played as a prank is. */
+    private Trick trick;
 
     private Object backCallback;
 
@@ -245,6 +249,7 @@ final class PlayStage extends View {
         }
         if (game == PlaySession.RUN) runGame = new RunGame(this, context, dark, haptics, art, pet);
         if (game == PlaySession.FIGHT) fightGame = new FightGame(this, context, dark, haptics, art, pet);
+        if (Unlocks.isTrick(game)) trick = new Trick(context, game - Unlocks.FIRST_TRICK, dark, art, pet);
         if (game == SNATCH || game == AVALANCHE) {
             pickApps(context, game == SNATCH ? 1 : SHAKEN);
             loot = icons.get(0);
@@ -290,16 +295,20 @@ final class PlayStage extends View {
     }
 
     static boolean isPrank(int game) {
-        return (game >= SNATCH && game <= BUG) || (game >= DRIP && game <= WEBS) || (game >= STICKERS && game <= LASER);
+        return (game >= SNATCH && game <= BUG) || (game >= DRIP && game <= WEBS) || (game >= STICKERS && game <= LASER) || Unlocks.isTrick(game);
     }
 
     /** The pranks she has yet to play this time round, in the order she will play them. */
     private static final List<Integer> NEXT_PRANKS = new ArrayList<>();
 
     /** A prank she has not played since she last got through them all. */
-    static int anyPrank(Random random) {
+    static int anyPrank(Random random) { return anyPrank(random, null); }
+
+    /** The same, with the tricks that have been unlocked among them. */
+    static int anyPrank(Random random, List<Integer> unlocked) {
         if (NEXT_PRANKS.isEmpty()) {
             for (int prank : PRANKS) NEXT_PRANKS.add(prank);
+            if (unlocked != null) NEXT_PRANKS.addAll(unlocked);
             java.util.Collections.shuffle(NEXT_PRANKS, random);
         }
         return NEXT_PRANKS.remove(NEXT_PRANKS.size() - 1);
@@ -324,12 +333,14 @@ final class PlayStage extends View {
     void setHome(float x, float feet) {
         homeX = x;
         homeY = feet;
+        if (trick != null) trick.setHome(x, feet, homeTall);
     }
 
     /** The same, with how tall she stands there. */
     void setHome(float x, float feet, float tall) {
         setHome(x, feet);
         homeTall = tall;
+        if (trick != null) trick.setHome(x, feet, tall);
     }
 
     @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
@@ -340,6 +351,11 @@ final class PlayStage extends View {
     private void layout() {
         play.set(insetLeft, insetTop, getWidth() - insetRight, getHeight() - insetBottom);
         if (play.width() <= 0 || play.height() <= 0) return;
+        if (trick != null) {
+            trick.layout(play);
+            started = true;
+            return;
+        }
         if (fightGame != null) {
             fightGame.layout(getWidth(), getHeight(), play);
             started = true;
@@ -673,6 +689,14 @@ final class PlayStage extends View {
             fightGame.advance(seconds);
             return;
         }
+        if (trick != null) {
+            String said = trick.saying();
+            if (trick.advance(seconds)) leave();
+            // Read out as it changes: the view is a live region.
+            String says = trick.saying();
+            if (says != null && !says.equals(said)) setContentDescription(says);
+            return;
+        }
         int row = once != NONE ? once : pose;
         frameClock += seconds * 1000;
         while (frameClock >= PetArt.FRAME_MS[row]) {
@@ -853,6 +877,11 @@ final class PlayStage extends View {
     private void tag(float seconds) {
         timeLeft -= seconds;
         if (timeLeft <= 0) {
+            session.count("tag_played");
+            session.add("tag_total", caught);
+            session.add("tag_miss", missed);
+            if (caught == 0) session.count("tag_none");
+            if (caught >= 8 && missed <= 2) session.count("tag_sharp");
             int best = session.tally("tag_best");
             boolean record = session.keepBest("tag_best", caught, false);
             finish("Time!", "You caught Halgakos " + caught + (caught == 1 ? " time." : " times.")
@@ -885,6 +914,7 @@ final class PlayStage extends View {
             rest = 0;
             pickGoal();
         } else {
+            missed++;
             ring(x, y, false);
         }
     }
@@ -923,12 +953,18 @@ final class PlayStage extends View {
                     score++;
                     ring(sign[0], sign[1], true);
                 } else {
+                    // How many she had caught before the first bump is kept: a careful start.
+                    if (hearts == HEARTS) session.keepBest("rain_dry", score, false);
                     hearts--;
                     hurt = .6f;
                     buzz();
                     ring(sign[0], sign[1], false);
                     say(1.2f, "Ow! That hurt Sloppy~♡", "Not that one Sloppy~♡", "Hey! Watch where you drag me Sloppy~♡", "Tch. That was your fault Sloppy~♡");
                     if (hearts <= 0) {
+                        session.count("rain_played");
+                        session.add("rain_total", score);
+                        session.add("rain_bumps", HEARTS);
+                        if (score <= 2) session.count("rain_quick");
                         int best = session.tally("rain_best");
                         boolean record = session.keepBest("rain_best", score, false);
                         finish("That's three bumps", "You caught " + score + (score == 1 ? " plus." : " pluses.")
@@ -1007,13 +1043,19 @@ final class PlayStage extends View {
             buzz();
             ring(touched[0], touched[1], true);
             if (bubbles.isEmpty()) {
+                session.count("order_played");
+                session.add("order_popped", BUBBLES);
+                session.add("order_wrong", missed);
+                if (missed == 0) session.count("order_clean");
                 // Kept in tenths of a second, the lower the better.
                 int tenths = Math.max(1, Math.round(elapsed * 10)), best = session.tally("order_best");
+                if (tenths >= 400) session.count("order_slow");
                 boolean record = session.keepBest("order_best", tenths, true);
                 finish("All popped!", "That took " + seconds(tenths) + " seconds."
                         + (record && best != 0 ? " That's a new best!" : best != 0 ? " Your best is " + seconds(Math.min(best, tenths)) + "." : ""));
             }
         } else {
+            missed++;
             elapsed += PENALTY_SECONDS;
             touched[5] = .45f;
             ring(x, y, false);
@@ -1057,10 +1099,15 @@ final class PlayStage extends View {
         if (digging && field.state() == Mines.PLAYING) elapsed += seconds;
         if (showing > 0 && (showing -= seconds) <= 0) {
             int time = Math.max(1, Math.round(elapsed));
+            session.add("mines_flags", flagsPlanted);
             if (field.state() == Mines.WON) {
+                session.count("mines_won");
+                if (flagsPlanted == 0) session.count("mines_noflag");
                 boolean record = session.keepBest("mines_best", time, true);
                 finish("Field cleared!", "All " + field.mines + " mines found in " + clock(time) + (record ? ". A new best!" : "."));
             } else {
+                session.count("mines_lost");
+                if (time <= 5) session.count("mines_quick");
                 finish("Boom!", "That was a mine. You lasted " + clock(time) + " among " + field.mines + " of them.");
             }
         }
@@ -1100,7 +1147,11 @@ final class PlayStage extends View {
                 removeCallbacks(plant);
                 if (pressed != Mines.NONE && !planted) {
                     buzz();
-                    if (flagging && !field.isOpen(pressed)) field.flag(pressed); else dig(pressed);
+                    if (flagging && !field.isOpen(pressed)) {
+                        if (field.flag(pressed)) flagsPlanted++;
+                    } else {
+                        dig(pressed);
+                    }
                 }
                 pressed = Mines.NONE;
                 break;
@@ -1115,7 +1166,9 @@ final class PlayStage extends View {
     private void plant() {
         if (field == null || pressed == Mines.NONE || phase != PLAYING) return;
         planted = true;
-        if (field.flag(pressed) && haptics) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        if (!field.flag(pressed)) return;
+        flagsPlanted++;
+        if (haptics) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
     }
 
     private void dig(int where) {
@@ -1141,6 +1194,8 @@ final class PlayStage extends View {
     private void play() {
         phase = PLAYING;
         elapsed = 0;
+        missed = 0;
+        flagsPlanted = 0;
         saying = null;
         signs.clear();
         bubbles.clear();
@@ -1933,6 +1988,13 @@ final class PlayStage extends View {
         }
         float x = event.getX(), y = event.getY();
         int action = event.getActionMasked();
+        if (trick != null) {
+            if (action == MotionEvent.ACTION_DOWN) {
+                buzz();
+                if (trick.touch()) leave();
+            }
+            return true;
+        }
         if (isPrank(game)) {
             if (action == MotionEvent.ACTION_DOWN) prankTouch();
             return true;
@@ -1995,6 +2057,10 @@ final class PlayStage extends View {
         }
         if (fightGame != null) {
             fightGame.draw(canvas);
+            return;
+        }
+        if (trick != null) {
+            trick.draw(canvas);
             return;
         }
         if (isPrank(game)) {

@@ -135,6 +135,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** The colour of the hair in those frames, and whether frames in another colour are being made. */
     private int hair;
     private boolean dyeing;
+    /** Whether she glows, and in what colour: a light of her hair's colour about her. */
+    private boolean glowing;
+    private int glowTint;
     /** Room around the figure in its window, for her shadow. */
     private int pad;
 
@@ -428,13 +431,42 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     private void speak() {
         wordsDue = false;
         if (idle()) {
-            lastWords = Chatter.idle(random, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY), lastWords);
+            // Some of the time it is one of the lines that playing has unlocked: more often the more there are, and most while new ones wait.
+            PlaySession session = PlaySession.get(app);
+            Unlocks.check(session, BuildConfig.DEBUG);
+            String line = random.nextFloat() >= Unlocks.share(session) ? null
+                    : Unlocks.fresh(session) ? Unlocks.freshLine(session, random) : Unlocks.anyLine(session, random);
+            if (line == null || line.equals(lastWords)) {
+                line = Chatter.idle(random, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY), lastWords);
+            }
+            lastWords = line;
             say(lastWords);
         }
         if (sprite != null && !sprite.away && prefs.chatter()) {
             wordsDue = true;
             handler.postDelayed(speak, NEXT_WORDS_MS + (long) (random.nextFloat() * NEXT_WORDS_SPREAD_MS));
         }
+    }
+
+    private final Runnable freshWords = this::freshWords;
+
+    /**
+     * Looks at what the games remember for anything that has come to be unlocked. Nothing says
+     * what it was; but if there is something new, and she is not waiting on a game that was
+     * left open, she soon says one of the new lines.
+     */
+    private void unlock() {
+        if (Unlocks.check(PlaySession.get(app), BuildConfig.DEBUG) == 0 || parked != null) return;
+        handler.removeCallbacks(freshWords);
+        handler.postDelayed(freshWords, 2600);
+    }
+
+    private void freshWords() {
+        if (!idle() || !prefs.chatter() || bubble != null) return;
+        String line = Unlocks.freshLine(PlaySession.get(app), random);
+        if (line == null) return;
+        lastWords = line;
+        say(line);
     }
 
     /** A prank she was not asked for: only while she is idle, and never over the app's own screens. */
@@ -497,6 +529,14 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
      */
     private void dye() {
         int wanted = Hair.chosen(app);
+        boolean glow = Hair.glows(app);
+        // The light about her is her hair's colour, paler.
+        int tint = Hair.colour(wanted), pale = Color.rgb((Color.red(tint) + 255) / 2, (Color.green(tint) + 255) / 2, (Color.blue(tint) + 255) / 2);
+        if (glow != glowing || pale != glowTint) {
+            glowing = glow;
+            glowTint = pale;
+            if (sprite != null) sprite.glow();
+        }
         if (pet == null || wanted == hair || dyeing) return;
         dyeing = true;
         new Thread(() -> {
@@ -531,6 +571,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             }
             ui = new ContextThemeWrapper(base, R.style.Theme_CoralCalculator);
             art = BitmapFactory.decodeResource(app.getResources(), R.drawable.halgakos);
+            // What was played while she was away, in the app's own screen of games, may have unlocked something.
+            Unlocks.check(PlaySession.get(app), BuildConfig.DEBUG);
             pad = dp(6);
             windows = (WindowManager) base.getSystemService(Context.WINDOW_SERVICE);
             return art != null && windows != null;
@@ -1028,6 +1070,8 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     private void closePanel() {
         if (panel == null) return;
+        // The card of games is put away: what was played on it may have unlocked something.
+        if (panelGames && stage == null) unlock();
         CalculatorSession.get(app).removeListener(this);
         remove(panel);
         panel = null;
@@ -1177,7 +1221,11 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         closeStage();
         if (sprite == null || sprite.away) return;
         if (settling != null) settling.cancel();
-        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random) : game;
+        PlaySession session = PlaySession.get(app);
+        int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random, Unlocks.tricks(session)) : game;
+        // A trick newly unlocked is the next one played; but not while the player is away in a game that is waiting.
+        int fresh = game == PlaySession.PRANK && parked == null ? Unlocks.freshTrick(session) : 0;
+        if (fresh != 0) kind = fresh;
         // In a build made for testing, a number kept under this name is the prank she plays, to look at one in particular.
         int asked = BuildConfig.DEBUG ? PlaySession.get(app).tally("prank_next") : 0;
         if (game == PlaySession.PRANK && PlayStage.isPrank(asked)) kind = asked;
@@ -1277,12 +1325,16 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         if (parked == null) return;
         parked.discard();
         parked = null;
+        unlock();
     }
 
     private void closeStage() {
         if (stage == null) return;
+        boolean game = !PlayStage.isPrank(stage.game());
         remove(stage);
         stage = null;
+        // Whatever was played, done with or only left open, may have unlocked something.
+        if (game) unlock();
         if (sprite != null) {
             sprite.onStage = false;
             sprite.invalidate();
@@ -1548,6 +1600,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         /** Draws a frame of the animated figure as its own shadow. */
         private final Paint silhouette = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        /** Draws a frame as a light about her, in the colour of her hair. */
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private int haloTint;
         private final Rect frameSource = new Rect();
         private final RectF frameTarget = new RectF();
         private final int[] shadowOffset = new int[2];
@@ -1632,11 +1687,38 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 frameTarget.set(pad, pad + pad * .3f, getWidth() - pad, getHeight() - pad + pad * .3f);
                 canvas.drawBitmap(sheet, frameSource, frameTarget, silhouette);
                 frameTarget.offset(0, -pad * .3f);
+                if (glowing) halo(canvas, sheet);
                 canvas.drawBitmap(sheet, frameSource, frameTarget, paint);
                 if (partyFrame >= 0) confetti(canvas);
             } else if (figure != null) {
                 canvas.drawBitmap(shadow, pad + shadowOffset[0], pad + shadowOffset[1] + pad * .3f, shadowPaint);
                 canvas.drawBitmap(figure, pad, pad, paint);
+            }
+        }
+
+        /** The light about her has been turned on or off, or has changed colour. */
+        void glow() { invalidate(); }
+
+        /**
+         * A light about her: the frame drawn again and again a little way off in every
+         * direction, in the colour of her hair, faint, so that it reads as a soft edge of light.
+         * It breathes a little from one frame to the next.
+         */
+        private void halo(Canvas canvas, Bitmap sheet) {
+            if (haloTint != glowTint) {
+                haloTint = glowTint;
+                halo.setColorFilter(new PorterDuffColorFilter(glowTint, PorterDuff.Mode.SRC_IN));
+            }
+            float breath = .82f + .18f * (float) Math.sin(SystemClock.uptimeMillis() / 420.0);
+            for (int ring = 0; ring < 3; ring++) {
+                float far = pad * (.95f - ring * .3f);
+                halo.setAlpha(Math.round((18 + ring * 14) * breath));
+                for (int turn = 0; turn < 16; turn++) {
+                    float x = (float) Math.cos(turn * Math.PI / 8) * far, y = (float) Math.sin(turn * Math.PI / 8) * far;
+                    frameTarget.offset(x, y);
+                    canvas.drawBitmap(sheet, frameSource, frameTarget, halo);
+                    frameTarget.offset(-x, -y);
+                }
             }
         }
 
