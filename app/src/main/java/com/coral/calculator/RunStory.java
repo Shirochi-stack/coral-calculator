@@ -742,6 +742,16 @@ final class RunStory {
     static final String[][] SHUT_OFF = {
             {"off1", "Hey! She shut one of my colours off. It comes back after the wait Sloppy~♡", "H",
                     PLAYER + "A boss has just switched off one of her magic hair colours in the middle of a fight. Indignant, then steady." + FAST}};
+    /** When she falls where a second jump would have saved her, and has none: the counter sells one. */
+    static final String[][] WINGS = {
+            {"wings1", "A second jump would've made that. The guild counter sells wings Sloppy~♡", "H",
+                    PLAYER + "She has just fallen into a pit she nearly cleared, and remembers that a shop sells an upgrade for a second jump in mid-air. Rueful, pointed, a little bossy." + FAST},
+            {"wings2", "Short again. Wings, at the guild counter: a jump in the air Sloppy~♡", "H",
+                    PLAYER + "She has fallen short of a jump once more and reminds her helper to buy the double jump upgrade. Exasperated, dry." + FAST}};
+    /** The white that is truly hers, when it is first had. */
+    static final String[][] TRUE_WHITE = {
+            {"true1", "White. All of me, and no clock on it. This is the real one Sloppy~♡", "H",
+                    PLAYER + "Every one of her colours has fused for good into true shining white, her complete form, with no time limit. Quiet awe, then certainty and joy."}};
     /** The first time she stands on a thin ledge with another storey under it. */
     static final String[][] DOWN = {
             {"down1", "A thin ledge. Press down and I'll drop through it Sloppy~♡", "H",
@@ -774,7 +784,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE);
         return groups.toArray(new String[0][][]);
     }
 }

@@ -1276,6 +1276,184 @@ public class PlusRunTest {
         assertEquals(blows + 1, fight.blows());
     }
 
+    @Test public void everyLandHasFiveTimesTheCreaturesItWasLaidWithAndTheFirstThreeTwice() {
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            int laid = 0, more = 0, packs = 0, was = -9, wasRow = -9;
+            java.util.Set<Integer> kinds = new java.util.TreeSet<>();
+            for (int[] foe : level.foes) {
+                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET) continue;
+                if (!RunLevels.crowd(foe)) {
+                    laid++;
+                    kinds.add(foe[0]);
+                }
+            }
+            for (int[] foe : level.foes) {
+                if (!RunLevels.crowd(foe) || RunLevels.flier(foe[0])) continue;
+                more++;
+                // Of a kind the land has already; standing on its ground or on a ledge, with room over it; clear of the start, of flags and of where the land ends.
+                assertTrue("land " + number + " kind " + foe[0], kinds.contains(foe[0]) || foe[0] == RunLevels.MINUS);
+                char under = level.land[foe[2] + 1][foe[1]];
+                assertTrue("land " + number + " at " + foe[1], under == RunLevels.BLOCK || under == RunLevels.LEDGE);
+                assertEquals("land " + number + " at " + foe[1], RunLevels.AIR, level.land[foe[2]][foe[1]]);
+                assertTrue("land " + number + " at " + foe[1], foe[1] >= 18 && foe[1] < level.gate - 5);
+                for (int flag : level.flags) assertTrue("land " + number + " at " + foe[1] + " by flag " + flag, Math.abs(flag - foe[1]) >= 6);
+                for (int[] thing : level.decor) assertTrue("land " + number + " at " + foe[1] + " in a village", Math.abs(thing[1] - foe[1]) >= 10);
+                if (foe[1] != was + 1 || foe[2] != wasRow) packs++;
+                was = foe[1];
+                wasRow = foe[2];
+            }
+            int times = RunLevels.crowdOf(number);
+            assertEquals("land " + number, number <= 3 ? 2 : 5, times);
+            // Five times what it was laid with, or twice: give or take a tenth, where there was not room for all of them.
+            // (Where someone waits at the end the land is short, and there is room for fewer: twice over at the least.)
+            assertTrue("land " + number + " laid " + laid + " more " + more, more <= laid * (times - 1)
+                    && more >= (RunLevels.bossOf(number) >= 0 ? Math.min(laid, laid * (times - 1)) : laid * (times - 1) * 6 / 10));
+            // In packs, spread along the land: not all in one place.
+            if (more >= 8) assertTrue("land " + number + " packs " + packs + " of " + more, packs >= more / 4 && packs <= more);
+        }
+        // One of them keeps still while she is far off, and is about its business when she is near.
+        RunLevels.Level level = flat(120);
+        level.foes.add(new int[]{RunLevels.MINUS, 90, FLOOR - 1, 1, 1});
+        level.foes.add(new int[]{RunLevels.MINUS, 20, FLOOR - 1, 1, 1});
+        PlusRun run = new PlusRun(level);
+        PlusRun.Foe far = run.foes().get(0), near = run.foes().get(1);
+        float farAt = far.x, nearAt = near.x;
+        hold(run, 2, false, false, false);
+        assertEquals(farAt, far.x, 0);
+        assertTrue(Math.abs(near.x - nearAt) > 1);
+        run.place(80, GROUND);
+        hold(run, 1, false, false, false);
+        assertTrue(Math.abs(far.x - farAt) > .5f);
+    }
+
+    @Test public void aBookBurstsWhereItLandsAndIsAFindAndNeverHurtsHer() {
+        // No land has more than one book lying in it, and none where she starts; and most have none.
+        int with = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            int books = 0;
+            for (int[] weapon : RunLevels.level(number).weapons) {
+                if (weapon[0] != PlusRun.BOOK) continue;
+                books++;
+                assertTrue("land " + number, weapon[1] >= 8);
+            }
+            assertTrue("land " + number + " books " + books, books <= 1);
+            if (books > 0) with++;
+        }
+        assertTrue("with " + with, with >= 10 && with <= RunLevels.TOTAL / 2);
+
+        // Thrown, it comes down a little way off, and bursts there: whatever stands within a little way of where it lands is dealt with,
+        // on either side of it, the spiked times among them; what stands further off is not.
+        RunLevels.Level level = armed(PlusRun.BOOK);
+        PlusRun probe = new PlusRun(level);
+        hold(probe, .4f, false, true, false);
+        float from = probe.x();
+        probe.place(from, GROUND);
+        probe.step(STEP, false, false, false, true);
+        for (int step = 0; step < 240 && probe.blasts() == 0; step++) probe.step(STEP, false, false, false);
+        assertEquals(1, probe.blasts());
+        float lands = probe.blastX(), reach = lands - from;
+        assertTrue("reach " + reach, reach > 3 && reach < 12);
+        assertEquals(FLOOR, probe.blastY(), 1.1f);
+        assertEquals(0, probe.hurts());
+        level = armed(PlusRun.BOOK);
+        int at = Math.round(lands);
+        level.foes.add(new int[]{RunLevels.TIMES, at + 1, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.MINUS, at - 2, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.MINUS, at + 6, FLOOR - 1});
+        PlusRun run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 0;
+        hold(run, .4f, false, true, false);
+        for (PlusRun.Foe foe : run.foes()) foe.x = foe.home;
+        run.place(from, GROUND);
+        run.step(STEP, false, false, false, true);
+        for (int step = 0; step < 240 && run.blasts() == 0; step++) {
+            for (PlusRun.Foe foe : run.foes()) if (!foe.flat) foe.x = foe.home;
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(1, run.blasts());
+        assertTrue(run.foes().get(0).flat);
+        assertTrue(run.foes().get(1).flat);
+        assertFalse(run.foes().get(2).flat);
+        assertEquals(0, run.hurts());
+        assertTrue(PlusRun.BLAST >= 2 && PlusRun.BLAST <= 3);
+        // It bursts under her own feet and does nothing to her.
+        PlusRun close = new PlusRun(armed(PlusRun.BOOK));
+        hold(close, .4f, false, true, false);
+        for (int step = 0; step < 300 && close.blasts() == 0; step++) {
+            close.step(STEP, false, false, false, step == 0);
+            for (PlusRun.Shot shot : close.shots()) if (shot.kind == PlusRun.BOOK && shot.down > 0) close.place(shot.x - PlusRun.WIDE / 2, GROUND);
+        }
+        assertEquals(1, close.blasts());
+        assertEquals(0, close.hurts());
+        // It does nothing to one who waits behind her shield; spent, she takes it as a blow. And in red the fire still goes with the book.
+        PlusRun fight = shutIn(RunLevels.GUARD_LAND, true);
+        PlusRun.Foe guard = waiting(fight);
+        fight.arm(PlusRun.BOOK);
+        int blows = fight.blows(), blasts = 0;
+        boolean shielded = false, spent = false;
+        for (int step = 0; step < 60 * 120 && !(shielded && spent); step++) {
+            fight.bare();
+            fight.place(guard.x - reach + .5f, guard.y + guard.tall() - PlusRun.TALL);
+            boolean open = fight.open(guard) && guard.dazed <= 0;
+            int before = fight.blows(), burst = fight.blasts();
+            fight.step(STEP, false, true, false, step % 40 == 0);
+            fight.shots().removeIf(shot -> !shot.hers);
+            if (fight.blasts() > burst && fight.blows() == before && !open) shielded = true;
+            if (fight.blows() > before) spent = true;
+        }
+        assertTrue(shielded);
+        assertTrue(spent);
+        PlusRun red = new PlusRun(armed(PlusRun.BOOK));
+        red.lend(PlusRun.RED);
+        hold(red, .4f, false, true, false);
+        red.step(STEP, false, false, false, true);
+        boolean fire = false, book = false;
+        for (PlusRun.Shot shot : red.shots()) {
+            fire |= shot.kind == PlusRun.FIRE;
+            book |= shot.kind == PlusRun.BOOK;
+        }
+        assertTrue(fire && book);
+    }
+
+    @Test public void whatIsBoughtWhileSheIsInALandIsHersThereAndThen() {
+        PlusRun run = new PlusRun(flat(60));
+        // With no wings, a second press in the air does nothing.
+        run.step(STEP, false, false, true);
+        hold(run, .25f, false, false, false);
+        float before = run.speedDown();
+        run.step(STEP, false, false, true);
+        assertEquals(0, run.flaps());
+        assertFalse(run.winged());
+        hold(run, 1.5f, false, false, false);
+        assertTrue(run.onGround());
+        // Wings bought, at the counter by a stall, while she is in the land: the next jump has its second.
+        PlusRun.Perks more = new PlusRun.Perks();
+        more.wings = true;
+        more.hearts = PlusRun.HEARTS + 1;
+        more.lives = PlusRun.LIVES + 1;
+        more.together = 3;
+        more.shots = PlusRun.GUN_SHOTS + 8;
+        more.colours = 1;
+        run.grant(more);
+        assertTrue(run.winged());
+        run.step(STEP, false, false, true);
+        hold(run, .25f, false, false, false);
+        run.step(STEP, false, false, true);
+        assertEquals(1, run.flaps());
+        assertTrue(run.speedDown() < before);
+        // And a heart more and a life more are there at once; and a colour, and how many she may wear.
+        assertEquals(PlusRun.HEARTS + 1, run.hearts());
+        assertEquals(PlusRun.LIVES + 1, run.lives());
+        assertEquals(3, run.together());
+        hold(run, 1.5f, false, false, false);
+        assertTrue(run.call(PlusRun.RED));
+        // Given again, nothing is given twice.
+        run.grant(more);
+        assertEquals(PlusRun.HEARTS + 1, run.hearts());
+        assertEquals(PlusRun.LIVES + 1, run.lives());
+    }
+
     @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
         int tempted = 0, stashed = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
@@ -2154,10 +2332,27 @@ public class PlusRunTest {
         return there;
     }
 
-    /** Deals with whoever of a cellar's wave is there, as if she had: they are down, and the wave is over. */
+    /** Deals with the whole of a cellar's wave, as if she had: those that are there, and each of those that come after as they come; and the wave is over. */
     private static void dealt(PlusRun run) {
-        for (PlusRun.Foe foe : run.foes()) if (foe.spawned) foe.flat = true;
-        run.step(STEP, false, false, false);
+        int wave = run.wave();
+        for (int step = 0; step < 60 * 400 && run.wave() == wave && run.wavePhase() == PlusRun.FOUGHT; step++) {
+            for (PlusRun.Foe foe : run.foes()) if (foe.spawned && !foe.flat) foe.flat = true;
+            run.shots().clear();
+            run.step(STEP, false, false, false);
+        }
+    }
+
+    /** Deals with those of a cellar's wave as they come, until one of those who wait is among them: the Old Book, where he sleeps. */
+    private static void thinned(PlusRun run) {
+        for (int step = 0; step < 60 * 400; step++) {
+            boolean waits = false;
+            for (PlusRun.Foe foe : run.foes()) waits |= foe.spawned && !foe.flat && RunLevels.boss(foe.kind);
+            if (waits) return;
+            run.shots().clear();
+            for (PlusRun.Foe foe : run.foes()) if (foe.spawned && !foe.flat) foe.flat = true;
+            run.shots().clear();
+            run.step(STEP, false, false, false);
+        }
     }
 
     @Test public void aCellarIsAnArenaWhoseThreeWavesAreAnnouncedAndMarkedAndNoTwoAlike() {
@@ -2180,8 +2375,11 @@ public class PlusRunTest {
             hold(run, .6f, false, false, false);
             // Fought: every one of the wave is marked where it will come in, before it is there, inside the arena and not on top of her.
             assertEquals(PlusRun.FOUGHT, run.wavePhase());
-            int[] kinds = RunLevels.wave(number, wave, one[10] != 0);
-            assertEquals(kinds.length, run.pending().size());
+            // (As many as the place holds at once; the rest of the wave wait their turn, and are counted as left.)
+            int[] host = RunLevels.host(number, wave, one[10] != 0);
+            int first = Math.min(PlusRun.CEILING, host.length);
+            assertEquals(first, run.pending().size());
+            assertEquals(host.length, run.waveLeft());
             for (float[] mark : run.pending()) {
                 assertTrue(mark[1] > one[3] && mark[1] < one[4] + 1 && mark[2] > one[12] && mark[2] <= one[11]);
                 assertTrue(mark[3] > .5f);
@@ -2191,20 +2389,60 @@ public class PlusRunTest {
             // Shut until the last of them is dealt with: there is no door to use.
             assertEquals(-1, run.door());
             assertEquals(wave == 2, run.dark());
-            assertEquals(kinds.length, arrived(run));
+            assertEquals(first, arrived(run));
+            assertEquals(host.length, run.waveLeft());
             for (PlusRun.Foe foe : run.foes()) {
                 if (!foe.spawned || foe.flat) continue;
                 assertTrue("at " + foe.x, foe.x >= one[3] - .5f && foe.x <= one[4] + 1);
             }
+            // Things to fight with lie on three of its storeys for each wave; in the last one of them is a book.
+            int lying = 0, books = 0;
+            java.util.Set<Integer> storeys = new java.util.TreeSet<>();
+            for (int[] arm : run.arms()) {
+                if (arm[1] < one[3] || arm[1] > one[4]) continue;
+                lying++;
+                storeys.add(arm[2]);
+                if (arm[0] == PlusRun.BOOK) books++;
+            }
+            assertTrue("lying " + lying + " on " + storeys, lying >= 3 && storeys.size() >= 2);
+            assertEquals(wave == PlusRun.WAVES ? 1 : 0, books);
             if (wave == PlusRun.WAVES) {
-                // The last: one of them is outsized, and takes six; and something to help lies in the place for it, a ribbon.
-                int giants = 0, ribbons = 0;
-                for (PlusRun.Foe foe : run.foes()) if (foe.spawned && foe.size > 1.5f && foe.left == 6) giants++;
-                assertEquals(one[10] != 0 ? 0 : 1, giants);
+                // The last: something to help lies in the place for it, a ribbon.
+                int ribbons = 0;
                 for (int[] item : run.items()) if (item[0] > PlusRun.FORM && item[0] < PlusRun.CHEST && item[1] >= one[3] && item[1] <= one[4]) ribbons++;
                 assertEquals(1, ribbons);
             }
-            dealt(run);
+            // One for each that falls, and never more there at once than the place holds; the outsized ones, which take six, at the end.
+            int seen = 0, most = 0, giants = 0, left = host.length;
+            java.util.Set<PlusRun.Foe> counted = new java.util.HashSet<>();
+            for (int step = 0; step < 60 * 400 && run.wave() == wave && run.wavePhase() == PlusRun.FOUGHT; step++) {
+                int there = run.pending().size();
+                for (PlusRun.Foe foe : run.foes()) {
+                    if (!foe.spawned || foe.flat) continue;
+                    there++;
+                    if (counted.add(foe)) {
+                        seen++;
+                        if (foe.size > 1.5f && foe.left == 6) {
+                            giants++;
+                            assertTrue("giant came as " + seen + " of " + host.length, seen > host.length - RunLevels.GIANTS - (one[10] != 0 ? 1 : 0));
+                        }
+                    }
+                }
+                most = Math.max(most, there);
+                assertTrue(run.waveLeft() <= left);
+                left = run.waveLeft();
+                // (One of them is dealt with every tenth of a second.)
+                if (step % 6 == 0) for (PlusRun.Foe foe : run.foes()) if (foe.spawned && !foe.flat) {
+                    foe.flat = true;
+                    break;
+                }
+                run.shots().clear();
+                run.step(STEP, false, false, false);
+            }
+            // (A few come twice: one that was far from her is gone from where it was and comes in again nearer.)
+            assertTrue("seen " + seen + " of " + host.length, seen >= host.length && seen <= host.length + 30);
+            assertEquals(PlusRun.CEILING, most);
+            assertEquals(wave < PlusRun.WAVES ? 0 : one[10] != 0 ? RunLevels.GIANTS - 1 : RunLevels.GIANTS, giants);
             if (wave < PlusRun.WAVES) {
                 // Cleared: a breath before the next.
                 assertEquals(PlusRun.CLEARED, run.wavePhase());
@@ -2222,12 +2460,24 @@ public class PlusRunTest {
         assertEquals(PlusRun.RANK_S, run.ranked());
         assertEquals(bonus + PlusRun.RANK_PAYS[PlusRun.RANK_S] + (one[10] != 0 ? 20 : 0), run.bonus());
         assertEquals(PlusRun.RANK_S, PlusRun.rank(60, 0, 0));
+        assertEquals(PlusRun.RANK_S, PlusRun.rank(PlusRun.PAR, 2, 0));
         assertEquals(PlusRun.RANK_A, PlusRun.rank(PlusRun.PAR + 1, 0, 0));
         assertEquals(PlusRun.RANK_A, PlusRun.rank(60, 3, 0));
-        assertEquals(PlusRun.RANK_B, PlusRun.rank(60, 4, 0));
+        assertEquals(PlusRun.RANK_A, PlusRun.rank(60, 8, 0));
+        assertEquals(PlusRun.RANK_B, PlusRun.rank(60, 9, 0));
         assertEquals(PlusRun.RANK_C, PlusRun.rank(60, 0, 1));
+        // A wave is its troop twenty times over; and the whole cellar some hundreds.
+        int whole = 0;
+        for (int wave = 1; wave <= PlusRun.WAVES; wave++) {
+            int[] troop = RunLevels.wave(number, wave, false), host = RunLevels.host(number, wave, false);
+            assertEquals((troop.length - (wave == PlusRun.WAVES ? 1 : 0)) * RunLevels.SWELL + (wave == PlusRun.WAVES ? RunLevels.GIANTS : 0), host.length);
+            whole += host.length;
+        }
+        assertEquals(20, RunLevels.SWELL);
+        assertTrue("whole " + whole, whole >= 300);
         assertTrue(PlusRun.RANK_PAYS[PlusRun.RANK_S] > PlusRun.RANK_PAYS[PlusRun.RANK_A] && PlusRun.RANK_PAYS[PlusRun.RANK_A] > PlusRun.RANK_PAYS[PlusRun.RANK_B]
                 && PlusRun.RANK_PAYS[PlusRun.RANK_B] > PlusRun.RANK_PAYS[PlusRun.RANK_C]);
+        run.place(one[6] + (1 - PlusRun.WIDE) / 2, one[11] - PlusRun.TALL);
         hold(run, .2f, false, false, false);
         assertEquals(which[0], run.door());
         assertTrue(run.enter());
@@ -2263,7 +2513,7 @@ public class PlusRunTest {
             }
         }
         assertEquals(1, run.livesLost());
-        assertEquals(PlusRun.HEARTS, run.arenaHurts());
+        assertTrue("hurts " + run.arenaHurts(), run.arenaHurts() >= PlusRun.HEARTS);
         assertEquals(1, run.arenaLives());
         hold(run, .05f, false, false, false);
         assertEquals(which[0], run.room());
@@ -2742,6 +2992,8 @@ public class PlusRunTest {
         run.step(STEP, false, false, false);
         assertEquals(PlusRun.DONE, run.quest());
         // Out of the cellar again, and back to Inju.
+        run.place(one[6] + (1 - PlusRun.WIDE) / 2, one[11] - PlusRun.TALL);
+        run.step(STEP, false, false, false);
         assertTrue(run.enter());
         run.step(STEP, false, false, false);
         handedIn(run, run.bonus());
@@ -3216,8 +3468,14 @@ public class PlusRunTest {
             RunLevels.Level level = RunLevels.level(number);
             int here = 0, lines = 0, was = -9;
             java.util.List<Integer> kinds = new java.util.ArrayList<>();
+            int more = 0;
             for (int[] foe : level.foes) {
                 if (!RunLevels.flier(foe[0])) continue;
+                if (RunLevels.crowd(foe)) {
+                    more++;
+                    assertTrue("land " + number, number >= RunLevels.FLIERS_FROM && RunLevels.flierFrom(foe[0]) <= number);
+                    continue;
+                }
                 here++;
                 if (first[foe[0]] == 0) first[foe[0]] = number;
                 // (Four tittles in a line are one of them.)
@@ -3233,9 +3491,10 @@ public class PlusRunTest {
                 if (under > 0) assertTrue("land " + number + " at " + foe[1], under - foe[2] - 1 <= 5 && under - foe[2] - 1 >= 2);
             }
             if (number < RunLevels.FLIERS_FROM) {
-                assertEquals("land " + number, 0, here);
+                assertEquals("land " + number, 0, here + more);
                 continue;
             }
+            assertTrue("land " + number + " more " + more, more <= RunLevels.fliersIn(number) * 2 * 4);
             // As many as the land is to have, give or take what there was no room for; and never fewer than two.
             assertTrue("land " + number + " has " + lines + " of " + RunLevels.fliersIn(number), lines >= Math.max(2, RunLevels.fliersIn(number) / 2) && lines <= RunLevels.fliersIn(number));
             // The land a kind is first met in has three of it before anything else that flies.
@@ -3761,6 +4020,7 @@ public class PlusRunTest {
         assertEquals(PlusRun.WAVES, run.wave());
         arrived(run);
         // The rest of the last wave is dealt with, for the purposes of this: he is what is left.
+        thinned(run);
         for (PlusRun.Foe foe : run.foes()) if (foe.spawned && foe.kind != RunLevels.OLD_BOOK) foe.flat = true;
         assertEquals(1, run.woken());
         PlusRun.Foe book = null;
@@ -3933,7 +4193,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);
@@ -4067,7 +4327,8 @@ public class PlusRunTest {
     /** A land without Zero, Illya or Tsubakieh in it: getting past them is a matter of skill, not of whether the land can be crossed. */
     private static RunLevels.Level unguarded(RunLevels.Level level) {
         for (int index = level.foes.size() - 1; index >= 0; index--) {
-            if (RunLevels.boss(level.foes.get(index)[0])) level.foes.remove(index);
+            // (Nor those put in to make up a land's numbers: what is proved is that the land itself can be crossed.)
+            if (RunLevels.boss(level.foes.get(index)[0]) || RunLevels.crowd(level.foes.get(index))) level.foes.remove(index);
         }
         level.guarded = false;
         return level;
