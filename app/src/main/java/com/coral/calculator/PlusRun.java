@@ -106,6 +106,229 @@ final class PlusRun {
     static final int CAKE = 8, DROPOFF = 9;
     /** A chest in a place off the land: opened by touching it, and what is in it is kept. */
     static final int CHEST = 20;
+    /**
+     * A pet that lies waiting in a land or a cellar to be taken along: this and its kind.
+     * Taken, it keeps beside her for the whole of the land, through doors and a life lost,
+     * and goes at whatever is near her by itself, each kind in its own way. An ink jar
+     * floats, and spits a blot at the nearest from a distance; what the blot does not deal
+     * with stands dazed. A cat pounces on what is close, often. A dog charges along the
+     * ground and knocks over all it runs through. A duck flies, drops on what is in the
+     * air before anything else, and with every third drop its quack dazes all that is
+     * near. A monkey lobs nuts, and fetches her the pluses and the ribbons it passes. What
+     * a pet deals with counts as hers. Nothing hurts a pet. Against one of those who wait
+     * a pet only helps: it takes half a piece off a shield and never the last of it, it
+     * lands a blow on one whose shield is broken, and it never lands the last blow.
+     */
+    static final int PET = 30, JAR = 0, CAT = 1, DOG = 2, DUCK = 3, MONKEY = 4, PETS = 5;
+    /** What a pet throws: a blot of ink, and a nut. */
+    static final int BLOT_SHOT = 23, NUT = 24;
+    private static final float[] PET_EVERY = {1.6f, 1, 2.2f, 1.5f, 1.8f}, PET_NEAR = {7, 3.2f, 6, 7, 6};
+    private int pet = -1, petKills, petJoined, petStrikes, petDrops;
+    private float petX, petY, petWait, petBusy, petFromX, petFromY, petToX, petToY, petDown;
+    private boolean petLeft;
+    private Foe petAt;
+
+    /** Which pet is with her, or -1; where its feet are; which way it faces; how much longer it is busy with what it is at; and counts that only go up. */
+    int pet() { return pet; }
+    float petX() { return petX; }
+    float petY() { return petY; }
+    boolean petLeftward() { return petLeft; }
+    float petBusy() { return petBusy; }
+    int petKills() { return petKills; }
+    int petJoined() { return petJoined; }
+    int petStrikes() { return petStrikes; }
+    static boolean floats(int pet) { return pet == JAR || pet == DUCK; }
+
+    /** A pet is hers, there and then: for looking at one, and for the tests. */
+    void adopt(int kind) {
+        pet = kind;
+        petX = x + WIDE / 2;
+        petY = y + TALL;
+        petWait = 1;
+        petBusy = 0;
+        petAt = null;
+        petJoined++;
+    }
+
+    /** What a pet does to something: it deals with a sign as a blow would; one of those who wait it only helps against. Returns whether anything came of it. */
+    private boolean petted(Foe foe) {
+        if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) return false;
+        if (RunLevels.boss(foe.kind)) {
+            if (!open(foe)) {
+                // Half a piece off her shield, and never the last of it.
+                if (foe.forming > 0 || foe.shield <= .5f) return false;
+                foe.shield = Math.max(.5f, foe.shield - .5f);
+                cracks++;
+                foeX = foe.x + foe.wide() / 2;
+                foeY = foe.y + foe.tall();
+                return true;
+            }
+            if (foe.left <= 1 || foe.dazed > 0) return false;
+        }
+        boolean was = foe.flat;
+        beat(foe, SURE);
+        if (foe.flat && !was) petKills++;
+        return true;
+    }
+
+    /** The pet for a step: it keeps by her, and when it has rested it goes at something. */
+    private void pets(float seconds) {
+        if (pet < 0) return;
+        float herX = x + WIDE / 2, herFeet = y + TALL;
+        boolean floats = floats(pet);
+        // Left too far behind, or under the land, it is beside her again.
+        if (Math.abs(petX - herX) > 12 || Math.abs(petY - herFeet) > 9) {
+            petX = herX + (facingLeft ? .9f : -.9f);
+            petY = herFeet - (floats ? 1.2f : 0);
+            petBusy = 0;
+            petAt = null;
+            petDown = 0;
+        }
+        if (petBusy > 0) {
+            // On its way to what it is going at; and there, it deals with it.
+            petBusy -= seconds;
+            float through = 1 - Math.max(0, petBusy) / .28f;
+            if (petAt != null) {
+                petToX = petAt.x + petAt.wide() / 2;
+                petToY = petAt.y + petAt.tall() * (pet == DUCK ? .2f : 1);
+            }
+            petX = petFromX + (petToX - petFromX) * through;
+            petY = petFromY + (petToY - petFromY) * through - (float) Math.sin(through * Math.PI) * (pet == DOG ? 0 : .8f);
+            if (pet == DOG) {
+                // Whatever it runs through on its way goes over.
+                for (int index = 0; index < foes.size(); index++) {
+                    Foe foe = foes.get(index);
+                    if (!RunLevels.boss(foe.kind) && Math.abs(foe.x + foe.wide() / 2 - petX) < .7f && Math.abs(foe.y + foe.tall() - petY) < 1.2f) petted(foe);
+                }
+            }
+            if (petBusy <= 0) {
+                if (petAt != null && pet != DOG) petted(petAt);
+                if (petAt != null && pet == DOG && RunLevels.boss(petAt.kind)) petted(petAt);
+                if (pet == DUCK && ++petDrops % 3 == 0) {
+                    // Its quack: whatever is near stands dazed.
+                    for (Foe foe : foes) {
+                        if (!foe.flat && !RunLevels.boss(foe.kind) && Math.abs(foe.x - petX) < 3 && Math.abs(foe.y - petY) < 3) foe.dazed = Math.max(foe.dazed, 1.2f);
+                    }
+                }
+                petAt = null;
+            }
+            return;
+        }
+        // By her: a floater in the air at her shoulder, behind her; one that runs, on the ground behind her, down onto it and up onto it as she goes.
+        float wantX = herX + (facingLeft ? 1 : -1) * (floats ? .8f : 1.1f);
+        if (pet == MONKEY) {
+            // A monkey goes after the nearest plus or ribbon within a little way of her, and comes back.
+            float nearest = 5.5f;
+            for (int[] plus : pluses) {
+                float away = Math.abs(plus[0] + .5f - herX);
+                if (away < nearest && Math.abs(plus[1] + .5f - herFeet) < 3) {
+                    nearest = away;
+                    wantX = plus[0] + .5f;
+                }
+            }
+            for (int[] item : items) {
+                float away = Math.abs(item[1] + .5f - herX);
+                if (cursed <= 0 && item[0] > FORM && item[0] < FORM + BLACK && item[3] == 0 && away < nearest && Math.abs(item[2] + .5f - herFeet) < 3) {
+                    nearest = away;
+                    wantX = item[1] + .5f;
+                }
+            }
+        }
+        float gap = wantX - petX;
+        petX += Math.signum(gap) * Math.min(Math.abs(gap), (Math.abs(gap) > 3 ? 13 : 8) * seconds);
+        if (Math.abs(gap) > .1f) petLeft = gap < 0;
+        else petLeft = facingLeft;
+        if (floats) {
+            float wantY = herFeet - 1.25f + (float) Math.sin(time * 3) * .12f;
+            petY += (wantY - petY) * Math.min(1, 9 * seconds);
+        } else {
+            int column = (int) Math.floor(petX), floor = -1;
+            for (int row = (int) Math.floor(herFeet) - 3; row <= (int) Math.floor(herFeet) + 6 && floor < 0; row++) {
+                char here = at(column, row);
+                if ((firm(here) || here == RunLevels.THIN || here == RunLevels.LEDGE) && !solid(at(column, row - 1))) floor = row;
+            }
+            if (floor < 0 || !onGround && petY >= herFeet - .01f && petDown >= 0 && herFeet < petY - .6f) {
+                // Nothing under it, or she is in the air: it jumps as she does.
+                petY += (herFeet - petY) * Math.min(1, 7 * seconds);
+                petDown = 0;
+            } else if (petY < floor) {
+                petDown += GRAVITY * seconds;
+                petY = Math.min(floor, petY + petDown * seconds);
+                if (petY >= floor) petDown = 0;
+            } else {
+                // Up onto where she has gone.
+                petY = Math.max(floor, petY - 14 * seconds);
+                petDown = 0;
+            }
+        }
+        // And a monkey fetches: the pluses it passes are hers, and a ribbon near it is brought to her.
+        if (pet == MONKEY) {
+            for (int index = pluses.size() - 1; index >= 0; index--) {
+                int[] plus = pluses.get(index);
+                if (Math.hypot(plus[0] + .5f - petX, plus[1] + .5f - petY + .4f) > 1.8f) continue;
+                pluses.remove(index);
+                collected++;
+                plusX = plus[0] + .5f;
+                plusY = plus[1] + .5f;
+            }
+            for (int index = items.size() - 1; index >= 0 && cursed <= 0; index--) {
+                int[] item = items.get(index);
+                if (item[0] <= FORM || item[0] >= FORM + BLACK || item[3] != 0 || Math.hypot(item[1] + .5f - petX, item[2] + .5f - petY + .4f) > 1.8f) continue;
+                items.remove(index);
+                taken++;
+                lastTaken = item[0];
+                take(item[0]);
+            }
+        }
+        if ((petWait -= seconds) > 0) return;
+        // Rested, it looks for something near her to go at: a duck, what is in the air first; the rest, whatever is nearest it.
+        Foe best = null;
+        float nearest = PET_NEAR[pet];
+        boolean flying = false;
+        for (Foe foe : foes) {
+            if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) continue;
+            if (RunLevels.boss(foe.kind) && (open(foe) ? foe.left <= 1 || foe.dazed > 0 : foe.forming > 0 || foe.shield <= .5f)) continue;
+            float across = foe.x + foe.wide() / 2 - (pet == CAT || pet == DOG ? petX : herX), down = foe.y + foe.tall() - (pet == CAT || pet == DOG ? petY : herFeet);
+            float away = (float) Math.hypot(across, down);
+            boolean air = RunLevels.flier(foe.kind) || foe.kind == RunLevels.DRAGON || foe.y + foe.tall() < foe.ground + foe.tall() - 1;
+            if (pet == DOG && Math.abs(down) > 1.5f) continue;
+            if (away > PET_NEAR[pet]) continue;
+            if (pet == DUCK && air != flying ? air : away < nearest) {
+                best = foe;
+                nearest = away;
+                flying = air;
+            }
+        }
+        if (best == null) return;
+        petWait = PET_EVERY[pet];
+        petStrikes++;
+        petLeft = best.x + best.wide() / 2 < petX;
+        if (pet == JAR || pet == MONKEY) {
+            // From where it is: a blot, straight; a nut, lobbed.
+            float toX = best.x + best.wide() / 2, toY = best.y + best.tall() / 2;
+            Shot shot;
+            if (pet == JAR) {
+                float length = Math.max(.5f, (float) Math.hypot(toX - petX, toY - petY + .5f));
+                shot = shoot(BLOT_SHOT, true, petX, petY - .5f, (toX - petX) / length * 11, (toY - petY + .5f) / length * 11, 1.2f);
+            } else {
+                shot = shoot(NUT, true, petX, petY - .6f, Math.max(-10, Math.min(10, (toX - petX) / .7f)), -9, 2.5f);
+            }
+            shot.pets = true;
+            return;
+        }
+        petBusy = .28f;
+        petFromX = petX;
+        petFromY = petY;
+        petAt = best;
+        petToX = best.x + best.wide() / 2;
+        petToY = best.y + best.tall();
+        if (pet == DOG) {
+            // Its charge is a line along the ground, on past what it goes at.
+            petAt = RunLevels.boss(best.kind) ? best : null;
+            petToX = petX + Math.signum(petToX - petX) * 6;
+            petToY = petY;
+        }
+    }
     /** How what is asked of her stands: not asked yet, being done, done, or not to be done this time. */
     static final int ASKED = 1, DONE = 2, FAILED = 3;
     /** And handed in: whoever asked it, or whoever it was for, has thanked her and paid her for it. */
@@ -186,6 +409,8 @@ final class PlusRun {
     static final class Shot {
         /** One of hers that goes on through whatever it meets. */
         boolean through;
+        /** One that a pet threw. */
+        boolean pets;
         final int kind;
         boolean hers;
         float x, y, across, down, left, age;
@@ -870,6 +1095,11 @@ final class PlusRun {
             if (where == null) continue;
             boolean there = false;
             for (int[] arm : arms) there |= Math.abs(arm[1] - where[2]) < 3 && Math.abs(arm[2] - where[3] + 1) < 2;
+            if (wave == 1 && which == 0 && pet < 0) {
+                boolean waits = false;
+                for (int[] item : items) waits |= item[0] >= PET && item[0] < PET + PETS && item[1] >= one[3] && item[1] <= one[4];
+                if (!waits) items.add(new int[]{PET + (level.number + 2) % PETS, where[2] + 2, where[3] - 1, 0});
+            }
             boolean book = wave == WAVES && which == 1;
             // (The book of the last wave takes the place of whatever lies where it is to lie.)
             if (there && book) for (int[] arm : arms) if (Math.abs(arm[1] - where[2]) < 3 && Math.abs(arm[2] - where[3] + 1) < 2) arm[0] = BOOK;
@@ -1783,6 +2013,13 @@ final class PlusRun {
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST) continue;
                 items.remove(index);
+                // A pet that lay waiting goes with her from here on, in place of any that was with her.
+                if (item[0] >= PET && item[0] < PET + PETS) {
+                    adopt(item[0] - PET);
+                    petX = item[1] + .5f;
+                    petY = item[2] + 1;
+                    continue;
+                }
                 // A chest is opened: ten pluses in it, whatever else; and a stash is done with when its chest is.
                 if (item[0] == CHEST) {
                     chests++;
@@ -1859,6 +2096,7 @@ final class PlusRun {
             }
         }
         for (Foe foe : foes) move(foe, seconds);
+        pets(seconds);
         if (!born.isEmpty()) {
             foes.addAll(born);
             born.clear();
@@ -2666,7 +2904,7 @@ final class PlusRun {
             shot.x += shot.across * seconds;
             shot.y += shot.down * seconds;
             shot.age += seconds;
-            if (shot.kind == BOOK) shot.down += BOOK_WEIGHT * seconds;
+            if (shot.kind == BOOK || shot.kind == NUT) shot.down += BOOK_WEIGHT * seconds;
             else if (shot.kind == WATER) shot.down += 6 * seconds;
             else if (shot.kind == SAYING) shot.down = (float) Math.cos(shot.age * 7) * 3.2f;
             else if (shot.kind == GLOB) shot.down += BOOK_WEIGHT * seconds;
@@ -2691,7 +2929,12 @@ final class PlusRun {
                     if (foe.flat || absent(foe) || shot.x < foe.x - .2f || shot.x > foe.x + foe.wide() + .2f || shot.y < foe.y - .2f
                             || shot.y > foe.y + foe.tall() + .2f) continue;
                     // Nothing thrown gets through Zero: anything times nothing is nothing.
-                    if (foe.kind == RunLevels.ZERO) {
+                    if (shot.pets) {
+                        // What a pet threw: as a pet's blow; and what a blot does not deal with stands dazed.
+                        boolean came = petted(foe);
+                        if (shot.kind == BLOT_SHOT && !foe.flat && !RunLevels.boss(foe.kind)) foe.dazed = Math.max(foe.dazed, 1.5f);
+                        if (came || !RunLevels.boss(foe.kind)) shots.remove(index);
+                    } else if (foe.kind == RunLevels.ZERO) {
                         shots.remove(index);
                     } else if (foe.kind == RunLevels.TSUBAKIEH && !open(foe) && foe.dazed <= 0) {
                         // Tsubakieh bats it straight back, unless she is spent.

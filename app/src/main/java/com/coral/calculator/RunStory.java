@@ -748,6 +748,18 @@ final class RunStory {
                     PLAYER + "She has just fallen into a pit she nearly cleared, and remembers that a shop sells an upgrade for a second jump in mid-air. Rueful, pointed, a little bossy." + FAST},
             {"wings2", "Short again. Wings, at the guild counter: a jump in the air Sloppy~♡", "H",
                     PLAYER + "She has fallen short of a jump once more and reminds her helper to buy the double jump upgrade. Exasperated, dry." + FAST}};
+    /** The first time each kind of pet goes with her: the ink jar, the cat, the dog, the duck and the monkey. */
+    static final String[][] PETS = {
+            {"pet1", "A floating ink jar. It spits at whatever comes close. It's with me now Sloppy~♡", "H",
+                    PLAYER + "A little living ink jar has just floated up to join her as a pet that fights beside her. Delighted, proprietary." + FAST},
+            {"pet2", "A kitten! It pounces on whatever's near. Mine now Sloppy~♡", "H",
+                    PLAYER + "A fluffy kitten has just joined her as a pet that fights beside her. Melting for a second, then bossy." + FAST},
+            {"pet3", "A puppy. It charges straight through the lot of them. Good dog Sloppy~♡", "H",
+                    PLAYER + "A round puppy has just joined her as a pet that charges at enemies. Fond, brisk, pleased." + FAST},
+            {"pet4", "A duckling in a sailor cap. It goes for the fliers, and its quack stuns Sloppy~♡", "H",
+                    PLAYER + "A duckling in a sailor cap has just joined her as a pet that attacks flying enemies. Amused, approving." + FAST},
+            {"pet5", "A monkey! It throws nuts and fetches my pluses. Hired Sloppy~♡", "H",
+                    PLAYER + "A baby monkey has just joined her as a pet that throws nuts and collects things for her. Gleeful, businesslike." + FAST}};
     /** The white that is truly hers, when it is first had. */
     static final String[][] TRUE_WHITE = {
             {"true1", "White. All of me, and no clock on it. This is the real one Sloppy~♡", "H",
@@ -784,7 +796,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF, DOWN, WINGS, TRUE_WHITE);
+                SHUT_OFF, DOWN, WINGS, TRUE_WHITE, PETS);
         return groups.toArray(new String[0][][]);
     }
 }

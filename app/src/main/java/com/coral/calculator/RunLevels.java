@@ -284,6 +284,27 @@ final class RunLevels {
         for (int more = 0; more < fliersIn(number) * 2; more++) perch(level, DRIFTER + random.nextInt(known), 18 + random.nextInt(Math.max(1, until - 30)), until - 2, true);
     }
 
+    /**
+     * From the third land on a pet lies waiting in every land, a different kind from land
+     * to land, a little past the first flag, on flat ground where nothing else lies.
+     */
+    static int petOf(int number) { return number < 3 ? -1 : (number * 3 + 1) % PlusRun.PETS; }
+
+    private static void kennel(Level level) {
+        int pet = petOf(level.number);
+        if (pet < 0 || level.flags.isEmpty()) return;
+        int flag = level.flags.get(0);
+        for (int column = flag + 3; column < flag + 12; column++) {
+            int floor = top(level, column);
+            boolean free = floor > 3 && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR;
+            for (int[] weapon : level.weapons) free &= weapon[1] != column;
+            for (int[] item : level.items) free &= item[1] != column;
+            if (!free) continue;
+            level.items.add(new int[]{PlusRun.PET + pet, column, floor - 1, 0});
+            return;
+        }
+    }
+
     /** One land in three has a book lying in it, and no land more than one: the rest are knives. A book is a find. */
     private static void shelve(Level level) {
         boolean one = level.number % 3 != 0;
@@ -684,6 +705,7 @@ final class RunLevels {
         tempt(level);
         crowd(level);
         shelve(level);
+        kennel(level);
         return level;
     }
 
@@ -849,6 +871,7 @@ final class RunLevels {
         tempt(level);
         crowd(level);
         shelve(level);
+        kennel(level);
         return level;
     }
 
