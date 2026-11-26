@@ -243,48 +243,82 @@ final class RunLevels {
             else if (foe[0] != WORD && foe[0] != DRAGON && foe[0] != ZERO) walkers.add(foe[0]);
         }
         if (walkers.isEmpty()) walkers.add(MINUS);
-        // Where one could stand: on the ground, or on a ledge, with room over it and the same to either side.
+        // Where one could stand: on the ground, or on a ledge, with room over it. They are small: one stands on a single square.
         List<int[]> spots = new ArrayList<>();
         for (int column = 24; column < until; column++) {
             boolean near = false;
             for (int flag : level.flags) near |= Math.abs(flag - column) < 6;
-            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 10;
+            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 8;
             for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
             for (int[] item : level.items) if (item[1] < level.main && (item[3] != 0 || item[0] >= PlusRun.CHEST)) near |= Math.abs(item[1] - column) < 6;
             // (Well clear of one met in the middle of the land: its place is its own.)
             for (int[] foe : level.foes) if (rover(foe[0])) near |= Math.abs(foe[1] - column) < 16;
             if (near) continue;
             int floor = top(level, column);
-            if (floor > 4 && top(level, column - 1) == floor && top(level, column + 1) == floor && level.land[floor - 1][column] == AIR
-                    && level.land[floor - 2][column] == AIR) spots.add(new int[]{column, floor});
+            // (Nor where one the land was laid with stands.)
+            boolean taken = false;
+            for (int[] foe : level.foes) taken |= foe[2] == floor - 1 && Math.abs(foe[1] - column) < 2;
+            if (floor > 4 && !taken && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR) {
+                spots.add(new int[]{column, floor});
+            }
             for (int row = 4; row < (floor > 0 ? floor - 2 : ROWS - 2); row++) {
-                if (level.land[row][column] == LEDGE && level.land[row][column - 1] == LEDGE && level.land[row][column + 1] == LEDGE
-                        && level.land[row - 1][column] == AIR && level.land[row - 2][column] == AIR) spots.add(new int[]{column, row});
+                if (level.land[row][column] == LEDGE && level.land[row - 1][column] == AIR && level.land[row - 2][column] == AIR) spots.add(new int[]{column, row});
             }
         }
-        for (int want = base * (crowdOf(number) - 1); want > 0 && !spots.isEmpty(); ) {
-            int[] spot = spots.get(random.nextInt(spots.size()));
-            // (In the lands of the first two chapters, which are short, they come one or two together; later, two to four.)
-            int size = Math.min(want, number <= 12 ? 1 + random.nextInt(2) : 2 + random.nextInt(3)), put = 0;
-            int kind = !shooters.isEmpty() && random.nextInt(5) == 0 ? shooters.get(random.nextInt(shooters.size())) : walkers.get(random.nextInt(walkers.size()));
-            // A times, which cannot be landed on, comes alone: never a row of them across the way. The rest of a pack stand a square apart,
-            // so that there is somewhere to come down among them.
-            if (kind == TIMES) {
-                // (And not where one of the others already stands within five squares: there it is a minus.)
-                for (int[] other : level.foes) if (crowd(other) && other[2] == spot[1] - 1 && Math.abs(other[1] - spot[0]) < 5) kind = MINUS;
+        // They stand in packs along each run of such squares, at places half a square apart. The members of a pack are a square and a
+        // half from one another: between any two of them there is room for her to come down, with room to spare. And from the last of
+        // one pack to the first of the next is two squares and a half: room to stand. A times cannot be landed on: it stands at the far
+        // end of its pack, two squares from the one before it, so that there is a way over it from among them; and never within five
+        // squares of another of its kind, so that there is no row of them across the way.
+        java.util.Collections.sort(spots, (one, other) -> one[1] != other[1] ? one[1] - other[1] : one[0] - other[0]);
+        List<List<int[]>> packs = new ArrayList<>();
+        int wasRow = -1, wasPlace = -99;
+        for (int index = 0; index < spots.size(); ) {
+            int last = index;
+            while (last + 1 < spots.size() && spots.get(last + 1)[1] == spots.get(index)[1] && spots.get(last + 1)[0] == spots.get(last)[0] + 1) last++;
+            int places = (last - index) * 2 + 1, first = spots.get(index)[0] * 2, row = spots.get(index)[1];
+            for (int at = places > 4 ? random.nextInt(2) : 0; at < places; ) {
+                // (Where one run of squares ends a square short of the next, the packs keep their distance across the break.)
+                if (row == wasRow && first + at - wasPlace < 5) {
+                    at = wasPlace + 5 - first;
+                    continue;
+                }
+                // (In the lands of the first two chapters, which are short, they come one to three together; then two to four; and in
+                // the second volume three to five.)
+                int size = Math.min(number <= 12 ? 1 + random.nextInt(3) : number <= COUNT ? 2 + random.nextInt(3) : 3 + random.nextInt(3), (places - 1 - at) / 3 + 1);
+                int kind = !shooters.isEmpty() && random.nextInt(5) == 0 ? shooters.get(random.nextInt(shooters.size())) : walkers.get(random.nextInt(walkers.size()));
+                boolean times = kind == TIMES;
+                int spiked = first + at + (size - 1) * 3 + (size > 1 ? 1 : 0);
+                if (times) {
+                    times = spiked < first + places;
+                    for (int[] other : level.foes) times &= other[0] != TIMES || other[2] != row - 1 || Math.abs(other[1] * 2 - spiked) >= 11;
+                    for (List<int[]> pack : packs) for (int[] other : pack) times &= other[0] != TIMES || other[2] != row - 1 || Math.abs(other[1] * 2 + other[4] - 1 - spiked) >= 10;
+                    kind = MINUS;
+                    for (int walker : walkers) if (walker != TIMES) kind = walker;
+                }
+                List<int[]> pack = new ArrayList<>();
+                int place = first + at;
+                for (int each = 0; each < size; each++) {
+                    boolean end = times && each == size - 1;
+                    place = end ? spiked : first + at + each * 3;
+                    pack.add(new int[]{end ? TIMES : kind, place / 2, row - 1, 1, place % 2 == 0 ? 1 : 2});
+                }
+                packs.add(pack);
+                wasRow = row;
+                wasPlace = place;
+                at = place - first + 5;
             }
-            if (kind == TIMES) size = 1;
-            for (int each = 0; each < size; each++) {
-                boolean stands = false;
-                for (int[] other : spots) stands |= other[0] == spot[0] + each * 2 && other[1] == spot[1];
-                if (!stands) break;
-                level.foes.add(new int[]{kind, spot[0] + each * 2, spot[1] - 1, 1, 1});
-                put++;
-            }
-            want -= Math.max(1, put);
-            for (int index = spots.size() - 1; index >= 0; index--) {
-                int[] other = spots.get(index);
-                if (other[1] == spot[1] && other[0] >= spot[0] - (kind == TIMES ? 5 : 3) && other[0] <= spot[0] + Math.max(1, put) * 2 + (kind == TIMES ? 5 : 2)) spots.remove(index);
+            index = last + 1;
+        }
+        // Which of the packs there is room for are there: taken as they come, shuffled, so that they are spread along the land.
+        java.util.Collections.shuffle(packs, random);
+        int want = base * (crowdOf(number) - 1);
+        for (List<int[]> pack : packs) {
+            for (int[] one : pack) {
+                // (A pack cut short keeps its near end: never a times left by itself where it was to have had company.)
+                if (want <= 0) break;
+                level.foes.add(one);
+                want--;
             }
         }
         // And in the air.
@@ -388,9 +422,9 @@ final class RunLevels {
     static final int[] FLOCKS = new int[100];
     static int flockTry = -1;
     static {
-        for (int land : new int[]{34, 41, 42, 44, 46, 48, 51, 53, 55, 61, 63, 71, 74, 76, 79}) FLOCKS[land - 1] = 1;
-        for (int land : new int[]{58, 67}) FLOCKS[land - 1] = 2;
-        FLOCKS[69 - 1] = 6;
+        for (int land : new int[]{40, 41, 46, 53, 54, 57, 61, 63, 68}) FLOCKS[land - 1] = 1;
+        for (int land : new int[]{67, 71, 76}) FLOCKS[land - 1] = 2;
+        FLOCKS[79 - 1] = 3;
     }
 
     static int flierFrom(int kind) { return FLIES_FROM[kind - DRIFTER]; }
