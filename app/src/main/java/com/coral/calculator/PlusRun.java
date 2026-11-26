@@ -76,6 +76,8 @@ final class PlusRun {
     static final int STALL = 7;
     /** And two that have to do with what is asked of her: a rice cake, to be found; and whoever a letter is for, who stays where she is. */
     static final int CAKE = 8, DROPOFF = 9;
+    /** A chest in a place off the land: opened by touching it, and what is in it is kept. */
+    static final int CHEST = 20;
     /** How what is asked of her stands: not asked yet, being done, done, or not to be done this time. */
     static final int ASKED = 1, DONE = 2, FAILED = 3;
     /** And handed in: whoever asked it, or whoever it was for, has thanked her and paid her for it. */
@@ -216,7 +218,8 @@ final class PlusRun {
     /** Which place off the land she is in, or -1; which she has been into, which she has finished, and which hidden doors she has broken through to. */
     private int room = -1, roomsFound, roomsDone, revealed;
     private int entered, reveals, roomWins, wave, caught, dice = 12345;
-    private float gameLeft, sinceDrop;
+    private float gameLeft, sinceDrop, gameLasts;
+    private int chests;
     private boolean quitting;
     private int heldWeapon = UNARMED, heldRounds, woken, bursts;
     /** In the range, with its gun in her hands; and called on in black, a shadow that nothing touches. */
@@ -355,6 +358,8 @@ final class PlusRun {
         caught = other.caught;
         dice = other.dice;
         gameLeft = other.gameLeft;
+        gameLasts = other.gameLasts;
+        chests = other.chests;
         sinceDrop = other.sinceDrop;
         quitting = other.quitting;
         heldWeapon = other.heldWeapon;
@@ -639,9 +644,16 @@ final class PlusRun {
                     // The cellar shuts, and the first of the signs are in it.
                     wave = 1;
                     summon(one);
+                } else if (one[0] == RunLevels.TRAMPLE) {
+                    // Signs keep coming, for fifteen seconds.
+                    gameLeft = 15;
+                    gameLasts = 15;
+                    caught = 0;
+                    sinceDrop = 0;
                 } else if (one[0] == RunLevels.RANGE) {
                     // An ink gun that does not run dry, for twelve seconds; what she carried is hers again after.
                     gameLeft = 12;
+                    gameLasts = 12;
                     caught = 0;
                     sinceDrop = 1;
                     heldWeapon = weapon;
@@ -651,9 +663,11 @@ final class PlusRun {
                     rounds = 999;
                 } else if (one[0] == RunLevels.GAME) {
                     gameLeft = FALLING;
+                    gameLasts = FALLING;
                     caught = 0;
                     sinceDrop = 0;
-                } else {
+                } else if (one[0] == RunLevels.PASSAGE) {
+                    // A way through is a way through: there is nothing to be done in it but go.
                     roomsDone |= 1 << at;
                 }
             }
@@ -754,11 +768,39 @@ final class PlusRun {
                 if (caught >= ENOUGH) bonus += 10;
                 unarm();
             }
+        } else if (one[0] == RunLevels.TRAMPLE && gameLeft > 0) {
+            // Never more than five of them at once: one more every so often, somewhere along the room, facing her.
+            int about = 0;
+            for (Foe foe : foes) if (foe.spawned && !foe.flat) about++;
+            if (about < 5 && (sinceDrop += seconds) > .7f) {
+                sinceDrop = 0;
+                dice = dice * 1103515245 + 12345;
+                Foe foe = new Foe(level.chapter >= 2 && (dice >>> 12) % 3 == 0 ? RunLevels.SLIME : RunLevels.MINUS);
+                foe.spawned = true;
+                foe.left = 1;
+                foe.x = one[3] + 3 + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 6);
+                // Not on top of her.
+                if (Math.abs(foe.x - x) < 2.5f) foe.x = x + (x < (one[3] + one[4]) / 2f ? 4 : -4);
+                foe.ground = RunLevels.FLOOR - foe.tall();
+                foe.y = foe.ground;
+                foe.home = foe.x;
+                foe.leftward = foe.x > x;
+                foe.dazed = .5f;
+                foes.add(foe);
+            }
+            if ((gameLeft -= seconds) <= 0) {
+                gameLeft = 0;
+                roomsDone |= 1 << room;
+                roomWins++;
+                if (caught >= ENOUGH) bonus += 10;
+                for (int index = foes.size() - 1; index >= 0; index--) if (foes.get(index).spawned && !RunLevels.boss(foes.get(index).kind)) foes.remove(index);
+            }
         } else if (one[0] == RunLevels.GAME && gameLeft > 0) {
             if ((sinceDrop += seconds) > .42f) {
                 sinceDrop = 0;
                 dice = dice * 1103515245 + 12345;
-                float at = one[3] + 1.5f + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 3);
+                // Over the middle of the room, where she can get under any of them in time.
+                float at = one[3] + 4.5f + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 9);
                 shoot(PLUSDROP, false, at, RunLevels.FLOOR - 7.6f, 0, 5.5f, 2);
             }
             if ((gameLeft -= seconds) <= 0) {
@@ -805,6 +847,16 @@ final class PlusRun {
     int wave() { return wave; }
     float gameLeft() { return gameLeft; }
     int caught() { return caught; }
+    /** How long the game in a room lasts in all; how many of a cellar's wave still stand; and how many chests she has opened, a count that only goes up. */
+    float gameLasts() { return gameLasts; }
+    int waveLeft() {
+        int left = 0;
+        for (Foe foe : foes) if (foe.spawned && !foe.flat) left++;
+        return left;
+    }
+    int chests() { return chests; }
+    /** A life more, won in this land. */
+    void spare() { lives++; }
 
     /** Her form, 0 for her own, and how much longer it lasts. */
     int form() { return form; }
@@ -1169,6 +1221,16 @@ final class PlusRun {
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 items.remove(index);
+                // A chest is opened: ten pluses in it, whatever else; and a stash is done with when its chest is.
+                if (item[0] == CHEST) {
+                    chests++;
+                    bonus += 10;
+                    if (room >= 0 && level.rooms.get(room)[0] == RunLevels.STASH && (roomsDone & 1 << room) == 0) {
+                        roomsDone |= 1 << room;
+                        roomWins++;
+                    }
+                    continue;
+                }
                 // A rice cake is only found: found before it was asked for, it still counts.
                 if (item[0] == CAKE) {
                     cakes++;
@@ -1525,10 +1587,13 @@ final class PlusRun {
             foe.y = foe.ground;
             foe.act = 0;
             flattened++;
-            // A paper target is only hit: two pluses for it.
+            // A paper target is only hit: two pluses for it. And where signs keep coming, each one dealt with counts, and is a plus.
             if (foe.kind == RunLevels.TARGET) {
                 caught++;
                 bonus += 2;
+            } else if (foe.spawned && room >= 0 && level.rooms.get(room)[0] == RunLevels.TRAMPLE && gameLeft > 0) {
+                caught++;
+                bonus++;
             }
             if (waits && !foe.spawned && !standing()) won();
             else if (waits && !foe.spawned && phase(foe) > phase) changed();
