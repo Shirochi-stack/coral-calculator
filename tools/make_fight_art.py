@@ -99,7 +99,8 @@ BETWEENS = {
 NAMES = [name for _, names, _ in SHEETS for name in names.split()]
 # Frames that are placed by the middle of what is drawn, not by where her feet are: in the air, lying down, and
 # leaning far out of a dodge.
-CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2 ADODGE BDODGE2 FDODGE".split())
+CENTRED = set("HOP2 RISE TOP FALL BLOWN AIR_HIT AIR_GUARD FALLING LYING KO A1 A2 A3 AX1 AX2 SM_UP SM_FALL DODGE2 ADODGE BDODGE2 FDODGE "
+              "RISE2 TOP2 AF1 AF2 AF3 AW SM_TIP PROP".split())
 # What stands in for the dodge and the clash while a fighter has no sheet of them yet.
 SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U3", "C3": "U4",
          "SLIP_S": "XS", "BDODGE1": "HOP1", "BDODGE2": "HOP2", "BDODGE3": "HOP1", "FDODGE": "DODGE1", "ADODGE": "DODGE2",
@@ -277,11 +278,20 @@ def fighter(name, report):
             image, body, feet = old[index]
             frames[slot] = (image, feet, body[3], index)
         return frames, False, False
+    missing = []
     for sheet, names, upright in SHEETS:
         path = folder / f"{sheet}.webp"
         if not path.exists():
             continue
-        cut, factor = cells(clean(Image.open(path)), 3, 2), RESIZE.get((name, sheet), 1.0)
+        try:
+            cut, factor = cells(clean(Image.open(path)), 3, 2), RESIZE.get((name, sheet), 1.0)
+        except SystemExit as problem:
+            # A sheet of in-betweens that cannot be cut into its six is left out, and what she had stands in for it.
+            if sheet not in MORE:
+                raise
+            report[f"{name} {sheet}"] = f"LEFT OUT: {problem}"
+            missing.append(sheet)
+            continue
         parts, scale = sized(cut, upright, factor)
         if sheet in BETWEENS:
             ratios = sorted((part[1][3] - part[1][1]) / ((frames[one][0].size[1] + frames[other][0].size[1]) / 2)
@@ -297,7 +307,7 @@ def fighter(name, report):
         frames.setdefault(slot, frames[spare])
     for slot in DROP:
         frames[slot] = frames["IDLE1"]
-    return frames, True, all((folder / f"{sheet}.webp").exists() for sheet in MORE)
+    return frames, True, not missing and all((folder / f"{sheet}.webp").exists() for sheet in MORE)
 
 
 def packed(name, frames):
