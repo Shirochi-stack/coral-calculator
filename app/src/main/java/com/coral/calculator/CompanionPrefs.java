@@ -39,6 +39,9 @@ final class CompanionPrefs {
     private static final String PARTIED = "partied";
     /** The colour of the animated Halgakos's hair: 0 for her own pink, or one of the colours won in Plus run, as {@link Hair} numbers them. */
     static final String HAIR = "hair";
+    /** The colour of the user's own mixing, as red, green and blue; and whether she glows in the colour she wears. */
+    static final String HAIR_CUSTOM = "hair_custom";
+    static final String HAIR_GLOW = "hair_glow";
     /** What she calls the user, in place of "Sloppy". */
     static final String NICKNAME = "nickname";
     static final int NICKNAME_LENGTH = 20;
@@ -78,6 +81,12 @@ final class CompanionPrefs {
     int hair() { return preferences.getInt(HAIR, Hair.PINK); }
 
     void setHair(int colour) { preferences.edit().putInt(HAIR, colour).apply(); }
+
+    int hairCustom() { return preferences.getInt(HAIR_CUSTOM, 0xF4A3BE) & 0xFFFFFF; }
+
+    void setHairCustom(int colour) { preferences.edit().putInt(HAIR_CUSTOM, colour & 0xFFFFFF).apply(); }
+
+    boolean hairGlow() { return preferences.getBoolean(HAIR_GLOW, false); }
 
     int birthday() { return preferences.getInt(BIRTHDAY, 0); }
 

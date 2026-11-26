@@ -13,6 +13,8 @@ import android.util.SparseArray;
  */
 final class Hair {
     static final int PINK = 0;
+    /** A colour of the user's own mixing, open to them once every colour is won: what the companion's setting is then. */
+    static final int CUSTOM = 9;
     /** In the order Plus run numbers its forms, after her own: {@link PlusRun#RED} is 1 and {@link PlusRun#WHITE} is 8. */
     static final String[] NAMES = {"Pink", "Red", "Blue", "Brown", "Green", "Yellow", "Purple", "Black", "White"};
     static final int[] COLOURS = {0xFFF4A3BE, 0xFFE0362F, 0xFF3B7BE0, 0xFFCF987A, 0xFF3FB56A, 0xFFF2C230, 0xFF9A4FD0, 0xFF3A3A44, 0xFFF4F4FA};
@@ -36,17 +38,37 @@ final class Hair {
         return context.getApplicationContext().getSharedPreferences("play", Context.MODE_PRIVATE).getInt(OWNED, 0);
     }
 
+    /** Whether every colour has been won: then the user may mix a colour of their own for the companion, and have her glow. */
+    static boolean all(Context context) {
+        int every = (1 << NAMES.length - 1) - 1;
+        return (owned(context) & every) == every;
+    }
+
+    /** Whether a look is a colour of the user's own: those are kept as the colour itself, with nothing let through. */
+    static boolean custom(int look) { return look >>> 24 == 0xFF; }
+
+    /** The colour of a look, to draw a mark of it in. */
+    static int colour(int look) { return custom(look) ? look : COLOURS[look > 0 && look < COLOURS.length ? look : PINK]; }
+
+    /** Whether the companion glows: the user's choice, once every colour is won. */
+    static boolean glows(Context context) { return all(context) && new CompanionPrefs(context).hairGlow(); }
+
     static boolean owns(int owned, int colour) { return colour == PINK || colour > 0 && colour < NAMES.length && (owned & 1 << colour - 1) != 0; }
 
-    /** The colour the companion wears: the one chosen, if it has been won, and her own pink otherwise. */
+    /**
+     * The look the companion wears: the colour chosen, if it has been won, a colour of the
+     * user's own if every colour has been, and her own pink otherwise.
+     */
     static int chosen(Context context) {
-        int colour = new CompanionPrefs(context).hair();
+        CompanionPrefs prefs = new CompanionPrefs(context);
+        int colour = prefs.hair();
+        if (colour == CUSTOM) return all(context) ? 0xFF000000 | prefs.hairCustom() : PINK;
         return colour != PINK && owns(owned(context), colour) ? colour : PINK;
     }
 
     /** A picture of the animated Halgakos with her hair in a colour. It may take a moment the first time: ask away from the screen where that matters. */
     static Bitmap art(Context context, int resource, int colour) {
-        if (colour <= PINK || colour >= NAMES.length) return BitmapFactory.decodeResource(context.getResources(), resource);
+        if (!custom(colour) && (colour <= PINK || colour >= NAMES.length)) return BitmapFactory.decodeResource(context.getResources(), resource);
         synchronized (made) {
             if (colour != madeIn) {
                 made.clear();
@@ -64,12 +86,19 @@ final class Hair {
         return dyed;
     }
 
+    /** The dye that turns the middle of her pink into a colour: its hue, and its strength and brightness as shares of her pink's. */
+    private static float[] dyeOf(int colour) {
+        float[] parts = new float[3];
+        Color.colorToHSV(colour, parts);
+        return new float[]{parts[0] / 360, parts[1] / .376f, parts[2] / .851f, 0};
+    }
+
     /** A picture of her with her hair a colour: every pink of her hair, ears and tail, and nothing else, is turned to it. */
     static Bitmap dyed(Bitmap from, int colour) {
         int wide = from.getWidth(), tall = from.getHeight();
         int[] pixels = new int[wide * tall];
         from.getPixels(pixels, 0, wide, 0, 0, wide, tall);
-        float[] dye = DYES[colour - 1], to = new float[3];
+        float[] dye = custom(colour) ? dyeOf(colour) : DYES[colour - 1], to = new float[3];
         for (int index = 0; index < pixels.length; index++) {
             int was = pixels[index];
             if (was >>> 24 == 0) continue;
