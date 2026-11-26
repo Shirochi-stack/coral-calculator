@@ -57,8 +57,14 @@ final class RunGame {
     /** Those who wait in the second volume, as they are drawn: Gokhae, Miri, Gari, Yeobaek, King Slime and the Mawang. */
     private static final int[] LATER_CAST = {R.drawable.run_gokhae, R.drawable.run_miri, R.drawable.run_gari, R.drawable.run_yeobaek,
             R.drawable.run_kingslime, R.drawable.run_mawang, R.drawable.run_guard, R.drawable.run_butler, R.drawable.run_byeoru, R.drawable.run_jupan,
-            R.drawable.run_sumbi, R.drawable.run_pads, R.drawable.run_party, R.drawable.run_oldbook};
-    private static final int[] LATER_FRAMES = {4, 3, 3, 6, 4, 6, 4, 4, 4, 4, 4, 4, 4, 4};
+            R.drawable.run_sumbi, R.drawable.run_pads, R.drawable.run_party, R.drawable.run_oldbook, R.drawable.run_oldbook, R.drawable.run_wyrm,
+            R.drawable.run_blot, R.drawable.run_gecko};
+    private static final int[] LATER_FRAMES = {4, 3, 3, 6, 4, 6, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+    /** Those that fly, as they are drawn: four pictures of each, wings up, wings down, about to do what it does, and beaten. And each one's colour. */
+    private static final int[] FLIER_CAST = {R.drawable.run_fly_drifter, R.drawable.run_fly_swooper, R.drawable.run_fly_bomber, R.drawable.run_fly_shooter,
+            R.drawable.run_fly_mite, R.drawable.run_fly_wisp, R.drawable.run_fly_rime};
+    private static final int[] FLIER_COLOURS = {0xFF3A3340, 0xFF7FA8E0, 0xFF8E86A6, 0xFFE0A21A, 0xFF3A3340, 0xFFF08A2C, 0xFF7FC4EC};
+    private final Bitmap[] flierCast = new Bitmap[FLIER_CAST.length];
     /** Where the five of the seven others who speak come among those who do: after the villagers. */
     private static final int FIRST_OTHER = 20;
     /** How many are met in the villages, each with a picture in the row of them; they come after the rest of those who speak. */
@@ -291,6 +297,16 @@ final class RunGame {
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
     private float formLasts = 1, shake, sinceBump = 9, sinceShut = 9, sinceOpened = 9, sinceParry = 9, flash;
     private int seenGreetings, seenEntered, seenReveals, seenWins;
+    /**
+     * One met in the middle of a land: how often it has been seen to be roused, which it is,
+     * how long since it last was, and whether its business in this run is over. And of the
+     * rest that is new: colours shut off, slimes grown on fire, flights ended, blows that
+     * went through what only water or fire deals with, dives; and which kinds of those that
+     * fly she has had a word about.
+     */
+    private int seenRoused, roverKind = -1, seenShuts, seenDrunk, seenGrounded, seenFizzled, seenDives, flySeen;
+    private float roverAge = 9;
+    private boolean roverOver;
     /** Which cracks she has had a word about in this land, and which kinds of place off it. */
     private int hinted, saidRoom;
     private int seenAsked, seenDone, seenFailed, seenCalled, seenBursts, seenWoken;
@@ -519,6 +535,46 @@ final class RunGame {
                 : "two hundred pluses, kept";
     }
 
+    /**
+     * One met in the middle of a land has been beaten, or, the wyrm, driven off. Beaten for
+     * the first time in a land, it gives a purse to keep that grows with the chapters, and
+     * a piece of a heart; beaten there again, fifteen pluses to keep. The wyrm seen off
+     * without being beaten gives ten, the first time in a land. Which of the three have
+     * ever been beaten is kept, and how many times in all.
+     */
+    private void roverDone(PlusRun.Foe rover, boolean beaten) {
+        int kind = rover.kind, had = session.tally("run_rover_" + number);
+        String name = waitName(kind);
+        if (beaten) {
+            session.keep("run_rovers", session.tally("run_rovers") | 1 << kind - RunLevels.WYRM);
+            session.keep("run_roved", session.tally("run_roved") + 1);
+            audio.play("win", .8f);
+            shake = Math.max(shake, .3f);
+            float at = rover.x + rover.wide() / 2, high = rover.y + rover.tall() * .5f;
+            for (int spark = 0; spark < 18; spark++) {
+                double way = random.nextFloat() * Math.PI * 2;
+                bits.add(new float[]{at, high, (float) Math.cos(way) * 7, (float) Math.sin(way) * 7 - 3, .6f, spark % 3 == 0 ? 1 : 0});
+            }
+            if (had < 2) {
+                session.keep("run_rover_" + number, 2);
+                int purse = 30 + 10 * RunLevels.chapterOf(number);
+                session.keep("run_bank", bank() + purse);
+                toast(name + " is beaten", "+ " + purse + " to keep" + piece(), CHEST_PICTURE);
+            } else {
+                session.keep("run_bank", bank() + 15);
+                toast(name + " is beaten again", "+ 15 to keep", CHEST_PICTURE);
+            }
+            speak(RunStory.ROVERS[3], true);
+        } else {
+            if (had < 1) {
+                session.keep("run_rover_" + number, 1);
+                session.keep("run_bank", bank() + 10);
+                toast(name + " is driven off", "+ 10 to keep. Beaten, it gives more", CHEST_PICTURE);
+            }
+            speak(RunStory.ROVERS[4], true);
+        }
+    }
+
     /** Says in a card of its own that something has been won: at once, or when the card that is on the screen has gone. */
     private void toast(String title, String words, int picture) {
         // One card at a time: behind the one that is up, or behind the card of a place off the land.
@@ -567,6 +623,11 @@ final class RunGame {
     private Bitmap cast(int who) {
         if (cast[who] == null) cast[who] = BitmapFactory.decodeResource(context.getResources(), CAST[who]);
         return cast[who];
+    }
+
+    private Bitmap flier(int which) {
+        if (flierCast[which] == null) flierCast[which] = BitmapFactory.decodeResource(context.getResources(), FLIER_CAST[which]);
+        return flierCast[which];
     }
 
     private Bitmap later(int who) {
@@ -697,11 +758,13 @@ final class RunGame {
 
     /** Who waits at the end of a land, by her colour, her name, and where she is among those who speak (below nothing for Zero and King Slime, who do not). */
     private static int waitColour(int kind) {
-        return kind == RunLevels.ZERO ? CalculatorLayout.CORAL : kind == RunLevels.KING ? 0xFF3FA878 : SPEAKER_COLOURS[waitFace(kind)];
+        return kind == RunLevels.ZERO ? CalculatorLayout.CORAL : kind == RunLevels.KING ? 0xFF3FA878 : kind == RunLevels.WYRM ? 0xFFB98A4E
+                : kind == RunLevels.BLOT ? 0xFF4A55C4 : kind == RunLevels.GECKO ? 0xFF4FAE6A : SPEAKER_COLOURS[waitFace(kind)];
     }
 
     private static String waitName(int kind) {
-        return kind == RunLevels.ZERO ? "Zero" : kind == RunLevels.ILLYA ? "Illya" : kind == RunLevels.TSUBAKIEH ? "Tsubakieh"
+        return kind == RunLevels.WYRM ? "The Margin Wyrm" : kind == RunLevels.BLOT ? "Blot" : kind == RunLevels.GECKO ? "The Bookmark Gecko"
+                : kind == RunLevels.ZERO ? "Zero" : kind == RunLevels.ILLYA ? "Illya" : kind == RunLevels.TSUBAKIEH ? "Tsubakieh"
                 : kind == RunLevels.GOKHAE ? "Gokhae" : kind == RunLevels.MIRI || kind == RunLevels.GARI ? "The Gazette Twins"
                 : kind == RunLevels.YEOBAEK ? "Yeobaek" : kind == RunLevels.KING ? "King Slime" : kind == RunLevels.GUARD ? "The Guild Guard"
                 : kind == RunLevels.BUTLER ? "Penchok-jipsa" : kind == RunLevels.BYEORU ? "Byeoru" : kind == RunLevels.JUPAN ? "Jupan"
@@ -950,6 +1013,11 @@ final class RunGame {
         seenGreetings = seenEntered = seenReveals = seenWins = 0;
         hinted = saidRoom = 0;
         seenAsked = seenDone = seenFailed = seenCalled = seenBursts = seenWoken = 0;
+        seenRoused = seenShuts = seenDrunk = seenGrounded = seenFizzled = seenDives = 0;
+        roverKind = -1;
+        roverAge = 9;
+        roverOver = false;
+        flySeen = session.tally("run_fly_seen");
         prizeAge = -1;
         prizeWon = RunLevels.NOTHING;
         saidRumour = false;
@@ -1042,11 +1110,13 @@ final class RunGame {
             if (late != RunLevels.NOTHING) prizeWon = late;
             speak(RunStory.WON[stars - 1], false);
             session.keep("run_mobs", session.tally("run_mobs") + run.flattened());
+            session.keep("run_fliers", session.tally("run_fliers") + run.fliers());
             pills(number < RunLevels.TOTAL ? number == RunLevels.COUNT ? RunStory.SEQUEL : "Next" : "The end", NEXT, "Again", AGAIN, "Lands", TO_MAP);
         } else {
             stars = 0;
             session.keep("run_lost", session.tally("run_lost") + 1);
             session.keep("run_mobs", session.tally("run_mobs") + run.flattened());
+            session.keep("run_fliers", session.tally("run_fliers") + run.fliers());
             audio.play("lose");
             speak(RunStory.LOST[random.nextInt(RunStory.LOST.length)], false);
             pills("Try again", AGAIN, "Lands", TO_MAP);
@@ -1386,8 +1456,79 @@ final class RunGame {
         }
         // Whoever waits here: the first of them that still stands, or the last that stood; in a cellar, the Old Book if he is awake.
         PlusRun.Foe boss = null;
-        for (PlusRun.Foe foe : run.foes()) if (RunLevels.boss(foe.kind) && !foe.spawned && (boss == null || boss.flat)) boss = foe;
+        // (One met in the middle of a land is not one of them: it keeps no gate, and is told of by itself.)
+        PlusRun.Foe rover = null;
+        for (PlusRun.Foe foe : run.foes()) {
+            if (RunLevels.rover(foe.kind)) rover = foe;
+            else if (RunLevels.boss(foe.kind) && !foe.spawned && (boss == null || boss.flat)) boss = foe;
+        }
         for (PlusRun.Foe foe : run.foes()) if (RunLevels.boss(foe.kind) && foe.spawned && run.room() >= 0) boss = foe;
+        roverAge += seconds;
+        if (run.roused() != seenRoused) {
+            seenRoused = run.roused();
+            if (rover != null) {
+                // It shows itself: its name across the screen, a sound of its own, and the first time a word about it.
+                roverKind = rover.kind;
+                roverAge = 0;
+                audio.play(rover.kind == RunLevels.WYRM ? "flap" : rover.kind == RunLevels.BLOT ? "quake" : "page", .8f);
+                audio.play("star", .5f);
+                buzz(true);
+                if (rover.kind == RunLevels.BLOT) shake = Math.max(shake, .35f);
+                if (seenRoused == 1) speak(RunStory.ROVERS[rover.kind - RunLevels.WYRM], true);
+            }
+        }
+        // The wyrm gone for the third time and not beaten: it is driven off.
+        if (rover != null && rover.kind == RunLevels.WYRM && !roverOver && run.roused() >= 3 && rover.away && !rover.flat) {
+            roverOver = true;
+            roverDone(rover, false);
+        }
+        if (boss == null && run.phases() != seenPhases) {
+            // It changes, a third of what it can take gone.
+            seenPhases = run.phases();
+            audio.play("form", .6f);
+            flash = .2f;
+        }
+        if (run.shuts() != seenShuts) {
+            // Whoever she fights has shut one of her colours off as she changed.
+            seenShuts = run.shuts();
+            audio.play("censor", .7f);
+            buzz(true);
+            pop(herX, herY - 1.9f, FORM_NAMES[run.lastShut() - 1] + " shut off!");
+            if (session.tally("run_hint_shut") == 0) {
+                session.keep("run_hint_shut", 1);
+                speak(RunStory.SHUT_OFF[0], true);
+            }
+        }
+        if (run.drunk() != seenDrunk) {
+            seenDrunk = run.drunk();
+            audio.play("splash", .6f);
+            pop(run.foeX(), run.foeY() - 1.6f, "It drinks fire!");
+        }
+        if (run.grounded() != seenGrounded) {
+            seenGrounded = run.grounded();
+            audio.play("censor", .6f);
+            buzz(true);
+            pop(herX, herY - 1.9f, "Grounded!");
+        }
+        if (run.fizzled() != seenFizzled) {
+            seenFizzled = run.fizzled();
+            audio.play("parry", .4f);
+            pop(run.foeX(), run.foeY() - 1.4f, run.fizzledAt() == RunLevels.WISP ? "Only water!" : "Only fire!");
+        }
+        if (run.dives() != seenDives) {
+            seenDives = run.dives();
+            audio.play("flap", .5f);
+        }
+        // Those that fly: the first time one of a kind is near, a word about it.
+        if (number >= RunLevels.FLIERS_FROM && captionLeft <= 0 && personLeft <= 0 && run.room() < 0) {
+            for (PlusRun.Foe foe : run.foes()) {
+                if (!RunLevels.flier(foe.kind) || foe.flat || (flySeen & 1 << foe.kind - RunLevels.DRIFTER) != 0 || Math.abs(foe.x - herX) > 7) continue;
+                flySeen |= 1 << foe.kind - RunLevels.DRIFTER;
+                session.keep("run_fly_seen", flySeen);
+                speak(RunStory.FLIERS[foe.kind - RunLevels.DRIFTER], true);
+                break;
+            }
+        }
         if (run.woken() != seenWoken && boss != null) {
             seenWoken = run.woken();
             audio.play("page", .8f);
@@ -1396,7 +1537,8 @@ final class RunGame {
         }
         // How whoever waits stands toward a blow: what kept blows off her breaks when she is spent, with a sound of its own; and the first
         // time anyone is met who has such a thing, a word about what it means.
-        int guard = boss == null || boss.flat || !(run.locked() || boss.spawned) ? -1 : run.guard(boss);
+        PlusRun.Foe guards = boss != null && !boss.flat && (run.locked() || boss.spawned) ? boss : rover != null && !rover.flat && !rover.away ? rover : null;
+        int guard = guards == null ? -1 : run.guard(guards);
         if (guard == PlusRun.BARE && guardWas == PlusRun.SHIELDED) {
             sinceBroke = 0;
             audio.play("crumble", .6f);
@@ -1529,6 +1671,10 @@ final class RunGame {
             if (in >= 0) {
                 int kind = here.rooms.get(in)[0];
                 boolean todo = (run.roomsDone() & 1 << in) == 0;
+                if (BuildConfig.DEBUG && session.tally("run_spot") > 0 && kind == RunLevels.ARENA) {
+                    int spot = session.tally("run_spot");
+                    run.place(here.rooms.get(in)[3] + spot % 1000, here.rooms.get(in)[11] - spot / 1000 * RunLevels.STOREY - PlusRun.TALL - .05f);
+                }
                 // Her word about the kind of place it is, the first time in a land; of a cellar or a game, only while it is still to do.
                 if ((saidRoom & 1 << kind) == 0 && (kind <= RunLevels.PASSAGE || run.sealed())) {
                     saidRoom |= 1 << kind;
@@ -1818,8 +1964,12 @@ final class RunGame {
         }
         if (run.blows() != seenBlows) {
             seenBlows = run.blows();
-            boolean fell = boss != null && (boss.spawned ? boss.flat : !run.standing());
-            audio.play(fell ? "fall" : "blow");
+            boolean fell = boss != null && (boss.spawned ? boss.flat : !run.standing()), roverFell = rover != null && rover.flat && !roverOver;
+            audio.play(fell || roverFell ? "fall" : "blow");
+            if (roverFell) {
+                roverOver = true;
+                roverDone(rover, true);
+            }
             buzz(true);
             shake = Math.max(shake, .15f);
             // The last of those who wait here is down: what she gives rises out of her there and then, and is hers; a colour is in her hair at once.
@@ -2340,6 +2490,7 @@ final class RunGame {
             if (run.dark()) drawDark(canvas);
             drawHud(canvas);
             if (screen == PLAY && run.wavePhase() != 0) drawWave(canvas);
+            if (screen == PLAY) drawRover(canvas);
             if (screen == PLAY && (roomCardAge >= 0 || roomResultAge >= 0)) drawRoomCards(canvas);
             if (screen == PLAY) {
                 // Charmed, the arrows are the wrong way round, and show it.
@@ -2720,6 +2871,8 @@ final class RunGame {
                 paint.setColor(Color.BLACK);
                 paint.setAlpha(255);
                 stroke.setAlpha(255);
+            } else if (RunLevels.flier(foe.kind)) {
+                drawFlier(canvas, foe, middle, feet, second, turned);
             } else if (foe.kind >= RunLevels.SLIME) {
                 // The signs of the second volume: two pictures of each about its business, and two of its going, after which it fades.
                 int which = SIGN_ART + (foe.kind - RunLevels.SLIME) * 4 + (foe.flat ? (foe.act < .22f ? 2 : 3) : second ? 1 : 0);
@@ -2759,6 +2912,18 @@ final class RunGame {
             float x = (shot.x - cameraX) * tile, y = (shot.y - cameraY) * tile;
             boolean leftward = shot.across < 0;
             float spin = shot.age * 620;
+            // What falls straight down throws a shadow on the ground it will land on, which grows as it comes.
+            if (shot.kind == PlusRun.STOP && !shot.hers && shot.across == 0 && run.room() < 0) {
+                int under = RunLevels.top(level, Math.max(0, Math.min(level.columns - 1, (int) shot.x)));
+                if (under > 0 && under > shot.y) {
+                    float near = Math.max(0, 1 - (under - shot.y) / 6f);
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.BLACK);
+                    paint.setAlpha(Math.round(50 + 110 * near));
+                    canvas.drawOval(x - tile * (.2f + .3f * near), (under - cameraY) * tile - tile * .09f, x + tile * (.2f + .3f * near), (under - cameraY) * tile + tile * .07f, paint);
+                    paint.setAlpha(255);
+                }
+            }
             switch (shot.kind) {
                 case PlusRun.HEART: {
                     float beat = 1 + .12f * (float) Math.sin(clock * 14);
@@ -3280,7 +3445,7 @@ final class RunGame {
      */
     private void drawWays(Canvas canvas, RunLevels.Level level) {
         PlusRun.Foe boss = null;
-        for (PlusRun.Foe foe : run.foes()) if (RunLevels.boss(foe.kind) && (boss == null || boss.flat)) boss = foe;
+        for (PlusRun.Foe foe : run.foes()) if (RunLevels.boss(foe.kind) && !RunLevels.rover(foe.kind) && (boss == null || boss.flat)) boss = foe;
         if (boss == null) return;
         boolean opening = run.opening() > 0, gone = !run.standing() && !opening;
         // Going up out of the way takes half a second once they open.
@@ -3339,7 +3504,22 @@ final class RunGame {
         boolean arriving = foe.enter > 0, changing = foe.flourish > 0, hit = foe.dazed > 0 || changing;
         float came = arriving ? 1 - Math.min(1, foe.enter / (run.entrances() == 1 ? PlusRun.ENTER : PlusRun.ENTER / 2)) : 1;
         float ease = came * came * (3 - 2 * came);
-        if (arriving) {
+        if (arriving && RunLevels.rover(kind)) {
+            // The gecko comes down its ribbon; Blot rises out of a pool of itself; the wyrm is on its way in from ahead.
+            float in = 1 - Math.min(1, foe.enter), soft = in * in * (3 - 2 * in);
+            if (kind == RunLevels.GECKO) {
+                lift = -(1 - soft) * tile * 6;
+            } else if (kind == RunLevels.BLOT) {
+                alpha = Math.round(255 * soft);
+                lift = (1 - soft) * foe.tall() * tile * .5f;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFF2B2F7A);
+                paint.setAlpha(Math.round(220 * (1 - soft * .6f)));
+                canvas.drawOval(middle - foe.wide() * tile * (.3f + .5f * soft), feet - tile * .16f, middle + foe.wide() * tile * (.3f + .5f * soft), feet + tile * .12f, paint);
+                paint.setColor(Color.BLACK);
+                paint.setAlpha(255);
+            }
+        } else if (arriving) {
             if (kind >= RunLevels.GUARD) {
                 arrives(canvas, kind, came, middle, feet, size, colour);
                 slide = inSlide;
@@ -3422,6 +3602,49 @@ final class RunGame {
             canvas.restore();
             // He holds up the book he is about to throw.
             if (!foe.flat && mode == 3 && step == 0 && !arriving) thing(canvas, PlusRun.BOOK, x, y - foe.tall() * tile * 1.25f, tile * .7f, 0, false, false);
+        } else if (RunLevels.rover(kind)) {
+            // One met in the middle of a land: about its business, at it, hit or spent, and down, each in its own way.
+            int pose = foe.flat ? 3 : hit || step == 2 ? 2 : (kind == RunLevels.GECKO ? step == 1 && mode == 3 : step == 0 && !arriving) ? 1 : 0;
+            float cell;
+            boolean hangs = false;
+            if (kind == RunLevels.WYRM) {
+                cell = tile * 2.1f * 190 / 160;
+                if (foe.flat) {
+                    // It comes down out of the air and lies where it lands.
+                    int under = RunLevels.top(run.level(), Math.max(0, Math.min(run.columns() - 1, (int) (foe.x + foe.wide() / 2))));
+                    y = Math.min(under < 0 ? y + tile * 14 : (under - cameraY) * tile, y + tile * 13 * foe.act * foe.act);
+                } else {
+                    y += tile * .3f;
+                }
+            } else if (kind == RunLevels.BLOT) {
+                cell = foe.tall() * tile * 1.1f * 230 / 200;
+                y += tile * .06f;
+                // Beaten, it spreads.
+                if (foe.flat) cell *= 1 - .25f * Math.min(1, foe.act / 1.5f);
+            } else {
+                cell = tile * 1.05f * 160 / 110;
+                y += tile * .05f;
+                // Up its ribbon it hangs head down; the ribbon goes up out of sight.
+                hangs = !foe.flat && (arriving || foe.y < foe.ground - .4f);
+                if (hangs) {
+                    stroke.setColor(0xFFC8423A);
+                    stroke.setAlpha(alpha);
+                    stroke.setStrokeWidth(tile * .13f);
+                    canvas.drawLine(x, y - tile * 9, x, y - tile * .9f, stroke);
+                    stroke.setAlpha(255);
+                }
+                // Beaten, it is thrown onto its back with a hop.
+                if (foe.flat) y -= (float) Math.sin(Math.min(1, foe.act / .5f) * Math.PI) * tile * .8f;
+            }
+            if (foe.flat && foe.act > 3) {
+                paint.setAlpha(255);
+                return;
+            }
+            if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (3 - foe.act) / .8f))));
+            canvas.save();
+            if (hangs) canvas.rotate(turned ? 90 : -90, x, y - tile * .5f);
+            cell(canvas, later(kind - RunLevels.GOKHAE), pose, 4, x, y, cell, turned);
+            canvas.restore();
         } else if (kind == RunLevels.ILLYA) {
             // Illya: floating, a heart at her fingers as she sends something, flustered when hit or spent, and sitting in tears at the last.
             int pose = foe.flat ? 3 : hit || step == 2 ? 2 : step <= 1 && !arriving ? 1 : 0;
@@ -4124,6 +4347,101 @@ final class RunGame {
      * the size she would be standing so tall, and turned about if asked. Hers were drawn
      * facing right and the others' facing left.
      */
+    /** One picture of a row of them, its foot at a point, the whole of its cell this tall. */
+    private void cell(Canvas canvas, Bitmap sheet, int index, int count, float feetX, float feetY, float tall, boolean turned) {
+        int wide = sheet.getWidth() / count;
+        float scale = tall / sheet.getHeight();
+        source.set(index * wide, 0, index * wide + wide, sheet.getHeight());
+        target.set(feetX - wide * scale / 2, feetY - tall, feetX + wide * scale / 2, feetY);
+        canvas.save();
+        if (turned) canvas.scale(-1, 1, feetX, feetY);
+        canvas.drawBitmap(sheet, source, target, paint);
+        canvas.restore();
+    }
+
+    /** A mark over something that is about to do what it does. */
+    private void warn(Canvas canvas, float x, float y, int colour) {
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTextSize(tile * (.7f + .12f * (float) Math.sin(clock * 20)));
+        text.setStyle(Paint.Style.STROKE);
+        text.setStrokeWidth(tile * .12f);
+        text.setColor(Color.WHITE);
+        canvas.drawText("!", x, y, text);
+        text.setStyle(Paint.Style.FILL);
+        text.setColor(colour);
+        canvas.drawText("!", x, y, text);
+    }
+
+    /**
+     * One of those that fly: its wings going; the picture of it about to do what it does
+     * while it is; a mark over the swallow that has marked her, with a line to where, and
+     * over the asterisk taking aim; a glow round the wisp and the flake, which are not to
+     * be dealt with as the rest are. Beaten, it turns over as it falls, and fades; the wisp
+     * goes up in smoke and the flake runs down as water.
+     */
+    private void drawFlier(Canvas canvas, PlusRun.Foe foe, float middle, float feet, boolean second, boolean turned) {
+        int kind = foe.kind, which = kind - RunLevels.DRIFTER, colour = FLIER_COLOURS[which];
+        if (foe.flat && foe.act > 1.2f) return;
+        boolean elemental = kind == RunLevels.WISP || kind == RunLevels.RIME;
+        boolean telling = foe.mode == 1 && (kind == RunLevels.SWOOPER || kind == RunLevels.BOMBER || kind == RunLevels.SHOOTER || kind == RunLevels.WISP);
+        int pose = foe.flat ? 3 : telling || kind == RunLevels.SWOOPER && foe.mode == 2 ? 2 : second ? 1 : 0;
+        float tall = foe.tall() * tile * 1.5f * 160 / 96, x = middle, y = feet + foe.tall() * tile * .3f, heart = feet - foe.tall() * tile * .5f;
+        if (!foe.flat && elemental) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(colour);
+            paint.setAlpha(Math.round(50 + 30 * (float) Math.sin(clock * 5 + foe.x)));
+            canvas.drawCircle(x, heart, foe.tall() * tile * .95f, paint);
+            paint.setColor(Color.BLACK);
+            paint.setAlpha(255);
+        }
+        if (!foe.flat && kind == RunLevels.SWOOPER && foe.mode == 1) {
+            // The mark: a line from it to her, which is where it will go.
+            float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herY = (run.y() + PlusRun.TALL * .5f - cameraY) * tile;
+            stroke.setColor(colour);
+            stroke.setAlpha(Math.round(110 + 90 * Math.abs((float) Math.sin(clock * 16))));
+            stroke.setStrokeWidth(tile * .06f);
+            canvas.drawLine(x, heart, herX, herY, stroke);
+            canvas.drawCircle(herX, herY, tile * .45f, stroke);
+            stroke.setAlpha(255);
+        }
+        canvas.save();
+        if (foe.flat) {
+            paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (1.2f - foe.act) / .4f))));
+            if (kind == RunLevels.WISP) {
+                y -= tile * 1.2f * foe.act;
+            } else {
+                y += Math.min(tile * 8, tile * (kind == RunLevels.RIME ? 5 : 11) * foe.act * foe.act);
+                if (!elemental) canvas.rotate(foe.act * 320 * (foe.leftward ? -1 : 1), x, y - tall * .3f);
+            }
+        } else if (foe.dazed > 0 && (int) (clock * 16) % 2 == 0) {
+            paint.setAlpha(120);
+        }
+        cell(canvas, flier(which), pose, 4, x, y, tall, turned);
+        canvas.restore();
+        paint.setAlpha(255);
+        if (!foe.flat && foe.mode == 1 && (kind == RunLevels.SWOOPER || kind == RunLevels.SHOOTER)) warn(canvas, x, feet - foe.tall() * tile * 1.5f, colour);
+    }
+
+    /**
+     * One met in the middle of a land shows itself: its name across the screen, in its
+     * colour, and under it that it is no gatekeeper; the wyrm come back, that it is back.
+     * And while the wyrm is still out of sight ahead, a mark at the edge it is coming from.
+     */
+    private void drawRover(Canvas canvas) {
+        if (roverKind < 0) return;
+        int colour = waitColour(roverKind);
+        for (PlusRun.Foe foe : run.foes()) {
+            if (foe.kind != RunLevels.WYRM || foe.away || foe.flat) continue;
+            float at = (foe.x + foe.wide() / 2 - cameraX) * tile;
+            if (at > width + tile * .5f) warn(canvas, safe.right - dp(18), Math.max(safe.top + dp(120), (foe.y + foe.tall() - cameraY) * tile), colour);
+        }
+        if (roverAge > 2.6f) return;
+        float solid = Math.min(1, Math.min(roverAge / .2f, (2.6f - roverAge) / .5f)), grow = 1.25f - .25f * Math.min(1, roverAge * 5), y = safe.top + safe.height() * .3f;
+        boolean again = roverKind == RunLevels.WYRM && seenRoused > 1;
+        word(canvas, again ? "It is back!" : waitName(roverKind).toUpperCase(java.util.Locale.ROOT), safe.centerX(), y, Math.min(dp(26), safe.width() / 12f) * grow, colour, solid);
+        if (!again) word(canvas, "No gatekeeper: beat it for a prize, or run on", safe.centerX(), y + dp(26), Math.min(dp(13.5f), safe.width() / 26f), 0xFF3A3F45, solid);
+    }
+
     private void frame(Canvas canvas, Bitmap sheet, int index, int count, float feetX, float feetY, float tall, boolean turned) {
         float scale = tall / (pet.getHeight() / (float) PetArt.FRAMES.length);
         int wide = sheet.getWidth() / count;
@@ -4202,14 +4520,22 @@ final class RunGame {
         // Shut in with someone: her name, and a bar of how much more she can take, marked at its thirds.
         boolean den = false;
         for (PlusRun.Foe foe : run.foes()) den |= foe.spawned && !foe.flat && RunLevels.boss(foe.kind) && run.room() >= 0;
-        if (run.locked() || run.opening() > 0 || den) {
+        // (And one met in the middle of a land has its name and its bar for as long as it is there.)
+        PlusRun.Foe roving = null;
+        for (PlusRun.Foe foe : run.foes()) if (RunLevels.rover(foe.kind) && !foe.away && run.room() < 0 && (!foe.flat || foe.act < 1.5f)) roving = foe;
+        if (run.locked() || run.opening() > 0 || den || roving != null) {
             PlusRun.Foe boss = null;
             int most = 0, left = 0;
             for (PlusRun.Foe foe : run.foes()) {
-                if (!RunLevels.boss(foe.kind) || foe.spawned != den) continue;
+                if (!RunLevels.boss(foe.kind) || RunLevels.rover(foe.kind) || foe.spawned != den || roving != null) continue;
                 if (boss == null || boss.flat) boss = foe;
                 most += foe.most;
                 left += Math.max(0, foe.left);
+            }
+            if (roving != null) {
+                boss = roving;
+                most = roving.most;
+                left = Math.max(0, roving.left);
             }
             if (boss != null) {
                 int colour = waitColour(boss.kind), face = waitFace(boss.kind);
