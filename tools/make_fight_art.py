@@ -86,9 +86,18 @@ SHEETS = [
     ("moves2", "MW_S DASH_QW DASH_HW BREAK_W LAUNCH_W SHOVE_W", (0,)),
     ("special2", "SW_S SW1 SW2 SW3 SW4 SW5", (0,)),
     ("ult2", "UW_S U12 U23 U34 U4R SF", (0,)),
+    # Tsubakieh's ultimate, drawn as one move of its own: the called shot, the wind-up, the swing, contact, the
+    # follow-through held, and watching it go. She stands simply in the last, and the sheet is sized by that one.
+    ("homer", "HR1 HR2 HR3 HR4 HR5 HR6", (5,)),
 ]
+# A sheet that only some fighters have: for the others what they had stands in.
+ONLY = {"homer": ("tsubakieh",)}
+# A sheet in which nothing stands simply upright can have each of its frames sized by itself, by how wide her face is
+# against her face as she stands. None is at present: by her face Tsubakieh's home run came out a tenth too small,
+# and it has a frame in which she stands.
+FACED = set()
 # The sheets of in-betweens, which a fighter may be without: what she had before stands in for them.
-MORE = [sheet for sheet, _, _ in SHEETS[17:]]
+MORE = [sheet for sheet, _, _ in SHEETS[17:] if sheet not in ONLY]
 # A frame that is only there to give its sheet her height is not kept; nor is one that is no longer shown: the
 # halves of the walk backward, and the second stagger.
 DROP = "SLIP_S J_S H_S QW_S QF_S HW_S HF_S A_S MW_S SW_S UW_S BB1 BB2 BB3 BB4 STAGGER2".split()
@@ -113,6 +122,7 @@ SPARE = {"XS": "IDLE1", "DODGE1": "HOP1", "DODGE2": "HOP2", "C1": "U1", "C2": "U
          "HW1": "HS", "HW2": "H1", "HW3": "H2", "HW4": "H3", "HW5": "H4", "HF1": "H1", "HF2": "H2", "HF3": "H3", "HF4": "H4", "HF5": "H5",
          "AF1": "A1", "AF2": "A2", "AF3": "A3", "AW": "A1", "SM_TIP": "SM_UP",
          "DASH_QW": "DASH_Q", "DASH_HW": "DASH_H", "BREAK_W": "MS", "LAUNCH_W": "LAUNCH", "SHOVE_W": "SHOVE",
+         "HR1": "U1", "HR2": "U2", "HR3": "U3", "HR4": "U3", "HR5": "U4", "HR6": "U4",
          "SW1": "SS", "SW2": "SS", "SW3": "SS", "SW4": "SS", "SW5": "SS", "U12": "U1", "U23": "U2", "U34": "U3", "U4R": "U4", "SF": "SS"}
 # For a fighter who has only her first twelve frames (standing, walking, jumping, guarding, hit, down, quick, heavy,
 # special, ultimate, win, and one more), which of them stands in for each frame.
@@ -262,6 +272,29 @@ def sized(parts, upright, factor=1.0):
     return out, scale
 
 
+def face_wide(image, top, bottom):
+    """How wide her face is in a picture, near enough: the square root of the largest patch of skin between two rows of it."""
+    pixels = numpy.asarray(image).astype(numpy.int32)[max(0, int(top)):max(1, int(bottom))]
+    r, g, b, a = pixels[..., 0], pixels[..., 1], pixels[..., 2], pixels[..., 3]
+    skin = (a > 200) & (r > 228) & (g > 196) & (b > 176) & (r - b >= 16) & (r - b <= 72) & (r - g <= 44)
+    labels, count = scipy.ndimage.label(skin)
+    return float(numpy.sqrt(numpy.bincount(labels.ravel())[1:].max())) if count else 0.0
+
+
+def faced(parts, want):
+    """The frames of a sheet, each brought by itself to the size at which her face is as wide as it is when she stands."""
+    found = [face_wide(image, body[1], body[1] + (body[3] - body[1]) * .5) for image, body, _ in parts]
+    known = sorted(want / value for value in found if value > 0)
+    usual = known[len(known) // 2] if known else 1.0
+    out, scales = [], []
+    for (image, body, feet), value in zip(parts, found):
+        scale = want / value if value > 0 and abs(want / value / usual - 1) < .2 else usual
+        size = (max(1, round(image.size[0] * scale)), max(1, round(image.size[1] * scale)))
+        out.append((image.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), [one * scale for one in body], feet * scale))
+        scales.append(round(scale, 3))
+    return out, scales
+
+
 # The frames in which she is on the floor: lying, knocked out, and getting up as far as one knee.
 FLOOR = "LYING KO SIT_UP KNEEL_UP PROP HALF_UP".split()
 
@@ -295,7 +328,7 @@ def fighter(name, report):
     missing = []
     for sheet, names, upright in SHEETS:
         path = folder / f"{sheet}.webp"
-        if not path.exists():
+        if not path.exists() or name not in ONLY.get(sheet, FIGHTERS):
             continue
         try:
             cut, factor = cells(clean(Image.open(path)), 3, 2), RESIZE.get((name, sheet), 1.0)
@@ -307,6 +340,11 @@ def fighter(name, report):
             missing.append(sheet)
             continue
         parts, scale = sized(cut, upright, factor)
+        if sheet in FACED:
+            standing = frames["IDLE1"]
+            parts, scale = faced(cut, face_wide(standing[0], 0, standing[2] * .5))
+            scale = scale[0] if scale else 1.0
+            report[f"{name} {sheet} sized by her face"] = [round(part[1][3] - part[1][1]) for part in parts]
         if sheet in BETWEENS:
             ratios = sorted((part[1][3] - part[1][1]) / ((frames[one][0].size[1] + frames[other][0].size[1]) / 2)
                             for part, (one, other) in zip(parts, BETWEENS[sheet]))
