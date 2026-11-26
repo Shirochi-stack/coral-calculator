@@ -141,6 +141,8 @@ final class PlusRun {
          */
         int colours;
         float recharge = 10, formLonger = 1;
+        /** Whether black on her lasts no longer than a ribbon does, and not twice as long: what the Mawang gave. */
+        boolean resists;
         /** How many of the colours that are hers she may wear at once. */
         int together = 2;
     }
@@ -1099,7 +1101,7 @@ final class PlusRun {
     float lasted(int colour) { return lasted[colour]; }
     float waiting(int colour) { return waits[colour]; }
     /** Whether she is white: all seven worn at once, or white from the rare ribbon. */
-    boolean white() { return pale > 0 || mix() == (1 << BLACK) - 1; }
+    boolean white() { return pale > 0 || (mix() & ALL) == ALL; }
     /** Which named mixes she wears now and has worn in this land, as bits; which formed last, or -1; and counts that only go up: mixes formed, colours gone, and times white of her own seven. */
     int mixed() { return mixed; }
     int mixes() { return mixes; }
@@ -1283,6 +1285,11 @@ final class PlusRun {
         safe = 0;
     }
 
+    /** Lands a blow on one of them, if one would land: for looking at one met in the middle of a land from its coming to its going, in a build made for testing. */
+    void deal(Foe foe) {
+        if (!foe.flat && !absent(foe) && open(foe) && foe.dazed <= 0) beat(foe);
+    }
+
     /** Deals with the nearest of a cellar's wave that is there, as if she had: for looking at a cellar from end to end in a build made for testing. */
     void sweep() {
         Foe nearest = null;
@@ -1399,10 +1406,6 @@ final class PlusRun {
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
         float fast = rush > 0 ? RUN * 1.3f : RUN, leap = rush > 0 ? LEAP * 1.1f : LEAP;
         if (has(YELLOW)) fast = RUN * 1.7f;
-        if (cursed > 0) {
-            fast *= .55f;
-            leap *= .85f;
-        }
         float wanted = left == right ? 0 : left ? -fast : fast;
         // On slime there is little to push against, and little to stop her.
         float push = (wanted == 0 ? DRAG : onGround ? PUSH : PUSH_IN_AIR) * seconds * (under == RunLevels.SLICK ? .16f : 1);
@@ -1504,6 +1507,7 @@ final class PlusRun {
                 continue;
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
+                if (cursed > 0 && item[0] > FORM && item[0] < CHEST) continue;
                 items.remove(index);
                 // A chest is opened: ten pluses in it, whatever else; and a stash is done with when its chest is.
                 if (item[0] == CHEST) {
@@ -1540,9 +1544,7 @@ final class PlusRun {
         // carries is used as well: the one is never lost to the other.
         sinceCast += seconds;
         sinceBrace += seconds;
-        if (cursed > 0) {
-            swing = 0;
-        } else {
+        {
             boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= REST[weapon];
             if (used) use();
             if ((has(RED) || has(BLUE)) && strike && (!strikeHeld || used) && sinceCast >= .32f) cast();
@@ -1618,12 +1620,9 @@ final class PlusRun {
                 airJumps = 0;
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
                 offIt = .3f;
-                // With black put on her she only bounces off it.
-                if (cursed <= 0) {
-                    beat(foe);
-                    // One sign after another without touching the ground: each is worth one plus more than the last.
-                    if (foe.flat && ++combo > 1) bonus += combo - 1;
-                }
+                beat(foe);
+                // One sign after another without touching the ground: each is worth one plus more than the last.
+                if (foe.flat && ++combo > 1) bonus += combo - 1;
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
                 knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
@@ -1668,7 +1667,7 @@ final class PlusRun {
 
     /** Whether a colour could be called on now. */
     boolean callable(int colour) {
-        return state == PLAYING && cursed <= 0 && colour >= RED && colour <= BLACK && (perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0
+        return state == PLAYING && cursed <= 0 && colour >= RED && colour < BLACK && (perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0
                 && waits[colour] <= 0 && Integer.bitCount(mix() & ~lent) < perks.together;
     }
 
@@ -1692,7 +1691,7 @@ final class PlusRun {
     /** The colours that are hers and could be called on now, were there room for them: neither on nor waiting. */
     int ready() {
         int ready = 0;
-        for (int colour = RED; colour <= BLACK; colour++) {
+        for (int colour = RED; colour < BLACK; colour++) {
             if ((perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0 && waits[colour] <= 0 && cursed <= 0) ready |= 1 << colour - 1;
         }
         return ready;
@@ -1701,12 +1700,17 @@ final class PlusRun {
     /** The colours a named mix is made of, as bits: none for the prism, which is any three. */
     static int mixOf(int which) {
         return which == STEAMS ? 1 | 2 : which == COMET ? 1 | 16 : which == TIDE ? 2 | 8 : which == MIRROR ? 4 | 32 : which == GALE ? 8 | 16 : which == EMBER ? 1 | 4
-                : which == WHITEN ? (1 << BLACK) - 1 : 0;
+                : which == WHITEN ? ALL : 0;
     }
 
-    /** The name some colours would have, worn together: white for all seven, the prism for any three or more, one of the pairs, or -1 for none. */
+    /** The six colours that are worn, as bits: black is not one of them. */
+    static final int ALL = (1 << PURPLE) - 1;
+    /** How long a ribbon lasts; and black put on her, which is twice that. */
+    static final float RIBBON = 14, BLACKENED = 2 * RIBBON;
+
+    /** The name some colours would have, worn together: white for all six, the prism for any three or more, one of the pairs, or -1 for none. */
     static int naming(int colours) {
-        if (colours == (1 << BLACK) - 1) return WHITEN;
+        if ((colours & ALL) == ALL) return WHITEN;
         if (Integer.bitCount(colours) >= 3) return PRISM;
         for (int which = STEAMS; which <= EMBER; which++) if (colours == mixOf(which)) return which;
         return -1;
@@ -1716,7 +1720,7 @@ final class PlusRun {
     static int most(int owned, int ready, int limit) {
         int chosen = 0;
         for (int turn = 0; turn < 2; turn++) {
-            for (int colour = RED; colour <= BLACK; colour++) {
+            for (int colour = RED; colour < BLACK; colour++) {
                 int bit = 1 << colour - 1;
                 if ((owned & bit) == 0 || (chosen & bit) != 0 || Integer.bitCount(chosen) >= limit) continue;
                 if (turn == 1 || (ready & bit) != 0) chosen |= bit;
@@ -1740,6 +1744,11 @@ final class PlusRun {
 
     /** A colour is given her there and then, to keep: it is in her hair at once, and it is hers to call on from now. */
     void gift(int colour) {
+        // Black is not worn: what the Mawang gives is that it lies on her half as long.
+        if (colour == BLACK) {
+            perks.resists = true;
+            return;
+        }
         perks.colours |= 1 << colour - 1;
         wear(colour, 9 * perks.lasting * perks.formLonger);
     }
@@ -1787,10 +1796,10 @@ final class PlusRun {
         if (green && yellow) now |= 1 << GALE;
         if (red && brown) now |= 1 << EMBER;
         if (Integer.bitCount(mix) >= 3) now |= 1 << PRISM;
-        if (mix == (1 << BLACK) - 1) {
+        if ((mix & ALL) == ALL) {
             now |= 1 << WHITEN;
-            // White of her own seven: of colours that are all hers.
-            if ((mixed & 1 << WHITEN) == 0 && (perks.colours & mix) == mix) whitened++;
+            // White, of every colour at once, however she came by them: a white she has not mastered.
+            if ((mixed & 1 << WHITEN) == 0) whitened++;
         }
         for (int which = MIXES - 1; which >= 0; which--) {
             if ((now & 1 << which) != 0 && (mixed & 1 << which) == 0) {
@@ -1814,19 +1823,34 @@ final class PlusRun {
         if (colour == WHITE) {
             for (int each = RED; each <= PURPLE; each++) put(each, lasts, true);
             pale = lasts;
-        } else if (colour == BLACK && (perks.colours & 1 << BLACK - 1) == 0) {
-            curse(lasts);
+        } else if (colour == BLACK) {
+            curse(blackened());
         } else {
-            put(colour, colour == BLACK ? Math.min(lasts, 5 * perks.lasting * perks.formLonger) : lasts, true);
+            put(colour, lasts, true);
         }
     }
 
-    /** Black is put on her: every colour she wore is gone, and for a while she is slow and can hurt nothing. */
+    /** How long black lies on her: twice as long as a ribbon lasts; half that for one the Mawang has given her gift. */
+    float blackened() { return perks.resists ? RIBBON : BLACKENED; }
+
+    /**
+     * Black is put on her, by a black ribbon or by a curse that is thrown: every colour she
+     * wore is gone, and for as long as it lies on her she can call on none and pick up none.
+     * It does not slow her, and what she carries still strikes.
+     */
     private void curse(float lasts) {
         fade(false);
         cursed = lasts;
+        cursedFor = lasts;
+        curses++;
         formed++;
     }
+
+    /** How long the black that is on her was to lie on her in all; and how many times black has been put on her, a count that only goes up. */
+    float cursedFor() { return cursedFor; }
+    int curses() { return curses; }
+    private float cursedFor;
+    private int curses;
 
     /** How long it will be before she can call on a colour again, in seconds, once it has gone; and the same as a share of the whole wait that is over. */
     float untilCall(int colour) { return colour >= RED && colour <= BLACK ? waits[colour] : 0; }
@@ -1980,7 +2004,7 @@ final class PlusRun {
             cleared++;
         } else if (kind > FORM) {
             int colour = kind - FORM;
-            wear(colour, colour == BLACK ? 7 : (colour == WHITE ? 12 : 14) * perks.lasting * perks.formLonger);
+            wear(colour, (colour == WHITE ? 12 : RIBBON) * perks.lasting * perks.formLonger);
         } else if (kind == ICE) {
             rush = LASTS[ICE] * perks.lasting;
         } else if (kind == MAGNET) {
@@ -2404,7 +2428,8 @@ final class PlusRun {
                     charmed = CHARM;
                     charms++;
                 } else if (shot.kind == CURSE) {
-                    if (worn[BLACK] <= 0) curse(4);
+                    // Black that is thrown: in brown it lies on her half as long.
+                    curse(blackened() * (has(BROWN) ? .5f : 1));
                 } else {
                     // A dragon's full stop is the end of a flight: the wind goes out of her hair, and waits as if it had run its time.
                     if (shot.kind == STOP && worn[GREEN] > 0 && !onGround) {
@@ -2724,8 +2749,8 @@ final class PlusRun {
                 // (How many times it has come is kept where its things done would be.)
                 if (foe.did >= 3 || px < level.gate * (foe.did + 1) / 4f - 6) return;
                 foe.did++;
-                foe.x = px + 13;
-                foe.ground = feet - 7 - foe.tall();
+                foe.x = px + 9;
+                foe.ground = feet - 6 - foe.tall();
                 foe.leftward = true;
             } else if (Math.abs(px - foe.home - foe.wide() / 2) > 9) {
                 return;
@@ -2741,6 +2766,14 @@ final class PlusRun {
             roused++;
             return;
         }
+        if (foe.kind != RunLevels.WYRM && Math.abs(px - foe.home - foe.wide() / 2) > 18) {
+            foe.away = true;
+            foe.x = foe.home;
+            foe.y = foe.ground;
+            foe.step = 3;
+            foe.enter = foe.flourish = 0;
+            return;
+        }
         if (foe.enter > 0) {
             foe.enter -= seconds;
             return;
@@ -2752,20 +2785,23 @@ final class PlusRun {
         float floor = foe.ground + foe.tall();
         if (foe.kind == RunLevels.WYRM) {
             if (foe.step == 0) {
-                foe.x -= SPEED[foe.kind] * seconds;
+                // Over her from ahead, and back over her from behind, letting blots fall all the way: twice over, then.
+                foe.x += (foe.leftward ? -1 : 1) * (SPEED[foe.kind] - 1.7f) * seconds;
                 foe.y = foe.ground + (float) Math.sin(foe.clock * 3) * .3f;
-                if ((foe.wait -= seconds) <= 0 && Math.abs(middle - px) < 7.5f) {
-                    foe.wait = .6f - .08f * phase;
+                if ((foe.wait -= seconds) <= 0 && Math.abs(middle - px) < 5) {
+                    foe.wait = .55f - .07f * phase;
                     shoot(STOP, false, middle, foe.y + foe.tall(), 0, 6.5f, 3);
                     thrown++;
                 }
-                if (middle < px - 5) {
-                    foe.step = 1;
+                if (foe.leftward && middle < px - 5) {
                     foe.leftward = false;
+                } else if (!foe.leftward && middle > px + 4) {
+                    foe.step = 1;
+                    foe.leftward = true;
                 }
             } else if (foe.step == 1) {
-                // Down, level with her, a little way behind.
-                float low = feet - foe.tall() - .7f, beside = px - 3.2f;
+                // Down, level with her, a little way ahead.
+                float low = feet - foe.tall() - .7f, beside = px + 3.2f;
                 foe.y += Math.signum(low - foe.y) * Math.min(Math.abs(low - foe.y), 7 * seconds);
                 foe.x += Math.signum(beside - middle) * Math.min(Math.abs(beside - middle), 5 * seconds);
                 foe.leftward = toLeft;
@@ -3012,7 +3048,7 @@ final class PlusRun {
                 if (foe.mode == 0) {
                     foe.y = foe.ground + (float) Math.sin(foe.clock * 2) * .25f;
                     foe.leftward = toLeft;
-                    if ((foe.wait -= seconds) <= 0 && away < 6.5f && y + TALL > foe.y + 1.5f) {
+                    if ((foe.wait -= seconds) <= 0 && away < 4.5f && y + TALL > foe.y + 1.5f) {
                         foe.mode = 1;
                         foe.act = .6f;
                     }
@@ -3053,9 +3089,9 @@ final class PlusRun {
                 foe.x += (foe.leftward ? -1 : 1) * SPEED[foe.kind] * seconds;
                 foe.y = foe.ground + (float) Math.sin(foe.clock * 1.6f) * .2f;
                 // What it lets go falls straight down: one every so often while she is anywhere under its way; it puffs itself up first.
-                foe.wait = Math.max(away < 7 ? -1 : .45f, foe.wait - seconds);
-                foe.mode = foe.wait < .45f && away < 7 ? 1 : 0;
-                if (foe.wait <= 0 && away < 7) {
+                foe.wait = Math.max(away < 5 ? -1 : .45f, foe.wait - seconds);
+                foe.mode = foe.wait < .45f && away < 5 ? 1 : 0;
+                if (foe.wait <= 0 && away < 5) {
                     foe.wait = 1.5f;
                     shoot(STOP, false, middle, foe.y + foe.tall(), 0, 6.5f, 4);
                     thrown++;
@@ -3070,16 +3106,19 @@ final class PlusRun {
                     if ((foe.act -= seconds) <= 0) {
                         foe.mode = 0;
                         foe.wait = 2.6f;
-                        aim(DOT, middle, foe.y + foe.tall() / 2, 6.5f, 0, 2.2f);
+                        aim(foe.step == 1 ? CURSE : DOT, middle, foe.y + foe.tall() / 2, foe.step == 1 ? 5 : 6.5f, 0, 2.6f);
+                        foe.step = 0;
                         thrown++;
                     }
                 } else {
                     // It keeps its distance: from nearer than four squares it backs off, as far as it may go from where it began.
                     float to = foe.x + (toLeft ? 1 : -1) * SPEED[foe.kind] * seconds;
                     if (away < 4 && Math.abs(to - foe.home) <= 5) foe.x = to;
-                    if ((foe.wait -= seconds) <= 0 && away < 9) {
+                    if ((foe.wait -= seconds) <= 0 && away < 5) {
                         foe.mode = 1;
-                        foe.act = .55f;
+                        // From the fifty-first land on, every third thing it fires is black, and it takes longer over it.
+                        foe.step = level.number >= RunLevels.CURSES_FROM && ++foe.turn % 3 == 0 ? 1 : 0;
+                        foe.act = foe.step == 1 ? .9f : .55f;
                     }
                 }
                 break;
@@ -3087,7 +3126,7 @@ final class PlusRun {
             case RunLevels.WISP: {
                 // It comes for her, slowly, no further than eight squares from where it began, and goes back when she has gone.
                 float px = x + WIDE / 2;
-                boolean after = away < 7 && Math.abs(px - foe.home) < 8;
+                boolean after = away < 5.5f && Math.abs(px - foe.home) < 8;
                 float toX = after ? px - foe.wide() / 2 : foe.home, toY = after ? y + TALL / 2 - foe.tall() / 2 : foe.ground;
                 float far = Math.max(.01f, (float) Math.hypot(toX - foe.x, toY - foe.y)), by = Math.min(far, SPEED[foe.kind] * seconds);
                 foe.x += (toX - foe.x) / far * by;

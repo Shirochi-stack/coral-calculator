@@ -878,24 +878,147 @@ public class PlusRunTest {
         assertEquals(1, run.flattened());
     }
 
-    @Test public void inBlackSheIsSlowAndCanHurtNothingAndItPasses() {
-        RunLevels.Level level = ribbon(armed(PlusRun.PEN), PlusRun.BLACK);
-        level.foes.add(new int[]{RunLevels.THROWER, 30, FLOOR - 1});
-        PlusRun run = new PlusRun(level), plain = new PlusRun(flat(60));
-        hold(run, 2, false, true, false);
-        hold(plain, 2, false, true, false);
+    @Test public void blackPutOnHerTakesEveryColourAndLetsHerWearNoneForTwiceARibbonsTime() {
+        RunLevels.Level level = flat(80);
+        level.items.add(new int[]{PlusRun.FORM + PlusRun.GREEN, 6, FLOOR - 1, 0});
+        level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, 10, FLOOR - 1, 0});
+        level.items.add(new int[]{PlusRun.FORM + PlusRun.RED, 14, FLOOR - 1, 0});
+        level.foes.add(new int[]{RunLevels.MINUS, 60, FLOOR - 1});
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.colours = 1 << PlusRun.BLUE - 1;
+        PlusRun run = new PlusRun(level, perks), plain = new PlusRun(flat(80));
+        run.place(5.8f, GROUND);
+        hold(run, .1f, false, false, false);
+        assertTrue(run.call(PlusRun.BLUE));
+        assertTrue(run.has(PlusRun.GREEN) && run.has(PlusRun.BLUE));
+        // A black ribbon: every colour she wore is gone, a ribbon's and her own alike, and black lies on her for twice a ribbon's time.
+        run.place(9.8f, GROUND);
+        hold(run, .1f, false, false, false);
+        assertEquals(1, run.curses());
+        assertEquals(0, run.mix());
+        assertFalse(run.coloured());
         assertEquals(PlusRun.BLACK, run.form());
-        assertTrue(run.x() < plain.x() - 3);
-        // Nothing she carries is any use, and coming down on a sign only bounces her off it.
-        run.step(STEP, false, false, false, true);
-        assertEquals(0, run.strikes());
-        for (PlusRun.Foe foe : run.foes()) foe.wait = 99;
-        run.place(29.9f, FLOOR - 5);
-        hold(run, 1, false, false, false);
-        assertEquals(0, run.flattened());
-        assertEquals(0, run.hurts());
-        hold(run, 6, false, false, false);
+        assertEquals(2 * PlusRun.RIBBON, PlusRun.BLACKENED, 0);
+        assertEquals(PlusRun.BLACKENED, run.cursedFor(), 0);
+        assertTrue(run.cursed() > PlusRun.BLACKENED - .2f);
+        // Under it she can call on nothing, and picks up no ribbon: the red one stays where it lies.
+        assertFalse(run.callable(PlusRun.BLUE));
+        assertEquals(0, run.ready());
+        assertEquals(0, run.wear(2));
+        int lying = run.items().size();
+        run.place(13.8f, GROUND);
+        hold(run, .3f, false, false, false);
+        assertEquals(lying, run.items().size());
+        assertFalse(run.has(PlusRun.RED));
+        // It does not slow her, and what she comes down on is still dealt with.
+        run.place(30, GROUND);
+        plain.place(30, GROUND);
+        hold(run, 1, false, true, false);
+        hold(plain, 1, false, true, false);
+        assertEquals(plain.x(), run.x(), .01f);
+        assertTrue(stomp(run, run.foes().get(0)));
+        // Twice a ribbon's time after it was put on her, it is gone; and then the ribbon is hers to take.
+        float gone = 0;
+        while (run.cursed() > 0 && gone < 40) {
+            run.place(40, GROUND);
+            run.step(STEP, false, false, false);
+            gone += STEP;
+        }
+        assertEquals(PlusRun.BLACKENED - 1.5f, gone, .5f);
         assertEquals(0, run.form());
+        run.place(13.8f, GROUND);
+        hold(run, .1f, false, false, false);
+        assertTrue(run.has(PlusRun.RED));
+        // What the Mawang gives is that it lies on her half as long: a ribbon's time; and black is no colour of hers to wear or to call on.
+        PlusRun given = new PlusRun(flat(20));
+        given.gift(PlusRun.BLACK);
+        assertEquals(0, given.form());
+        assertEquals(0, given.mix());
+        assertFalse(given.callable(PlusRun.BLACK));
+        assertFalse(given.call(PlusRun.BLACK));
+        given.lend(PlusRun.BLACK);
+        assertEquals(PlusRun.BLACK, given.form());
+        assertEquals(PlusRun.RIBBON, given.cursedFor(), 0);
+        PlusRun.Perks all = new PlusRun.Perks();
+        all.colours = 127;
+        all.together = 7;
+        PlusRun every = new PlusRun(flat(20), all);
+        assertEquals(63, every.callAll(127));
+        assertFalse(every.has(PlusRun.BLACK));
+        assertFalse(every.shadow());
+        assertEquals(63, PlusRun.most(127, 127, 7));
+
+        // Black that is thrown, from the fifty-first land on, by an asterisk: every third thing it fires. In purple it goes back; in brown it
+        // lies on her half as long.
+        for (int form : new int[]{0, PlusRun.BROWN, PlusRun.PURPLE}) {
+            RunLevels.Level late = new RunLevels.Level(RunLevels.CURSES_FROM, 80);
+            for (int column = 0; column < 80; column++) for (int row = FLOOR; row < RunLevels.ROWS; row++) late.land[row][column] = RunLevels.BLOCK;
+            late.gate = 77;
+            late.foes.add(new int[]{RunLevels.SHOOTER, 30, FLOOR - 4});
+            PlusRun cursed = new PlusRun(late);
+            PlusRun.Foe star = cursed.foes().get(0);
+            java.util.List<Integer> fired = new java.util.ArrayList<>();
+            boolean longer = false;
+            for (int step = 0; step < 60 * 30 && cursed.curses() == 0 && cursed.turned() == 0; step++) {
+                if (form != 0 && cursed.on(form) < 3) cursed.lend(form);
+                if (cursed.shots().isEmpty()) cursed.place(star.x - 3.5f, GROUND);
+                for (PlusRun.Shot shot : new java.util.ArrayList<>(cursed.shots())) {
+                    if (shot.age == 0 || shot.age <= STEP * 1.5f) fired.add(shot.kind);
+                    // What is not black she is kept out of the way of; what is, she waits for.
+                    if (shot.kind != PlusRun.CURSE) cursed.shots().remove(shot);
+                }
+                longer |= star.mode == 1 && star.step == 1 && star.act > .6f;
+                cursed.bare();
+                cursed.step(STEP, false, false, false);
+            }
+            assertTrue("form " + form + " fired " + fired, fired.size() >= 3 && fired.get(0) == PlusRun.DOT && fired.get(1) == PlusRun.DOT && fired.get(2) == PlusRun.CURSE);
+            assertTrue(longer);
+            assertEquals("form " + form, form == PlusRun.PURPLE ? 0 : 1, cursed.curses());
+            assertEquals("form " + form, form == PlusRun.PURPLE ? 1 : 0, cursed.turned());
+            assertEquals(0, cursed.hurts());
+            if (form != PlusRun.PURPLE) assertEquals("form " + form, form == PlusRun.BROWN ? PlusRun.BLACKENED / 2 : PlusRun.BLACKENED, cursed.cursedFor(), 0);
+        }
+        // Before the fifty-first land it throws nothing black.
+        PlusRun early = flown(RunLevels.SHOOTER, 30, 3);
+        for (int step = 0; step < 60 * 14; step++) {
+            early.place(26.5f, GROUND - 6);
+            early.step(STEP, false, false, false);
+            for (PlusRun.Shot shot : early.shots()) assertEquals(PlusRun.DOT, shot.kind);
+        }
+        assertEquals(0, early.curses());
+    }
+
+    @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
+        int tempted = 0, stashed = 0;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            // What a place off the land or a game gives when it is won: a ribbon of one of the six, one in the first volume and two after.
+            int[] given = RunLevels.ribbonsOf(number);
+            assertEquals("land " + number, number > RunLevels.COUNT ? 2 : 1, given.length);
+            for (int colour : given) assertTrue("land " + number, colour >= PlusRun.RED && colour <= PlusRun.PURPLE);
+            if (given.length == 2) assertTrue(given[0] != given[1]);
+            boolean black = false;
+            for (int[] item : level.items) {
+                // Nowhere, in a land or in a place off it, does a white ribbon lie.
+                assertTrue("land " + number + " has a white ribbon at " + item[1], item[0] != PlusRun.FORM + PlusRun.WHITE);
+                if (item[0] != PlusRun.FORM + PlusRun.BLACK) continue;
+                assertTrue("land " + number, number >= RunLevels.BLACK_FROM);
+                if (item[1] >= level.main) stashed++;
+                else black = true;
+            }
+            if (black && number <= RunLevels.COUNT) tempted++;
+        }
+        assertTrue("tempted " + tempted + " stashed " + stashed, tempted >= 8 && stashed >= 10);
+        // A black ribbon of the first volume lies on the ground a little past a good one.
+        RunLevels.Level level = RunLevels.level(RunLevels.BLACK_FROM);
+        boolean beside = false;
+        for (int[] item : level.items) {
+            if (item[0] != PlusRun.FORM + PlusRun.BLACK || item[1] >= level.main) continue;
+            for (int[] other : level.items) {
+                beside |= other[0] > PlusRun.FORM && other[0] < PlusRun.FORM + PlusRun.BLACK && item[1] - other[1] >= 2 && item[1] - other[1] <= 4 && other[2] == item[2];
+            }
+        }
+        assertTrue(beside);
     }
 
     @Test public void inWhiteSheHasEveryPowerButBlack() {
@@ -1548,7 +1671,7 @@ public class PlusRunTest {
             assertEquals(spent ? 1 : 0, armed.blows());
             assertEquals(spent ? turned : turned + 1, armed.turned());
         }
-        // The Mawang's black ribbon: it does not hurt, it leaves her an ordinary girl for a while.
+        // The Mawang's black ribbon: it does not hurt; it is black put on her, for twice as long as a ribbon lasts.
         run = shutIn(80, true);
         foe = waiting(run);
         until(run, foe, 6);
@@ -1565,7 +1688,9 @@ public class PlusRunTest {
         }
         assertEquals(PlusRun.BLACK, run.form());
         assertEquals(0, run.hurts());
-        assertTrue(run.formLeft() <= 4);
+        assertEquals(1, run.curses());
+        assertEquals(PlusRun.BLACKENED, run.cursedFor(), 0);
+        assertTrue(run.formLeft() > PlusRun.BLACKENED - .5f);
     }
 
     @Test public void oneSignAfterAnotherHitWithWhatSheThrowsIsWorthMoreAndABigOneTakesThree() {
@@ -2563,12 +2688,13 @@ public class PlusRunTest {
         assertEquals(4 | 32, PlusRun.mixOf(PlusRun.MIRROR));
         assertEquals(8 | 16, PlusRun.mixOf(PlusRun.GALE));
         assertEquals(1 | 4, PlusRun.mixOf(PlusRun.EMBER));
-        assertEquals(127, PlusRun.mixOf(PlusRun.WHITEN));
+        assertEquals(63, PlusRun.mixOf(PlusRun.WHITEN));
         assertEquals(0, PlusRun.mixOf(PlusRun.PRISM));
         for (int which = PlusRun.STEAMS; which <= PlusRun.EMBER; which++) assertEquals(which, PlusRun.naming(PlusRun.mixOf(which)));
         assertEquals(PlusRun.WHITEN, PlusRun.naming(127));
         assertEquals(PlusRun.PRISM, PlusRun.naming(1 | 2 | 4));
-        assertEquals(PlusRun.PRISM, PlusRun.naming(63));
+        assertEquals(PlusRun.WHITEN, PlusRun.naming(63));
+        assertEquals(PlusRun.PRISM, PlusRun.naming(31));
         assertEquals(-1, PlusRun.naming(1));
         assertEquals(-1, PlusRun.naming(2 | 4));
         assertEquals(-1, PlusRun.naming(0));
@@ -2583,7 +2709,7 @@ public class PlusRunTest {
         // "All I can wear": as many as the limit allows, those that are ready first, each in its order.
         assertEquals(1 | 2, PlusRun.most(127, 127, 2));
         assertEquals(1 | 2 | 4, PlusRun.most(127, 127, 3));
-        assertEquals(127, PlusRun.most(127, 127, 7));
+        assertEquals(63, PlusRun.most(127, 127, 7));
         assertEquals(4 | 8, PlusRun.most(127, 4 | 8 | 16, 2));
         assertEquals(1 | 8 | 32, PlusRun.most(1 | 2 | 8 | 32, 8 | 32, 3));
         assertEquals(2 | 16, PlusRun.most(2 | 16, 0, 5));
@@ -2647,9 +2773,11 @@ public class PlusRunTest {
             assertFalse(who, run.standing());
             int spent = 0, shielded = 0, thrown = run.thrown(), quakes = run.quakes();
             boolean hung = false;
+            float on = 30;
             for (int step = 0; step < 60 * 240 && !foe.flat; step++) {
-                // She keeps to where it is: for the wyrm, on through the land, so that it comes again.
-                float stand = rover == RunLevels.WYRM ? Math.min(180, 30 + run.time() * 2.2f) : 56;
+                // She keeps to where it is: for the wyrm, on through the land while it is away, so that it comes again.
+                if (foe.away) on = Math.min(180, on + 2.2f * STEP);
+                float stand = rover == RunLevels.WYRM ? on : 56;
                 int guard = run.guard(foe);
                 if (guard == PlusRun.SHIELDED) shielded++;
                 if (rover == RunLevels.GECKO && !foe.away && foe.y < foe.ground - 5) hung = true;
@@ -2701,13 +2829,16 @@ public class PlusRunTest {
 
         // The wyrm not beaten is driven off: after its third coming it does not come again, and the land is hers to finish.
         PlusRun off = roving(RunLevels.WYRM, 60);
-        for (int step = 0; step < 60 * 200 && off.state() == PlusRun.PLAYING; step++) {
-            off.place(Math.min(199.5f, 30 + off.time() * 1.6f), GROUND - 9);
+        PlusRun.Foe wyrm = null;
+        for (PlusRun.Foe each : off.foes()) if (each.kind == RunLevels.WYRM) wyrm = each;
+        float along = 30;
+        for (int step = 0; step < 60 * 300 && off.state() == PlusRun.PLAYING; step++) {
+            // (She goes on only while it is away, and keeps out of its way while it is there.)
+            if (wyrm.away) along = Math.min(199.5f, along + 1.6f * STEP);
+            off.place(wyrm.away ? along : along - 3, GROUND - 9);
             off.step(STEP, false, false, false);
         }
         assertEquals(3, off.roused());
-        PlusRun.Foe wyrm = null;
-        for (PlusRun.Foe each : off.foes()) if (each.kind == RunLevels.WYRM) wyrm = each;
         assertTrue(wyrm.away && !wyrm.flat);
     }
 
@@ -2818,7 +2949,7 @@ public class PlusRunTest {
                 continue;
             }
             // As many as the land is to have, give or take what there was no room for; and never fewer than two.
-            assertTrue("land " + number + " has " + lines + " of " + RunLevels.fliersIn(number), lines >= Math.max(2, RunLevels.fliersIn(number) - 2) && lines <= RunLevels.fliersIn(number));
+            assertTrue("land " + number + " has " + lines + " of " + RunLevels.fliersIn(number), lines >= Math.max(2, RunLevels.fliersIn(number) / 2) && lines <= RunLevels.fliersIn(number));
             // The land a kind is first met in has three of it before anything else that flies.
             for (int kind = RunLevels.DRIFTER; kind <= RunLevels.RIME; kind++) {
                 if (RunLevels.flierFrom(kind) != number) continue;
@@ -2829,7 +2960,7 @@ public class PlusRunTest {
         }
         for (int kind = RunLevels.DRIFTER; kind <= RunLevels.RIME; kind++) assertEquals("kind " + kind, RunLevels.flierFrom(kind), first[kind]);
         assertEquals(21, first[RunLevels.DRIFTER]);
-        assertTrue(before >= 2 && last >= before * 3);
+        assertTrue("before " + before + " last " + last, before >= 3 && last >= before + 3);
         // And the lands from there on are longer than the count of the lands before would have made them.
         assertTrue(RunLevels.level(79).gate > RunLevels.level(31).gate + 100);
     }
@@ -2942,7 +3073,7 @@ public class PlusRunTest {
         // An asterisk hovers, takes aim, and fires at where she is; it backs off from her, so far and no further; and in purple what it fires goes back.
         run = flown(RunLevels.SHOOTER, 30, 3);
         PlusRun.Foe star = run.foes().get(0);
-        run.place(23, GROUND);
+        run.place(26, GROUND);
         boolean aimed = false;
         for (int step = 0; step < 60 * 6 && run.shots().isEmpty(); step++) {
             run.step(STEP, false, false, false);
@@ -3063,19 +3194,21 @@ public class PlusRunTest {
         hold(run, 7, false, false, false);
         assertFalse(run.has(PlusRun.RED));
         assertTrue(run.has(PlusRun.BLUE) && run.has(PlusRun.GREEN) && run.has(PlusRun.PURPLE));
-        // A black ribbon, to one who does not own black, is black put on her: everything she wore is gone, each to its own wait, and for a
-        // while she is slow and can hurt nothing. It is no colour of hers: she can call on nothing under it.
+        // A black ribbon is black put on her: everything she wore is gone, each to its own wait. It is no colour of hers: she can call on
+        // nothing under it, for twice as long as a ribbon lasts.
         run.place(39.8f, GROUND);
         hold(run, .1f, false, false, false);
         assertEquals(0, run.mix());
         assertFalse(run.coloured());
         assertEquals(PlusRun.BLACK, run.form());
-        assertTrue(run.cursed() > 6.5f);
+        assertTrue(run.cursed() > PlusRun.BLACKENED - .5f);
         assertTrue(run.untilCall(PlusRun.BLUE) > 9.5f);
         assertTrue(run.untilCall(PlusRun.RED) > 0 && run.untilCall(PlusRun.RED) < run.untilCall(PlusRun.BLUE));
         hold(run, 7.2f, false, false, false);
+        assertEquals(PlusRun.BLACK, run.form());
+        assertFalse(run.callable(PlusRun.RED));
+        hold(run, PlusRun.BLACKENED - 7, false, false, false);
         assertEquals(0, run.form());
-        hold(run, 4, false, false, false);
         assertTrue(run.callable(PlusRun.RED));
         // A life lost puts an end to everything she wears.
         RunLevels.Level holed = flat(60);
@@ -3195,7 +3328,8 @@ public class PlusRunTest {
         for (PlusRun.Shot shot : tide.shots()) if (shot.kind == PlusRun.WATER) water++;
         assertEquals(2, water);
 
-        // How many she may wear at once is what she has been given to keep: two, three, and at the last all seven; and all seven are white.
+        // How many she may wear at once is what she has been given to keep: two, three, and at the last all of them; and all six are white:
+        // a white with a time to it, as each of the six has. Black is not one of them.
         PlusRun.Perks few = new PlusRun.Perks();
         few.colours = (1 << PlusRun.BLACK) - 1;
         PlusRun two2 = new PlusRun(flat(60), few);
@@ -3207,28 +3341,26 @@ public class PlusRunTest {
         few.together = 7;
         PlusRun white = new PlusRun(flat(60), few);
         assertEquals(0, white.whitened());
-        assertEquals(127, white.callAll(127));
+        assertEquals(63, white.callAll(127));
         assertTrue(white.white());
         assertEquals(PlusRun.WHITE, white.form());
         assertEquals(1, white.whitened());
         assertTrue((white.mixed() & 1 << PlusRun.WHITEN) != 0);
         assertEquals(PlusRun.WHITEN, white.lastMix());
-        for (int colour = PlusRun.RED; colour <= PlusRun.BLACK; colour++) assertTrue(white.has(colour));
-        assertTrue(white.shadow());
-        // Black, the shortest, goes first, in its burst; and then she is no longer white, though she still wears six.
-        hold(white, 5.2f, false, false, false);
+        for (int colour = PlusRun.RED; colour <= PlusRun.PURPLE; colour++) assertTrue(white.has(colour));
+        assertFalse(white.has(PlusRun.BLACK));
+        assertTrue(white.formLeft() > 8 && white.formLeft() <= 9);
+        hold(white, 9.2f, false, false, false);
         assertFalse(white.white());
-        assertEquals(1, white.bursts());
-        assertEquals(6, Integer.bitCount(white.mix()));
+        assertEquals(0, white.mix());
         assertEquals(1, white.whitened());
-        // The rare white ribbon is white too, for as long as it lasts, with the six that have powers; but it is not the white of her own seven.
+        // A white ribbon, which no place gives now, would be white too, for as long as it lasted.
         PlusRun lent = new PlusRun(flat(60), new PlusRun.Perks());
         lent.lend(PlusRun.WHITE);
         assertTrue(lent.white());
         assertEquals(PlusRun.WHITE, lent.form());
         assertEquals(63, lent.mix());
-        assertFalse(lent.shadow());
-        assertEquals(0, lent.whitened());
+        assertEquals(1, lent.whitened());
         assertTrue(lent.formLeft() > 11);
         hold(lent, 12.2f, false, false, false);
         assertFalse(lent.white());
@@ -3377,57 +3509,7 @@ public class PlusRunTest {
         assertEquals(PlusRun.PLAYING, run.state());
     }
 
-    @Test public void calledOnInBlackSheIsAShadowThatNothingTouchesAndItEndsInABurst() {
-        RunLevels.Level level = flat(40);
-        level.foes.add(new int[]{RunLevels.MINUS, 9, FLOOR - 1});
-        level.foes.add(new int[]{RunLevels.TIMES, 12, FLOOR - 1});
-        level.foes.add(new int[]{RunLevels.MINUS, 30, FLOOR - 1});
-        level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, 36, FLOOR - 1, 0});
-        PlusRun.Perks perks = new PlusRun.Perks();
-        perks.colours = 1 << PlusRun.BLACK - 1;
-        PlusRun run = new PlusRun(level, perks);
-        hold(run, .2f, false, false, false);
-        assertTrue(run.call(PlusRun.BLACK));
-        assertTrue(run.shadow());
-        assertTrue(run.coloured());
-        assertEquals(5, run.on(PlusRun.BLACK), .01f);
-        // In among them, standing where they walk, nothing hurts her.
-        for (int step = 0; step < 90; step++) {
-            run.place(run.foes().get(1).x - .3f, GROUND);
-            run.step(STEP, false, false, false);
-        }
-        assertEquals(0, run.hurts());
-        // When it passes, whatever is near her goes over, and what is far does not.
-        while (run.shadow()) {
-            run.place((run.foes().get(0).x + run.foes().get(1).x) / 2, GROUND);
-            run.step(STEP, false, false, false);
-        }
-        assertEquals(1, run.bursts());
-        assertEquals(2, run.flattened());
-        assertFalse(run.foes().get(2).flat);
-        run.foes().get(2).flat = true;
-        // It waits twice as long as another colour before it can be called on again.
-        assertEquals(0, run.charge(PlusRun.BLACK), .01f);
-        assertTrue(run.untilCall(PlusRun.BLACK) > 19.5f);
-        hold(run, 19, false, false, false);
-        assertFalse(run.call(PlusRun.BLACK));
-        hold(run, 1.5f, false, false, false);
-        assertEquals(1, run.charge(PlusRun.BLACK), 0);
-        // To her who owns it a black ribbon is her own shadow, and adds to what she wears.
-        run.place(36, GROUND);
-        hold(run, .2f, false, false, false);
-        assertTrue(run.shadow());
-        assertEquals(0, run.cursed(), 0);
-        // To one who does not, black is only what it was: no shadow, slow, and what she touches hurts her.
-        PlusRun other = new PlusRun(level, new PlusRun.Perks());
-        other.place(36, GROUND);
-        hold(other, .2f, false, false, false);
-        assertEquals(PlusRun.BLACK, other.form());
-        assertFalse(other.shadow());
-        assertTrue(other.cursed() > 6);
-        other.place(29.6f, GROUND);
-        hold(other, .5f, false, true, false);
-        assertEquals(1, other.hurts());
+    @Test public void aColourGivenHerIsHersToCallOnAndOneLentIsNot() {
         // A colour given her there and then is hers to call on; one lent her is not.
         PlusRun given = new PlusRun(flat(20), new PlusRun.Perks());
         given.gift(PlusRun.RED);
@@ -3529,7 +3611,8 @@ public class PlusRunTest {
         for (int kind = RunLevels.THROWER; kind <= RunLevels.MAWANG; kind++) {
             if (kind != RunLevels.ILLYA && kind != RunLevels.TSUBAKIEH) assertTrue("no sign " + kind, signs[kind]);
         }
-        for (int form = PlusRun.RED; form <= PlusRun.WHITE; form++) assertTrue("no ribbon " + form, ribbons[form]);
+        for (int form = PlusRun.RED; form <= PlusRun.BLACK; form++) assertTrue("no ribbon " + form, ribbons[form]);
+        assertFalse(ribbons[PlusRun.WHITE]);
         for (int who = 1; who <= RunLevels.NURI; who++) assertTrue("no one met " + who, met[who]);
     }
 

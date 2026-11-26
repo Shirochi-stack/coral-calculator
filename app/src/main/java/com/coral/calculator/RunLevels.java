@@ -199,6 +199,39 @@ final class RunLevels {
     static boolean flier(int kind) { return kind >= DRIFTER && kind <= RIME; }
 
     /**
+     * Black, which is a curse, is met from the middle of the first volume on: a black
+     * ribbon lies a little past a good one in the land, for whoever takes both without
+     * looking, and another in a stash, after its pluses. And from the fifty-first land on
+     * an asterisk throws it. No place gives a white ribbon: what a place off the land or a
+     * game gives is a ribbon of one of the six colours, for a while, in the first volume,
+     * and two in the second.
+     */
+    static final int BLACK_FROM = 13, CURSES_FROM = 51;
+
+    /** The colours of the ribbons a place off a land gives when it is won there: one in the first volume, two after; never white, never black. */
+    static int[] ribbonsOf(int number) {
+        int first = PlusRun.RED + number % 6, second = PlusRun.RED + (number + 3) % 6;
+        return number > COUNT ? new int[]{first, second} : new int[]{first};
+    }
+
+    /** A black ribbon is laid a little past the first good one of a land, from the thirteenth on, where the ground is flat and nothing lies. */
+    private static void tempt(Level level) {
+        if (level.number < BLACK_FROM || level.number > COUNT) return;
+        for (int[] item : new ArrayList<>(level.items)) {
+            if (item[0] <= PlusRun.FORM || item[0] >= PlusRun.CHEST || item[0] == PlusRun.FORM + PlusRun.BLACK || item[1] >= level.main || item[3] != 0) continue;
+            for (int column = item[1] + 2; column <= item[1] + 4; column++) {
+                int floor = top(level, column);
+                boolean clear = floor > 3 && floor == top(level, item[1]) && level.land[floor - 1][column] == AIR;
+                for (int[] other : level.items) clear &= other[1] != column;
+                for (int[] foe : level.foes) clear &= Math.abs(foe[1] - column) > 1;
+                if (!clear) continue;
+                level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, column, floor - 1, 0});
+                return;
+            }
+        }
+    }
+
+    /**
      * Which of the ways they might be spread over a land is used for it: the first, but
      * for the lands named here, where the first left the land one that could not be crossed
      * without a hurt. Found as the numbers the lands are made from were. (And a way to try
@@ -207,8 +240,9 @@ final class RunLevels {
     static final int[] FLOCKS = new int[100];
     static int flockTry = -1;
     static {
-        for (int land : new int[]{34, 41, 50, 53, 55, 56, 57, 58, 61, 63, 64, 66, 68, 70}) FLOCKS[land - 1] = 1;
-        for (int land : new int[]{69, 79}) FLOCKS[land - 1] = 2;
+        for (int land : new int[]{34, 41, 42, 44, 46, 48, 51, 53, 55, 61, 63, 71, 74, 76, 79}) FLOCKS[land - 1] = 1;
+        for (int land : new int[]{58, 67}) FLOCKS[land - 1] = 2;
+        FLOCKS[69 - 1] = 6;
     }
 
     static int flierFrom(int kind) { return FLIES_FROM[kind - DRIFTER]; }
@@ -259,9 +293,11 @@ final class RunLevels {
             for (int beside = column - 2; beside <= column + wide + 1 && clear; beside++) {
                 for (int up = row - 1; up <= row + 1 && clear; up++) clear = level.land[up][beside] == AIR;
             }
-            for (int flag : level.flags) clear &= Math.abs(flag - column) > 4;
+            for (int flag : level.flags) clear &= Math.abs(flag - column) > 9;
             for (int[] foe : level.foes) if (flier(foe[0]) || rover(foe[0])) clear &= Math.abs(foe[1] - column) > (rover(foe[0]) ? 9 : 5);
-            for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 3;
+            // (And of villages, and of whoever stands in the land to be spoken to or bought from.)
+            for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 12;
+            for (int[] item : level.items) if (item[1] < level.main && (item[3] != 0 || item[0] >= PlusRun.CHEST)) clear &= Math.abs(item[1] - column) > 9;
             if (!clear) continue;
             for (int each = 0; each < wide; each++) level.foes.add(new int[]{kind, column + each, row});
             return;
@@ -294,7 +330,7 @@ final class RunLevels {
                     for (int up = 1; up <= 4 && clear; up++) clear = level.land[floor - up][beside] == AIR;
                 }
                 if (reach > 0) {
-                    for (int[] room : level.rooms) clear &= Math.abs(room[1] - column) > 6 && Math.abs(room[5] - column) > 6;
+                    for (int[] room : level.rooms) clear &= Math.abs(room[1] - column) > 10 && Math.abs(room[5] - column) > 10;
                     for (int flag : level.flags) clear &= Math.abs(flag - column) > 6;
                     for (int[] item : level.items) if (item[1] < level.main) clear &= Math.abs(item[1] - column) > 5;
                 }
@@ -549,6 +585,7 @@ final class RunLevels {
         level.foes.addAll(draft.lodgers);
         rove(level);
         flock(level);
+        tempt(level);
         return level;
     }
 
@@ -624,7 +661,7 @@ final class RunLevels {
         }
         List<Integer> free = free(level, waits >= 0 ? waits - 4 : level.gate - 6);
         int[] ribbons = {PlusRun.BROWN, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.PURPLE, PlusRun.BROWN, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.PURPLE,
-                PlusRun.BLACK, PlusRun.BLACK, PlusRun.WHITE};
+                PlusRun.BLACK, PlusRun.BLACK, PlusRun.BLACK};
         int[] treats = {PlusRun.ICE, PlusRun.MAGNET, PlusRun.NOTES, PlusRun.MAGNET};
         for (int count = 0; count < 4 && !free.isEmpty(); count++) {
             int column = take(free, random);
@@ -711,6 +748,7 @@ final class RunLevels {
         level.foes.addAll(draft.lodgers);
         rove(level);
         flock(level);
+        tempt(level);
         return level;
     }
 
@@ -918,6 +956,7 @@ final class RunLevels {
                         pluses(from + 9, from + 11, FLOOR - 6);
                         pluses(from + 13, from + 15, FLOOR - 8);
                         level.items.add(new int[]{treat, from + 14, FLOOR - 7, 0});
+                        if (number >= BLACK_FROM) level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, from + 12, FLOOR - 6, 0});
                         level.items.add(new int[]{PlusRun.CHEST, to - 1, FLOOR - 9, 0});
                     } else {
                         // A spring on the floor to a shelf half way up, and a spring at the end of that to a shelf under the ceiling, where the chest is.
@@ -927,6 +966,7 @@ final class RunLevels {
                         ledge(to - 11, FLOOR - 10, 6);
                         pluses(from + 13, from + 17, FLOOR - 7);
                         level.items.add(new int[]{treat, from + 15, FLOOR - 6, 0});
+                        if (number >= BLACK_FROM) level.items.add(new int[]{PlusRun.FORM + PlusRun.BLACK, from + 18, FLOOR - 7, 0});
                         level.items.add(new int[]{PlusRun.CHEST, to - 9, FLOOR - 11, 0});
                     }
                 } else if (kind == PASSAGE) {

@@ -405,8 +405,9 @@ final class RunStory {
             {"form4", "Green! Hold the jump and I fly Sloppy~♡", "H", PLAYER + "Her hair turns green and she can fly on the wind. Light, delighted, breathless." + FAST},
             {"form5", "Yellow! Try to keep your eyes on me Sloppy~♡", "H", PLAYER + "Her hair turns yellow and she becomes extremely fast. Giddy, zippy, talking very fast indeed."},
             {"form6", "Purple. Throw it at me. It's coming right back Sloppy~♡", "H", PLAYER + "Her hair turns purple and she reflects whatever is thrown at her. Cool, sly, taunting."},
-            {"form7", "Black... I feel so ordinary. I can't hurt a thing like this Sloppy~♡", "H", PLAYER + "Her hair turns black and all her powers drain away: she is an ordinary girl, slow and weak. Deflated, sluggish, dismayed, speaking slowly."},
-            {"form8", "White. Everything at once. Don't blink Sloppy~♡", "H", PLAYER + "Her hair turns pure white, her ultimate form with every power at once. Awed for a moment, then exultant."},
+            {"form7", "A black ribbon! Every colour's gone, and none comes back till it fades Sloppy~♡", "H",
+                    PLAYER + "Her hair has just turned black: a curse has stripped every one of her magic colours and she cannot use any until it wears off. Dismayed, annoyed with herself, urgent." + FAST},
+            {"form8", "White. Every colour at once, while it lasts Sloppy~♡", "H", PLAYER + "Her hair turns white as every one of her colours is on at once, for a short while. Awed for a moment, then pleased."},
     };
     /** What Tsubakieh and Illya say as they hand over what they have. */
     static final String[][] GIFTS = {
@@ -707,8 +708,8 @@ final class RunStory {
                     PLAYER + "She explains that tapping a little palette button lets her choose which of her hair colours to wear at once. Helpful, bossy, pleased with herself." + FAST},
             {"mix2", "Mixed, they do something neither does alone. Try them all Sloppy~♡", "H",
                     PLAYER + "She has just combined two magic hair colours and found a new power. Surprised, delighted, eager." + FAST},
-            {"white1", "All seven at once. White. Look at me glow Sloppy~♡", "H",
-                    PLAYER + "All seven of her colours have just fused into shining white and she is glowing. Awed for a second, then vain and thrilled."}};
+            {"white1", "White! But I haven't mastered it. A glow, not yet a light Sloppy~♡", "H",
+                    PLAYER + "Every one of her colours has just fused into white, but only faintly: she can tell it is not the real thing yet. Awed for a second, then honest and a little rueful."}};
     /** One met in the middle of a land, the first time it shows itself: the Margin Wyrm, Blot, the Bookmark Gecko; one of them beaten; and the wyrm driven off. */
     static final String[][] ROVERS = {
             {"rover1", "A dragon made of pages, overhead! Dodge what it drops, and hit it when it comes low Sloppy~♡", "H",
