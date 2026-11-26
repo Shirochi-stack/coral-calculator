@@ -1,8 +1,8 @@
 # Halgakos Calculator privacy policy
 
-Effective 25 November 2026.
+Effective 26 November 2026.
 
-Halgakos Calculator does not collect, store on any server, share or sell any personal data. It has no accounts, ads or analytics, and it does not have the permission to use the network.
+Halgakos Calculator does not collect, store on any server, share or sell any personal data. It has no accounts, ads or analytics. It uses the network for one thing only: a game of Page brawl between two devices, which you start yourself, and in which the two devices talk straight to each other over the Wi-Fi they share.
 
 ## What stays on your device
 
@@ -18,11 +18,12 @@ This is kept in the app's private storage. It leaves the device only if you copy
   - A game that is played all over the screen, which you start yourself, covers the screen while it is up, so touches go to the game until you leave it. The app underneath is dimmed, not read.
   - A prank is a drawing on top of the screen and nothing more. It cannot delete or change anything, and it cannot see what is inside another app or how your home screen is laid out. The icons she appears to delete or shake loose are those of apps in your launcher, drawn by her and gone when the prank ends. For the few seconds it lasts, a touch ends the prank instead of reaching the app underneath. She plays one every several minutes while idle, and **Surprise pranks** in her settings switches those off.
 - **Run at startup** is used only so that a companion you have switched on returns after the device restarts.
+- **Network access** is used only for a game of Page brawl between two devices, begun with **Host a game** on one and **Join a game** on the other. The device that hosts announces the game on the local network so that the other can find it, and the two then send each other only the game: which fighter each player chose, which buttons are held down, and how the fight stands. Nothing about you is sent, there is no account or name, it goes through no server, and nothing of it is kept when the game ends. As with any connection, each device can see the other's address on that network while they are joined. Outside such a game the app does not use the network at all.
 
 The app can see two things about what else is installed, and neither leaves the device:
 
 - Whether its own earlier edition, the one released before the app's ID changed in version 1.2.0, is still installed. It uses this only to remind you to remove the duplicate.
-- The names and icons of the apps that appear in your launcher. Halgakos's pranks draw them, as when she pretends to bin one. They are read when a prank starts, drawn on screen, and not kept, listed anywhere or sent anywhere. The app has no permission to use the network.
+- The names and icons of the apps that appear in your launcher. Halgakos's pranks draw them, as when she pretends to bin one. They are read when a prank starts, drawn on screen, and not kept, listed anywhere or sent anywhere.
 
 Switching the companion off in **Settings › Halgakos companion**, or withdrawing the permission in Android's settings, removes her from the screen.
 

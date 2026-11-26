@@ -99,6 +99,10 @@ She keeps her place when the device is folded, unfolded, or turned, and comes ba
 
 While she is on screen, Android posts a notification of its own saying that Halgakos Calculator is displaying over other apps. It belongs to Android, so its icon and wording cannot be changed by the app, but **Turn off that notification** at the bottom of her settings opens the place to switch it off.
 
+### Your birthday
+
+Tell her the day and the month in **Settings › Your birthday** and she celebrates it with you when it comes: a cake with a candle, a party popper, a party horn and confetti, when she is first on screen that day and now and then until it ends. The year is not asked for, and the date stays on the device.
+
 ### Play with Halgakos
 
 **Play with Halgakos**, in her menu, opens a card of small games where the mini calculator opens. The arrow in its corner carries the game on to a full screen in the app, which also opens from **Settings › Play with Halgakos**. Tallies and best results are kept on the device.
@@ -123,6 +127,7 @@ While she is on screen, Android posts a notification of its own saying that Halg
 - **Tsubakieh**, close and fast: Normal No. 2, a full swing, the bat thrown so that it comes back, and a home run.
 - **Rune**, long range: ink flicked and wept, a paper knife thrown, and a flood of tears along the ground that can be jumped.
 - **Illya**, all range: hearts, pink magic and a heart beam, and a grand compliment in four pulses.
+- **Two players.** **2 players here** gives each player half of one screen and a set of buttons of their own: best on a tablet or an open foldable, with the screen on its side. **Host a game** on one device and **Join a game** on another lets two people on the same Wi-Fi play each other, each on their own screen; the devices find each other and talk straight to each other, with no account and no server.
 - **Voices and sound.** Each has ten spoken lines, her catchphrase among them, in the same voices as in Plus run, and there are sound effects for every hit, guard and throw.
 
 Also on the card:
@@ -142,6 +147,8 @@ All over the screen, on top of whatever app you are in:
 - **Minesweeper.** A minefield as large as the screen allows, with about one mine to every six or seven squares. Tap a square to open it, hold one to flag a mine, or switch the flag button on to flag with a tap. The first square you open is never a mine, and tapping an open number that has all its flags opens the rest round it. Your best time is kept.
 
 The **✕** in the corner, or Back, leaves one of these. They dim the app underneath and take its touches only while they are up.
+
+Going to the home screen, or to the list of recent apps, closes whichever of these is up.
 
 **Prank me** has her play a prank, a different one each time until she has been through them all:
 

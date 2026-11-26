@@ -60,6 +60,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** Height of the figure for each size setting, in dp. */
     private static final int[] HEIGHT_DP = {64, 88, 116};
     private static final long MENU_MS = 6000;
+    /** Her birthday frames: holding the cake, offering it, a party popper, a cheer, a party horn, clapping; and the order she goes through them in. */
+    private static final int PARTY_FRAMES = 6;
+    private static final int[] PARTY_ORDER = {0, 0, 1, 1, 0, 2, 2, 3, 3, 4, 4, 4, 5, 3, 5, 3, 5, 3};
+    private static final int[] CONFETTI = {0xFFFF5F7E, 0xFFFFC53D, 0xFF4FC3F7, 0xFF7BD88F, 0xFFB388FF};
     private static final float REST_ALPHA = .5f;
     /** The mini calculator shrinks to fit a small screen, but no further than this. */
     private static final float SMALLEST_SCALE = .62f;
@@ -234,6 +238,15 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             prankDue = false;
             handler.removeCallbacks(surprise);
         }
+        if (shown && prefs.birthdayToday()) {
+            if (!partyDue) {
+                partyDue = true;
+                handler.postDelayed(birthday, prefs.partiedToday() ? PARTY_AGAIN_MS : PARTY_FIRST_MS);
+            }
+        } else {
+            partyDue = false;
+            handler.removeCallbacks(birthday);
+        }
         if (shown && prefs.pranks()) {
             if (!anticDue) {
                 anticDue = true;
@@ -246,6 +259,28 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     }
 
     // Small pranks of her own: a few seconds of mischief in her own window, while she is idle
+
+    // Her user's birthday: she celebrates it when she is first seen that day, and again now and then while the day lasts
+
+    private static final long PARTY_FIRST_MS = 4000, PARTY_AGAIN_MS = 40 * 60_000, PARTY_MS = 11_000;
+    private boolean partyDue;
+    private final Runnable birthday = this::birthday;
+
+    private void birthday() {
+        partyDue = false;
+        if (sprite == null || sprite.away || !prefs.birthdayToday()) return;
+        // Not in the middle of something else: she waits her moment.
+        if (!idle() || playing != NO_ANTIC || bubble != null) {
+            partyDue = true;
+            handler.postDelayed(birthday, 8000);
+            return;
+        }
+        prefs.setPartied();
+        sprite.celebrate(PARTY_MS);
+        if (prefs.chatter()) say(Chatter.birthday(random));
+        partyDue = true;
+        handler.postDelayed(birthday, PARTY_AGAIN_MS);
+    }
 
     private void antic() {
         anticDue = false;
@@ -1090,9 +1125,11 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         int kind = game == PlaySession.PRANK ? PlayStage.anyPrank(random) : game;
         boolean prank = PlayStage.isPrank(kind);
         PlayStage view = new PlayStage(ui, kind, dark(), haptics(), art, animated() ? pet : null, played -> {
+            // Left by going home, the game leaves nothing behind it on the home screen.
+            boolean home = stage != null && stage.wentHome();
             closeStage();
             // After a game the others are offered again; a prank just ends.
-            if (!PlayStage.isPrank(played)) openPanel(true);
+            if (!PlayStage.isPrank(played) && !home) openPanel(true);
         });
         Rect screen = screen();
         stageParams = overlay(screen.width(), screen.height(), POPUP_FLAGS);
@@ -1102,7 +1139,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         // A game takes the keys as well, so that Back leaves it and not the app underneath.
         if (!prank) stageParams.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         view.setHome(spriteParams.x + spriteParams.width / 2f - screen.left,
-                spriteParams.y + spriteParams.height - pad - screen.top);
+                spriteParams.y + spriteParams.height - pad - screen.top, spriteParams.height - pad * 2);
         if (!add(view, stageParams)) return;
         stage = view;
         fitStage();
@@ -1418,6 +1455,12 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         private int gaze = PetArt.NOWHERE;
         /** Whether the next frame is on its way. */
         private boolean moving;
+        /** Her birthday frames, read in when first wanted; which of them shows, or -1; and when the celebration ends. */
+        private Bitmap party;
+        private int partyFrame = -1, partyStep;
+        private long partyUntil;
+        private final Runnable revel = this::revel;
+        private final Paint confettiPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         /** Kept on screen but unseen, waiting for a folded device to be opened. */
         boolean away;
         /** She has left this window for the whole screen, for a game or a prank. */
@@ -1462,10 +1505,18 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
                 int column = gaze != PetArt.NOWHERE ? PetArt.lookColumn(gaze) : frame;
                 int width = pet.getWidth() / PET_COLUMNS, height = pet.getHeight() / PET_FRAMES.length;
                 frameSource.set(column * width, row * height, (column + 1) * width, (row + 1) * height);
+                // Celebrating, she is drawn from her birthday frames, which are the size and shape of her others.
+                Bitmap sheet = pet;
+                if (partyFrame >= 0 && party != null) {
+                    sheet = party;
+                    int wide = party.getWidth() / PARTY_FRAMES;
+                    frameSource.set(partyFrame * wide, 0, (partyFrame + 1) * wide, party.getHeight());
+                }
                 frameTarget.set(pad, pad + pad * .3f, getWidth() - pad, getHeight() - pad + pad * .3f);
-                canvas.drawBitmap(pet, frameSource, frameTarget, silhouette);
+                canvas.drawBitmap(sheet, frameSource, frameTarget, silhouette);
                 frameTarget.offset(0, -pad * .3f);
-                canvas.drawBitmap(pet, frameSource, frameTarget, paint);
+                canvas.drawBitmap(sheet, frameSource, frameTarget, paint);
+                if (partyFrame >= 0) confetti(canvas);
             } else if (figure != null) {
                 canvas.drawBitmap(shadow, pad + shadowOffset[0], pad + shadowOffset[1] + pad * .3f, shadowPaint);
                 canvas.drawBitmap(figure, pad, pad, paint);
@@ -1491,6 +1542,43 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
             again = times - 1;
             frame = 0;
             resume();
+        }
+
+        /** Has her celebrate for a while: her birthday frames one after another, and confetti falling about her. */
+        void celebrate(long forMs) {
+            if (pet == null) return;
+            if (party == null) party = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.halgakos_party);
+            partyUntil = android.os.SystemClock.uptimeMillis() + forMs;
+            partyStep = 0;
+            handler.removeCallbacks(revel);
+            revel();
+        }
+
+        private void revel() {
+            if (android.os.SystemClock.uptimeMillis() >= partyUntil || !isAttachedToWindow() || away) {
+                partyFrame = -1;
+                invalidate();
+                return;
+            }
+            partyFrame = PARTY_ORDER[partyStep++ % PARTY_ORDER.length];
+            invalidate();
+            handler.postDelayed(revel, 300);
+        }
+
+        /** Bits of coloured paper falling past her, for as long as she celebrates. */
+        private void confetti(Canvas canvas) {
+            long now = android.os.SystemClock.uptimeMillis();
+            float bit = pad * .42f;
+            for (int piece = 0; piece < 16; piece++) {
+                float speed = .3f + piece * 37 % 10 / 22f, fall = (now % 200_000 / 1000f * speed + piece * .173f) % 1f;
+                float x = getWidth() * (piece * 61 % 100 / 100f) + (float) Math.sin(now / 300.0 + piece) * pad, y = fall * getHeight();
+                confettiPaint.setColor(CONFETTI[piece % CONFETTI.length]);
+                canvas.save();
+                canvas.rotate((now / 4f + piece * 40) % 360, x, y);
+                canvas.drawRect(x - bit, y - bit * .55f, x + bit, y + bit * .55f, confettiPaint);
+                canvas.restore();
+            }
+            postInvalidateOnAnimation();
         }
 
         /** Has her look a way, in place of whatever pose she is in; {@link PetArt#NOWHERE} lets the pose show again. */

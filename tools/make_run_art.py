@@ -18,6 +18,7 @@ six frames of Halgakos jumping drawn from her own running frames. This cuts them
     pictures in faces/ are those chibi pictures themselves, made small for the story cards.
   * arm_pen.png and the five like it each give eight frames of her carrying one of the things
     she fights with: standing, four of running, rising, falling, and using it.
+  * party.png gives six of her celebrating a birthday, for the companion: res/drawable-nodpi/halgakos_party.webp.
   * lose.png gives six more of her, for when she is hurt and when she has lost: hit, knocked
     into the air, falling, sitting dazed, sulking and crying. They are treated the same way.
 
@@ -48,6 +49,8 @@ KEEP, DROP = 40, 150
 JUMP_CELL = (256, 208)
 LOSE_CELL = (288, 224)
 ARM_CELL = (304, 248)
+# Her birthday frames, for the companion: each the size of one of her own frames, so she is drawn the same size.
+PARTY_CELL = (173, 202)
 ARMS = ("pen", "knife", "book", "brush", "sword", "gun")
 # The brush stands over her head and is taken for part of her horns, which would make her too small: on that sheet
 # she is given the size she has on the sheets drawn to the same layout.
@@ -346,6 +349,7 @@ def main():
     jump, running = her_frames("jump", "jump", JUMP_CELL, 14, 3, report)
     lose, _ = her_frames("lose", "lose", LOSE_CELL, 40, 3, report)
     armed = [her_frames(f"arm{index}", f"arm_{name}", ARM_CELL, 14, 4, report)[0] for index, name in enumerate(ARMS)]
+    her_frames("party", "party", PARTY_CELL, 14, 3, report)
     others = [cast_frames(name) for name in CAST]
     faces = [face(name) for name in FACES]
     print("atlas", atlas.size, "cells", len(cells), "jump", jump.size, "lose", lose.size, "armed", armed[0].size,

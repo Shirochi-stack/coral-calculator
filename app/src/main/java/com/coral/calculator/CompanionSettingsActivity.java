@@ -134,6 +134,7 @@ public final class CompanionSettingsActivity extends Activity {
                         + "most of it is teasing. A tap on the bubble sends it away.",
                 prefs.chatter(), checked -> { prefs.set(CompanionPrefs.CHATTER, checked); apply(); });
         nameField(content);
+        birthdayField(content);
         toggle(content, "Sounds in Plus run", "Plus run plays sound effects, and Halgakos tells its story aloud. Switch this "
                         + "off to play it in silence, with her words on screen only. The speaker button on its map does "
                         + "the same. Her voice is heard while she calls you Sloppy, the name it was recorded with.",
@@ -373,6 +374,53 @@ public final class CompanionSettingsActivity extends Activity {
                 prefs.setNickname(text.toString());
                 show.run();
             }
+        });
+        show.run();
+    }
+
+    /**
+     * The user's birthday: the day and the month only. On that day she celebrates, with a cake
+     * and confetti, when she is first seen and now and then while the day lasts.
+     */
+    private void birthdayField(LinearLayout parent) {
+        TextView label = text("Your birthday", 19, ink());
+        label.setPadding(0, dp(10), 0, 0);
+        parent.addView(label);
+        TextView value = text("", 18, CalculatorLayout.CORAL);
+        value.setPadding(0, dp(10), 0, dp(10));
+        value.setMinHeight(dp(48));
+        value.setGravity(Gravity.CENTER_VERTICAL);
+        value.setFocusable(true);
+        value.setBackgroundResource(android.R.drawable.list_selector_background);
+        parent.addView(value);
+        TextView note = text("", 15, muted());
+        note.setPadding(0, 0, dp(56), dp(8));
+        parent.addView(note);
+        Runnable show = () -> {
+            int day = prefs.birthday();
+            String[] months = new java.text.DateFormatSymbols(java.util.Locale.ENGLISH).getMonths();
+            value.setText(day == 0 ? "Not set  ›" : day % 100 + " " + months[day / 100 - 1] + "  ›");
+            value.setContentDescription(day == 0 ? "Your birthday: not set. Tap to choose the day"
+                    : "Your birthday: " + day % 100 + " " + months[day / 100 - 1] + ". Tap to change it");
+            note.setText(day == 0 ? "Tell Halgakos the day and the month, and she celebrates it with you when it comes. The year is not asked for, "
+                    + "and the date stays on this device."
+                    : "On that day she celebrates, with a cake and confetti, when she is first on screen and now and then through the day.");
+        };
+        value.setOnClickListener(view -> {
+            int day = prefs.birthday();
+            // A leap year, so that the 29th of February can be chosen; the year itself is thrown away.
+            android.app.DatePickerDialog picker = new android.app.DatePickerDialog(this, (dialog, year, month, date) -> {
+                prefs.setBirthday((month + 1) * 100 + date);
+                show.run();
+                apply();
+            }, 2000, day == 0 ? java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) : day / 100 - 1,
+                    day == 0 ? java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH) : day % 100);
+            picker.setButton(android.content.DialogInterface.BUTTON_NEUTRAL, "Clear", (dialog, which) -> {
+                prefs.setBirthday(0);
+                show.run();
+                apply();
+            });
+            picker.show();
         });
         show.run();
     }

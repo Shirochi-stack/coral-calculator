@@ -40,14 +40,24 @@ PROJECT = pathlib.Path(r"C:\Users\ADMIN\Dev\Halgakos-AI")
 URL = "https://api.inworld.ai/tts/v1/voice:stream"
 MODEL = "inworld-tts-2"
 # Who speaks in which voice, how fast, and how much lower or higher the recording is made afterwards.
+# Her friends have community anime voices, each raised a little so that all of them sit near Halgakos's own
+# register (hers is about 370 Hz; the voices they had first were as low as 260 Hz and sounded grown up).
 # The Mawang is Halgakos herself, sixty years on: her voice, slower and lower.
 VOICES = {
     "H": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "C": ("Riley", 1.0, 1.0),
-    "R": ("Yuki", 1.0, 1.0),
-    "I": ("community-qj9kc2jtun4a", 1.0, 1.0),
-    "T": ("Piper", 1.0, 1.0),
+    "C": ("community-iyfnceehtmbk", .95, 1.06),
+    "R": ("community-ae0qjkqan5hx", .96, 1.05),
+    "I": ("community-blcuaurhzmvi", .95, 1.06),
+    "T": ("community-pwotyqkmtlsi", .92, 1.1),
     "M": ("community-5fwhmdpiq45g", 1.0, .84),
+}
+# How each of the others sounds, said to the voice before the scene of every line of hers, so that none of
+# them drifts into sounding grown up or dark, whatever the scene.
+MANNER = {
+    "C": "Chikuwa is a sunny, bubbly girl with a high, bright, cute anime voice. ",
+    "R": "Rune is a shy girl who is always crying: a high, fragile, tearful anime voice, sniffling and sad. ",
+    "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
+    "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
 
@@ -71,7 +81,7 @@ def story():
     text = STORY.read_text(encoding="utf-8")
     player = re.search(r'PLAYER = "([^"]+)"', text).group(1)
     found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Z])",\s*(PLAYER \+ )?"([^"]+)"\}', text)
-    return [(name, words, who, (player if with_player else "") + scene) for name, words, who, with_player, scene in found]
+    return [(name, words, who, MANNER.get(who, "") + (player if with_player else "") + scene) for name, words, who, with_player, scene in found]
 
 
 def spoken(text):

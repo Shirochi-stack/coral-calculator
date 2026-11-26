@@ -1,5 +1,6 @@
 package com.coral.calculator;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -397,4 +398,124 @@ public class FightTest {
         // What Halgakos cries when she loses is the cry she keeps for when her output is gone.
         assertEquals(Chatter.OUTPUT, FightCast.line(Fight.HALGAKOS, FightCast.LOSE)[1]);
     }
-}
+
+    // Two players
+
+    @Test public void whatIsHeldDownSurvivesBeingSentAsANumber() {
+        for (int bits = 0; bits < 128; bits++) {
+            Fight.Pad pad = new Fight.Pad();
+            pad.set(bits);
+            assertEquals(bits, pad.bits());
+            assertEquals((bits & 4) != 0, pad.jump);
+            assertEquals((bits & 64) != 0, pad.special);
+        }
+    }
+
+    @Test public void aFightWrittenDownAndReadBackIsTheSameFightToLookAt() throws Exception {
+        // One fight plays itself; another is only ever told how the first stands, as a device that joins is.
+        Fight host = new Fight(Fight.HALGAKOS, Fight.ILLYA, 2, 2, 7), shown = new Fight(Fight.HALGAKOS, Fight.ILLYA, -1, -1, 0);
+        Fight.Pad none = new Fight.Pad();
+        int thrown = 0;
+        for (int step = 0; step < 2400 && host.phase() != Fight.MATCH_OVER; step++) {
+            host.step(1 / 60f, none);
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            host.write(new java.io.DataOutputStream(bytes));
+            assertTrue("a fight takes " + bytes.size() + " bytes to send", bytes.size() < 4000);
+            shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+            assertEquals(host.phase(), shown.phase());
+            assertEquals(host.round(), shown.round());
+            assertEquals(host.hits(), shown.hits());
+            assertEquals(host.blocks(), shown.blocks());
+            assertEquals(host.moves(), shown.moves());
+            assertEquals(host.left(), shown.left(), 0);
+            assertEquals(host.flourisher(), shown.flourisher());
+            assertEquals(host.shots().size(), shown.shots().size());
+            thrown = Math.max(thrown, host.shots().size());
+            for (int index = 0; index < host.shots().size(); index++) {
+                assertEquals(host.shots().get(index).kind, shown.shots().get(index).kind);
+                assertEquals(host.shots().get(index).x, shown.shots().get(index).x, 0);
+            }
+            for (int side = 0; side < 2; side++) {
+                Fight.Fighter hers = host.fighters[side], seen = shown.fighters[side];
+                assertEquals(hers.x, seen.x, 0);
+                assertEquals(hers.y, seen.y, 0);
+                assertEquals(hers.state, seen.state);
+                assertEquals(hers.move, seen.move);
+                assertEquals(hers.clock, seen.clock, 0);
+                assertEquals(hers.health, seen.health, 0);
+                assertEquals(hers.meter, seen.meter, 0);
+                assertEquals(hers.wins, seen.wins);
+                assertEquals(hers.facingLeft, seen.facingLeft);
+                assertEquals(hers.unarmed, seen.unarmed);
+            }
+        }
+        assertTrue(host.hits() > 3);
+        assertTrue(thrown > 0);
+    }
+
+    @Test public void twoPlayersByHandFightEachOther() {
+        Fight fight = new Fight(Fight.TSUBAKIEH, Fight.CHIKUWA, -1, -1, 1);
+        Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+        float started = fight.fighters[1].x;
+        // The second player walks left on her own buttons while the first stands; neither is played for her.
+        two.left = true;
+        for (int step = 0; step < 30; step++) fight.step(1 / 60f, one, two);
+        assertTrue(fight.fighters[1].x < started - .5f);
+        assertEquals(Fight.WIDE / 2 - 2.2f, fight.fighters[0].x, .01f);
+        // And hits her when she is close enough.
+        float health = fight.fighters[0].health;
+        for (int step = 0; step < 600 && fight.fighters[0].health == health; step++) {
+            two.left = Math.abs(fight.fighters[1].x - fight.fighters[0].x) > 1f;
+            two.light = !two.left && step % 20 < 6;
+            fight.step(1 / 60f, one, two);
+        }
+        assertTrue(fight.fighters[0].health < health);
+    }
+
+    @Test public void twoDevicesTalkOverALine() throws Exception {
+        int port;
+        try (java.net.ServerSocket free = new java.net.ServerSocket(0)) {
+            port = free.getLocalPort();
+        }
+        FightLink host = FightLink.host(port);
+        Thread.sleep(300);
+        FightLink guest = FightLink.join("127.0.0.1", port);
+        for (int tries = 0; tries < 100 && !(host.connected() && guest.connected()); tries++) Thread.sleep(50);
+        assertTrue(host.connected());
+        assertTrue(guest.connected());
+        guest.send(FightLink.HELLO, FightLink.VERSION, Fight.RUNE, 90);
+        byte[] hello = null;
+        for (int tries = 0; tries < 100 && hello == null; tries++) {
+            hello = host.poll();
+            if (hello == null) Thread.sleep(20);
+        }
+        assertArrayEquals(new byte[]{FightLink.HELLO, FightLink.VERSION, Fight.RUNE, 90}, hello);
+        // How the fight stands, sent again and again: the last one sent is the last one to arrive.
+        for (int count = 1; count <= 50; count++) {
+            byte[] state = new byte[300];
+            state[0] = (byte) count;
+            host.send(FightLink.STATE, state);
+            if (count % 10 == 0) Thread.sleep(15);
+        }
+        guest.send(FightLink.PAD, 21);
+        byte[] last = null, pad = null;
+        for (int tries = 0; tries < 100 && (last == null || last[1] != 50 || pad == null); tries++) {
+            byte[] message = guest.poll();
+            if (message != null) last = message;
+            byte[] other = host.poll();
+            if (other != null) pad = other;
+            if (message == null && other == null) Thread.sleep(20);
+        }
+        assertEquals(FightLink.STATE, last[0]);
+        assertEquals(50, last[1]);
+        assertEquals(301, last.length);
+        assertArrayEquals(new byte[]{FightLink.PAD, 21}, pad);
+        // One leaves; the other finds the line over.
+        guest.close();
+        for (int tries = 0; tries < 100 && !host.closed(); tries++) {
+            host.poll();
+            Thread.sleep(30);
+        }
+        assertTrue(host.closed());
+        host.close();
+    }}

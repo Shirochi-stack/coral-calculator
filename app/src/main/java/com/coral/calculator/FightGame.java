@@ -25,20 +25,22 @@ import java.util.Random;
  * the screen over to it.
  */
 final class FightGame {
-    private static final int SELECT = 0, VERSUS = 1, FIGHT = 2, PAUSED = 3, RESULT = 4;
+    private static final int SELECT = 0, VERSUS = 1, FIGHT = 2, PAUSED = 3, RESULT = 4, LOBBY = 5;
+    /** Who plays: one player up the ladder; two on this screen, a half of it each; or two on two devices, this one hosting the fight or joining it. */
+    private static final int SOLO = 0, DUO = 1, HOST = 2, GUEST = 3;
     private static final int RESUME = 0, AGAIN = 1, TO_SELECT = 2, NEXT = 3;
     /** The buttons, in the order their places are kept. */
     private static final int LEFT = 0, RIGHT = 1, JUMP = 2, GUARD = 3, LIGHT = 4, HEAVY = 5, SPECIAL = 6, BUTTONS = 7;
     private static final int[] SHEETS = {R.drawable.fight_halgakos, R.drawable.fight_chikuwa, R.drawable.fight_tsubakieh,
             R.drawable.fight_rune, R.drawable.fight_illya};
-    private static final int[] STAGES = {R.drawable.fight_stage1, R.drawable.fight_stage2};
+    private static final int[] STAGES = {R.drawable.fight_stage1, R.drawable.fight_stage2, R.drawable.fight_stage3};
     /**
      * A fighter's pictures: twelve frames, six across and two down, each in a cell with her
      * feet at one place in it. The first six are her standing, walking, jumping, guarding,
      * hit and down; the next her quick move, heavy move, special, ultimate, win, and one
      * more of her special. The numbers are those tools/make_fight_art.py builds them to.
      */
-    private static final int CELL_WIDE = 480, CELL_TALL = 400, FEET_ACROSS = 200, FEET_DOWN = 392, STANDING = 262, ACROSS = 6;
+    private static final int CELL_WIDE = 720, CELL_TALL = 600, FEET_ACROSS = 300, FEET_DOWN = 588, STANDING = 393, ACROSS = 6;
     private static final int STAND = 0, STEP = 1, LEAP = 2, SHIELD = 3, REEL = 4, FLOORED = 5, QUICK = 6, STRONG = 7, CAST = 8, GRAND = 9,
             CHEER = 10, EXTRA = 11;
     /** The things that fly and flash, side by side in squares; and how much of its square each fills. */
@@ -79,6 +81,23 @@ final class FightGame {
     private final Path path = new Path();
     private final Fight.Pad pad = new Fight.Pad();
     private final int cardColor, ink, soft;
+
+    // Two players
+    private int mode = SOLO, second, picking, twoStage;
+    private final RectF[] buttons2 = new RectF[BUTTONS];
+    private final boolean[] held2 = new boolean[BUTTONS], pressed2 = new boolean[BUTTONS];
+    private final Fight.Pad pad2 = new Fight.Pad();
+    private final RectF duoButton = new RectF(), hostButton = new RectF(), joinButton = new RectF();
+    /** The line to the other device, how it finds this one, and how far the two have got in meeting. */
+    private FightLink link;
+    private FightNearby nearby;
+    private boolean greeted;
+    /** What the other device's player holds, and has pressed since the fight last moved on; what this one last sent, and how long ago. */
+    private int theirHeld, theirPressed, sentPad = -1;
+    private float sincePad, theirSpan = Fight.WIDE;
+    private String notice;
+    private float noticeLeft;
+    private final java.io.ByteArrayOutputStream packed = new java.io.ByteArrayOutputStream(512);
 
     private int width, height;
     private int screen = SELECT;
@@ -125,7 +144,10 @@ final class FightGame {
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
         stroke.setStrokeJoin(Paint.Join.ROUND);
-        for (int index = 0; index < buttons.length; index++) buttons[index] = new RectF();
+        for (int index = 0; index < buttons.length; index++) {
+            buttons[index] = new RectF();
+            buttons2[index] = new RectF();
+        }
         for (int index = 0; index < tiles.length; index++) tiles[index] = new RectF();
         player = Math.max(0, Math.min(Fight.FIGHTERS - 1, session.tally("fight_last")));
         sheet(player);
@@ -169,18 +191,7 @@ final class FightGame {
         unit = Math.max(width / Fight.WIDE, Math.min(width / 6.4f, height * .13f));
         groundY = landscape ? height * .8f : height * .6f;
         if (fight != null) fight.setSpan(width / unit - 1.5f);
-        // The buttons: on the left the arrows with the jump and the guard over them, on the right the two blows with the special over them.
-        float edge = dp(18), size = Math.min(dp(landscape ? 64 : 72), (safe.width() - edge * 2 - dp(64)) / 4.1f), gap = size * .34f;
-        float low = safe.bottom - dp(24) - size, high = low - size - dp(12);
-        float left = safe.left + edge;
-        buttons[LEFT].set(left, low, left + size, low + size);
-        buttons[RIGHT].set(left + size + gap, low, left + size * 2 + gap, low + size);
-        buttons[GUARD].set(left, high, left + size, high + size);
-        buttons[JUMP].set(left + size + gap, high, left + size * 2 + gap, high + size);
-        float right = safe.right - edge;
-        buttons[HEAVY].set(right - size, low, right, low + size);
-        buttons[LIGHT].set(right - size * 2 - gap, low, right - size - gap, low + size);
-        buttons[SPECIAL].set(right - size * 1.5f - gap / 2, high, right - size * .5f - gap / 2, high + size);
+        arrange();
         float small = dp(40), margin = dp(10);
         closeButton.set(safe.right - margin - small, safe.top + margin, safe.right - margin, safe.top + margin + small);
         soundButton.set(closeButton.left - dp(8) - small, closeButton.top, closeButton.left - dp(8), closeButton.bottom);
@@ -194,9 +205,45 @@ final class FightGame {
         }
         float buttonLeft = landscape ? safe.centerX() + dp(8) : safe.left + dp(16);
         fightButton.set(buttonLeft, safe.bottom - dp(22) - dp(54), safe.right - dp(16), safe.bottom - dp(22));
+        // Over it, the three ways for two to play: on this screen, or on two devices, hosting or joining.
+        // On a wide screen they have the left half, beside the button, under whoever is picked.
+        float waysLeft = landscape ? safe.left + dp(16) : buttonLeft, waysRight = landscape ? safe.centerX() - dp(8) : fightButton.right;
+        float each = (waysRight - waysLeft - dp(16)) / 3, pillTop = landscape ? fightButton.centerY() - dp(20) : fightButton.top - dp(10) - dp(40);
+        duoButton.set(waysLeft, pillTop, waysLeft + each, pillTop + dp(40));
+        hostButton.set(duoButton.right + dp(8), pillTop, duoButton.right + dp(8) + each, pillTop + dp(40));
+        joinButton.set(hostButton.right + dp(8), pillTop, waysRight, pillTop + dp(40));
+    }
+
+    /** Sets out a player's seven buttons between two edges: on the left the arrows with the jump and the guard over them, on the right the two blows with the special over them. */
+    private void cluster(RectF[] set, float left, float right, float size) {
+        float gap = size * .34f, low = safe.bottom - dp(24) - size, high = low - size - dp(12);
+        set[LEFT].set(left, low, left + size, low + size);
+        set[RIGHT].set(left + size + gap, low, left + size * 2 + gap, low + size);
+        set[GUARD].set(left, high, left + size, high + size);
+        set[JUMP].set(left + size + gap, high, left + size * 2 + gap, high + size);
+        set[HEAVY].set(right - size, low, right, low + size);
+        set[LIGHT].set(right - size * 2 - gap, low, right - size - gap, low + size);
+        set[SPECIAL].set(right - size * 1.5f - gap / 2, high, right - size * .5f - gap / 2, high + size);
+    }
+
+    /** The buttons, for however many play on this screen: one player has the width of it, two have a half each. */
+    private void arrange() {
+        boolean landscape = width > height * 1.15f;
+        float edge = dp(18);
+        if (mode == DUO) {
+            float middle = safe.centerX(), size = Math.min(dp(64), (middle - safe.left - edge - dp(12)) / 4.85f);
+            cluster(buttons, safe.left + edge, middle - dp(12), size);
+            cluster(buttons2, middle + dp(12), safe.right - edge, size);
+            // With both sets of buttons under the stage, the two stand above them, where they can be seen.
+            groundY = Math.min(landscape ? height * .8f : height * .6f, buttons[GUARD].top - dp(6));
+        } else {
+            groundY = landscape ? height * .8f : height * .6f;
+            cluster(buttons, safe.left + edge, safe.right - edge, Math.min(dp(landscape ? 64 : 72), (safe.width() - edge * 2 - dp(64)) / 4.1f));
+        }
     }
 
     void close() {
+        unlink();
         audio.close();
         keepOnly(-1, -1);
         if (backdrop != null) backdrop.recycle();
@@ -209,16 +256,31 @@ final class FightGame {
             pause();
         } else if (screen == PAUSED) {
             screen = FIGHT;
-        } else if (screen == VERSUS || screen == RESULT) {
+        } else if (screen == VERSUS || screen == RESULT || screen == LOBBY) {
             toSelect();
+        } else if (picking == 1) {
+            picking = 0;
         } else {
             return false;
         }
         return true;
     }
 
+    /** Lets go of the other device, if there is one. */
+    private void unlink() {
+        if (link != null) link.close();
+        if (nearby != null) nearby.stop();
+        link = null;
+        nearby = null;
+        greeted = false;
+    }
+
     private void toSelect() {
         audio.hush();
+        unlink();
+        mode = SOLO;
+        picking = 0;
+        arrange();
         screen = SELECT;
         fight = null;
         keepOnly(player, -1);
@@ -278,14 +340,175 @@ final class FightGame {
         say(player, which);
     }
 
+    /** Two players on this screen: the second picks her fighter, and they begin. */
+    private void two() {
+        mode = DUO;
+        twoStage = random.nextInt(STAGES.length);
+        keepOnly(player, second);
+        backdrop(twoStage);
+        begin();
+    }
+
+    /** Opens a game for another device to join, and waits for it. */
+    private void host() {
+        unlink();
+        mode = HOST;
+        link = FightLink.host(FightLink.PORT);
+        nearby = new FightNearby(context);
+        nearby.announce(FightLink.PORT);
+        screen = LOBBY;
+        pills("Cancel", TO_SELECT);
+    }
+
+    /** Looks for a game another device has opened on this Wi-Fi, to join it. */
+    private void join() {
+        unlink();
+        mode = GUEST;
+        // In a build made for testing, a number kept under this name joins a game through the machine the emulator runs on.
+        if (BuildConfig.DEBUG && session.tally("fight_direct") > 0) {
+            link = FightLink.join("10.0.2.2", FightLink.PORT);
+        } else {
+            nearby = new FightNearby(context);
+            nearby.look();
+        }
+        screen = LOBBY;
+        pills("Cancel", TO_SELECT);
+    }
+
+    /** The two devices meeting: each tells the other who it fights as, and the one that hosts says when to begin. */
+    private void lobby() {
+        if (mode == GUEST && link == null && nearby != null && nearby.address() != null) link = FightLink.join(nearby.address(), nearby.port());
+        if (link == null) return;
+        if (link.closed()) {
+            // It did not work: the one that joins goes on looking, the one that hosts gives up.
+            String why = link.problem();
+            if (mode == GUEST && nearby != null) {
+                link = null;
+                greeted = false;
+                nearby.stop();
+                nearby = new FightNearby(context);
+                nearby.look();
+            } else {
+                toSelect();
+                say("Could not connect" + (why == null ? "" : ": " + why));
+            }
+            return;
+        }
+        if (!link.connected()) return;
+        if (mode == GUEST && !greeted) {
+            greeted = true;
+            link.send(FightLink.HELLO, FightLink.VERSION, player, Math.round(Math.min(Fight.WIDE, width / unit - 1.5f) * 10));
+        }
+        for (byte[] message = link.poll(); message != null; message = link.poll()) {
+            if (message[0] == FightLink.HELLO && mode == HOST && message.length >= 4) {
+                if (message[1] != FightLink.VERSION) {
+                    toSelect();
+                    say("The other device has a different version of the app");
+                    return;
+                }
+                second = Math.max(0, Math.min(Fight.FIGHTERS - 1, message[2]));
+                theirSpan = (message[3] & 0xFF) / 10f;
+                twoStage = random.nextInt(STAGES.length);
+                link.send(FightLink.START, player, second, twoStage);
+                keepOnly(player, second);
+                backdrop(twoStage);
+                begin();
+                return;
+            } else if (message[0] == FightLink.START && mode == GUEST && message.length >= 4) {
+                second = Math.max(0, Math.min(Fight.FIGHTERS - 1, message[1]));
+                twoStage = Math.max(0, Math.min(STAGES.length - 1, message[3]));
+                keepOnly(player, second);
+                backdrop(twoStage);
+                begin();
+                return;
+            } else if (message[0] == FightLink.BYE) {
+                toSelect();
+                say("The other player left");
+                return;
+            }
+        }
+    }
+
+    /** A word across the top of the screen for a few seconds. */
+    private void say(String words) {
+        notice = words;
+        noticeLeft = 4;
+    }
+
+    /**
+     * What has come over the line during a fight on two devices, and what goes back. The
+     * host hears what the other player holds down and sends how the fight stands; the one
+     * that joined is sent the fight and shows it. Returns false if the other has gone.
+     */
+    private boolean net() {
+        byte[] state = null;
+        for (byte[] message = link.poll(); message != null; message = link.poll()) {
+            if (message[0] == FightLink.PAD && mode == HOST && message.length >= 2) {
+                int bits = message[1];
+                theirPressed |= bits & ~theirHeld;
+                theirHeld = bits;
+            } else if (message[0] == FightLink.STATE && mode == GUEST) {
+                state = message;
+            } else if (message[0] == FightLink.START && mode == GUEST && message.length >= 4) {
+                twoStage = Math.max(0, Math.min(STAGES.length - 1, message[3]));
+                backdrop(twoStage);
+                begin();
+                state = null;
+            } else if (message[0] == FightLink.AGAIN && mode == HOST && screen == RESULT) {
+                again();
+            } else if (message[0] == FightLink.BYE) {
+                toSelect();
+                say("The other player left");
+                return false;
+            }
+        }
+        if (link.closed()) {
+            toSelect();
+            say("The other player left");
+            return false;
+        }
+        try {
+            if (state != null) {
+                fight.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(state, 1, state.length - 1)));
+            } else if (mode == HOST) {
+                packed.reset();
+                fight.write(new java.io.DataOutputStream(packed));
+                link.send(FightLink.STATE, packed.toByteArray());
+            }
+        } catch (java.io.IOException garbled) {
+            toSelect();
+            say("The two devices stopped understanding each other");
+            return false;
+        }
+        return true;
+    }
+
+    /** Another fight between the same two: the host begins it and tells the other. */
+    private void again() {
+        twoStage = random.nextInt(STAGES.length);
+        link.send(FightLink.START, player, second, twoStage);
+        backdrop(twoStage);
+        begin();
+    }
+
     private void begin() {
-        int foe = ladder[rung];
-        fight = new Fight(player, foe, -1, Math.min(Fight.LEVELS - 1, rung), System.nanoTime());
-        fight.setSpan(width / unit - 1.5f);
-        sheet(player);
-        sheet(foe);
+        // One player meets the next on the ladder; two meet each other, the host's fighter on the left on both devices.
+        if (mode == SOLO) fight = new Fight(player, ladder[rung], -1, Math.min(Fight.LEVELS - 1, rung), System.nanoTime());
+        else if (mode == GUEST) fight = new Fight(second, player, -1, -1, 0);
+        else fight = new Fight(player, second, -1, -1, System.nanoTime());
+        arrange();
+        // They may get no further apart than the narrower of the two screens shows.
+        fight.setSpan(Math.min(width / unit - 1.5f, mode == HOST ? theirSpan : Fight.WIDE));
+        sheet(fight.fighters[0].kind);
+        sheet(fight.fighters[1].kind);
         java.util.Arrays.fill(held, false);
         java.util.Arrays.fill(pressed, false);
+        java.util.Arrays.fill(held2, false);
+        java.util.Arrays.fill(pressed2, false);
+        pad2.clear();
+        theirHeld = 0;
+        theirPressed = 0;
+        sentPad = -1;
         seenHits = 0;
         seenBlocks = 0;
         seenThrows = 0;
@@ -309,8 +532,10 @@ final class FightGame {
 
     private void pause() {
         java.util.Arrays.fill(held, false);
+        java.util.Arrays.fill(held2, false);
         screen = PAUSED;
-        pills("Carry on", RESUME, "Fighters", TO_SELECT);
+        // On two devices the fight goes on behind the card: there is no stopping the other player's clock.
+        pills("Carry on", RESUME, mode == SOLO ? "Fighters" : "Leave", TO_SELECT);
     }
 
     private void pills(Object... labelled) {
@@ -322,9 +547,17 @@ final class FightGame {
     }
 
     private void finish() {
-        won = fight.winner() == 0;
+        won = fight.winner() == (mode == GUEST ? 1 : 0);
         java.util.Arrays.fill(held, false);
+        java.util.Arrays.fill(held2, false);
         screen = RESULT;
+        if (mode != SOLO) {
+            // Between two players nothing is kept: whoever won says so, and they may go again.
+            audio.play(won || mode == DUO ? "win" : "lose");
+            say(fight.fighters[fight.winner()].kind, FightCast.WIN);
+            pills("Rematch", AGAIN, "Fighters", TO_SELECT);
+            return;
+        }
         session.keep(won ? "fight_won" : "fight_lost", session.tally(won ? "fight_won" : "fight_lost") + 1);
         if (won) {
             if (rung + 1 > session.tally("fight_best")) session.keep("fight_best", rung + 1);
@@ -346,6 +579,13 @@ final class FightGame {
         buzz(false);
         if (action == RESUME) {
             screen = FIGHT;
+        } else if (action == AGAIN && mode == DUO) {
+            begin();
+        } else if (action == AGAIN && mode == HOST) {
+            again();
+        } else if (action == AGAIN && mode == GUEST) {
+            link.send(FightLink.AGAIN);
+            say("Asked the other player for another");
         } else if (action == TO_SELECT) {
             toSelect();
         } else if (action == NEXT) {
@@ -362,7 +602,14 @@ final class FightGame {
 
     void advance(float seconds) {
         clock += seconds;
-        if (screen != FIGHT) return;
+        if (noticeLeft > 0) noticeLeft -= seconds;
+        if (screen == LOBBY) {
+            lobby();
+            return;
+        }
+        boolean linked = (mode == HOST || mode == GUEST) && fight != null && link != null;
+        if (linked && !net()) return;
+        if (screen != FIGHT && !(linked && screen == PAUSED)) return;
         for (int side = 0; side < 2; side++) if (captionLeft[side] > 0) captionLeft[side] -= seconds;
         if (bannerLeft > 0) bannerLeft -= seconds;
         if (shake > 0) shake -= seconds;
@@ -378,18 +625,30 @@ final class FightGame {
             java.util.Arrays.fill(pressed, false);
             audio.play("bell", .6f);
         }
-        if (hold > 0) {
+        if (mode == GUEST) {
+            // What this player holds down goes to the device that runs the fight, whenever it changes and a few times a second besides.
+            held(pad, held, pressed);
+            int bits = pad.bits();
+            if (bits != sentPad || (sincePad += seconds) > .05f) {
+                link.send(FightLink.PAD, bits);
+                sentPad = bits;
+                sincePad = 0;
+            }
+            if (hold > 0) hold -= seconds;
+            heard();
+        } else if (hold > 0) {
             hold -= seconds;
         } else {
-            pad.left = held[LEFT];
-            pad.right = held[RIGHT];
-            pad.block = held[GUARD];
-            pad.jump = held[JUMP] || pressed[JUMP];
-            pad.light = held[LIGHT] || pressed[LIGHT];
-            pad.heavy = held[HEAVY] || pressed[HEAVY];
-            pad.special = held[SPECIAL] || pressed[SPECIAL];
-            java.util.Arrays.fill(pressed, false);
-            fight.step(seconds, pad);
+            held(pad, held, pressed);
+            if (mode == SOLO) {
+                fight.step(seconds, pad);
+            } else {
+                // The other side is played by hand too: on this screen's other half, or on the other device.
+                if (mode == DUO) held(pad2, held2, pressed2);
+                else pad2.set(theirHeld | theirPressed);
+                theirPressed = 0;
+                fight.step(seconds, pad, pad2);
+            }
             heard();
         }
         Fight.Fighter one = fight.fighters[0], other = fight.fighters[1];
@@ -402,6 +661,18 @@ final class FightGame {
             shownHealth[side] = now > shownHealth[side] ? now : Math.max(now, shownHealth[side] - seconds * .45f);
         }
         if (fight.phase() == Fight.MATCH_OVER) finish();
+    }
+
+    /** What a player holds down: a button held, or pressed since the fight last moved on. */
+    private void held(Fight.Pad into, boolean[] holding, boolean[] tapped) {
+        into.left = holding[LEFT];
+        into.right = holding[RIGHT];
+        into.block = holding[GUARD];
+        into.jump = holding[JUMP] || tapped[JUMP];
+        into.light = holding[LIGHT] || tapped[LIGHT];
+        into.heavy = holding[HEAVY] || tapped[HEAVY];
+        into.special = holding[SPECIAL] || tapped[SPECIAL];
+        java.util.Arrays.fill(tapped, false);
     }
 
     /** What has just happened in the fight, made into sounds, flashes and words. */
@@ -513,11 +784,36 @@ final class FightGame {
             } else if (fightButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 buzz(false);
-                climb();
+                if (picking == 1) two();
+                else climb();
+            } else if (picking == 0 && duoButton.contains(x, y)) {
+                // The second player picks next, from the same five.
+                audio.play("tap", .5f);
+                buzz(false);
+                picking = 1;
+                second = (player + 1) % Fight.FIGHTERS;
+                sheet(second);
+            } else if (picking == 0 && hostButton.contains(x, y)) {
+                audio.play("tap", .5f);
+                buzz(false);
+                host();
+            } else if (picking == 0 && joinButton.contains(x, y)) {
+                audio.play("tap", .5f);
+                buzz(false);
+                join();
             } else {
                 for (int index = 0; index < tiles.length; index++) {
                     if (tiles[index].contains(x, y)) {
-                        pick(index);
+                        if (picking == 1) {
+                            second = index;
+                            keepOnly(player, second);
+                            sheet(second);
+                            audio.play("pick", .6f);
+                            say(second, FightCast.PICK);
+                            buzz(false);
+                        } else {
+                            pick(index);
+                        }
                         return;
                     }
                 }
@@ -547,25 +843,31 @@ final class FightGame {
      */
     private void holding(MotionEvent event) {
         int action = event.getActionMasked();
-        boolean[] now = new boolean[BUTTONS];
+        // With two players on this screen there are two sets of buttons, and a finger may be on either.
+        boolean[] now = new boolean[BUTTONS * 2];
+        int sets = mode == DUO ? 2 : 1;
         if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
             for (int finger = 0; finger < event.getPointerCount(); finger++) {
                 if (action == MotionEvent.ACTION_POINTER_UP && finger == event.getActionIndex()) continue;
-                float x = event.getX(finger), y = event.getY(finger), nearest = Float.MAX_VALUE;
+                float x = event.getX(finger), y = event.getY(finger), nearest = Float.MAX_VALUE, wide = 0;
                 int which = -1;
-                for (int index = 0; index < BUTTONS; index++) {
-                    float away = (float) Math.hypot(x - buttons[index].centerX(), y - buttons[index].centerY());
+                for (int index = 0; index < BUTTONS * sets; index++) {
+                    RectF button = index < BUTTONS ? buttons[index] : buttons2[index - BUTTONS];
+                    float away = (float) Math.hypot(x - button.centerX(), y - button.centerY());
                     if (away < nearest) {
                         nearest = away;
                         which = index;
+                        wide = button.width();
                     }
                 }
-                if (which >= 0 && nearest < buttons[which].width() * .95f) now[which] = true;
+                if (which >= 0 && nearest < wide * .95f) now[which] = true;
             }
         }
         for (int index = 0; index < BUTTONS; index++) {
             if (now[index] && !held[index]) pressed[index] = true;
             held[index] = now[index];
+            if (now[BUTTONS + index] && !held2[index]) pressed2[index] = true;
+            held2[index] = now[BUTTONS + index];
         }
     }
 
@@ -575,18 +877,55 @@ final class FightGame {
         if (width == 0) return;
         if (screen == SELECT) {
             drawSelect(canvas);
+        } else if (screen == LOBBY) {
+            drawLobby(canvas);
         } else if (screen == VERSUS) {
             drawVersus(canvas);
         } else {
             drawFight(canvas);
             if (screen == PAUSED) {
                 canvas.drawColor(0x99000000);
-                card(canvas, "Paused", FightCast.NAMES[player] + " against " + FightCast.NAMES[ladder[rung]], 0);
+                card(canvas, mode == HOST || mode == GUEST ? "Leave the fight?" : "Paused",
+                        FightCast.NAMES[fight.fighters[0].kind] + " against " + FightCast.NAMES[fight.fighters[1].kind], 0);
             } else if (screen == RESULT) {
                 canvas.drawColor(0x99000000);
                 drawResult(canvas);
             }
         }
+        // A word across the top, when there is one to say.
+        if (noticeLeft > 0 && notice != null) {
+            text.setTextSize(dp(14));
+            text.setTextAlign(Paint.Align.CENTER);
+            float wide = Math.min(safe.width() - dp(32), text.measureText(notice) + dp(32));
+            box.set(safe.centerX() - wide / 2, safe.top + dp(96), safe.centerX() + wide / 2, safe.top + dp(134));
+            plate(canvas, box, dp(19), Math.round(240 * Math.min(1, noticeLeft / .4f)));
+            text.setColor(ink);
+            text.setAlpha(Math.round(255 * Math.min(1, noticeLeft / .4f)));
+            if (text.measureText(notice) > wide - dp(24)) text.setTextSize(dp(14) * (wide - dp(24)) / text.measureText(notice));
+            canvas.drawText(notice, safe.centerX(), safe.top + dp(120), text);
+            text.setAlpha(255);
+        }
+    }
+
+    /** Waiting for the other device: what is being waited for, and what the other player has to do. */
+    private void drawLobby(Canvas canvas) {
+        boolean landscape = width > height * 1.15f;
+        drawBackdrop(canvas, 0, height * (landscape ? .86f : .62f), (float) Math.sin(clock * .2f) * .3f);
+        canvas.drawColor(0x99000000);
+        String dots = "...".substring(0, 1 + (int) (clock * 2) % 3);
+        boolean joined = link != null && link.connected();
+        String title = joined ? "Found each other" + dots : mode == HOST ? "Waiting for player two" + dots : "Looking for a game" + dots;
+        text.setTextSize(dp(14));
+        float wide = Math.min(safe.width() - dp(32), dp(320)) - dp(40);
+        List<String> lines = wrap(mode == HOST ? "On the other device: open Page brawl, pick a fighter and tap Join. Both devices have to be on the same Wi-Fi."
+                : "On the other device: open Page brawl, pick a fighter and tap Host. Both devices have to be on the same Wi-Fi.", wide);
+        float high = lines.size() * dp(19) + dp(8);
+        float top = card(canvas, title, "You fight as " + FightCast.NAMES[player], high);
+        text.setTextSize(dp(14));
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        float left = safe.centerX() - wide / 2;
+        for (int index = 0; index < lines.size(); index++) canvas.drawText(lines.get(index), left, top + dp(19) * (index + .8f), text);
     }
 
     /** A stage over the whole screen, the line its fighters stand on at a height asked for, slid a little by how far along the view is. */
@@ -694,7 +1033,7 @@ final class FightGame {
         Fight.Fighter[] two = fight.fighters;
         float jolt = shake > 0 ? (float) Math.sin(clock * 90) * dp(5) * Math.min(1, shake / .2f) : 0;
         float span = Math.max(.01f, Fight.WIDE - width / unit);
-        drawBackdrop(canvas, rung % STAGES.length, groundY, width / unit >= Fight.WIDE ? 0 : (cameraX / span) * 2 - 1);
+        drawBackdrop(canvas, mode == SOLO ? rung % STAGES.length : twoStage, groundY, width / unit >= Fight.WIDE ? 0 : (cameraX / span) * 2 - 1);
         canvas.save();
         canvas.translate(jolt, 0);
         float scale = Fight.TALL * unit / STANDING;
@@ -844,7 +1183,9 @@ final class FightGame {
             outlined(canvas, bannerUnder, safe.centerX(), y + dp(28), Color.WHITE, fade);
         }
         if (screen == FIGHT) {
-            for (int index = 0; index < BUTTONS; index++) button(canvas, index);
+            // Each player's buttons show her own fighter's special; on the device that joined, that is the one on the right.
+            for (int index = 0; index < BUTTONS; index++) button(canvas, index, buttons, held, fight.fighters[mode == GUEST ? 1 : 0]);
+            if (mode == DUO) for (int index = 0; index < BUTTONS; index++) button(canvas, index, buttons2, held2, fight.fighters[1]);
             plate(canvas, pauseButton, pauseButton.height() / 2, 200);
             paint.setColor(ink);
             canvas.drawRoundRect(pauseButton.centerX() - dp(5.5f), pauseButton.centerY() - dp(6.5f), pauseButton.centerX() - dp(2), pauseButton.centerY() + dp(6.5f), dp(1.2f), dp(1.2f), paint);
@@ -950,7 +1291,10 @@ final class FightGame {
             // Her name, and a pip for each round she has taken.
             text.setTextSize(dp(12.5f));
             text.setTextAlign(side == 0 ? Paint.Align.LEFT : Paint.Align.RIGHT);
-            outlined(canvas, FightCast.NAMES[fighter.kind], side == 0 ? left + dp(2) : right - dp(2), meterTop + low + dp(15), Color.WHITE, 1);
+            // With two playing, whose she is goes after her name.
+            String name = FightCast.NAMES[fighter.kind] + (mode == DUO ? side == 0 ? "  P1" : "  P2"
+                    : mode != SOLO && (mode == GUEST) == (side == 1) ? "  you" : "");
+            outlined(canvas, name, side == 0 ? left + dp(2) : right - dp(2), meterTop + low + dp(15), Color.WHITE, 1);
             for (int pip = 0; pip < Fight.ROUNDS; pip++) {
                 float x = inner - way * (dp(7) + pip * dp(14)), y = meterTop + low + dp(10);
                 paint.setColor(pip < fighter.wins ? GOLD : 0x99201A2C);
@@ -967,10 +1311,9 @@ final class FightGame {
     }
 
     /** One of the round buttons: see-through, with a soft edge, and filled in while it is held. */
-    private void button(Canvas canvas, int which) {
-        RectF where = buttons[which];
-        Fight.Fighter mine = fight.fighters[0];
-        boolean down = held[which], ready = which == SPECIAL && mine.charged();
+    private void button(Canvas canvas, int which, RectF[] set, boolean[] holding, Fight.Fighter mine) {
+        RectF where = set[which];
+        boolean down = holding[which], ready = which == SPECIAL && mine.charged();
         float x = where.centerX(), y = where.centerY(), round = where.width() / 2;
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0x26000000);
@@ -1028,7 +1371,8 @@ final class FightGame {
             int picture = SPECIAL_FX[mine.kind];
             thing(canvas, picture, x, y - (ready ? round * .16f : 0), round * (picture == BAT_FX ? 1.5f : 1.05f), picture == BAT_FX ? -40 : 0, false);
             if (ready) {
-                text.setTextSize(round * .44f);
+                // Small enough to sit inside the button, under the picture.
+                text.setTextSize(round * .27f);
                 text.setTextAlign(Paint.Align.CENTER);
                 text.setColor(0xFF3A3340);
                 canvas.drawText("ULTIMATE", x, y + round * .62f, text);
@@ -1138,6 +1482,16 @@ final class FightGame {
         boolean last = rung + 1 >= ladder.length;
         String title = won ? last ? "Top of the ladder!" : FightCast.NAMES[player] + " wins" : FightCast.NAMES[ladder[rung]] + " wins";
         String under = won && last ? "All four beaten with " + FightCast.NAMES[player] : "Fight " + (rung + 1) + " of " + ladder.length;
+        int player = this.player;
+        boolean won = this.won;
+        if (mode != SOLO) {
+            // Between two players the card is the winner's, with what she says about it.
+            int winner = fight.winner();
+            player = fight.fighters[winner].kind;
+            title = mode == DUO ? "Player " + (winner + 1) + " wins" : won ? "You win!" : "You lose";
+            under = FightCast.NAMES[player] + " takes it, " + fight.fighters[winner].wins + " rounds to " + fight.fighters[1 - winner].wins;
+            won = true;
+        }
         // Her on the card, with what she says about it.
         text.setTextSize(dp(14));
         List<String> lines = wrap("“" + shown(player, FightCast.line(player, won ? FightCast.WIN : FightCast.LOSE)) + "”",
@@ -1188,17 +1542,20 @@ final class FightGame {
 
     private void drawSelect(Canvas canvas) {
         boolean landscape = width > height * 1.15f;
+        // With two to play on this screen, the second picks after the first: the same five, and her card.
+        int player = picking == 1 ? second : this.player;
         drawBackdrop(canvas, 0, height * (landscape ? .86f : .62f), (float) Math.sin(clock * .2f) * .3f);
         canvas.drawColor(dark ? 0x8C000000 : 0x59FFFFFF);
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(ink);
         text.setTextSize(dp(26));
-        canvas.drawText(FightCast.GAME, safe.left + dp(18), safe.top + dp(40), text);
+        canvas.drawText(picking == 1 ? "Player two" : FightCast.GAME, safe.left + dp(18), safe.top + dp(40), text);
         int cleared = 0;
         for (int fighter = 0; fighter < Fight.FIGHTERS; fighter++) if (session.tally("fight_cleared_" + fighter) > 0) cleared++;
         text.setColor(soft);
         text.setTextSize(dp(13.5f));
-        canvas.drawText("Won " + session.tally("fight_won") + "  ·  Ladder topped with " + cleared + " of " + Fight.FIGHTERS,
+        canvas.drawText(picking == 1 ? "Pick your fighter. Best with the screen on its side."
+                : "Won " + session.tally("fight_won") + "  ·  Ladder topped with " + cleared + " of " + Fight.FIGHTERS,
                 safe.left + dp(18), safe.top + dp(58), text);
         corner(canvas, closeButton, false);
         corner(canvas, soundButton, true);
@@ -1219,9 +1576,14 @@ final class FightGame {
         text.setTextSize(dp(13.5f));
         List<String> tip = wrap(FightCast.TIPS[player], cardRight - cardLeft - pad * 2);
         List<String> phrase = wrap("“" + shown(player, FightCast.line(player, FightCast.PICK)) + "”", cardRight - cardLeft - pad * 2);
-        float tall = pad + dp(30) + dp(20) + dp(8) + 4 * dp(19) + dp(8) + tip.size() * dp(18) + dp(6) + phrase.size() * dp(18) + pad;
-        float cardBottom = fightButton.top - dp(12), cardTop = landscape ? Math.max(safe.top + dp(66), cardBottom - tall) : cardBottom - tall;
-        float bandTop = tiles[0].bottom + dp(8), bandBottom = landscape ? safe.bottom - dp(20) : cardTop - dp(4);
+        float cardBottom = (picking == 1 || landscape ? fightButton.top : duoButton.top) - dp(12);
+        // On a short screen what there is no room for is left off the card: first the tip, then what she says.
+        float most = landscape ? cardBottom - safe.top - dp(66) : Float.MAX_VALUE, fixed = pad + dp(30) + dp(20) + dp(8) + 4 * dp(19) + dp(8) + dp(6) + pad;
+        if (fixed + (tip.size() + phrase.size()) * dp(18) > most) tip = new ArrayList<>();
+        if (fixed + (tip.size() + phrase.size()) * dp(18) > most) phrase = new ArrayList<>();
+        float tall = fixed + (tip.size() + phrase.size()) * dp(18);
+        float cardTop = cardBottom - tall;
+        float bandTop = tiles[0].bottom + dp(8), bandBottom = landscape ? (picking == 1 ? safe.bottom - dp(20) : duoButton.top - dp(8)) : cardTop - dp(4);
         float standing = Math.min(dp(300), bandBottom - bandTop - dp(6));
         if (standing > dp(70)) {
             float scale = standing / (STANDING * 1.12f), x = landscape ? safe.left + safe.width() * .25f : safe.centerX();
@@ -1281,7 +1643,22 @@ final class FightGame {
         text.setColor(Color.WHITE);
         text.setTextSize(dp(18));
         text.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText("Fight", fightButton.centerX(), fightButton.centerY() + dp(6.5f), text);
+        canvas.drawText(picking == 1 ? "Start" : "Fight", fightButton.centerX(), fightButton.centerY() + dp(6.5f), text);
+        if (picking == 1) return;
+        // The ways for two to play: a half of this screen each, or a device each over the same Wi-Fi.
+        RectF[] ways = {duoButton, hostButton, joinButton};
+        String[] names = {"2 players here", "Host a game", "Join a game"};
+        for (int index = 0; index < ways.length; index++) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(dark ? 0xFF44292E : 0xFFFCE9EB);
+            canvas.drawRoundRect(ways[index], dp(20), dp(20), paint);
+            paint.setColor(Color.BLACK);
+            text.setColor(CalculatorLayout.CORAL);
+            text.setTextSize(dp(13.5f));
+            float room = ways[index].width() - dp(14), wide = text.measureText(names[index]);
+            if (wide > room) text.setTextSize(dp(13.5f) * room / wide);
+            canvas.drawText(names[index], ways[index].centerX(), ways[index].centerY() + dp(5), text);
+        }
     }
 
     private void drawVersus(Canvas canvas) {

@@ -33,6 +33,10 @@ final class CompanionPrefs {
     static final String PRANKS = "pranks";
     /** Plus run plays its sounds and her voice. */
     static final String GAME_SOUND = "game_sound";
+    /** The user's birthday, the month and the day as one number (the 14th of March is 314), or 0 if she has not been told. */
+    static final String BIRTHDAY = "birthday";
+    /** The last day she celebrated it on, the year and the day of the year as one number. */
+    private static final String PARTIED = "partied";
     /** What she calls the user, in place of "Sloppy". */
     static final String NICKNAME = "nickname";
     static final int NICKNAME_LENGTH = 20;
@@ -68,6 +72,30 @@ final class CompanionPrefs {
     float x() { return clamp(preferences.getFloat(X, 1f)); }
     float y() { return clamp(preferences.getFloat(Y, .58f)); }
     boolean offered() { return preferences.getBoolean(OFFERED, false); }
+
+    int birthday() { return preferences.getInt(BIRTHDAY, 0); }
+
+    void setBirthday(int monthAndDay) { preferences.edit().putInt(BIRTHDAY, monthAndDay).apply(); }
+
+    /** Whether today is the user's birthday. One born on the 29th of February has it on the 28th in a year without one. */
+    boolean birthdayToday() { return birthdayOn(birthday(), java.util.Calendar.getInstance()); }
+
+    static boolean birthdayOn(int monthAndDay, java.util.Calendar day) {
+        if (monthAndDay <= 0) return false;
+        int month = day.get(java.util.Calendar.MONTH) + 1, date = day.get(java.util.Calendar.DAY_OF_MONTH);
+        if (monthAndDay == 229 && day.getActualMaximum(java.util.Calendar.DAY_OF_YEAR) < 366) return month == 2 && date == 28;
+        return monthAndDay == month * 100 + date;
+    }
+
+    private static int today() {
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        return now.get(java.util.Calendar.YEAR) * 1000 + now.get(java.util.Calendar.DAY_OF_YEAR);
+    }
+
+    /** Whether she has already celebrated today; and remembers that she now has. */
+    boolean partiedToday() { return preferences.getInt(PARTIED, 0) == today(); }
+
+    void setPartied() { preferences.edit().putInt(PARTIED, today()).apply(); }
 
     /** What she calls the user: "Sloppy" unless they gave her another name. */
     String nickname() { return Chatter.nickname(preferences.getString(NICKNAME, null)); }

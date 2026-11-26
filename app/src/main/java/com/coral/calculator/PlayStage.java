@@ -1,6 +1,9 @@
 package com.coral.calculator;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -87,6 +90,8 @@ final class PlayStage extends View {
     private int insetLeft, insetTop, insetRight, insetBottom;
     private int hinge = FoldState.NO_HINGE;
     private float homeX = Float.NaN, homeY = Float.NaN;
+    /** How tall she stands where she keeps the user company: in a prank she is that tall here too, so she does not change size as it begins. */
+    private float homeTall = Float.NaN;
     private boolean started;
     private boolean running;
     /** The host has been told to take the stage down. */
@@ -307,6 +312,12 @@ final class PlayStage extends View {
         homeY = feet;
     }
 
+    /** The same, with how tall she stands there. */
+    void setHome(float x, float feet, float tall) {
+        setHome(x, feet);
+        homeTall = tall;
+    }
+
     @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
         layout();
     }
@@ -326,7 +337,9 @@ final class PlayStage extends View {
             started = true;
             return;
         }
-        herHeight = Math.max(dp(84), Math.min(dp(136), Math.min(play.width(), play.height()) * .17f));
+        // In a prank she is the size she was a moment ago; in a game, a size that suits the screen.
+        herHeight = isPrank(game) && !Float.isNaN(homeTall) ? homeTall
+                : Math.max(dp(84), Math.min(dp(136), Math.min(play.width(), play.height()) * .17f));
         herWidth = herHeight * (pet != null ? (pet.getWidth() / PetArt.COLUMNS) / (float) (pet.getHeight() / PetArt.FRAMES.length)
                 : art.getWidth() / (float) art.getHeight());
         if (Float.isNaN(homeX)) {
@@ -472,8 +485,36 @@ final class PlayStage extends View {
 
     // The clock
 
+    /**
+     * Going home, or to the list of recent apps, takes a game down with it. A game is drawn
+     * over whatever is on screen, so without this it would stay there, over the home screen.
+     * The system says when either is asked for; a prank, which ends by itself, is left to.
+     */
+    private final BroadcastReceiver homeward = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            wentHome = true;
+            leave();
+        }
+    };
+    private boolean listening, wentHome;
+
+    /** Whether the game was left by going home: then nothing of it is to be put back on the screen. */
+    boolean wentHome() { return wentHome; }
+
+    // Before Android 13 there is no flag to give: the system is the only sender of this, and the check for the version is above the call.
+    @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag")
     @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        if (!isPrank(game) && !listening) {
+            IntentFilter away = new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
+            try {
+                if (Build.VERSION.SDK_INT >= 33) getContext().registerReceiver(homeward, away, Context.RECEIVER_EXPORTED);
+                else getContext().registerReceiver(homeward, away);
+                listening = true;
+            } catch (RuntimeException refused) {
+                // Then the game stays up until it is left by its own button or by Back.
+            }
+        }
         if (Build.VERSION.SDK_INT >= 33 && !isPrank(game)) {
             OnBackInvokedCallback callback = this::back;
             findOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
@@ -484,6 +525,14 @@ final class PlayStage extends View {
     }
 
     @Override protected void onDetachedFromWindow() {
+        if (listening) {
+            try {
+                getContext().unregisterReceiver(homeward);
+            } catch (RuntimeException gone) {
+                // It was not registered after all.
+            }
+            listening = false;
+        }
         running = false;
         removeCallbacks(frame);
         if (runGame != null) runGame.close();

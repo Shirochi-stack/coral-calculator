@@ -300,6 +300,18 @@ final class Chatter {
             "Top the ladder in Page brawl. With me Sloppy~♡",
     };
 
+    /** On the user's birthday, as she celebrates it. */
+    private static final String[] BIRTHDAY = {
+            "Happy birthday Sloppy~♡",
+            "It's your birthday! I baked. Sort of Sloppy~♡",
+            "One year older. Still can't do sums Sloppy~♡",
+            "Make a wish. Not that one Sloppy~♡",
+            "The cake is mine. You may watch Sloppy~♡",
+            "Today you're allowed one wrong answer Sloppy~♡",
+            "Happy birthday. I got you me Sloppy~♡",
+            "Blow out the candle. Gently, it's mine Sloppy~♡",
+    };
+
     /** A line in Japanese now and then, to tease those who cannot read it. */
     private static final String[] JAPANESE = {
             "え〜、こんなのも計算できないの？ ざぁこ~♡",
@@ -370,7 +382,7 @@ final class Chatter {
             "Heh heh heh Sloppy~♡",
     };
 
-    private static final String[][] EVERYTHING = {OUTPUTS, ANTICS, TEASING, SUMS, GAMES, JAPANESE, MORNING, AFTERNOON,
+    private static final String[][] EVERYTHING = {OUTPUTS, ANTICS, TEASING, SUMS, GAMES, BIRTHDAY, JAPANESE, MORNING, AFTERNOON,
             EVENING, NIGHT, PRANK};
 
     private Chatter() {}
@@ -382,6 +394,9 @@ final class Chatter {
      * @param hour the hour of the day, 0 to 23
      * @param last what she said last, which she does not say twice running; may be null
      */
+    /** What she says as she celebrates the user's birthday. */
+    static String birthday(Random random) { return BIRTHDAY[random.nextInt(BIRTHDAY.length)]; }
+
     static String idle(Random random, int hour, String last) {
         for (int tries = 0; ; tries++) {
             int roll = random.nextInt(100);

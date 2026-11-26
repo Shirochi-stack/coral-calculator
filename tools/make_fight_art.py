@@ -36,14 +36,17 @@ SOURCE = ROOT / "assets" / "fight"
 RES = ROOT / "app" / "src" / "main" / "res" / "drawable-nodpi"
 FIGHTERS = ("halgakos", "chikuwa", "tsubakieh", "rune", "illya")
 # A fighter's cell, where her feet stand in it, and how tall she is standing.
-CELL = (480, 400)
-FEET = (200, 392)
-STAND = 262
+# Large enough that a fighter is not stretched to more than about one and a half times her size on a big screen:
+# at two thirds of this she looked soft there.
+CELL = (720, 600)
+FEET = (300, 588)
+STAND = 393
 # The frames of each sheet in which she is upright, from which her height is taken.
 UPRIGHT = {"move": (0, 1, 3, 4), "hits": (0, 1, 2, 4, 5)}
-FX_CELL = 160
+FX_CELL = 240
 FACE = 256
-STAGE_WIDTH = 1280
+STAGE_WIDTH = 1920
+STAGES = 3
 
 
 def clean(image):
@@ -145,7 +148,7 @@ def fighter(name, report):
             if size[0] > CELL[0] or top < 0:
                 raise SystemExit(f"{name} {sheet_name} frame {column} is {size}, too large for its cell {CELL}")
             atlas.alpha_composite(small, (column * CELL[0] + left, row * CELL[1] + top))
-    atlas.save(RES / f"fight_{name}.webp", quality=88, alpha_quality=92, method=6)
+    atlas.save(RES / f"fight_{name}.webp", quality=90, alpha_quality=94, method=6)
     return atlas
 
 
@@ -202,10 +205,10 @@ def main():
         tall.append(size[1] / FX_CELL)
     fx.save(RES / "fight_fx.webp", quality=90, alpha_quality=92, method=6)
 
-    for number in (1, 2):
+    for number in range(1, STAGES + 1):
         stage = Image.open(SOURCE / f"stage{number}.webp").convert("RGB")
         stage = stage.resize((STAGE_WIDTH, round(stage.size[1] * STAGE_WIDTH / stage.size[0])), Image.LANCZOS)
-        stage.save(RES / f"fight_stage{number}.webp", quality=80, method=6)
+        stage.save(RES / f"fight_stage{number}.webp", quality=88, method=6)
 
     print("cell", CELL, "feet", FEET, "stand", STAND, "faces", faces.size, "fx", fx.size)
     print("FX_WIDE = {" + ", ".join(f"{value:.3f}f" for value in wide) + "};")

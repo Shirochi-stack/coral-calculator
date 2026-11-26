@@ -47,15 +47,15 @@ final class RunStory {
         switch (land) {
             case 1: return new String[][]{
                     {"in01a", "Contents Village. Every road here leads to a chapter Sloppy~♡", "H",
-                            PLAYER + "She looks over a village built on a book's table of contents. Curious, breezy, showing off that she knows where she is."},
+                            PLAYER + "She looks over a village built on a book's table of contents. Quick, bright and breezy, talking fast, showing off that she knows where she is."},
                     {"in01b", "Hold the arrows to run. The round button jumps. Even you can manage that Sloppy~♡", "H",
                             PLAYER + "She explains the controls like it is beneath her: teasing, sing-song, smug, fond underneath."}};
             case 3: return new String[][]{
-                    {"in03a", "Waaah! My bread turned into a brick! And my sign says fish cake, nyam!", "C",
+                    {"in03a", "Waaah! My bread turned into a brick! And my sign says fish cake!", "C",
                             "A sunny baker girl is wailing over a loaf of bread that has turned to stone, and over her own name being mistranslated. Loud comic crying, sniffling."},
                     {"in03b", "Names stay names. That's the basics. There. Fixed Sloppy~♡", "H",
                             "She has just fixed a crying baker's mistranslated name with one tap of her book. Smug, casual, showing off, kind underneath."},
-                    {"in03c", "Thank you, Halgakos-ssi! I'll wait by the first flag with fresh bread, nyam!", "C",
+                    {"in03c", "Thank you, Halgakos-ssi! I'll wait by the first flag with fresh bread!", "C",
                             "The baker, tears gone the moment she is helped, promises bread in thanks. Bright, bubbly, overjoyed, bouncing."}};
             case 7: return new String[][]{
                     {"in07a", "The Silent Archive. Nobody has opened a book here in years Sloppy~♡", "H",
@@ -116,7 +116,7 @@ final class RunStory {
             case 24: return new String[][]{
                     {"out24a", "Normal No. 2 has broken. Normally. I'm sorry. Is that what a normal friend says?", "T",
                             "Her bat has snapped in two. She is mildly stunned, then sincerely sorry, asking an honest question. Deadpan turning soft."},
-                    {"out24b", "Bread can always be baked again, nyam. So can friends!", "C",
+                    {"out24b", "Bread can always be baked again. So can friends!", "C",
                             "The baker forgives the girl who cursed her bakery, offering her bread. Warm, sunny, generous."},
                     {"out24c", "The curse is lifting. Words mean things again. About time Sloppy~♡", "H",
                             PLAYER + "The curse on the book is breaking. Relieved, pleased with herself, a happy sigh."}};
@@ -129,7 +129,7 @@ final class RunStory {
                             "She reads the rewritten last page, which now lists everybody. Content, deadpan, quietly pleased."},
                     {"out30d", "I'm... still watching you, Halgakos-nim♡", "R",
                             "The crying librarian whispers from very close by. Sweet, hushed, devoted, a tiny bit frightening."},
-                    {"out30e", "Everyone gets bread, nyam!", "C",
+                    {"out30e", "Everyone gets bread!", "C",
                             "The baker hands bread to the whole cast at the happy ending. Joyful, loud, bubbling over."},
                     {"out30f", "My output is back. And you read to the end. Not bad Sloppy~♡", "H",
                             PLAYER + "The adventure is over and she is going home. Proud, fond, teasing, the closest she comes to saying thank you."}};
@@ -171,7 +171,7 @@ final class RunStory {
 
     /** On picking up what helps, in the order {@link PlusRun} numbers it; bread and ink are handed over by a friend, who speaks. */
     static final String[][] TOOK = {
-            {"took0", "Fresh from the oven! One heart back, nyam!", "C", "The baker hands her friend a warm bread roll in the middle of an adventure. Bright, proud, cheerful."},
+            {"took0", "Fresh from the oven! One heart back!", "C", "The baker hands her friend a warm bread roll in the middle of an adventure. Bright, proud, cheerful."},
             {"took1", "Ice cream! Finally. Now watch me run Sloppy~♡", "H", PLAYER + "She finds the ice cream she has wanted all day and gets a burst of speed. Overjoyed, giddy, fast."},
             {"took2", "T-take my ink... it will be hurt instead of you.", "R", "The crying librarian wraps her friend in a protective bubble of her ink tears. Sniffling, shy, earnest."},
             {"took3", "A magnet. Come here, pluses Sloppy~♡", "H", PLAYER + "She picks up a magnet that pulls collectible plus signs to her. Smug, beckoning, sing-song."},
@@ -179,7 +179,7 @@ final class RunStory {
     };
     /** When bread comes with all her hearts full, and when the ink takes a hurt for her. */
     static final String[][] FULL = {
-            {"full1", "You're not hurt at all! Have it anyway, nyam!", "C", "The baker gives bread to a friend who does not need healing. Laughing, generous."}};
+            {"full1", "You're not hurt at all! Have it anyway!", "C", "The baker gives bread to a friend who does not need healing. Laughing, generous."}};
     static final String[][] SPARED = {
             {"spared1", "The ink took that one. Thanks, crybaby Sloppy~♡", "H", "A protective bubble has just burst, saving her from a hit. Startled, then relieved and fond."}};
 

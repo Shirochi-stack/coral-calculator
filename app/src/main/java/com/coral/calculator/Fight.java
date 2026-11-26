@@ -120,6 +120,21 @@ final class Fight {
             heavy = false;
             special = false;
         }
+
+        /** What is held down as one number, a bit for each, to send to another device. */
+        int bits() {
+            return (left ? 1 : 0) | (right ? 2 : 0) | (jump ? 4 : 0) | (block ? 8 : 0) | (light ? 16 : 0) | (heavy ? 32 : 0) | (special ? 64 : 0);
+        }
+
+        void set(int bits) {
+            left = (bits & 1) != 0;
+            right = (bits & 2) != 0;
+            jump = (bits & 4) != 0;
+            block = (bits & 8) != 0;
+            light = (bits & 16) != 0;
+            heavy = (bits & 32) != 0;
+            special = (bits & 64) != 0;
+        }
     }
 
     /** One of the two who fight. */
@@ -244,6 +259,115 @@ final class Fight {
     int hitSide() { return hitSide; }
 
     void setSpan(float span) { this.span = Math.max(5, Math.min(WIDE - 2 * EDGE, span)); }
+
+    /**
+     * Writes down the whole of the fight as it stands, so that another device can show it:
+     * everything that is drawn or heard, and nothing of how either side decides what to do.
+     */
+    void write(java.io.DataOutput out) throws java.io.IOException {
+        out.writeByte(phase);
+        out.writeByte(round);
+        out.writeByte(flourisher);
+        out.writeByte(lastWinner);
+        out.writeFloat(phaseClock);
+        out.writeFloat(roundClock);
+        out.writeFloat(time);
+        out.writeInt(hits);
+        out.writeInt(blocks);
+        out.writeInt(throwsMade);
+        out.writeInt(falls);
+        out.writeInt(moves);
+        out.writeFloat(hitX);
+        out.writeFloat(hitY);
+        out.writeBoolean(hitHard);
+        out.writeByte(hitSide);
+        for (Fighter fighter : fighters) {
+            out.writeFloat(fighter.x);
+            out.writeFloat(fighter.y);
+            out.writeFloat(fighter.across);
+            out.writeFloat(fighter.up);
+            out.writeBoolean(fighter.facingLeft);
+            out.writeByte(fighter.state);
+            out.writeByte(fighter.move);
+            out.writeFloat(fighter.clock);
+            out.writeInt(fighter.landed);
+            out.writeFloat(fighter.health);
+            out.writeFloat(fighter.meter);
+            for (float rest : fighter.rest) out.writeFloat(rest);
+            out.writeFloat(fighter.safe);
+            out.writeFloat(fighter.stunned);
+            out.writeFloat(fighter.lain);
+            out.writeInt(fighter.specials);
+            out.writeByte(fighter.wins);
+            out.writeBoolean(fighter.unarmed);
+        }
+        out.writeByte(shots.size());
+        for (Shot shot : shots) {
+            out.writeByte(shot.kind);
+            out.writeByte(shot.side);
+            out.writeFloat(shot.x);
+            out.writeFloat(shot.y);
+            out.writeFloat(shot.across);
+            out.writeFloat(shot.up);
+            out.writeFloat(shot.left);
+            out.writeFloat(shot.age);
+            out.writeByte(shot.lands);
+            out.writeFloat(shot.wait);
+        }
+    }
+
+    /** Makes this fight stand as one written down by {@link #write}: for showing a fight that is run on another device. */
+    void read(java.io.DataInput in) throws java.io.IOException {
+        phase = in.readByte();
+        round = in.readByte();
+        flourisher = in.readByte();
+        lastWinner = in.readByte();
+        phaseClock = in.readFloat();
+        roundClock = in.readFloat();
+        time = in.readFloat();
+        hits = in.readInt();
+        blocks = in.readInt();
+        throwsMade = in.readInt();
+        falls = in.readInt();
+        moves = in.readInt();
+        hitX = in.readFloat();
+        hitY = in.readFloat();
+        hitHard = in.readBoolean();
+        hitSide = in.readByte();
+        for (Fighter fighter : fighters) {
+            fighter.x = in.readFloat();
+            fighter.y = in.readFloat();
+            fighter.across = in.readFloat();
+            fighter.up = in.readFloat();
+            fighter.facingLeft = in.readBoolean();
+            fighter.state = in.readByte();
+            fighter.move = in.readByte();
+            fighter.clock = in.readFloat();
+            fighter.landed = in.readInt();
+            fighter.health = in.readFloat();
+            fighter.meter = in.readFloat();
+            for (int index = 0; index < fighter.rest.length; index++) fighter.rest[index] = in.readFloat();
+            fighter.safe = in.readFloat();
+            fighter.stunned = in.readFloat();
+            fighter.lain = in.readFloat();
+            fighter.specials = in.readInt();
+            fighter.wins = in.readByte();
+            fighter.unarmed = in.readBoolean();
+        }
+        shots.clear();
+        for (int count = in.readUnsignedByte(); count > 0; count--) {
+            Shot shot = new Shot(in.readByte(), in.readByte());
+            shot.x = in.readFloat();
+            shot.y = in.readFloat();
+            shot.across = in.readFloat();
+            shot.up = in.readFloat();
+            shot.left = in.readFloat();
+            shot.age = in.readFloat();
+            shot.lands = in.readByte();
+            shot.wait = in.readFloat();
+            shots.add(shot);
+        }
+    }
 
     // Moving it on
 
