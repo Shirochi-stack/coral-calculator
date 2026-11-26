@@ -719,6 +719,8 @@ final class PlusRun {
          * what the black ribbon thrown there is turned by.
          */
         boolean whole;
+        /** Whether the white that is truly hers has been won, in the last land: from then on it is hers to call on in any land. */
+        boolean white;
         /** Whether black on her lasts no longer than a ribbon does, and not twice as long: what the Mawang gave. */
         boolean resists;
         /** How many of the colours that are hers she may wear at once. */
@@ -2027,6 +2029,19 @@ final class PlusRun {
     private float moment;
     private boolean decided, ribboned;
 
+    /**
+     * Once it has been won, the white that is truly hers is hers to call on in any land: every colour at once, with no time to it,
+     * for the rest of the land. Not while black lies on her; and not in the last land before the ribbon is thrown, where it is what
+     * the ribbon turns into. Whether she can call on it just now; and she calls on it, which returns whether she did.
+     */
+    boolean canMaster() { return perks.white && !mastered && cursed <= 0 && state == PLAYING && moment <= 0 && level.number != RunLevels.TOTAL; }
+
+    boolean callWhite() {
+        if (!canMaster()) return false;
+        master();
+        return true;
+    }
+
     /** How much longer the moment lasts; whether it has come; whether the ribbon has reached her; and whether she is whole. */
     float moment() { return moment; }
     boolean decided() { return decided; }
@@ -2136,6 +2151,7 @@ final class PlusRun {
         perks.levels = now.levels.clone();
         // What she wears, put on or taken off: a heart that went with it goes with it.
         perks.whole = now.whole;
+        perks.white = now.white;
         perks.defence = now.defence;
         perks.stomp = now.stomp;
         perks.mercy = now.mercy;
@@ -2262,13 +2278,13 @@ final class PlusRun {
             case RunLevels.MIRI:
             case RunLevels.GARI:
             case RunLevels.OLD_BOOK:
-            case RunLevels.LUCY:
                 return 4;
             case RunLevels.SUMBI:
             case RunLevels.YEOBAEK:
             case RunLevels.PADS:
             case RunLevels.KING:
             case RunLevels.PARTY:
+            case RunLevels.LUCY:
                 return 5;
             default:
                 return 6;
@@ -5065,6 +5081,8 @@ final class PlusRun {
         // Sumbi dives: she is under the ground until she comes up.
         if (what == 241) foe.unseen = true;
         if (foe.kind == RunLevels.GUARD || foe.kind == RunLevels.BUTLER) return 1;
+        // Lucy is quick about it: she shows what is coming for a little less long than anyone.
+        if (foe.kind == RunLevels.LUCY) return what == 392 ? .45f : .6f;
         switch (what) {
             case 242:
                 return 1.6f;

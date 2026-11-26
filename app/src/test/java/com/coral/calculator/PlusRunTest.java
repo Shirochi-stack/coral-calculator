@@ -4760,12 +4760,18 @@ public class PlusRunTest {
     }
 
     @Test public void theLaterLandsAreTougherByTheirLevelsAndWhatSheWearsAnswersIt() {
-        // A level more with every five lands; a blow more with every five levels, and half a heart more to a hurt with every six.
+        // A level more with every five lands; a blow more with every five levels, and half a heart more to a hurt with every six: through
+        // the first two volumes. The third is harder than that: five blows throughout, and a hurt of two hearts and a half, then three.
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             assertEquals(1 + (number - 1) / 5, RunLevels.levelOf(number));
-            assertEquals(number <= 25 ? 0 : number <= 50 ? 1 : number <= 75 ? 2 : 3, RunLevels.toughOf(number));
-            assertEquals(number <= 30 ? 0 : number <= 60 ? 1 : number <= 90 ? 2 : 3, RunLevels.biteOf(number));
+            assertEquals(number <= 25 ? 0 : number <= 50 ? 1 : number <= 75 ? 2 : number <= 80 ? 3 : 4, RunLevels.toughOf(number));
+            assertEquals(number <= 30 ? 0 : number <= 60 ? 1 : number <= 80 ? 2 : number <= 90 ? 3 : 4, RunLevels.biteOf(number));
         }
+        // (In the third volume a creature takes five blows, and a hurt costs five halves of a heart and then six, before what she wears.)
+        assertEquals(5, 1 + RunLevels.toughOf(81));
+        assertEquals(5, 2 + RunLevels.biteOf(85));
+        assertEquals(6, 2 + RunLevels.biteOf(100));
+        assertEquals(5, PlusRun.strength(RunLevels.LUCY));
         assertEquals(20, RunLevels.levelOf(RunLevels.TOTAL));
         // In the lands themselves: every creature takes as many more as its land's level says; those who wait, a paper target, a wisp and a flake do not.
         for (int number : new int[]{5, 30, 55, 80}) {
@@ -5396,6 +5402,44 @@ public class PlusRunTest {
         assertTrue(cut > 3);
     }
 
+    @Test public void theWhiteThatIsTrulyHersIsHersToCallOnInAnyLandOnceItHasBeenWon() {
+        // Not hers: it cannot be called on.
+        PlusRun run = new PlusRun(RunLevels.level(40));
+        assertFalse(run.canMaster());
+        assertFalse(run.callWhite());
+        assertFalse(run.mastered());
+        // Hers: called on, it is every colour at once, with no time to it; and the beam is what a held strike is.
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.white = true;
+        run = new PlusRun(RunLevels.level(40), perks);
+        hold(run, .3f, false, false, false);
+        assertTrue(run.canMaster());
+        assertFalse(run.white());
+        assertTrue(run.callWhite());
+        assertTrue(run.mastered() && run.white());
+        assertFalse(run.canMaster());
+        assertFalse(run.callWhite());
+        hold(run, 60, false, false, false);
+        assertTrue(run.mastered() && run.white());
+        assertEquals(0, run.beams());
+        for (int step = 0; step < 60 && run.beams() == 0; step++) run.step(STEP, false, false, false, true);
+        assertEquals(1, run.beams());
+        // And it rests between one beam and the next, for longer than it lasts.
+        float began = run.time();
+        while (run.beams() < 2 && run.time() < began + 20) run.step(STEP, false, false, false, true);
+        assertEquals(PlusRun.BEAM_LASTS + PlusRun.BEAM_WAIT + PlusRun.BEAM_CHARGE, run.time() - began, .1f);
+        assertTrue(PlusRun.BEAM_WAIT > PlusRun.BEAM_LASTS);
+        // Not in the last land before the ribbon is thrown: there it is what the ribbon turns into.
+        PlusRun.Perks whole = new PlusRun.Perks();
+        whole.white = true;
+        whole.whole = true;
+        PlusRun last = new PlusRun(RunLevels.level(RunLevels.TOTAL), whole);
+        hold(last, .3f, false, false, false);
+        assertFalse(last.canMaster());
+        assertFalse(last.callWhite());
+        assertFalse(last.mastered());
+    }
+
     // The ride: Halgakos on Lucy's back, and the Mother Tongue
 
     /** How far clear of something the Mother has sent a place is: nothing or less, and it lands there. */
@@ -5442,9 +5486,10 @@ public class PlusRunTest {
     }
 
     @Test public void theMotherTongueIsReadOnlyWhileHerShieldIsBrokenAndTheLastOfItTakesTheBeamAndTheBreathTogether() {
+        // (With the most hearts there are, ten, and the best there is to wear, which leaves a hurt of the last land a heart and a half.)
         int hurts = 0;
         for (long seed = 1; seed <= 16; seed++) {
-            RunRide ride = new RunRide(6, 2, seed);
+            RunRide ride = new RunRide(20, 3, seed);
             assertEquals(RunRide.SHIELD[0], ride.shield());
             assertEquals(0, ride.open(), 0);
             ride(ride, 400, true, true);
@@ -5459,7 +5504,7 @@ public class PlusRunTest {
             assertTrue(ride.things().isEmpty());
             hurts += ride.hurts();
         }
-        assertTrue("hurts " + hurts, hurts < 32);
+        assertTrue("hurts " + hurts, hurts < 48);
         // With the beam and no breath: her friends break her shield for her, in time, and the beam reads her; but the last of it never goes.
         RunRide beamOnly = new RunRide(6000, 2, 3);
         ride(beamOnly, 500, true, false);

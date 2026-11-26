@@ -306,7 +306,7 @@ final class RunGame {
     private final RectF pickerCard = new RectF(), wearButton = new RectF();
     private final List<RectF> chips = new ArrayList<>();
     private final List<Integer> chipMixes = new ArrayList<>();
-    private static final int ONE_AT_A_TIME = -1, ALL_I_CAN = -2;
+    private static final int ONE_AT_A_TIME = -1, ALL_I_CAN = -2, TRUE_WHITE = -3;
     private final RectF[] fanCells = new RectF[PlusRun.WHITE];
     private float lookAge = 9;
     private static final float LOOK = .55f;
@@ -750,6 +750,8 @@ final class RunGame {
         if (RunGear.whole(on)) kept.hearts++;
         // And how much harder she has chosen to have it, at the black market.
         kept.harder = hard();
+        // The white that is truly hers, once it has been won in the last land: hers to call on in any land.
+        kept.white = (colours() & 1 << PlusRun.WHITE - 1) != 0;
         // Whether she is whole, for the black ribbon thrown in the last land: every colour hers to keep, and every friend pledged.
         // (In a build made for testing it can be said to be so, or not so.)
         int said = BuildConfig.DEBUG ? session.tally("run_whole") : 0;
@@ -2950,7 +2952,7 @@ final class RunGame {
         if (tougher > session.tally("run_tough_told")) {
             session.keep("run_tough_told", tougher);
             toast("A level " + RunLevels.levelOf(land) + " land", "Creatures take " + (1 + run.tough()) + (run.tough() == 0 ? " blow" : " blows") + "  ·  a hurt costs "
-                    + (run.bite() == 0 ? "a heart" : run.bite() == 1 ? "a heart and a half" : "two hearts"), 0);
+                    + hearts(2 + run.bite()), 0);
         }
         // A rung of the black arena: she begins at the door of the place where whoever waits is, and a card says who, and what winning gives.
         if (blackRung > 0) {
@@ -3058,6 +3060,13 @@ final class RunGame {
         idle();
         screen = PAUSED;
         pills("Carry on", RESUME, "Start again", AGAIN, "Lands", TO_MAP);
+    }
+
+    /** What a hurt costs, in words, from how many halves of a heart it is. */
+    private static String hearts(int halves) {
+        String[] whole = {"", "a heart", "two hearts", "three hearts", "four hearts", "five hearts", "six hearts"};
+        int full = Math.min(whole.length - 1, halves / 2);
+        return halves % 2 == 0 ? whole[full] : full == 0 ? "half a heart" : whole[full] + " and a half";
     }
 
     /** Sets out the buttons of a card. */
@@ -5980,6 +5989,19 @@ final class RunGame {
     /** A quick choice is taken: a named mix, as many as she can wear, or one colour at a time. */
     private void choose(int which) {
         int owned = perks.colours & 127;
+        if (which == TRUE_WHITE) {
+            // The white that is truly hers: called on at once, and the picker is done with.
+            fanOpen = false;
+            ribbonFinger = -1;
+            idle();
+            if (run.callWhite()) {
+                dye(PlusRun.WHITE);
+                flash = .5f;
+                audio.play("star", 1);
+                buzz(true);
+            }
+            return;
+        }
         if (which == ONE_AT_A_TIME) {
             oneAtATime = true;
             ticks = Integer.lowestOneBit(ticks != 0 ? ticks : herMix & owned);
@@ -10363,6 +10385,11 @@ final class RunGame {
         chips.clear();
         chipMixes.clear();
         List<String> names = new ArrayList<>();
+        // (Once it has been won: the white that is truly hers, first among them.)
+        if (run.canMaster()) {
+            names.add("White, and hers");
+            chipMixes.add(TRUE_WHITE);
+        }
         names.add("One at a time");
         chipMixes.add(ONE_AT_A_TIME);
         if (run.together() > 1) {
@@ -10404,13 +10431,13 @@ final class RunGame {
             RectF where = new RectF(at, down, at + widths[chip], down + chipHigh);
             chips.add(where);
             int which = chipMixes.get(chip);
-            boolean lit = which == ONE_AT_A_TIME ? oneAtATime : which == ALL_I_CAN ? false : !oneAtATime && which != PlusRun.PRISM && ticks == PlusRun.mixOf(which);
+            boolean lit = which == ONE_AT_A_TIME ? oneAtATime : which == ALL_I_CAN || which == TRUE_WHITE ? false : !oneAtATime && which != PlusRun.PRISM && ticks == PlusRun.mixOf(which);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(lit ? CalculatorLayout.CORAL : dark ? 0xFF3A3F45 : 0xFFF0ECE6);
+            paint.setColor(which == TRUE_WHITE ? 0xFFE9C96A : lit ? CalculatorLayout.CORAL : dark ? 0xFF3A3F45 : 0xFFF0ECE6);
             canvas.drawRoundRect(where, chipHigh / 2, chipHigh / 2, paint);
             paint.setColor(Color.BLACK);
             text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(lit ? Color.WHITE : ink);
+            text.setColor(which == TRUE_WHITE ? 0xFF3A2E12 : lit ? Color.WHITE : ink);
             text.setTextSize(dp(13));
             canvas.drawText(names.get(chip), where.centerX(), where.centerY() + dp(4.5f), text);
             at += widths[chip] + dp(6);

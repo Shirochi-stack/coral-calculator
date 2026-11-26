@@ -38,7 +38,7 @@ final class RunFlight {
     static final float SAFE = 1.3f, REELS = 1.8f;
     /** How near a puff or a star must arrive to hurt, and how near the line of a gust or a pillar. */
     static final float NEAR = .27f, BAR = .2f;
-    private static final float[] EVERY = {1.55f, 1.25f, 1.05f}, LUCY_SPEED = {.42f, .6f, .8f}, TURNS = {2.4f, 1.8f, 1.3f};
+    private static final float[] EVERY = {1.35f, 1.1f, .92f}, LUCY_SPEED = {.42f, .6f, .8f}, TURNS = {2.4f, 1.8f, 1.3f};
 
     /** Something on its way to her: what it is, where it will arrive, how far off it still is, from one to nothing, and how fast it comes. */
     static final class Thing {

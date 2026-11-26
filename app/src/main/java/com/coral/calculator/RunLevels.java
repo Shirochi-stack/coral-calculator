@@ -149,9 +149,13 @@ final class RunLevels {
      */
     static int levelOf(int number) { return number < 1 ? 1 : 1 + (number - 1) / 5; }
 
-    /** How many more blows a creature of a land takes than one of the first lands; and how many more halves of a heart a hurt costs there. */
-    static int toughOf(int number) { return (levelOf(number) - 1) / 5; }
-    static int biteOf(int number) { return (levelOf(number) - 1) / 6; }
+    /**
+     * How many more blows a creature of a land takes than one of the first lands; and how many more halves of a heart a hurt costs
+     * there. By its level, through the first two volumes. The third is harder than its levels alone would make it: its creatures take
+     * five blows throughout; and a hurt costs two hearts and a half in its first chapter, and three in its last.
+     */
+    static int toughOf(int number) { return number > SECOND ? 4 : (levelOf(number) - 1) / 5; }
+    static int biteOf(int number) { return number > SECOND + IN_LATER_CHAPTER ? 4 : number > SECOND ? 3 : (levelOf(number) - 1) / 6; }
 
     /** The sorts of the two buildings of a village that can be gone into. */
     static int[] buildingsOf(int number, int village) {
