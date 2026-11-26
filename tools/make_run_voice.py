@@ -43,11 +43,31 @@ MODEL = "inworld-tts-2"
 # The Mawang is Halgakos herself, sixty years on: her voice, slower and lower.
 VOICES = {
     "H": ("community-5fwhmdpiq45g", 1.0, 1.0),
-    "C": ("Riley", 1.0, 1.0),
-    "R": ("Yuki", 1.0, 1.0),
-    "I": ("community-qj9kc2jtun4a", 1.0, 1.0),
-    "T": ("Piper", 1.0, 1.0),
+    "C": ("community-iyfnceehtmbk", .95, 1.06),
+    "R": ("community-ae0qjkqan5hx", .96, 1.05),
+    "I": ("community-blcuaurhzmvi", .95, 1.06),
+    "T": ("community-pwotyqkmtlsi", .92, 1.1),
     "M": ("community-5fwhmdpiq45g", 1.0, .84),
+    # The second volume. Gokhae, who is up to no good, speaks lower than the rest on purpose. The twins share
+    # a voice: Miri quick and bright, Gari slow and hushed.
+    "G": ("community-mzyrf5zr14rb", .95, 1.06),
+    "J": ("community-2e7y7ype1d0u", 1.1, 1.0),
+    "K": ("community-2e7y7ype1d0u", .88, .97),
+    "Y": ("community-qdnchfkneudi", .82, 1.12),
+    "N": ("community-qj9kc2jtun4a", .95, 1.15),
+}
+# Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
+MANNER = {
+    "C": "Chikuwa is a sunny, bubbly girl with a high, bright, cute anime voice. ",
+    "R": "Rune is a shy girl who is always crying: a high, fragile, tearful anime voice, sniffling and sad. ",
+    "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
+    "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
+    "M": "The Mawang is Halgakos herself from another volume, after sixty years alone: the same girl's voice, but tired, low and gloomy. ",
+    "G": "Gokhae is a sly young court interpreter with a smooth, cool anime voice, smug and precise, never old or mature. ",
+    "J": "Miri is a bright, gossipy newspaper girl with a high, quick, chirpy anime voice. ",
+    "K": "Gari is Miri's shy twin sister, with the same high anime voice, hushed and timid, almost a whisper. ",
+    "Y": "Yeobaek is a sleepy young swordswoman with a soft, high, drowsy anime voice, drawling and yawning. ",
+    "N": "Nuri is a young queen with a clear, high, earnest anime voice, formal and brave. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
 
@@ -70,8 +90,10 @@ def story():
     """Every line of the story: its name, words, speaker and scene."""
     text = STORY.read_text(encoding="utf-8")
     player = re.search(r'PLAYER = "([^"]+)"', text).group(1)
-    found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Z])",\s*(PLAYER \+ )?"([^"]+)"\}', text)
-    return [(name, words, who, (player if with_player else "") + scene) for name, words, who, with_player, scene in found]
+    fast = re.search(r'FAST = "([^"]+)"', text).group(1)
+    found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Z])",\s*(PLAYER \+ )?"([^"]+)"( \+ FAST)?\}', text)
+    return [(name, words, who, MANNER.get(who, "") + (player if with_player else "") + scene + (fast if quick else ""))
+            for name, words, who, with_player, scene, quick in found]
 
 
 def spoken(text):

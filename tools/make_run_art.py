@@ -18,6 +18,12 @@ six frames of Halgakos jumping drawn from her own running frames. This cuts them
     pictures in faces/ are those chibi pictures themselves, made small for the story cards.
   * arm_pen.png and the five like it each give eight frames of her carrying one of the things
     she fights with: standing, four of running, rising, falling, and using it.
+  * For the second volume: sky6.png to sky10.png and ground6.png to ground10.png for its five
+    chapters; lava.png and water.png; terrain.png, effects.png and forms.png (the ribbons);
+    foes2a.png, foes2b.png and foes2c.png, each two signs in four frames, two of them its
+    defeat; and gokhae.png, twins.png, yeobaek.png, kingslime.png and mawang.png, who wait at
+    the ends of its chapters. All but the skies and those five go into a second sheet of
+    squares, plus_run_art2.webp, eight to a row.
   * lose.png gives six more of her, for when she is hurt and when she has lost: hit, knocked
     into the air, falling, sitting dazed, sulking and crying. They are treated the same way.
 
@@ -57,7 +63,12 @@ CAST = {"chikuwa": (1, 3), "rune": (1, 3), "illya": (1, 4), "tsubakieh": (2, 3)}
 CAST_CELL = (288, 248)
 # How tall the first frame of each is made, in the pixels her own frames are measured in: she stands 190 tall.
 CAST_TALL = {"chikuwa": 198, "rune": 190, "illya": 188, "tsubakieh": 190}
-FACES = ("chikuwa", "rune", "illya", "tsubakieh", "mawang")
+FACES = ("chikuwa", "rune", "illya", "tsubakieh", "mawang", "gokhae", "miri", "gari", "yeobaek", "nuri")
+# The second volume: how many squares its sheet has to a row; and those who wait in it, with how many rows and
+# frames across the sheet of each has, how tall her first frame is made, and the cell each frame goes in.
+LATER_ACROSS = 8
+LATER_CAST = {"gokhae": (1, 4, 198, (320, 264)), "twins": (2, 3, 180, (320, 264)), "yeobaek": (2, 3, 192, (352, 264)),
+              "kingslime": (1, 4, 190, (400, 300)), "mawang": (2, 3, 196, (352, 264))}
 FACE_TALL = 520
 PET_GRID = (8, 9)
 
@@ -250,6 +261,98 @@ def face(name):
     return image
 
 
+def merged(filled, expected):
+    """The stretches of a row of yes and no that are yes, the nearest of them taken together until as many are left as are expected."""
+    found = runs(filled, 1, 2)
+    while len(found) > expected:
+        gaps = [found[index + 1][0] - found[index][1] for index in range(len(found) - 1)]
+        index = gaps.index(min(gaps))
+        found[index:index + 2] = [(found[index][0], found[index + 1][1])]
+    if len(found) != expected:
+        raise SystemExit(f"expected {expected}, found {len(found)}")
+    return found
+
+
+def pieces(name, down, across):
+    """The sprites of a sheet of some rows, when a sprite may be drawn in several pieces: a flying drop, a broken half. Each trimmed to what is drawn."""
+    sheet = cleared(Image.open(SOURCE / f"{name}.png"))
+    sheet.putalpha(sheet.getchannel("A").point(lambda value: 0 if value < 48 else value))
+    mask = solid(sheet)
+    found = []
+    for top, bottom in merged([mask.crop((0, y, sheet.size[0], y + 1)).getbbox() is not None for y in range(sheet.size[1])], down):
+        strip = sheet.crop((0, top, sheet.size[0], bottom))
+        band = solid(strip)
+        for left, right in merged([band.crop((x, 0, x + 1, strip.size[1])).getbbox() is not None for x in range(strip.size[0])], across):
+            piece = strip.crop((left, 0, right, strip.size[1]))
+            found.append(piece.crop(solid(piece).getbbox()))
+    return found
+
+
+def together(frames, size=CELL):
+    """Frames of one thing each in a square, all at one scale, standing on the bottom of it in the middle."""
+    scale = size / max(max(frame.size) for frame in frames)
+    squares = []
+    for frame in frames:
+        wide, tall = max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale))
+        small = frame.convert("RGBa").resize((wide, tall), Image.LANCZOS).convert("RGBA")
+        square = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        square.alpha_composite(small, ((size - wide) // 2, size - tall))
+        squares.append(square)
+    return squares
+
+
+def strip_of(frames, tall, box, target):
+    """Frames of someone in a row of cells at her size, her feet in the middle of each."""
+    scale = tall / frames[0].size[1]
+    strip = Image.new("RGBA", (box[0] * len(frames), box[1]), (0, 0, 0, 0))
+    for index, frame in enumerate(frames):
+        size = (max(1, round(frame.size[0] * scale)), max(1, round(frame.size[1] * scale)))
+        if size[0] > box[0] or size[1] > box[1]:
+            raise SystemExit(f"{target} frame {index} is {size}, larger than its cell {box}")
+        small = frame.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
+        feet = solid(small).crop((0, size[1] * 4 // 5, size[0], size[1])).getbbox()
+        middle = (feet[0] + feet[2]) / 2 if feet else size[0] / 2
+        left = max(0, min(box[0] - size[0], round(box[0] / 2 - middle)))
+        strip.alpha_composite(small, (index * box[0] + left, box[1] - size[1]))
+    clear = Image.new("RGBA", strip.size, (0, 0, 0, 0))
+    strip = Image.composite(strip, clear, strip.getchannel("A").point(lambda value: 255 if value else 0))
+    strip.save(RES / f"run_{target}.webp", lossless=True, quality=100, method=6, exact=True)
+    return strip
+
+
+def later():
+    """Everything of the second volume."""
+    squares = []
+    for chapter in range(6, 11):
+        sky = Image.open(SOURCE / f"sky{chapter}.png").convert("RGB")
+        sky.resize((SKY_WIDTH, round(sky.size[1] * SKY_WIDTH / sky.size[0])), Image.LANCZOS).save(RES / f"plus_run_sky{chapter}.webp", quality=82, method=6)
+    for name in ("ground6", "ground7", "ground8", "ground9", "ground10", "lava", "water"):
+        ground = Image.open(SOURCE / f"{name}.png").convert("RGBA")
+        side = ground.size[0]
+        squares.append(ground.crop((side // 8, 0, side // 8 + side * 3 // 4, side * 3 // 4)).resize((CELL, CELL), Image.LANCZOS))
+        squares.append(ground.crop((side // 8, side * 3 // 8, side // 8 + side // 2, side * 7 // 8)).resize((CELL, CELL), Image.LANCZOS))
+    for name, count in (("terrain", 6), ("effects", 7)):
+        squares += [cell(piece)[0] for piece in pieces(name, 1, count)]
+    squares += together(pieces("forms", 2, 4))
+    for name in ("foes2a", "foes2b", "foes2c"):
+        frames = pieces(name, 2, 4)
+        squares += together(frames[:4]) + together(frames[4:])
+    down = (len(squares) + LATER_ACROSS - 1) // LATER_ACROSS
+    atlas = Image.new("RGBA", (CELL * LATER_ACROSS, CELL * down), (0, 0, 0, 0))
+    for index, square in enumerate(squares):
+        atlas.alpha_composite(square.convert("RGBA"), (index % LATER_ACROSS * CELL, index // LATER_ACROSS * CELL))
+    atlas.save(RES / "plus_run_art2.webp", lossless=True, quality=100, method=6)
+    strips = []
+    for name, (rows, across, tall, box) in LATER_CAST.items():
+        frames = pieces(name, rows, across)
+        if name == "twins":
+            strips.append(strip_of(frames[:3], tall, box, "miri"))
+            strips.append(strip_of(frames[3:], tall, box, "gari"))
+        else:
+            strips.append(strip_of(frames, tall, box, name))
+    return atlas, len(squares), strips
+
+
 def her_frames(name, source, box, gap, across, report):
     """Frames of her from a sheet of two rows, in one row, in the pink and at the size of her running frames."""
     sheet = cleared(Image.open(SOURCE / f"{source}.png"))
@@ -315,6 +418,7 @@ def her_frames(name, source, box, gap, across, report):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=pathlib.Path)
+    parser.add_argument("--later", type=pathlib.Path, help="where to put a picture of the second volume's art")
     args = parser.parse_args()
 
     cells, wide, tall = [], [], []
@@ -354,6 +458,8 @@ def main():
     print("ART_TALL = {" + ", ".join(f"{value:.3f}f" for value in tall) + "};")
     for key, value in report.items():
         print(key, value)
+    second, count, _ = later()
+    print("second sheet", second.size, "squares", count)
     if args.preview:
         grey = (120, 120, 130, 255)
         half = atlas.resize((atlas.size[0] // 2, atlas.size[1] // 2), Image.LANCZOS)
@@ -364,6 +470,15 @@ def main():
         # Her running frames under her jump frames, at the same size, to see that they are one girl.
         for index, frame in enumerate(running[:6]):
             board.alpha_composite(frame, (index * JUMP_CELL[0] + (JUMP_CELL[0] - frame.size[0]) // 2, half.size[1] + 10 + JUMP_CELL[1] + (JUMP_CELL[1] - frame.size[1])))
+        if args.later:
+            second, _, strips = later()
+            sheet = Image.new("RGBA", (max([second.size[0]] + [strip.size[0] for strip in strips]), second.size[1] + sum(strip.size[1] + 4 for strip in strips)), grey)
+            sheet.alpha_composite(second, (0, 0))
+            down = second.size[1]
+            for strip in strips:
+                sheet.alpha_composite(strip, (0, down + 4))
+                down += strip.size[1] + 4
+            sheet.convert("RGB").save(args.later)
         board.alpha_composite(lose, (0, half.size[1] + 20 + JUMP_CELL[1] * 2))
         down = half.size[1] + 30 + JUMP_CELL[1] * 2 + LOSE_CELL[1]
         for strip in armed:
