@@ -63,12 +63,12 @@ final class RunStory {
                     {"in07b", "I made it quiet. A normal library is a quiet library.", "T",
                             "The girl with the bat appears, pleased with herself for scaring every reader away from a library. Cheerful, matter-of-fact, polite."}};
             case 9: return new String[][]{
-                    {"in09a", "Y-you read my letter... Then you're my first friend. Forever. Okay? Okay?♡", "R",
-                            "A shy, lonely librarian who cries ink has just been read by someone for the first time in years. She stammers through tears, then turns intensely, sweetly clingy."},
+                    {"in09a", "Y-you read it... sniff... You're my friend now. F-forever, okay? Okay?♡", "R",
+                            "A lonely little librarian who cries ink has just had her letter read by someone for the first time in years. She is a little crybaby sobbing her way through the words: hiccups, sniffles, a wobbling whine, childish and small. Then clingy and hopeful."},
                     {"in09b", "Friends go places together. So come along, crybaby Sloppy~♡", "H",
                             "She is flustered by a crying girl's sudden devotion and covers it with teasing. Awkward, warm, a little embarrassed."},
-                    {"in09c", "I-I'll wait by the second flag... with my ink. It will take one hurt for you, Halgakos-nim.", "R",
-                            "The librarian offers the one thing she has, her ink tears, to protect her new friend. Sniffling, timid, devoted, very soft."}};
+                    {"in09c", "I-I'll wait by the second flag... sniff... My ink gets hurt, n-not you, Halgakos-nim.", "R",
+                            "The little librarian offers the one thing she has, her ink tears, to protect her new friend. She is a little crybaby sobbing her way through the words: hiccups, sniffles, a wobbling whine, childish and small. Timid and devoted."}};
             case 13: return new String[][]{
                     {"in13a", "Welcome to Heart-Flutter Plaza♡ I have given nine thousand, nine hundred and ninety-nine compliments. Yours will be the next♡", "I",
                             "The idol welcomes her guest to a pink plaza full of her fans. Radiant, flirtatious, perfectly polite, a performer on her own stage."},
@@ -127,8 +127,8 @@ final class RunStory {
                             "The defeated idol is being complimented, sincerely, for the first time in her life. Crying, overwhelmed, disbelieving, happy."},
                     {"out30c", "Cast: everyone. That seems normal.", "T",
                             "She reads the rewritten last page, which now lists everybody. Content, deadpan, quietly pleased."},
-                    {"out30d", "I'm... still watching you, Halgakos-nim♡", "R",
-                            "The crying librarian whispers from very close by. Sweet, hushed, devoted, a tiny bit frightening."},
+                    {"out30d", "Ehehe... sniff... I-I'm still watching... Halgakos-nim♡", "R",
+                            "The little crybaby librarian whispers from very close by, giggling through her sniffles. Small, hushed, clingy, a tiny bit frightening."},
                     {"out30e", "Everyone gets bread!", "C",
                             "The baker hands bread to the whole cast at the happy ending. Joyful, loud, bubbling over."},
                     {"out30f", "My output is back. And you read to the end. Not bad Sloppy~♡", "H",
@@ -173,7 +173,7 @@ final class RunStory {
     static final String[][] TOOK = {
             {"took0", "Fresh from the oven! One heart back!", "C", "The baker hands her friend a warm bread roll in the middle of an adventure. Bright, proud, cheerful."},
             {"took1", "Ice cream! Finally. Now watch me run Sloppy~♡", "H", PLAYER + "She finds the ice cream she has wanted all day and gets a burst of speed. Overjoyed, giddy, fast."},
-            {"took2", "T-take my ink... it will be hurt instead of you.", "R", "The crying librarian wraps her friend in a protective bubble of her ink tears. Sniffling, shy, earnest."},
+            {"took2", "H-here... my ink... waaah... d-don't get hurt...", "R", "The little librarian wraps her friend in a protective bubble of her ink tears. She is a little crybaby sobbing her way through the words: hiccups, sniffles, a wobbling whine, childish and small. Earnest."},
             {"took3", "A magnet. Come here, pluses Sloppy~♡", "H", PLAYER + "She picks up a magnet that pulls collectible plus signs to her. Smug, beckoning, sing-song."},
             {"took4", "Her notes. Nothing can touch me now Sloppy~♡", "H", PLAYER + "She picks up glowing notes that make her invincible for a few seconds. Bold, exhilarated."},
     };

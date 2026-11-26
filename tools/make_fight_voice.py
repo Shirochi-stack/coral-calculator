@@ -44,7 +44,7 @@ VOICES = {
     "h": ("community-5fwhmdpiq45g", 1.0, 1.0),
     "c": ("community-iyfnceehtmbk", .95, 1.06),
     "t": ("community-pwotyqkmtlsi", .92, 1.1),
-    "r": ("community-ae0qjkqan5hx", .96, 1.05),
+    "r": ("Pixie", 1.25, 1.08),
     "i": ("community-blcuaurhzmvi", .95, 1.06),
 }
 # Who each of them is, for the voice to know.
@@ -52,7 +52,7 @@ WHO = {
     "h": "Halgakos, a smug, teasing translator girl with a cheeky sing-song voice, in a fighting game. She talks fast.",
     "c": "Chikuwa, a sunny, bubbly baker girl in a fighting game, who thinks of everything in bread. A high, bright, cute anime voice.",
     "t": "Tsubakieh, a cheerful, unbothered girl with a baseball bat who calls everything normal, in a fighting game. A light, cute, deadpan anime voice.",
-    "r": "Rune, a shy, lonely librarian girl who is always crying, in a fighting game. Stammering, sniffling, fragile, tearful; her devotion can turn sweetly and quietly frightening.",
+    "r": "Rune, a little crybaby librarian in a fighting game: a very high, small, squeaky, childlike anime voice. She sobs, sniffles and hiccups through every line, whiny and wobbly. Never calm, eloquent or grown-up.",
     "i": "Illya, a lovely magical-girl idol in a fighting game. A sweet, bright, high, sparkling anime voice; polite and sincere, never sultry.",
 }
 # What each kind of line is said in the middle of.

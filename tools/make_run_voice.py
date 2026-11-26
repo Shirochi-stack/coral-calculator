@@ -46,7 +46,7 @@ MODEL = "inworld-tts-2"
 VOICES = {
     "H": ("community-5fwhmdpiq45g", 1.0, 1.0),
     "C": ("community-iyfnceehtmbk", .95, 1.06),
-    "R": ("community-ae0qjkqan5hx", .96, 1.05),
+    "R": ("Pixie", 1.3, 1.08),
     "I": ("community-blcuaurhzmvi", .95, 1.06),
     "T": ("community-pwotyqkmtlsi", .92, 1.1),
     "M": ("community-5fwhmdpiq45g", 1.0, .84),
@@ -55,7 +55,7 @@ VOICES = {
 # them drifts into sounding grown up or dark, whatever the scene.
 MANNER = {
     "C": "Chikuwa is a sunny, bubbly girl with a high, bright, cute anime voice. ",
-    "R": "Rune is a shy girl who is always crying: a high, fragile, tearful anime voice, sniffling and sad. ",
+    "R": "Rune is a little crybaby: a very high, small, squeaky, childlike anime voice. She sobs, sniffles and hiccups through every line, whiny and wobbly, with simple words. Never calm, eloquent or grown-up. ",
     "I": "Illya is a cute magical-girl idol with a high, bright, sparkling anime voice: cheerful and sweet, never dark, sultry or mature. ",
     "T": "Tsubakieh is a cheerful, unbothered girl with a light, cute anime voice, perfectly calm and deadpan. ",
 }
@@ -91,7 +91,11 @@ def spoken(text):
 
 def speak(key, text, who, scene):
     voice, rate, _ = VOICES[who]
-    body = {"text": spoken(text), "voiceId": voice, "modelId": MODEL, "deliveryMode": "CREATIVE",
+    said = spoken(text)
+    # Rune's lines are full of pauses, and a long one would take a quarter of a minute to say: most of them are said as short breaks.
+    if who == "R" and len(said) > 60:
+        said = said.replace("... ", ", ")
+    body = {"text": said, "voiceId": voice, "modelId": MODEL, "deliveryMode": "CREATIVE",
             "audioConfig": {"audioEncoding": "PCM", "sampleRateHertz": RATE_IN, "speakingRate": rate},
             "synthesisContext": {"reasoning": "REASONING_ON", "reasoningContext": scene[:600]}}
     headers = {"Authorization": f"Basic {key}", "Content-Type": "application/json", "Accept": "application/json"}
