@@ -157,11 +157,11 @@ final class PlusRun {
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
     private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
-            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0, 6.5f, 1.2f, 3};
+            1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0, 6.5f, 1.2f, 3, 1.8f, 2, 2.6f, 2.2f, 3, 1.3f, 1.3f};
     private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
-            .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f, 2.6f, 1.5f, 1.9f};
+            .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f, 2.6f, 1.5f, 1.9f, .9f, 1, 1.2f, .9f, .5f, .8f, .9f};
     private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
-            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f, 1.5f, 1.2f, .8f};
+            1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f, 1.5f, 1.2f, .8f, .7f, .8f, .8f, .9f, .45f, .9f, .9f};
     /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
     private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
@@ -1599,7 +1599,7 @@ final class PlusRun {
             boolean comet = named(COMET) && Math.abs(speedAcross) > RUN * 1.4f && !RunLevels.boss(foe.kind);
             if (comet) {
                 foe.left = 1;
-                beat(foe);
+                beat(foe, SURE);
             } else if (notes > 0 || has(BROWN)) {
                 // With the notes about her, or in brown, whatever she touches is dealt with; one of those who wait, unless spent, only stops against her.
                 if (RunLevels.boss(foe.kind) && !open(foe) && has(BROWN)) {
@@ -1607,13 +1607,13 @@ final class PlusRun {
                 } else if (has(BROWN) && !RunLevels.boss(foe.kind)) {
                     // Any sign, from any side, spikes and all, and however much it can take.
                     foe.left = 1;
-                    beat(foe);
+                    beat(foe, SURE);
                     // The ember: in red as well, it goes off burning, the way she faces, into whatever is beyond it.
                     if (named(EMBER)) shoot(FIRE, true, foe.x + foe.wide() / 2, foe.y + foe.tall() * .5f, (facingLeft ? -1 : 1) * 12, 0, .8f);
                 } else if (foe.dazed <= 0) {
-                    beat(foe);
+                    beat(foe, SURE);
                 }
-            } else if (onto && foe.kind != RunLevels.TIMES && foe.dazed <= 0) {
+            } else if (onto && foe.kind != RunLevels.TIMES && foe.kind != RunLevels.WISP && foe.dazed <= 0) {
                 speedDown = -BOUNCE;
                 airJumps = 0;
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
@@ -1622,7 +1622,7 @@ final class PlusRun {
                 if (cursed <= 0) {
                     beat(foe);
                     // One sign after another without touching the ground: each is worth one plus more than the last.
-                    if (++combo > 1) bonus += combo - 1;
+                    if (foe.flat && ++combo > 1) bonus += combo - 1;
                 }
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
@@ -1974,7 +1974,7 @@ final class PlusRun {
             // Normal No. 3 sends every sign near her over the fence; a compliment leaves them standing, charmed.
             for (Foe foe : foes) {
                 if (foe.flat || RunLevels.boss(foe.kind) || Math.abs(foe.x - x) > 9) continue;
-                if (kind == HOMERUN) beat(foe);
+                if (kind == HOMERUN) beat(foe, SURE);
                 else foe.dazed = 6;
             }
             cleared++;
@@ -1996,9 +1996,27 @@ final class PlusRun {
      * third of what they can take is gone they change, which takes a moment in which nothing
      * touches them and whatever they had in the air is gone.
      */
+    private void beat(Foe foe, int by) {
+        with = by;
+        beat(foe);
+        with = PLAIN;
+    }
+
+    /** What the blow being dealt is made with: nothing in particular; something nothing stands against; or the kind of thing thrown. */
+    private static final int PLAIN = -1, SURE = -2;
+    private int with = PLAIN;
+
     private void beat(Foe foe) {
         if (!open(foe)) {
             parried++;
+            return;
+        }
+        // A candle wisp is put out only by water, and a rime flake melted only by fire; steam does for both. Anything else goes through them.
+        if ((foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) && with != SURE && with != STEAM && with != (foe.kind == RunLevels.WISP ? WATER : FIRE)) {
+            fizzled++;
+            fizzledAt = foe.kind;
+            foeX = foe.x + foe.wide() / 2;
+            foeY = foe.y + foe.tall();
             return;
         }
         boolean waits = RunLevels.boss(foe.kind);
@@ -2011,6 +2029,7 @@ final class PlusRun {
             foe.y = foe.ground;
             foe.act = 0;
             flattened++;
+            if (RunLevels.flier(foe.kind)) fliers++;
             // A paper target is only hit: two pluses for it. And where signs keep coming, each one dealt with counts, and is a plus.
             if (foe.kind == RunLevels.TARGET) {
                 caught++;
@@ -2020,6 +2039,10 @@ final class PlusRun {
                 bonus++;
             }
             if (foe.kind == RunLevels.BLOT) split(foe);
+            if (RunLevels.rover(foe.kind)) {
+                for (Shot shot : shots) if (!shot.hers) shot.left = 0;
+                return;
+            }
             if (waits && !foe.spawned && !standing()) won();
             else if (waits && !foe.spawned && phase(foe) > phase) changed();
             return;
@@ -2042,8 +2065,8 @@ final class PlusRun {
             split(foe);
         }
         if (phase(foe) > phase) {
-            if (foe.spawned) {
-                // The Old Book changes by himself.
+            if (foe.spawned || RunLevels.rover(foe.kind)) {
+                // The Old Book changes by himself, and so does one met in the middle of a land.
                 phases++;
                 foe.flourish = FLOURISH;
             } else {
@@ -2349,7 +2372,7 @@ final class PlusRun {
                         foe.left = 2;
                         drunk++;
                     } else if (foe.dazed <= 0) {
-                        beat(foe);
+                        beat(foe, shot.kind);
                         // One sign after another dealt with by what she throws: each is worth one plus more than the last, up to four.
                         if (foe.flat && !RunLevels.boss(foe.kind)) {
                             if (foe.kind == RunLevels.TARGET) break;
@@ -2421,6 +2444,12 @@ final class PlusRun {
     int lastShut() { return lastShut; }
     int drunk() { return drunk; }
     int grounded() { return grounded; }
+    /** And: those that fly beaten; blows that went through one that only water or only fire deals with, and which of the two it was; and dives begun. */
+    int fliers() { return fliers; }
+    int fizzled() { return fizzled; }
+    int fizzledAt() { return fizzledAt; }
+    int dives() { return dives; }
+    private int fliers, fizzled, fizzledAt, dives;
 
     /** How many times something has been turned aside by her in brown, a count that only goes up; and where the last was. */
     int braces() { return braces; }
@@ -2967,6 +2996,111 @@ final class PlusRun {
                 } else if ((foe.y -= 3 * seconds) <= hangs) {
                     foe.mode = 0;
                 }
+                break;
+            }
+            case RunLevels.DRIFTER:
+            case RunLevels.MITE: {
+                // To and fro over where it began, bobbing: a tittle quicker, and each a little after the one before it in the line.
+                boolean mite = foe.kind == RunLevels.MITE;
+                if (Math.abs(foe.x - foe.home) > (mite ? 4 : 3.5f)) foe.leftward = foe.x > foe.home;
+                foe.x += (foe.leftward ? -1 : 1) * SPEED[foe.kind] * seconds;
+                foe.y = foe.ground + (float) Math.sin(foe.clock * (mite ? 3.2f : 2.4f)) * (mite ? .4f : .45f);
+                break;
+            }
+            case RunLevels.SWOOPER: {
+                // Hanging (0); it has marked her (1); the dive, down through where she stood and up the other side (2); getting its height back (3).
+                if (foe.mode == 0) {
+                    foe.y = foe.ground + (float) Math.sin(foe.clock * 2) * .25f;
+                    foe.leftward = toLeft;
+                    if ((foe.wait -= seconds) <= 0 && away < 6.5f && y + TALL > foe.y + 1.5f) {
+                        foe.mode = 1;
+                        foe.act = .6f;
+                    }
+                } else if (foe.mode == 1) {
+                    if ((foe.act -= seconds) <= 0) {
+                        foe.mode = 2;
+                        foe.act = 0;
+                        foe.fromX = foe.x;
+                        foe.toX = Math.max(foe.x - 6.5f, Math.min(foe.x + 6.5f, x + WIDE / 2 - foe.wide() / 2));
+                        // (How far down it goes is kept where its wait would be.)
+                        foe.wait = Math.max(1.5f, Math.min(7, y + TALL - foe.tall() - foe.ground));
+                        foe.leftward = foe.toX < foe.fromX;
+                        dives++;
+                    }
+                } else if (foe.mode == 2) {
+                    float through = Math.min(1, (foe.act += seconds) / 1.1f);
+                    foe.x = foe.fromX + (foe.toX - foe.fromX) * 2 * through;
+                    foe.y = foe.ground + foe.wait * (float) Math.sin(through * Math.PI);
+                    if (through >= 1) {
+                        foe.mode = 3;
+                        foe.act = 1.4f;
+                    }
+                } else {
+                    // Back to over where it began.
+                    float back = foe.home - foe.x;
+                    foe.y = foe.ground;
+                    foe.x += Math.signum(back) * Math.min(Math.abs(back), 2.5f * seconds);
+                    if (back != 0) foe.leftward = back < 0;
+                    if ((foe.act -= seconds) <= 0) {
+                        foe.mode = 0;
+                        foe.wait = .5f;
+                    }
+                }
+                break;
+            }
+            case RunLevels.BOMBER: {
+                if (Math.abs(foe.x - foe.home) > 6) foe.leftward = foe.x > foe.home;
+                foe.x += (foe.leftward ? -1 : 1) * SPEED[foe.kind] * seconds;
+                foe.y = foe.ground + (float) Math.sin(foe.clock * 1.6f) * .2f;
+                // What it lets go falls straight down: one every so often while she is anywhere under its way; it puffs itself up first.
+                foe.wait = Math.max(away < 7 ? -1 : .45f, foe.wait - seconds);
+                foe.mode = foe.wait < .45f && away < 7 ? 1 : 0;
+                if (foe.wait <= 0 && away < 7) {
+                    foe.wait = 1.5f;
+                    shoot(STOP, false, middle, foe.y + foe.tall(), 0, 6.5f, 4);
+                    thrown++;
+                }
+                break;
+            }
+            case RunLevels.SHOOTER: {
+                foe.leftward = toLeft;
+                foe.y = foe.ground + (float) Math.sin(foe.clock * 2.2f) * .3f;
+                if (foe.mode == 1) {
+                    // Taking aim; and then it fires at where she is.
+                    if ((foe.act -= seconds) <= 0) {
+                        foe.mode = 0;
+                        foe.wait = 2.6f;
+                        aim(DOT, middle, foe.y + foe.tall() / 2, 6.5f, 0, 2.2f);
+                        thrown++;
+                    }
+                } else {
+                    // It keeps its distance: from nearer than four squares it backs off, as far as it may go from where it began.
+                    float to = foe.x + (toLeft ? 1 : -1) * SPEED[foe.kind] * seconds;
+                    if (away < 4 && Math.abs(to - foe.home) <= 5) foe.x = to;
+                    if ((foe.wait -= seconds) <= 0 && away < 9) {
+                        foe.mode = 1;
+                        foe.act = .55f;
+                    }
+                }
+                break;
+            }
+            case RunLevels.WISP: {
+                // It comes for her, slowly, no further than eight squares from where it began, and goes back when she has gone.
+                float px = x + WIDE / 2;
+                boolean after = away < 7 && Math.abs(px - foe.home) < 8;
+                float toX = after ? px - foe.wide() / 2 : foe.home, toY = after ? y + TALL / 2 - foe.tall() / 2 : foe.ground;
+                float far = Math.max(.01f, (float) Math.hypot(toX - foe.x, toY - foe.y)), by = Math.min(far, SPEED[foe.kind] * seconds);
+                foe.x += (toX - foe.x) / far * by;
+                foe.y += (toY - foe.y) / far * by;
+                foe.leftward = toLeft;
+                foe.mode = after ? 1 : 0;
+                break;
+            }
+            case RunLevels.RIME: {
+                // Round and round where it began.
+                foe.x = foe.home + (float) Math.cos(foe.clock * SPEED[foe.kind]) * 2;
+                foe.y = foe.ground + (float) Math.sin(foe.clock * SPEED[foe.kind]) * 1.2f;
+                foe.leftward = toLeft;
                 break;
             }
             default:

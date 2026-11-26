@@ -3207,7 +3207,7 @@ public class PlusRunTest {
     }
 
     @Test public void theLandsOfTheSecondVolumeAreLongerAndHaveWhatTheirChaptersAreMadeOf() {
-        boolean[] ground = new boolean[128], signs = new boolean[RunLevels.GECKO + 1], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
+        boolean[] ground = new boolean[128], signs = new boolean[RunLevels.RIME + 1], ribbons = new boolean[PlusRun.WHITE + 1], met = new boolean[RunLevels.NURI + 1];
         int movers = 0, doors = 0, first = 0, total = 0, heights = 0, crowd = 0;
         for (int number = 1; number <= RunLevels.COUNT; number++) first += RunLevels.level(number).columns;
         for (int number = RunLevels.COUNT + 1; number <= RunLevels.TOTAL; number++) {
@@ -3457,6 +3457,33 @@ public class PlusRunTest {
                     PlusRun.WON, run.state());
             assertEquals("land " + number, PlusRun.HEARTS, run.hearts());
         }
+    }
+
+    /** Not a check: run with RUN_FLOCK set in the environment to get, for the lands that have fliers, the number each is made from and the way its fliers are spread. */
+    @Test public void findsTheNumbersAndTheFlocksOfTheLandsWithFliers() {
+        if (System.getenv("RUN_FLOCK") == null) return;
+        StringBuilder found = new StringBuilder();
+        try {
+            for (int number = RunLevels.FLIERS_FROM; number <= RunLevels.TOTAL; number++) {
+                long now = number > RunLevels.COUNT ? RunLevels.LATER_SEEDS[number - RunLevels.COUNT - 1] : RunLevels.SEEDS[number - 1], chosen = -1;
+                int way = -1;
+                for (int seed = 0; seed <= (number > RunLevels.COUNT ? 24 : 120) && chosen < 0; seed++) {
+                    long with = seed == 0 ? now : seed;
+                    for (int flock = 0; flock < 3 && chosen < 0; flock++) {
+                        RunLevels.flockTry = flock;
+                        PlusRun run = cross(unguarded(RunLevels.level(number, with)), number > RunLevels.COUNT ? 400 : 240);
+                        if (run.state() == PlusRun.WON && run.hearts() == PlusRun.HEARTS) {
+                            chosen = with;
+                            way = flock;
+                        }
+                    }
+                }
+                found.append(number).append(':').append(chosen).append('/').append(way).append(chosen == now && way == 0 ? "" : " *").append("\n");
+            }
+        } finally {
+            RunLevels.flockTry = -1;
+        }
+        throw new AssertionError("FLOCK:\n" + found);
     }
 
     /** Not a check: run with RUN_SEEDS2 set in the environment to get the numbers for the lands of the second volume. */

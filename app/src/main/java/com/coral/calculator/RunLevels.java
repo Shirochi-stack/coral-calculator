@@ -178,6 +178,91 @@ final class RunLevels {
 
     static boolean rover(int kind) { return kind >= WYRM && kind <= GECKO; }
 
+    /**
+     * And those that fly, which are in the lands themselves from the twenty-first on, more
+     * of them and more kinds as the lands go by. A comma moth goes to and fro at a height
+     * and is in the way of a jump. A caret swallow hangs high, marks whoever comes under it,
+     * and dives through where she stood and up again. An ellipsis cloud flies over and lets
+     * full stops fall straight down. An asterisk hovers at a distance, takes aim and fires,
+     * and backs off from whoever comes near. Tittles, the dots of the letter i, fly four in
+     * a line, and are worth more each landed on without touching the ground. A candle wisp
+     * comes slowly after whoever passes, and only water, or steam, puts it out; a rime flake
+     * goes round and round, and only fire, or steam, melts it. Neither of those two has to
+     * be beaten: a wisp can be outrun and a flake gone under or over. And a full stop that
+     * lands on her in the air is the end of a flight in green, whoever let it fall.
+     */
+    static final int DRIFTER = 32, SWOOPER = 33, BOMBER = 34, SHOOTER = 35, MITE = 36, WISP = 37, RIME = 38;
+    /** The first land that has any of them; the land each is first met in, which has three of it before anything else that flies; and how far over the ground each keeps. */
+    static final int FLIERS_FROM = 21;
+    private static final int[] FLIES_FROM = {21, 23, 26, 28, 32, 37, 43}, FLIES_HIGH = {2, 5, 4, 3, 2, 3, 3};
+
+    static boolean flier(int kind) { return kind >= DRIFTER && kind <= RIME; }
+
+    /**
+     * Which of the ways they might be spread over a land is used for it: the first, but
+     * for the lands named here, where the first left the land one that could not be crossed
+     * without a hurt. Found as the numbers the lands are made from were. (And a way to try
+     * another, for the finding.)
+     */
+    static final int[] FLOCKS = new int[100];
+    static int flockTry = -1;
+    static {
+        for (int land : new int[]{66, 69, 72, 80}) FLOCKS[land - 1] = 1;
+    }
+
+    static int flierFrom(int kind) { return FLIES_FROM[kind - DRIFTER]; }
+
+    /** How many of them, or lines of them, a land has: three in the twenty-first, one more every five lands, two more in the second volume; fewer where someone waits. */
+    static int fliersIn(int number) {
+        if (number < FLIERS_FROM) return 0;
+        return Math.min(14, 3 + (number - FLIERS_FROM) / 5 + (number > COUNT ? 2 : 0) - (bossOf(number) >= 0 ? 1 : 0));
+    }
+
+    /**
+     * Those that fly are put into a land, spread along it from a little after its start to
+     * a little before its end or whoever waits there: each over the ground it keeps to, or
+     * by a pit over the nearer side of it, in open air, away from the flags and from each
+     * other. They are put in when everything else has been, with chances of their own, so
+     * that the land under them is the land it was.
+     */
+    private static void flock(Level level) {
+        int number = level.number, count = fliersIn(number);
+        if (count == 0) return;
+        Random random = new Random(7919L * number + 13 + 104729L * (flockTry >= 0 ? flockTry : FLOCKS[number - 1]));
+        int from = 18, until = (level.arena >= 0 ? level.arena : level.gate) - 8, newest = -1, known = 0;
+        for (int kind = DRIFTER; kind <= RIME; kind++) {
+            if (FLIES_FROM[kind - DRIFTER] == number) newest = kind;
+            if (FLIES_FROM[kind - DRIFTER] <= number) known++;
+        }
+        for (int index = 0; index < count; index++) {
+            int kind = newest >= 0 && index < 3 ? newest : DRIFTER + random.nextInt(known);
+            perch(level, kind, from + (until - from) * (index * 2 + 1) / (count * 2) + random.nextInt(5) - 2, until);
+        }
+    }
+
+    private static void perch(Level level, int kind, int column, int until) {
+        int high = FLIES_HIGH[kind - DRIFTER], wide = kind == MITE ? 4 : 1;
+        for (int tries = 0; tries < 10; tries++, column += 2) {
+            if (column < 14 || column + wide + 2 >= until) return;
+            int floor = -1;
+            for (int reach = 0; reach <= 5 && floor < 0; reach++) {
+                floor = top(level, column - reach);
+                if (floor < 0) floor = top(level, column + reach);
+            }
+            int row = floor - high - 1;
+            boolean clear = floor > 0 && row >= 2;
+            for (int beside = column - 2; beside <= column + wide + 1 && clear; beside++) {
+                for (int up = row - 1; up <= row + 1 && clear; up++) clear = level.land[up][beside] == AIR;
+            }
+            for (int flag : level.flags) clear &= Math.abs(flag - column) > 4;
+            for (int[] foe : level.foes) if (flier(foe[0]) || rover(foe[0])) clear &= Math.abs(foe[1] - column) > (rover(foe[0]) ? 9 : 5);
+            for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 3;
+            if (!clear) continue;
+            for (int each = 0; each < wide; each++) level.foes.add(new int[]{kind, column + each, row});
+            return;
+        }
+    }
+
     /** Which of the three is met in a land, or -1: in no land where someone waits at the end. */
     static int roverOf(int number) {
         if (bossOf(number) >= 0) return -1;
@@ -216,7 +301,7 @@ final class RunLevels {
     }
     static final int GUARD_LAND = 6, BUTLER_LAND = 12;
 
-    static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE && kind != TARGET; }
+    static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE && kind <= GECKO && kind != TARGET; }
 
     /** Who waits at the end of a land, or -1: for the twins, Miri. */
     static int bossOf(int number) {
@@ -398,7 +483,8 @@ final class RunLevels {
         Level draft = new Level(number, 1200, DEEP);
         Builder builder = new Builder(draft, random, 1, chapter);
         builder.ground(6);
-        int stretches = boss >= 0 ? 12 : 16 + (number - COUNT - 1) / 7, last = -1;
+        // (Longer as they go: eighteen stretches in the thirty-first, twenty-seven in the seventy-ninth.)
+        int stretches = boss >= 0 ? 12 : 18 + (number - COUNT - 1) / 5, last = -1;
         int[] pool = LATER_POOLS[chapter - CHAPTERS], shapes = LATER_SHAPES[chapter - CHAPTERS];
         for (int stretch = 0; stretch < stretches; stretch++) {
             int kind;
@@ -457,6 +543,7 @@ final class RunLevels {
         armLater(level, new Random(seed * 104729 + number * 31L));
         level.foes.addAll(draft.lodgers);
         rove(level);
+        flock(level);
         return level;
     }
 
@@ -558,7 +645,8 @@ final class RunLevels {
         builder.ground(6);
         int boss = bossOf(number);
         boolean shaped = number >= SHAPED_FROM;
-        int stretches = boss >= 0 ? (shaped ? 8 : 6) : 6 + number / 3;
+        // (From the twenty-first on, three stretches more than the count of the lands before would give.)
+        int stretches = boss >= 0 ? (shaped ? 8 : 6) : 6 + number / 3 + (number >= FLIERS_FROM ? 3 : 0);
         int last = -1;
         for (int stretch = 0; stretch < stretches; stretch++) {
             int[] pool = chapter < EARLY_POOLS.length ? EARLY_POOLS[chapter] : HIGH_POOL;
@@ -617,6 +705,7 @@ final class RunLevels {
         // The signs that walk in the places off the land join the rest only now, so that what the land is given is what it was given without them.
         level.foes.addAll(draft.lodgers);
         rove(level);
+        flock(level);
         return level;
     }
 
