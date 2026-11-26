@@ -17,8 +17,10 @@ import java.util.Random;
  * while, and must rest before it is gathered again. While she gathers and while it lasts
  * she flies more slowly. It goes straight ahead from where she is: it reaches Lucy only
  * while Lucy is before her, and whatever is coming at her along it is gone. Thirds of what
- * Lucy can take are stages: in each she is quicker and sends more; as one ends she reels,
- * everything in the air is gone, and for a breath nothing comes.
+ * Lucy can take are stages: in each she is quicker and sends more, and from the second on
+ * she does not stay in the beam but makes off across the sky when it finds her, to be
+ * followed; as one ends she reels, everything in the air is gone, and for a breath nothing
+ * comes.
  *
  * A hurt costs hearts, counted in halves, as it does on the ground; when they are gone she
  * has fallen, and the flight is over: whoever keeps the lives decides whether it begins
@@ -32,7 +34,7 @@ final class RunFlight {
     /** The beam: how long it is gathered, how long it lasts, how long it rests, how often it lands while it is on Lucy, and how near her it must be. */
     static final float CHARGE = .45f, LASTS = 1.3f, WAIT = 1.5f, TICK = .12f, TRUE = .3f, CUTS = .27f;
     /** How many times the beam must land; how long she cannot be hurt again after a hurt; and how long Lucy reels as a stage ends. */
-    static final int TAKES = 27;
+    static final int TAKES = 54;
     static final float SAFE = 1.3f, REELS = 1.8f;
     /** How near a puff or a star must arrive to hurt, and how near the line of a gust or a pillar. */
     static final float NEAR = .27f, BAR = .2f;
@@ -51,7 +53,7 @@ final class RunFlight {
     private int state = FLYING, halves, left = TAKES, stage, turn;
     private int beams, hits, hurts, wiped, thrown, stages;
     private float x, y = .25f, lucyX, lucyY = -.2f, goalX, goalY, sinceGoal = 9;
-    private float safe, held, beam, wait, tick, reel = 1.2f, next = 1, time, sinceThrow = 9, sinceStruck = 9, sinceHurt = 9;
+    private float safe, held, beam, wait, tick, reel = 1.2f, next = 1, time, sinceThrow = 9, sinceStruck = 9, sinceHurt = 9, sinceFled = 9;
 
     /** A flight for someone with so many halves of hearts, whom a hurt costs so many of them. */
     RunFlight(int halves, int costs, long seed) {
@@ -108,6 +110,7 @@ final class RunFlight {
         sinceThrow += seconds;
         sinceStruck += seconds;
         sinceHurt += seconds;
+        sinceFled += seconds;
         if (safe > 0) safe -= seconds;
         shine(seconds, strike);
         if (state != FLYING) return;
@@ -173,6 +176,13 @@ final class RunFlight {
                         state = WON;
                         things.clear();
                         return;
+                    }
+                    // From the second stage on she does not stay in it: she makes for the other side of the sky, every so often.
+                    if (stage >= 1 && sinceFled > 1.2f) {
+                        sinceFled = 0;
+                        sinceGoal = 0;
+                        goalX = x > 0 ? -.2f - random.nextFloat() * .55f : .2f + random.nextFloat() * .55f;
+                        goalY = (random.nextFloat() * 2 - 1) * .55f;
                     }
                     int now = Math.min(2, (TAKES - left) * 3 / TAKES);
                     if (now > stage) {

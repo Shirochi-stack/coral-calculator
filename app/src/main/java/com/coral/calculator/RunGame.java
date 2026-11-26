@@ -391,7 +391,7 @@ final class RunGame {
     private static final String[] READ = {"Onii-tan", "...wait for me", "Onii-tan!", "...read it to me", "Onii-tan...", "...don't change it"};
     private final Bitmap[] lucyArt = new Bitmap[3], whiteArt = new Bitmap[2];
     private int finale, unmadeSaid;
-    private float finaleAge, cheerAge = 9, flightNoteAge, unmadeAt, sinceBeamEnd = 9;
+    private float finaleAge, cheerAge = 9, flightNoteAge, unmadeAt, lucyRoseAt, sinceBeamEnd = 9;
     private RunFlight flight;
     private String flightNote;
     private int seenFlightHits, seenFlightHurts, seenFlightBeams, seenFlightStages, seenFlightThrown;
@@ -3022,6 +3022,9 @@ final class RunGame {
         cameraY = restingCamera();
         screen = PLAY;
         captionLeft = 0;
+        // And, in the last land, the flight or the land unmade at once, for looking at them.
+        if (BuildConfig.DEBUG && land == RunLevels.TOTAL && session.tally("run_finale") == 1) takeOff();
+        else if (BuildConfig.DEBUG && land == RunLevels.TOTAL && session.tally("run_finale") == 2) unmake();
         // The first time she has a colour of her own to call on, she says how; after that, something about setting off.
         if (greeted && perks.colours != 0 && session.tally("run_hint_call") == 0) {
             session.keep("run_hint_call", 1);
@@ -3138,11 +3141,13 @@ final class RunGame {
         flightWords.clear();
         idle();
         dye(PlusRun.WHITE);
-        flight = new RunFlight(run.halves(), Math.max(1, 2 + run.bite() - perks.defence), random.nextLong());
+        // (Every heart she has: the white that formed has made her whole.)
+        flight = new RunFlight(run.maxHearts() * 2, Math.max(1, 2 + run.bite() - perks.defence), random.nextLong());
         seenFlightHits = seenFlightHurts = seenFlightBeams = seenFlightStages = seenFlightThrown = 0;
         flash = .8f;
         audio.play("flap", .9f);
         buzz(true);
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "flight");
     }
 
     /** The black ribbon lay on her for good: the land is unmade, and what follows is watched, not played. */
@@ -3165,7 +3170,12 @@ final class RunGame {
         talks();
         for (int index = flightWords.size() - 1; index >= 0; index--) if ((flightWords.get(index)[2] += seconds) > 1.5f) flightWords.remove(index);
         if (finale == FLIGHT) {
-            flight.step(seconds, goLeft, goRight, goJump, goDown, goStrike);
+            // (In a build made for testing it can be flown by itself, to be looked at: to where Lucy is, with the beam held.)
+            if (BuildConfig.DEBUG && session.tally("run_sweep") == 1) {
+                flight.step(seconds, flight.lucyX() < flight.x() - .06f, flight.lucyX() > flight.x() + .06f, flight.lucyY() < flight.y() - .06f, flight.lucyY() > flight.y() + .06f, true);
+            } else {
+                flight.step(seconds, goLeft, goRight, goJump, goDown, goStrike);
+            }
             if (flight.beams() != seenFlightBeams) {
                 seenFlightBeams = flight.beams();
                 audio.play("form", .7f);
@@ -3233,6 +3243,7 @@ final class RunGame {
         } else if (unmadeSaid == 1 && finaleAge > unmadeAt + 4.2f && !audio.speaking()) {
             unmadeSaid = 2;
             unmadeAt = finaleAge;
+            lucyRoseAt = finaleAge;
             speak(RunStory.LUCY[10], true);
         } else if (unmadeSaid == 2 && finaleAge > unmadeAt + 4.6f && !audio.speaking()) {
             unmadeSaid = 3;
@@ -3313,8 +3324,10 @@ final class RunGame {
     private void drawFlight(Canvas canvas) {
         drawSky(canvas, RunLevels.chapterOf(RunLevels.TOTAL), clock * tile * 2.4f);
         canvas.drawColor(0x66121A3A);
-        float cx = safe.centerX(), cy = safe.top + safe.height() * .43f, wide = safe.width() * .4f, high = safe.height() * .27f;
-        float farY = cy - safe.height() * .05f, far = .5f;
+        // (Where she flies is the lower middle of the screen; where Lucy does, far off, is above it and half the size: so the beam, which
+        // goes away from her, always has the height of the sky between them to cross.)
+        float cx = safe.centerX(), cy = safe.top + safe.height() * .6f, wide = safe.width() * .4f, high = safe.height() * .17f;
+        float farY = safe.top + safe.height() * .37f, far = .5f;
         canvas.save();
         if (shake > 0) canvas.translate((random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4), (random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4));
         paint.setStyle(Paint.Style.FILL);
@@ -3374,7 +3387,7 @@ final class RunGame {
                 paint.setColor(0xFFE0362F);
                 paint.setAlpha(warn / 2);
                 if (level) canvas.drawRect(0, nearY - band, width, nearY + band, paint);
-                else canvas.drawRect(nearX - band, safe.top, nearX + band, cy + high * 1.25f, paint);
+                else canvas.drawRect(nearX - band, farY - high * .5f, nearX + band, cy + high * 1.1f, paint);
                 paint.setColor(0xFFBFF3EA);
                 paint.setAlpha(Math.round(80 + 140 * near));
                 if (level) canvas.drawRoundRect(cx - safe.width() * (.22f + .4f * near), y - half, cx + safe.width() * (.22f + .4f * near), y + half, half, half, paint);
@@ -3474,7 +3487,7 @@ final class RunGame {
         // Her friends are heard from as a third of it ends: some of them, going by.
         if (cheerAge < 2.6f && flight.stages() > 0) {
             int first = flight.stage() == 1 ? 0 : 9, count = flight.stage() == 1 ? 9 : 10;
-            float in = Math.min(1, cheerAge / .35f), out = Math.max(0, (cheerAge - 2.1f) / .5f), row = cy + high * 1.18f;
+            float in = Math.min(1, cheerAge / .35f), out = Math.max(0, (cheerAge - 2.1f) / .5f), row = cy + high * 1.12f;
             canvas.saveLayerAlpha(0, row - dp(40), width, row + dp(46), Math.round(255 * in * (1 - out)));
             for (int index = 0; index < count; index++) {
                 float x = safe.left + safe.width() * (index + .5f) / count - (1 - in) * safe.width() * .5f;
@@ -3490,7 +3503,7 @@ final class RunGame {
 
     /** Over the flight: her hearts and her lives; how much more Lucy can take, of which two thirds went on the ground; a word when a life is lost; and what is said. */
     private void flightHud(Canvas canvas, boolean flying) {
-        int hearts = flying ? (flight.most() + 1) / 2 : run.maxHearts(), halves = flying ? flight.halves() : run.halves();
+        int hearts = (flight.most() + 1) / 2, halves = flight.halves();
         float tall = dp(44), margin = dp(10), heart = hearts > 5 ? dp(15) : hearts > 3 ? dp(18) : dp(22);
         text.setTextSize(dp(15));
         text.setTextAlign(Paint.Align.LEFT);
@@ -3653,22 +3666,22 @@ final class RunGame {
         if (white > 0) canvas.drawColor(Color.argb(Math.round(255 * white), 250, 248, 244));
         if (age > 5.2f) {
             // Lucy, alone in it: sitting, at first; on her feet to say who she is; and then away, on her own wings.
-            float in = Math.min(1, (age - 5.2f) / .8f), away = unmadeSaid >= 2 ? Math.max(0, age - unmadeAt - 3.4f) : 0;
-            float x = safe.centerX() + away * tile * 1.6f, y = safe.top + safe.height() * .52f - away * away * tile * 2.4f;
+            float in = Math.min(1, (age - 5.2f) / .8f), away = unmadeSaid >= 2 ? Math.max(0, age - lucyRoseAt - 3.4f) : 0;
+            float x = safe.centerX() + away * tile * 1.8f, y = safe.top + safe.height() * .52f - away * away * tile * 2.8f;
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(0xFF8A8F99);
             paint.setAlpha(Math.round(60 * in * Math.max(0, 1 - away)));
-            canvas.drawOval(safe.centerX() - tile * .8f, safe.top + safe.height() * .52f - tile * .1f, safe.centerX() + tile * .8f, safe.top + safe.height() * .52f + tile * .12f, paint);
+            canvas.drawOval(safe.centerX() - tile * 1.1f, safe.top + safe.height() * .52f - tile * .12f, safe.centerX() + tile * 1.1f, safe.top + safe.height() * .52f + tile * .14f, paint);
             paint.setColor(Color.BLACK);
             paint.setAlpha(Math.round(255 * in * Math.max(0, 1 - away / 1.8f)));
-            if (away > 0) frame(canvas, lucy(1), 0, 4, x, y, tile * 2.3f, true);
-            else frame(canvas, lucy(0), unmadeSaid >= 2 ? 0 : 3, 4, x, y, tile * 2.3f, false);
+            if (away > 0) frame(canvas, lucy(1), 0, 4, x, y, tile * 3.4f, true);
+            else frame(canvas, lucy(0), unmadeSaid >= 2 ? 0 : 3, 4, x, y, tile * 3.4f, false);
             paint.setAlpha(255);
         }
         if (unmadeSaid >= 3) {
             // And Halgakos, in her own colour, where she fell.
             paint.setAlpha(Math.round(255 * Math.min(1, (age - unmadeAt) / .8f)));
-            frame(canvas, lose, (int) ((age - unmadeAt) / .7f) % 2 == 0 ? SULK : DAZED, LOSE_FRAMES, safe.centerX(), safe.top + safe.height() * .74f, tile * 2, false);
+            frame(canvas, lose, (int) ((age - unmadeAt) / .7f) % 2 == 0 ? SULK : DAZED, LOSE_FRAMES, safe.centerX(), safe.top + safe.height() * .76f, tile * 2.8f, false);
             paint.setAlpha(255);
         }
         plate(canvas, pauseButton, dp(22), 235);
@@ -9133,6 +9146,11 @@ final class RunGame {
         if (mixShown >= 0 && mixAge < 3.2f && run.mix() != 0) {
             float show = Math.min(1, mixAge / .2f) * Math.max(0, Math.min(1, (3.2f - mixAge) / .4f));
             String name = MIX_NAMES[mixShown] + "!", does = MIX_OF[mixShown] + ": " + MIX_DOES[mixShown];
+            // (The white that is truly hers is not that white: it has a name and a line of its own.)
+            if (mixShown == PlusRun.WHITEN && run.mastered()) {
+                name = "White, and hers!";
+                does = "Every colour, for good: the light, both wings, and the beam";
+            }
             text.setTextSize(dp(12));
             float wide = Math.min(safe.width() - margin * 2, Math.max(dp(150), text.measureText(does) + dp(28))), high = dp(52);
             float left = safe.centerX() - wide / 2, top = safe.top + safe.height() * .32f;
