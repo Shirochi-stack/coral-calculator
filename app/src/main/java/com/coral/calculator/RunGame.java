@@ -298,7 +298,7 @@ final class RunGame {
     private final boolean[] saidForm = new boolean[PlusRun.WHITE + 1];
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
     private float formLasts = 1, shake, sinceBump = 9, sinceShut = 9, sinceOpened = 9, sinceParry = 9, flash;
-    private int seenGreetings, seenEntered, seenReveals, seenWins, seenCurses, seenDrops;
+    private int seenGreetings, seenEntered, seenReveals, seenWins, seenCurses, seenDrops, seenBeams;
     /**
      * What of the story is still to be told in this land, a line after another, in the
      * bubble at the top, while she plays; whether it is being told; whether the line being
@@ -1040,7 +1040,7 @@ final class RunGame {
         talk.clear();
         talking = told = false;
         hintMoved = hintJumped = false;
-        seenDrops = 0;
+        seenDrops = seenBeams = 0;
         goDown = false;
         perks = kept();
         // For looking at what losing looks like in a build made for testing: one heart and one life.
@@ -1062,6 +1062,8 @@ final class RunGame {
         }
         // And, for the same, she may start in a colour, as from a ribbon, and with something in her hands.
         if (BuildConfig.DEBUG && session.tally("run_wear") > 0) run.lend(session.tally("run_wear"));
+        // And the white that is truly hers, which the story has yet to give.
+        if (BuildConfig.DEBUG && session.tally("run_true") > 0) run.master();
         if (BuildConfig.DEBUG && session.tally("run_arm") > 0) run.arm(session.tally("run_arm") - 1);
         idle();
         seenJumps = seenLandings = seenCollected = seenFlattened = seenHurts = seenSprings = seenFlags = seenBlows = 0;
@@ -1609,6 +1611,14 @@ final class RunGame {
             seenFizzled = run.fizzled();
             audio.play("parry", .4f);
             pop(run.foeX(), run.foeY() - 1.4f, run.fizzledAt() == RunLevels.WISP ? "Only water!" : "Only fire!");
+        }
+        if (run.beams() != seenBeams) {
+            seenBeams = run.beams();
+            audio.play("form", .9f);
+            audio.play("fire", .7f);
+            buzz(true);
+            shake = Math.max(shake, .2f);
+            flash = .25f;
         }
         if (run.drops() != seenDrops) {
             seenDrops = run.drops();
@@ -2546,6 +2556,7 @@ final class RunGame {
         int action = event.getActionMasked();
         boolean left = false, right = false, up = false, strike = false, down = false;
         boolean carrying = run != null && (run.weapon() != PlusRun.UNARMED || run.has(PlusRun.RED) || run.has(PlusRun.BLUE));
+        // (Held, it is held: the beam is gathered by holding it.)
         if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
             float low = height * .45f, between = (leftButton.right + rightButton.left) / 2;
             float arrows = Math.min(rightButton.right + dp(26), (rightButton.right + strikeButton.left) / 2);
@@ -2597,6 +2608,7 @@ final class RunGame {
         } else {
             drawLand(canvas);
             // A moment in which something is won or handed over lies over the land, and under what is said and shown of how she stands.
+            if (run.beam() > 0) drawBeam(canvas);
             if (screen == PLAY && prizeAge >= 0) drawPrize(canvas);
             if (screen == PLAY && handAge >= 0) drawHandOver(canvas);
             // With the lights out, the dark lies over the place and under everything that is said and shown of how she stands.
@@ -3121,6 +3133,22 @@ final class RunGame {
                 case PlusRun.WATER:
                     piece(canvas, two, DROP_ART, x, y + tile * .25f, tile * .55f, leftward);
                     break;
+                case PlusRun.STEAM: {
+                    // Fire and water thrown as one: a cloud of steam, rolling, with the flame and the drop in it.
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.WHITE);
+                    for (int puff = 0; puff < 5; puff++) {
+                        double turn = shot.age * 5 + puff * 1.26;
+                        paint.setAlpha(150 + 20 * puff);
+                        canvas.drawCircle(x + (float) Math.cos(turn) * tile * .22f - (leftward ? -1 : 1) * puff * tile * .09f, y + (float) Math.sin(turn) * tile * .16f,
+                                tile * (.3f - puff * .03f), paint);
+                    }
+                    paint.setColor(Color.BLACK);
+                    paint.setAlpha(255);
+                    piece(canvas, two, FIRE_ART, x - tile * .12f, y + tile * .22f, tile * .5f, leftward);
+                    piece(canvas, two, DROP_ART, x + tile * .16f, y + tile * .2f, tile * .36f, leftward);
+                    break;
+                }
                 case PlusRun.FEATHER:
                     pieceIn(canvas, two, FEATHER_ART, x, y, tile * .6f, (float) Math.toDegrees(Math.atan2(shot.down, shot.across)) + 180);
                     break;
@@ -4343,13 +4371,28 @@ final class RunGame {
                 paint.setColor(Color.BLACK);
             }
             if (run.white()) {
-                // White she has not mastered: a faint glow about her, and no rays. (The light of the white that is truly hers is brighter, and turns.)
+                // White she has not mastered: a faint glow about her, and no rays. The light of the white that is truly hers is brighter, and
+                // its rays turn; and while she gathers the beam it draws in.
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(Color.WHITE);
-                float beat = .5f + .5f * (float) Math.sin(clock * 3);
-                for (int ring = 2; ring >= 1; ring--) {
-                    paint.setAlpha(Math.round((12 + 6 * beat) * (3 - ring)));
-                    canvas.drawCircle(feetX, feetY - tall * .48f, tall * (.4f + ring * .13f + .03f * beat), paint);
+                boolean hers = run.mastered();
+                float beat = .5f + .5f * (float) Math.sin(clock * (hers ? 4 : 3)), gathers = hers ? run.beamCharge() : 0;
+                for (int ring = hers ? 3 : 2; ring >= 1; ring--) {
+                    paint.setAlpha(Math.round(hers ? (26 + 14 * beat) * (4 - ring) : (12 + 6 * beat) * (3 - ring)));
+                    canvas.drawCircle(feetX, feetY - tall * .48f, tall * ((hers ? .42f : .4f) + ring * (hers ? .16f : .13f) * (1 - .5f * gathers) + .03f * beat), paint);
+                }
+                if (hers) {
+                    paint.setColor(0xFFFFF3C4);
+                    for (int ray = 0; ray < 8; ray++) {
+                        double turn = clock * (.7f + 3 * gathers) + ray * Math.PI / 4;
+                        path.reset();
+                        path.moveTo(feetX, feetY - tall * .48f);
+                        path.lineTo(feetX + (float) Math.cos(turn - .09) * tall * 1.15f, feetY - tall * .48f + (float) Math.sin(turn - .09) * tall * 1.15f);
+                        path.lineTo(feetX + (float) Math.cos(turn + .09) * tall * 1.15f, feetY - tall * .48f + (float) Math.sin(turn + .09) * tall * 1.15f);
+                        path.close();
+                        paint.setAlpha(Math.round(34 + 22 * beat + 80 * gathers));
+                        canvas.drawPath(path, paint);
+                    }
                 }
                 paint.setColor(Color.BLACK);
                 paint.setAlpha(255);
@@ -4495,6 +4538,58 @@ final class RunGame {
      * the size she would be standing so tall, and turned about if asked. Hers were drawn
      * facing right and the others' facing left.
      */
+    /**
+     * The beam of the white that is truly hers: wide and bright, from her along the way
+     * she faced when it began, as far as it reaches; nothing stops it, and where it goes
+     * through a ledge, a wall or the ground there is a glow on what it goes through.
+     * Letters and feathers stream along it.
+     */
+    private void drawBeam(Canvas canvas) {
+        float way = run.beamLeft() ? -1 : 1, fromX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile + way * tile * .4f, y = (run.y() + PlusRun.TALL * .5f - cameraY) * tile;
+        float toX = fromX + way * PlusRun.BEAM_REACH * tile, life = run.beam() / PlusRun.BEAM_LASTS;
+        float swell = (float) Math.sin(Math.min(1, (1 - life) * 6) * Math.PI / 2) * Math.min(1, life * 5), half = tile * PlusRun.BEAM_WIDE * swell;
+        paint.setStyle(Paint.Style.FILL);
+        for (int layer = 0; layer < 3; layer++) {
+            paint.setColor(layer == 0 ? 0xFFFFE9A8 : layer == 1 ? 0xFFFFF7DE : Color.WHITE);
+            paint.setAlpha(layer == 0 ? 110 : layer == 1 ? 190 : 255);
+            float thick = half * (1.25f - layer * .42f) * (1 + .08f * (float) Math.sin(clock * 40 + layer));
+            canvas.drawRoundRect(Math.min(fromX, toX), y - thick, Math.max(fromX, toX), y + thick, thick, thick, paint);
+        }
+        // Where it goes through something solid, that glows.
+        int row = (int) Math.floor(run.y() + PlusRun.TALL * .5f), from = (int) Math.floor(run.x() + PlusRun.WIDE / 2);
+        RunLevels.Level here = run.level();
+        for (int step = 1; step <= PlusRun.BEAM_REACH; step++) {
+            int column = from + (int) way * step;
+            if (column < 0 || column >= here.columns || row < 0 || row >= here.land.length || !PlusRun.solid(here.land[row][column])) continue;
+            float at = (column + .5f - cameraX) * tile;
+            paint.setColor(0xFFFFD24A);
+            paint.setAlpha(Math.round(150 * swell));
+            canvas.drawCircle(at, y, tile * (.62f + .08f * (float) Math.sin(clock * 30 + column)), paint);
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(200 * swell));
+            canvas.drawCircle(at, y, tile * .3f, paint);
+        }
+        // Letters and feathers along it.
+        String[] letters = {"A", "가", "あ", "文", "Z", "한", "ん", "字"};
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTextSize(tile * .42f);
+        for (int index = 0; index < 10; index++) {
+            float along = (clock * 2.6f + index * .1f) % 1, at = fromX + way * along * PlusRun.BEAM_REACH * tile;
+            float high = y + (float) Math.sin(along * 20 + index) * half * .55f;
+            if (index % 3 == 2) {
+                paint.setAlpha(Math.round(230 * swell));
+                pieceIn(canvas, two, FEATHER_ART, at, high, tile * .45f, way > 0 ? 180 : 0);
+            } else {
+                text.setColor(0xFFB9862C);
+                text.setAlpha(Math.round(230 * swell));
+                canvas.drawText(letters[index % letters.length], at, high + tile * .14f, text);
+            }
+        }
+        text.setAlpha(255);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+    }
+
     /** A ring of light that beats about a button: here is the thing that was just spoken of. */
     private void glow(Canvas canvas, RectF button) {
         float beat = .5f + .5f * (float) Math.sin(clock * 6), round = Math.min(button.width(), button.height()) / 2;
@@ -5225,9 +5320,31 @@ final class RunGame {
         button(canvas, where, goStrike, CalculatorLayout.CORAL);
         boolean upright = weapon != PlusRun.GUN && weapon != PlusRun.BOOK;
         paint.setAlpha(255);
-        boolean casts = run.has(PlusRun.RED) || run.has(PlusRun.BLUE);
+        boolean casts = run.has(PlusRun.RED) || run.has(PlusRun.BLUE), both = run.has(PlusRun.RED) && run.has(PlusRun.BLUE), white = run.white();
+        if (white) {
+            // In white the button wears white and gold; in the white that is truly hers, the beam's mark: gathering while it is held, a
+            // ring that closes while it waits, and bright when it is ready.
+            stroke.setColor(0xFFE9C96A);
+            stroke.setStrokeWidth(dp(3));
+            canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2 - dp(2), stroke);
+            if (run.mastered()) {
+                float ready = run.beamWait() > 0 ? 1 - run.beamWait() / PlusRun.BEAM_WAIT : 1, charge = run.beamCharge();
+                box.set(where.left - dp(3), where.top - dp(3), where.right + dp(3), where.bottom + dp(3));
+                stroke.setColor(Color.WHITE);
+                stroke.setStrokeWidth(dp(3.5f));
+                canvas.drawArc(box, -90, 360 * (charge > 0 ? charge : ready), false, stroke);
+                paint.setAlpha(ready >= 1 ? 255 : 110);
+                art(canvas, STAR_ART, where.right - dp(9), where.top + dp(13), dp(16) + dp(5) * charge, false);
+                paint.setAlpha(255);
+            }
+        }
         if (casts && weapon == PlusRun.UNARMED) {
-            pieceIn(canvas, two, run.has(PlusRun.RED) ? FIRE_ART : DROP_ART, where.centerX(), where.centerY(), where.height() * .5f, 0);
+            if (both) {
+                pieceIn(canvas, two, FIRE_ART, where.centerX() - where.width() * .14f, where.centerY(), where.height() * .42f, 0);
+                pieceIn(canvas, two, DROP_ART, where.centerX() + where.width() * .17f, where.centerY() + where.height() * .03f, where.height() * .32f, 0);
+            } else {
+                pieceIn(canvas, two, run.has(PlusRun.RED) ? FIRE_ART : DROP_ART, where.centerX(), where.centerY(), where.height() * .5f, 0);
+            }
             return;
         }
         thing(canvas, weapon, where.centerX(), where.centerY(), where.height() * (upright ? .66f : .48f), upright ? 35 : 0, false, false);
@@ -5238,7 +5355,12 @@ final class RunGame {
             paint.setColor(cardColor);
             canvas.drawCircle(x, y, corner * .62f, paint);
             paint.setColor(Color.BLACK);
-            pieceIn(canvas, two, run.has(PlusRun.RED) ? FIRE_ART : DROP_ART, x, y, corner, 0);
+            if (both) {
+                pieceIn(canvas, two, FIRE_ART, x - corner * .18f, y, corner * .8f, 0);
+                pieceIn(canvas, two, DROP_ART, x + corner * .24f, y + corner * .05f, corner * .6f, 0);
+            } else {
+                pieceIn(canvas, two, run.has(PlusRun.RED) ? FIRE_ART : DROP_ART, x, y, corner, 0);
+            }
         }
         if (weapon == PlusRun.GUN) {
             text.setTextSize(dp(12));
