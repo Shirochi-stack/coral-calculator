@@ -115,6 +115,16 @@ While she is on screen, Android posts a notification of its own saying that Halg
 - **Stars.** One for finishing a land, two for most of its pluses, three for nearly all. The map shows every land, the stars won, and which is next.
 - **Sound.** Everything said is spoken aloud, each line in a way that fits the moment it is said in, and there are sound effects for everything. The speaker button on the map, or **Sounds in Plus run** in her settings, turns them off. Halgakos's own voice is heard while she calls you Sloppy; the others are heard either way.
 
+**Page brawl**, under it and also recommended, is a fighting game over the whole screen with five fighters from the webtoon, drawn as they are in its full-size pages: Halgakos, Chikuwa, Tsubakieh, Rune and Illya. Pick one and climb a ladder of the other four, best of three rounds each, with a few words between the two before every fight.
+
+- **Playing.** Arrows to walk, a button to jump and one to guard, and three to fight with: a quick move, a heavy move, and a special that has to rest between uses. Landing and taking hits fills a meter; when it is full the special button becomes her ultimate, which cannot be interrupted.
+- **Halgakos**, mid range: her ring of API keys up close, a scan from Glossarion, her tablet of a book, and for her ultimate a chunked translation that cuts the whole stage three times, with her glossary and honorifics on show.
+- **Chikuwa**, close and heavy: a baguette, the brick bread that knocks down, a bread roll lobbed, and a brick bread dropped from above.
+- **Tsubakieh**, close and fast: Normal No. 2, a full swing, the bat thrown so that it comes back, and a home run.
+- **Rune**, long range: ink flicked and wept, a paper knife thrown, and a flood of tears along the ground that can be jumped.
+- **Illya**, all range: hearts, pink magic and a heart beam, and a grand compliment in four pulses.
+- **Voices and sound.** Each has ten spoken lines, her catchphrase among them, in the same voices as in Plus run, and there are sound effects for every hit, guard and throw.
+
 Also on the card:
 
 - **Tic-tac-toe.** You are the crosses and she is the noughts. She plays well, but not perfectly.

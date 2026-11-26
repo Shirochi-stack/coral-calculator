@@ -31,6 +31,8 @@ final class PlaySession {
     static final int CHESS = 23, MINES = 24;
     /** Last card is played on the card too, and Plus run all over the screen. */
     static final int LAST_CARD = 25, RUN = 26;
+    /** Page brawl, a fight between two of the webtoon's five, all over the screen; numbered on from the last of her pranks. */
+    static final int FIGHT = 31;
     static final int NO_SQUARE = -1;
     /** How many moves ahead she looks at chess, counting each side's. */
     private static final int CHESS_AHEAD = 3;
@@ -38,7 +40,7 @@ final class PlaySession {
     /** What a game is called. */
     static String name(int game) {
         return game == CHESS ? "Chess" : game == MINES ? "Minesweeper" : game == LAST_CARD ? "Last card"
-                : game == RUN ? "Plus run" : NAMES[game];
+                : game == RUN ? "Plus run" : game == FIGHT ? FightCast.GAME : NAMES[game];
     }
 
     /** Whether a game is played on the card, and not all over the screen. */

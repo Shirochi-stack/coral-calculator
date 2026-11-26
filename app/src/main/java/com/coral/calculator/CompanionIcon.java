@@ -36,6 +36,7 @@ final class CompanionIcon extends View {
     static final String MINE = "mine";
     static final String FAN = "fan";
     static final String LEAP = "leap";
+    static final String CLASH = "clash";
     static final String NONE = "";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -211,6 +212,12 @@ final class CompanionIcon extends View {
                 canvas.drawLine(2.5f, 20, 9, 20, paint); canvas.drawLine(15, 20, 21.5f, 20, paint);
                 bounds.set(4, 5, 20, 29); canvas.drawArc(bounds, 200, 140, false, paint);
                 canvas.drawLine(19.3f, 12.2f, 15.8f, 12.6f, paint); canvas.drawLine(19.3f, 12.2f, 18.7f, 8.7f, paint);
+                break;
+            case CLASH:
+                // Two blades crossed, and the spark where they meet.
+                canvas.drawLine(4.5f, 19.5f, 17.5f, 6.5f, paint); canvas.drawLine(19.5f, 19.5f, 6.5f, 6.5f, paint);
+                canvas.drawLine(3.5f, 16, 8, 20.5f, paint); canvas.drawLine(20.5f, 16, 16, 20.5f, paint);
+                canvas.drawLine(12, 2.5f, 12, 5, paint); canvas.drawLine(8.6f, 3.6f, 9.6f, 5.6f, paint); canvas.drawLine(15.4f, 3.6f, 14.4f, 5.6f, paint);
                 break;
             case MINE:
                 // A mine: a ball with spikes all round it.
