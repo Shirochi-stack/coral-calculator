@@ -22,7 +22,7 @@ final class RunLevels {
      */
     static final int SECOND = 80, FRIENDS = 19;
     /** How far the lands are open: to the last but one, until whoever waits at the end of the hundredth is there. */
-    static final int OPEN_TO = 99;
+    static final int OPEN_TO = 100;
 
     /** Which of her friends stands in a land of the third volume to pledge her help, from nought; or none. */
     static int friendOf(int number) { return number > SECOND && number < TOTAL ? number - SECOND - 1 : -1; }
@@ -370,6 +370,11 @@ final class RunLevels {
      * lands on her in the air is the end of a flight in green, whoever let it fall.
      */
     static final int DRIFTER = 32, SWOOPER = 33, BOMBER = 34, SHOOTER = 35, MITE = 36, WISP = 37, RIME = 38;
+    /**
+     * And who waits at the end of the last land of all: Lucy, the Dragon of Lost Words, whom they call the Great Translation Killer.
+     * A child, to look at, until her dragon side comes out; and at the last a dragon.
+     */
+    static final int LUCY = 39;
     /** The first land that has any of them; the land each is first met in, which has three of it before anything else that flies; and how far over the ground each keeps. */
     static final int FLIERS_FROM = 21;
     private static final int[] FLIES_FROM = {21, 23, 26, 28, 32, 37, 43}, FLIES_HIGH = {2, 5, 4, 3, 2, 3, 3};
@@ -697,12 +702,12 @@ final class RunLevels {
     }
     static final int GUARD_LAND = 6, BUTLER_LAND = 12;
 
-    static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE && kind <= GECKO && kind != TARGET; }
+    static boolean boss(int kind) { return kind == ZERO || kind == ILLYA || kind == TSUBAKIEH || kind >= GOKHAE && kind <= GECKO && kind != TARGET || kind == LUCY; }
 
     /** Who waits at the end of a land, or -1: for the twins, Miri. */
     static int bossOf(int number) {
-        // (In the third volume no one waits but at its end; and who that is comes with her.)
-        if (number > SECOND) return -1;
+        // (In the third volume no one waits but at its end.)
+        if (number > SECOND) return number == TOTAL ? LUCY : -1;
         if (number > COUNT) {
             // The middle of each chapter of the second volume, and its end.
             if (number % IN_LATER_CHAPTER == 5) return BYEORU + (number - COUNT) / IN_LATER_CHAPTER;
