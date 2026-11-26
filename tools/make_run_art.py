@@ -411,6 +411,10 @@ def places():
     # The three met in the middle of lands: about its business, at it, hit, and down.
     for name, tall, box in (("wyrm", 160, (300, 190)), ("blot", 200, (330, 230)), ("gecko", 110, (420, 160))):
         strip_of(pieces(f"boss_{name}", 1, 4), tall, box, name)
+    # Pets: six pictures of each. One that runs: standing, two of running, jumping, at it, and pleased. One that floats: two of hovering,
+    # looking, darting, at it, and pleased.
+    for name in ("jar", "cat", "dog", "duck", "monkey"):
+        strip_of(pieces(f"pet_{name}", 1, 6), 100, (220, 170), f"pet_{name}")
     # A times, beaten: knocked into the air, and flat on its back.
     strip_of(pieces("times_down", 1, 2), 110, (160, 124), "times_down")
     # Those that fly: wings up, wings down, about to do what it does, and beaten.

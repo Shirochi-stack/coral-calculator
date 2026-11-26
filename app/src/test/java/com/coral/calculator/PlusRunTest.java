@@ -1575,6 +1575,266 @@ public class PlusRunTest {
         assertTrue(late.opens(last) < 2 && late.forms(last) < 1.5f);
     }
 
+    @Test public void aPetWaitsInEveryLandFromTheThirdAndKeepsBesideHerForTheWholeOfIt() {
+        // Where they wait: none in the first two lands; from the third one in every land, on its ground, past its first flag; no two lands running the same kind; and every kind.
+        java.util.Set<Integer> kinds = new java.util.TreeSet<>();
+        int last = -1;
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            int waiting = 0;
+            for (int[] item : level.items) {
+                if (item[0] < PlusRun.PET || item[0] >= PlusRun.PET + PlusRun.PETS) continue;
+                waiting++;
+                assertEquals("land " + number, RunLevels.petOf(number), item[0] - PlusRun.PET);
+                assertTrue("land " + number, item[1] > level.flags.get(0) && item[1] < level.flags.get(0) + 12 && item[1] < level.main);
+                assertEquals("land " + number, RunLevels.top(level, item[1]) - 1, item[2]);
+                kinds.add(item[0] - PlusRun.PET);
+                assertTrue("land " + number, item[0] - PlusRun.PET != last);
+                last = item[0] - PlusRun.PET;
+            }
+            assertEquals("land " + number, number < 3 ? 0 : 1, waiting);
+        }
+        assertEquals(PlusRun.PETS, kinds.size());
+
+        // Touched, it goes with her: one that runs keeps on the ground behind her; one that floats, in the air at her shoulder.
+        for (int kind = 0; kind < PlusRun.PETS; kind++) {
+            RunLevels.Level level = flat(120);
+            level.items.add(new int[]{PlusRun.PET + kind, 8, FLOOR - 1, 0});
+            hole(level, 60, 62);
+            PlusRun run = new PlusRun(level);
+            assertEquals(-1, run.pet());
+            run.place(7.8f, GROUND);
+            hold(run, .2f, false, false, false);
+            assertEquals(kind, run.pet());
+            assertEquals(1, run.petJoined());
+            hold(run, 3, false, true, false);
+            hold(run, .6f, false, false, false);
+            assertTrue("pet " + kind + " at " + run.petX() + " her " + run.x(), Math.abs(run.petX() - run.x()) < 2.5f && run.petX() < run.x() + .4f);
+            if (PlusRun.floats(kind)) assertTrue("pet " + kind, run.petY() < FLOOR - .8f && run.petY() > FLOOR - 2);
+            else assertEquals("pet " + kind, FLOOR, run.petY(), .05f);
+            // Over a pit it is not left behind, nor lost in it.
+            for (int step = 0; step < 60 * 12 && run.x() < 70; step++) run.step(STEP, false, true, run.x() > 59 && run.x() < 64);
+            hold(run, 1, false, false, false);
+            assertEquals("pet " + kind, 0, run.livesLost());
+            assertTrue("pet " + kind + " at " + run.petX() + "," + run.petY(), Math.abs(run.petX() - run.x()) < 2.5f && run.petY() <= FLOOR + .05f);
+            // Left far behind, it is beside her again.
+            run.place(110, GROUND);
+            run.step(STEP, false, false, false);
+            assertTrue("pet " + kind, Math.abs(run.petX() - 110) < 2);
+            // It is hers for the whole of the land: a life lost does not cost her it.
+            PlusRun.Perks frail = new PlusRun.Perks();
+            frail.hearts = 1;
+            RunLevels.Level holed = flat(60);
+            hole(holed, 20, 24);
+            PlusRun fallen = new PlusRun(holed, frail);
+            fallen.adopt(kind);
+            fallen.place(22, 6);
+            hold(fallen, 2.5f, false, false, false);
+            assertEquals(1, fallen.livesLost());
+            assertEquals(kind, fallen.pet());
+            hold(fallen, .5f, false, false, false);
+            assertTrue(Math.abs(fallen.petX() - fallen.x()) < 2.5f);
+        }
+        // In a cellar one waits by the things to fight with, for the first wave, if she has none.
+        int[] which = new int[1];
+        PlusRun cellar = atDoor(RunLevels.SHAPED_FROM, RunLevels.ARENA, false, which);
+        int[] one = cellar.level().rooms.get(which[0]);
+        assertTrue(cellar.enter());
+        arrived(cellar);
+        int waits = 0;
+        for (int[] item : cellar.items()) if (item[0] >= PlusRun.PET && item[1] >= one[3] && item[1] <= one[4]) waits++;
+        assertEquals(1, waits);
+    }
+
+    @Test public void eachPetGoesAtWhatIsNearInItsOwnWayAndOnlyHelpsAgainstThoseWhoWait() {
+        // The ink jar: from a distance, a blot; a sign it deals with is hers; what takes more stands dazed.
+        RunLevels.Level level = flat(80);
+        level.foes.add(new int[]{RunLevels.TIMES, 26, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.TIMES, 50, FLOOR - 1, 3});
+        PlusRun run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(20, GROUND);
+        run.adopt(PlusRun.JAR);
+        hold(run, .5f, false, false, false);
+        boolean blot = false;
+        for (int step = 0; step < 60 * 4 && run.flattened() == 0; step++) {
+            for (PlusRun.Foe foe : run.foes()) if (!foe.flat) foe.x = foe.home;
+            run.step(STEP, false, false, false);
+            for (PlusRun.Shot shot : run.shots()) blot |= shot.kind == PlusRun.BLOT_SHOT && shot.pets && shot.hers;
+        }
+        assertTrue(blot);
+        assertTrue(run.foes().get(0).flat);
+        assertEquals(1, run.petKills());
+        assertEquals(1, run.flattened());
+        assertEquals(0, run.hurts());
+        run.place(45, GROUND);
+        PlusRun.Foe tough = run.foes().get(1);
+        tough.dazed = 0;
+        for (int step = 0; step < 60 * 4 && tough.left == 3; step++) {
+            tough.x = tough.home;
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(2, tough.left);
+        assertTrue(tough.dazed > 1);
+
+        // The cat: what is close to it, and nothing further off; and often.
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.MINUS, 28, FLOOR - 1});
+        run = new PlusRun(level);
+        PlusRun.Foe minus = run.foes().get(0);
+        run.place(20, GROUND);
+        run.adopt(PlusRun.CAT);
+        for (int step = 0; step < 60 * 3; step++) {
+            minus.x = minus.home;
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(0, run.petStrikes());
+        assertFalse(minus.flat);
+        run.place(27, GROUND);
+        for (int step = 0; step < 60 * 3 && !minus.flat; step++) {
+            minus.x = minus.home;
+            run.step(STEP, false, false, false);
+        }
+        assertTrue(minus.flat);
+        assertEquals(1, run.petKills());
+
+        // The dog: along the ground in a line, through all of them; not at what is up on a ledge.
+        level = flat(80);
+        for (int column = 30; column <= 34; column++) level.land[FLOOR - 4][column] = RunLevels.LEDGE;
+        level.foes.add(new int[]{RunLevels.MINUS, 32, FLOOR - 5});
+        run = new PlusRun(level);
+        run.place(28, GROUND);
+        run.adopt(PlusRun.DOG);
+        for (int step = 0; step < 60 * 4; step++) {
+            run.foes().get(0).x = run.foes().get(0).home;
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(0, run.petStrikes());
+        level = flat(80);
+        for (int each = 0; each < 3; each++) level.foes.add(new int[]{RunLevels.TIMES, 24 + each, FLOOR - 1});
+        run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(22, GROUND);
+        run.adopt(PlusRun.DOG);
+        for (int step = 0; step < 60 * 3 && run.flattened() < 3; step++) run.step(STEP, false, false, false);
+        assertEquals(3, run.flattened());
+        assertEquals(1, run.petStrikes());
+        assertEquals(3, run.petKills());
+
+        // The duck: what is in the air before what is on the ground; and with its third drop, a quack that dazes what is near.
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.MINUS, 22, FLOOR - 1, 9});
+        level.foes.add(new int[]{RunLevels.DRIFTER, 25, FLOOR - 4});
+        level.foes.add(new int[]{RunLevels.MINUS, 23, FLOOR - 1, 9});
+        run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(20, GROUND - 6);
+        run.adopt(PlusRun.DUCK);
+        PlusRun.Foe moth = run.foes().get(1);
+        for (int step = 0; step < 60 * 3 && !moth.flat; step++) {
+            run.place(20, GROUND - 6);
+            run.step(STEP, false, false, false);
+        }
+        assertTrue(moth.flat);
+        assertEquals(9, run.foes().get(0).left);
+        assertEquals(1, run.petStrikes());
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 0;
+        for (int step = 0; step < 60 * 8 && run.petStrikes() < 3; step++) {
+            run.place(20, GROUND - 6);
+            for (PlusRun.Foe foe : run.foes()) if (!foe.flat) foe.x = foe.home;
+            run.step(STEP, false, false, false);
+        }
+        assertEquals(3, run.petStrikes());
+        for (int step = 0; step < 30; step++) {
+            run.place(20, GROUND - 6);
+            run.step(STEP, false, false, false);
+        }
+        assertTrue(run.foes().get(0).dazed > .3f && run.foes().get(2).dazed > .3f);
+
+        // The monkey: a nut, lobbed; and it fetches: the pluses it passes are hers, and a ribbon it comes by is tied on her.
+        level = flat(80);
+        level.foes.add(new int[]{RunLevels.TIMES, 26, FLOOR - 1});
+        for (int column = 14; column <= 16; column++) level.pluses.add(new int[]{column, FLOOR - 2});
+        level.items.add(new int[]{PlusRun.FORM + PlusRun.GREEN, 15, FLOOR - 1, 0});
+        run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(22, GROUND);
+        run.adopt(PlusRun.MONKEY);
+        boolean nut = false;
+        for (int step = 0; step < 60 * 4 && run.flattened() == 0; step++) {
+            run.step(STEP, false, false, false);
+            for (PlusRun.Shot shot : run.shots()) nut |= shot.kind == PlusRun.NUT && shot.pets && shot.down < 0;
+        }
+        assertTrue(nut);
+        assertEquals(1, run.petKills());
+        int collected = run.collected();
+        run.place(17.2f, GROUND);
+        for (int step = 0; step < 60 * 2; step++) {
+            run.place(17.2f, GROUND);
+            run.step(STEP, true, false, false);
+        }
+        assertEquals(collected + 3, run.collected());
+        assertTrue(run.has(PlusRun.GREEN));
+
+        // Against one who waits a pet only helps: it takes half a piece off her shield and never the last; it never breaks it; and broken by
+        // her, it lands blows, but never the last.
+        for (int kind = 0; kind < PlusRun.PETS; kind++) {
+            // (She keeps over him, out of his reach and not touching him, with her pet under her; in a bare place, so that nothing is in the way.)
+            RunLevels.Level pen = flat(70);
+            pen.arena = 20;
+            pen.foes.add(new int[]{RunLevels.GUARD, 34, FLOOR - 1});
+            PlusRun fight = shutIn(pen, true);
+            PlusRun.Foe guard = waiting(fight);
+            fight.adopt(kind);
+            for (int step = 0; step < 60 * 30; step++) {
+                fight.place(guard.x - 1.05f, floorOf(fight) - PlusRun.TALL - 1.8f);
+                fight.shots().removeIf(shot -> !shot.hers);
+                fight.step(STEP, false, false, false);
+            }
+            assertTrue("pet " + kind + " cracks " + fight.cracks() + " strikes " + fight.petStrikes() + " pet at " + fight.petX() + "," + fight.petY() + " her " + fight.x() + "," + fight.y()
+                    + " guard " + guard.x + "," + guard.y + " away " + guard.away + " shield " + fight.shield(guard) + " forming " + fight.forming(guard), fight.cracks() >= 1);
+            assertEquals("pet " + kind, 0, fight.shatters());
+            assertEquals("pet " + kind, 0, fight.blows());
+            assertTrue("pet " + kind, fight.shield(guard) >= .5f / PlusRun.strength(RunLevels.GUARD) - .001f && fight.shield(guard) < 1);
+            assertFalse(fight.open(guard));
+        }
+        RunLevels.Level pen = flat(70);
+        pen.arena = 20;
+        pen.foes.add(new int[]{RunLevels.GUARD, 34, FLOOR - 1});
+        PlusRun fight = shutIn(pen, true);
+        PlusRun.Foe guard = waiting(fight);
+        fight.adopt(PlusRun.CAT);
+        for (int step = 0; step < 60 * 20 && !fight.open(guard); step++) {
+            if (pressable(fight, guard)) touch(fight, guard);
+            else park(fight);
+        }
+        assertTrue(fight.open(guard));
+        guard.left = 1;
+        guard.broken = 30;
+        for (int step = 0; step < 60 * 6; step++) {
+            // (With nothing about her that would land a blow of her own.)
+            fight.bare();
+            fight.place(guard.x - 1.05f, floorOf(fight) - PlusRun.TALL - 1.8f);
+            fight.shots().removeIf(shot -> !shot.hers);
+            fight.step(STEP, false, false, false);
+        }
+        assertFalse(guard.flat);
+        assertEquals(1, guard.left);
+        assertTrue(fight.standing());
+        guard.left = 3;
+        guard.dazed = 0;
+        int blows = fight.blows();
+        for (int step = 0; step < 60 * 6 && fight.blows() == blows; step++) {
+            // (With nothing about her that would land a blow of her own.)
+            fight.bare();
+            fight.place(guard.x - 1.05f, floorOf(fight) - PlusRun.TALL - 1.8f);
+            fight.shots().removeIf(shot -> !shot.hers);
+            fight.step(STEP, false, false, false);
+        }
+        assertEquals(blows + 1, fight.blows());
+        assertEquals(2, guard.left);
+    }
+
     @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
         int tempted = 0, stashed = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
@@ -4353,7 +4613,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 5, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);

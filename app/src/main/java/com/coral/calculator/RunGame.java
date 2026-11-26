@@ -65,6 +65,15 @@ final class RunGame {
             R.drawable.run_fly_mite, R.drawable.run_fly_wisp, R.drawable.run_fly_rime};
     private static final int[] FLIER_COLOURS = {0xFF3A3340, 0xFF7FA8E0, 0xFF8E86A6, 0xFFE0A21A, 0xFF3A3340, 0xFFF08A2C, 0xFF7FC4EC};
     private final Bitmap[] flierCast = new Bitmap[FLIER_CAST.length];
+    /** The pets, as they are drawn: six pictures of each; and what each is called. */
+    private static final int[] PET_CAST = {R.drawable.run_pet_jar, R.drawable.run_pet_cat, R.drawable.run_pet_dog, R.drawable.run_pet_duck, R.drawable.run_pet_monkey};
+    private static final String[] PET_NAMES = {"The ink jar", "The kitten", "The puppy", "The duckling", "The monkey"};
+    private static final String[] PET_DOES = {"spits ink at what comes near", "pounces on what is close", "charges through them along the ground",
+            "drops on what flies, and quacks", "throws nuts, and fetches"};
+    private final Bitmap[] petCast = new Bitmap[PET_CAST.length];
+    /** Of the pet: where it was a frame ago, how long since it joined her or last dealt with something, and what of it has been seen. */
+    private float petWasX, petWasY, petGlad = 9;
+    private int seenPetJoined, seenPetStrikes, seenPetKills;
     /** A times beaten: two pictures of it. */
     private Bitmap timesDown;
     /** Where the five of the seven others who speak come among those who do: after the villagers. */
@@ -694,6 +703,11 @@ final class RunGame {
         return cast[who];
     }
 
+    private Bitmap petArt(int which) {
+        if (petCast[which] == null) petCast[which] = BitmapFactory.decodeResource(context.getResources(), PET_CAST[which]);
+        return petCast[which];
+    }
+
     private Bitmap flier(int which) {
         if (flierCast[which] == null) flierCast[which] = BitmapFactory.decodeResource(context.getResources(), FLIER_CAST[which]);
         return flierCast[which];
@@ -1064,6 +1078,8 @@ final class RunGame {
         talking = told = false;
         hintMoved = hintJumped = false;
         seenDrops = seenBeams = seenBlasts = jumpsAtFall = seenCracks = seenShatters = seenThrownBack = 0;
+        seenPetJoined = seenPetStrikes = seenPetKills = 0;
+        petGlad = 9;
         slow = 0;
         goDown = false;
         perks = kept();
@@ -1089,6 +1105,8 @@ final class RunGame {
         // And the white that is truly hers, which the story has yet to give.
         if (BuildConfig.DEBUG && session.tally("run_true") > 0) run.master();
         PlusRun.ceiling = BuildConfig.DEBUG && session.tally("run_ceiling") > 0 ? session.tally("run_ceiling") : PlusRun.CEILING;
+        // And a pet, for looking at one.
+        if (BuildConfig.DEBUG && session.tally("run_pet") > 0) run.adopt(session.tally("run_pet") - 1);
         if (BuildConfig.DEBUG && session.tally("run_arm") > 0) run.arm(session.tally("run_arm") - 1);
         idle();
         seenJumps = seenLandings = seenCollected = seenFlattened = seenHurts = seenSprings = seenFlags = seenBlows = 0;
@@ -1199,12 +1217,14 @@ final class RunGame {
             speak(RunStory.WON[stars - 1], false);
             session.keep("run_mobs", session.tally("run_mobs") + run.flattened());
             session.keep("run_fliers", session.tally("run_fliers") + run.fliers());
+            session.keep("run_pet_kills", session.tally("run_pet_kills") + run.petKills());
             pills(number < RunLevels.TOTAL ? number == RunLevels.COUNT ? RunStory.SEQUEL : "Next" : "The end", NEXT, "Again", AGAIN, "Lands", TO_MAP);
         } else {
             stars = 0;
             session.keep("run_lost", session.tally("run_lost") + 1);
             session.keep("run_mobs", session.tally("run_mobs") + run.flattened());
             session.keep("run_fliers", session.tally("run_fliers") + run.fliers());
+            session.keep("run_pet_kills", session.tally("run_pet_kills") + run.petKills());
             audio.play("lose");
             speak(RunStory.LOST[random.nextInt(RunStory.LOST.length)], false);
             pills("Try again", AGAIN, "Lands", TO_MAP);
@@ -1648,6 +1668,30 @@ final class RunGame {
             pop(run.foeX(), run.foeY() - 1.4f, run.fizzledAt() == RunLevels.WISP ? "Only water!" : "Only fire!");
         }
         sinceWings += seconds;
+        petGlad += seconds;
+        if (run.petJoined() != seenPetJoined) {
+            // A pet goes with her: a card names it and what it does, and the first time each kind does she has a word about it.
+            seenPetJoined = run.petJoined();
+            int kind = run.pet(), had = session.tally("run_pets");
+            petGlad = 0;
+            audio.play("star", .8f);
+            buzz(true);
+            if (kind >= 0) {
+                toast(PET_NAMES[kind] + " goes with her", "For the whole of this land: it " + PET_DOES[kind], -(100 + kind));
+                if ((had & 1 << kind) == 0) {
+                    session.keep("run_pets", had | 1 << kind);
+                    speak(RunStory.PETS[kind], true);
+                }
+            }
+        }
+        if (run.petStrikes() != seenPetStrikes) {
+            seenPetStrikes = run.petStrikes();
+            audio.play(run.pet() == PlusRun.DUCK ? "flap" : run.pet() == PlusRun.JAR ? "splash" : "throw", .35f);
+        }
+        if (run.petKills() != seenPetKills) {
+            seenPetKills = run.petKills();
+            petGlad = 0;
+        }
         if (run.cracks() != seenCracks) {
             // A piece off a shield: it rings, higher the less of it is left, and shards fly.
             seenCracks = run.cracks();
@@ -3257,6 +3301,30 @@ final class RunGame {
                 case PlusRun.WATER:
                     piece(canvas, two, DROP_ART, x, y + tile * .25f, tile * .55f, leftward);
                     break;
+                case PlusRun.BLOT_SHOT: {
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(0xFF27338F);
+                    canvas.drawCircle(x, y, tile * .2f, paint);
+                    canvas.drawCircle(x - (leftward ? -1 : 1) * tile * .22f, y, tile * .11f, paint);
+                    paint.setColor(Color.WHITE);
+                    paint.setAlpha(170);
+                    canvas.drawCircle(x - tile * .06f, y - tile * .07f, tile * .05f, paint);
+                    paint.setColor(Color.BLACK);
+                    paint.setAlpha(255);
+                    break;
+                }
+                case PlusRun.NUT: {
+                    canvas.save();
+                    canvas.rotate(spin, x, y);
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(0xFF8A5A2B);
+                    canvas.drawOval(x - tile * .16f, y - tile * .2f, x + tile * .16f, y + tile * .2f, paint);
+                    paint.setColor(0xFFC89A5E);
+                    canvas.drawOval(x - tile * .07f, y - tile * .16f, x + tile * .03f, y + tile * .02f, paint);
+                    paint.setColor(Color.BLACK);
+                    canvas.restore();
+                    break;
+                }
                 case PlusRun.STEAM: {
                     // Fire and water thrown as one: a cloud of steam, rolling, with the flame and the drop in it.
                     paint.setStyle(Paint.Style.FILL);
@@ -3338,6 +3406,7 @@ final class RunGame {
         }
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);
+        drawPet(canvas);
         drawHer(canvas);
         // What has just been won, rising from where it was won.
         text.setTextAlign(Paint.Align.CENTER);
@@ -3741,6 +3810,12 @@ final class RunGame {
 
     /** Something that helps, by its kind: what lay about in the first volume, what her friends hold out in the second, and the ribbons. */
     private void help(Canvas canvas, int kind, float x, float y, float size) {
+        if (kind >= PlusRun.PET) {
+            // A pet that lies waiting: it sits there, and hops now and then.
+            float hop = Math.abs((float) Math.sin(clock * 3 + x)) * size * .12f;
+            cell(canvas, petArt(kind - PlusRun.PET), (int) (clock * 1.2f) % 4 == 0 ? 5 : 0, 6, x, y + size * .62f - hop, size * 1.5f, false);
+            return;
+        }
         if (kind == PlusRun.CHEST) pieceIn(canvas, four, CHEST_PICTURE, x, y, size * 1.5f, 0);
         else if (kind > PlusRun.FORM) pieceIn(canvas, two, RIBBON_ART + kind - PlusRun.FORM - 1, x, y, size, 0);
         else if (kind == PlusRun.HOMERUN || kind == PlusRun.COMPLIMENT) pieceIn(canvas, two, GIFT_ART + kind - PlusRun.HOMERUN, x, y, size, 0);
@@ -4738,6 +4813,25 @@ final class RunGame {
         paint.setAlpha(255);
     }
 
+    /**
+     * Her pet, where it is: one that runs, standing, running, in the air or at something;
+     * one that floats, hovering or at something; and either of them pleased, for a moment
+     * after it joins her and after it has dealt with something.
+     */
+    private void drawPet(Canvas canvas) {
+        int kind = run.pet();
+        if (kind < 0) return;
+        float x = (run.petX() - cameraX) * tile, y = (run.petY() - cameraY) * tile, across = run.petX() - petWasX, down = run.petY() - petWasY;
+        petWasX = run.petX();
+        petWasY = run.petY();
+        boolean busy = run.petBusy() > 0, floats = PlusRun.floats(kind);
+        int pose = busy ? 4 : petGlad < .7f ? 5 : floats ? (Math.abs(across) > .05f ? 3 : (int) (clock * 5) % 2)
+                : Math.abs(down) > .03f ? 3 : Math.abs(across) > .01f ? 1 + (int) (clock * 9) % 2 : 0;
+        float tall = tile * .95f * 170 / 100, hop = petGlad < .7f ? Math.abs((float) Math.sin(petGlad / .7f * Math.PI * 2)) * tile * .25f : 0;
+        // A soft shadow under one that floats, so that it is seen to be in the air.
+        cell(canvas, petArt(kind), pose, 6, x, y + tile * .04f - hop, tall, !run.petLeftward());
+    }
+
     /** A ring of light that beats about a button: here is the thing that was just spoken of. */
     private void glow(Canvas canvas, RectF button) {
         float beat = .5f + .5f * (float) Math.sin(clock * 6), round = Math.min(button.width(), button.height()) / 2;
@@ -4944,6 +5038,12 @@ final class RunGame {
         canvas.drawRoundRect(pauseButton.centerX() + dp(2.5f), pauseButton.centerY() - dp(8), pauseButton.centerX() + dp(7), pauseButton.centerY() + dp(8), dp(1.5f), dp(1.5f), paint);
         paint.setColor(Color.BLACK);
         float under = safe.top + margin + tall + dp(8), round = dp(36), x = safe.left + margin;
+        if (run.pet() >= 0) {
+            float face = dp(42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
+            box.set(left, top, left + face, top + face);
+            plate(canvas, box, face / 2, 235);
+            cell(canvas, petArt(run.pet()), petGlad < .7f ? 5 : 0, 6, left + face / 2, top + face * .86f, face * 1.05f, false);
+        }
         // Shut in with someone: her name, and a bar of how much more she can take, marked at its thirds.
         boolean den = false;
         for (PlusRun.Foe foe : run.foes()) den |= foe.spawned && !foe.flat && RunLevels.boss(foe.kind) && run.room() >= 0;
@@ -5643,6 +5743,11 @@ final class RunGame {
 
     /** The picture of something won to keep: a ribbon of its colour, or Zero's ring. */
     private void prizePicture(Canvas canvas, int prize, float x, float y, float size) {
+        if (prize >= 100) {
+            // A pet: as it stands.
+            cell(canvas, petArt(prize - 100), 0, 6, x, y + size * .55f, size * 1.25f, false);
+            return;
+        }
         if (prize > 0) {
             pieceIn(canvas, two, RIBBON_ART + prize - 1, x, y, size, 0);
             return;

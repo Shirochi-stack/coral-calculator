@@ -215,7 +215,26 @@ final class PlusRun {
             return;
         }
         // By her: a floater in the air at her shoulder, behind her; one that runs, on the ground behind her, down onto it and up onto it as she goes.
-        float wantX = herX + (facingLeft ? 1 : -1) * (floats ? .8f : 1.1f), gap = wantX - petX;
+        float wantX = herX + (facingLeft ? 1 : -1) * (floats ? .8f : 1.1f);
+        if (pet == MONKEY) {
+            // A monkey goes after the nearest plus or ribbon within a little way of her, and comes back.
+            float nearest = 5.5f;
+            for (int[] plus : pluses) {
+                float away = Math.abs(plus[0] + .5f - herX);
+                if (away < nearest && Math.abs(plus[1] + .5f - herFeet) < 3) {
+                    nearest = away;
+                    wantX = plus[0] + .5f;
+                }
+            }
+            for (int[] item : items) {
+                float away = Math.abs(item[1] + .5f - herX);
+                if (cursed <= 0 && item[0] > FORM && item[0] < FORM + BLACK && item[3] == 0 && away < nearest && Math.abs(item[2] + .5f - herFeet) < 3) {
+                    nearest = away;
+                    wantX = item[1] + .5f;
+                }
+            }
+        }
+        float gap = wantX - petX;
         petX += Math.signum(gap) * Math.min(Math.abs(gap), (Math.abs(gap) > 3 ? 13 : 8) * seconds);
         if (Math.abs(gap) > .1f) petLeft = gap < 0;
         else petLeft = facingLeft;
@@ -246,7 +265,7 @@ final class PlusRun {
         if (pet == MONKEY) {
             for (int index = pluses.size() - 1; index >= 0; index--) {
                 int[] plus = pluses.get(index);
-                if (Math.hypot(plus[0] + .5f - petX, plus[1] + .5f - petY + .4f) > 2.6f) continue;
+                if (Math.hypot(plus[0] + .5f - petX, plus[1] + .5f - petY + .4f) > 1.8f) continue;
                 pluses.remove(index);
                 collected++;
                 plusX = plus[0] + .5f;
@@ -254,7 +273,7 @@ final class PlusRun {
             }
             for (int index = items.size() - 1; index >= 0 && cursed <= 0; index--) {
                 int[] item = items.get(index);
-                if (item[0] <= FORM || item[0] >= FORM + BLACK || item[3] != 0 || Math.hypot(item[1] + .5f - petX, item[2] + .5f - petY + .4f) > 3) continue;
+                if (item[0] <= FORM || item[0] >= FORM + BLACK || item[3] != 0 || Math.hypot(item[1] + .5f - petX, item[2] + .5f - petY + .4f) > 1.8f) continue;
                 items.remove(index);
                 taken++;
                 lastTaken = item[0];
