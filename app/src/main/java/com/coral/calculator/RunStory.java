@@ -529,6 +529,40 @@ final class RunStory {
             {"caught1", "Time. Not bad for one pair of hands Sloppy~♡", "H",
                     PLAYER + "A coin-catching game has just ended. Pleased, a little smug." + FAST},
     };
+    /**
+     * What is asked of her in a land, said by whoever asks it as she hands over what she
+     * holds, in the order {@link RunLevels} numbers what may be asked: Boksun's rice cakes,
+     * Inju's cellar, Somi's letter, Ttosun's race, Galpi's hidden room. And what is said when
+     * it is done: by the same, but for the letter, which Yeseo has by then.
+     */
+    static final String[][] ASKS = {
+            {"ask1", "Aigoo, my three rice cakes rolled off about this land. Find them for me, dear?", "B",
+                    "A kind old baker granny asks a passing girl to find three rice cakes she has lost. Warm, fussing, a little flustered, elderly."},
+            {"ask2", "Guild request: slimes in the cellar, three waves. The door with the iron ring.", "U",
+                    "The guild's receptionist reads out a job from a form: clearing a cellar of monsters. Crisp, pleasant, efficient."},
+            {"ask3", "Halgakos-nim! Take this letter to Yeseo-unnie by the gate? Don't get hit, it creases!", "S",
+                    "A cheerful young adventurer girl presses a letter on her hero and begs her to deliver it carefully. Bright, eager, high, a little worried."},
+            {"ask4", "Race you! Reach the next flag before my count runs out. Go, go, go!", "O",
+                    "A lively, sporty guild girl challenges the heroine to a race against her count. Loud, grinning, energetic."},
+            {"ask5", "A page is missing here. There is a room behind a cracked wall. Find it.", "P",
+                    "The quiet bookmark witch tells the heroine that a hidden room lies behind a cracked wall somewhere in this land. Soft, mysterious, calm."},
+    };
+    static final String[][] ASKED = {
+            {"done1", "All three! You have a good heart. Now eat something.", "B",
+                    "The old baker granny has her three lost rice cakes back and is delighted. Warm, fussing, pleased, elderly."},
+            {"done2", "Request closed. The guild thanks you. Stamped.", "U",
+                    "The guild receptionist stamps a finished job with satisfaction. Crisp, pleasant, a small proud smile."},
+            {"done3", "A letter from Somi? Not one crease. Footnote: thank you.", "E",
+                    "The careful leader of the Footnote Party receives a letter in perfect condition and is touched. Precise, earnest, warm underneath."},
+            {"done4", "You beat the count! Faster than a guild courier!", "O",
+                    "The sporty guild girl cheers because the heroine has won her race. Loud, delighted, out of breath."},
+            {"done5", "You found the hidden page. Every book keeps one.", "P",
+                    "The bookmark witch is quietly pleased that the hidden room has been found. Soft, dreamy, content."},
+    };
+    /** When what was asked cannot be done this time: a letter creased, a count run out. */
+    static final String[][] UNDONE = {
+            {"undone1", "Ugh. That one's off for this run. Next time Sloppy~♡", "H",
+                    PLAYER + "She has just failed a small side quest and shrugs it off, a little annoyed." + FAST}};
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -555,7 +589,7 @@ final class RunStory {
         }
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
-                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON);
+                AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE);
         return groups.toArray(new String[0][][]);
     }
 }

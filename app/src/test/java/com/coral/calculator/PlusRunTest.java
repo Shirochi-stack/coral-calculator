@@ -1560,6 +1560,139 @@ public class PlusRunTest {
         assertTrue(hidden >= 20);
     }
 
+    // What is asked of her
+
+    /** A land from one on in which something of a kind is asked, with her having just been asked it. */
+    private static PlusRun asked(int from, int quest) {
+        for (int number = from; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level level = RunLevels.level(number);
+            if (level.quest != quest) continue;
+            PlusRun run = new PlusRun(level);
+            assertEquals(0, run.quest());
+            at(run, RunLevels.giverOf(quest), -1);
+            assertEquals("land " + number, PlusRun.ASKED, run.quest());
+            assertEquals(1, run.questGiven());
+            return run;
+        }
+        throw new AssertionError("nothing of kind " + quest + " is asked");
+    }
+
+    /** Puts her at whoever holds something out, or at the first thing of a kind that lies about, for a step. */
+    private static void at(PlusRun run, int who, int kind) {
+        for (int[] item : run.items()) {
+            if (who >= 0 ? item[3] != who || item[0] == PlusRun.STALL : item[0] != kind) continue;
+            run.place(item[1] + (1 - PlusRun.WIDE) / 2, item[2] + 1 - PlusRun.TALL);
+            run.step(STEP, false, false, false);
+            return;
+        }
+        throw new AssertionError("no one " + who + " and nothing " + kind);
+    }
+
+    @Test public void whatIsAskedOfHerIsDoneAndPaidForOrFailsAndIsNeverNeeded() {
+        // Boksun's rice cakes: three lie about the land, out of the way; found, the last of them is the doing of it.
+        PlusRun run = asked(RunLevels.SHAPED_FROM, RunLevels.CAKES);
+        int cakes = 0;
+        for (int[] item : run.items()) if (item[0] == PlusRun.CAKE) cakes++;
+        assertEquals(3, cakes);
+        int bonus = run.bonus();
+        for (int found = 1; found <= 3; found++) {
+            assertEquals(PlusRun.ASKED, run.quest());
+            at(run, -1, PlusRun.CAKE);
+            assertEquals(found, run.cakes());
+        }
+        assertEquals(PlusRun.DONE, run.quest());
+        assertEquals(1, run.questsDone());
+        assertEquals(bonus + 15, run.bonus());
+        // Found before they were asked for, they still count: asked, it is done at once.
+        PlusRun early = new PlusRun(run.level());
+        for (int found = 1; found <= 3; found++) at(early, -1, PlusRun.CAKE);
+        assertEquals(0, early.quest());
+        at(early, RunLevels.BOKSUN, -1);
+        assertEquals(PlusRun.DONE, early.quest());
+
+        // Inju's cellar: cleared, it is done.
+        run = asked(RunLevels.SHAPED_FROM, RunLevels.CELLAR);
+        int cellar = -1;
+        for (int index = 0; index < run.level().rooms.size(); index++) if (run.level().rooms.get(index)[0] == RunLevels.ARENA) cellar = index;
+        int[] one = run.level().rooms.get(cellar);
+        run.place(one[1] + (1 - PlusRun.WIDE) / 2, one[2] - PlusRun.TALL);
+        run.step(STEP, false, false, false);
+        assertTrue(run.enter());
+        for (int wave = 0; wave < PlusRun.WAVES; wave++) {
+            for (PlusRun.Foe foe : run.foes()) if (foe.spawned) foe.flat = true;
+            assertEquals(PlusRun.ASKED, run.quest());
+            run.step(STEP, false, false, false);
+        }
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.DONE, run.quest());
+
+        // Galpi's hidden room: gone into, it is found.
+        run = asked(RunLevels.SHAPED_FROM, RunLevels.ROOM);
+        int hidden = -1;
+        for (int index = 0; index < run.level().rooms.size(); index++) if (run.level().rooms.get(index)[7] != 0) hidden = index;
+        one = run.level().rooms.get(hidden);
+        run.place(one[1] + (1 - PlusRun.WIDE) / 2, one[2] - PlusRun.TALL);
+        run.step(STEP, false, false, false);
+        assertTrue(run.enter());
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.ASKED, run.quest());
+        assertTrue(run.enter());
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.DONE, run.quest());
+
+        // Somi's letter: brought to Yeseo by the gate, it is done; through a hurt on the way, it is not to be handed over.
+        run = asked(RunLevels.SHAPED_FROM, RunLevels.LETTER);
+        PlusRun creased = run.copy();
+        at(run, -1, PlusRun.DROPOFF);
+        assertEquals(PlusRun.DONE, run.quest());
+        int[] spikes = {-1, -1};
+        RunLevels.Level level = creased.level();
+        for (int column = 0; column < level.main && spikes[0] < 0; column++) {
+            for (int row = 0; row < RunLevels.ROWS; row++) {
+                if (level.land[row][column] == RunLevels.SPIKE) {
+                    spikes[0] = column;
+                    spikes[1] = row;
+                }
+            }
+        }
+        if (spikes[0] >= 0) {
+            creased.place(spikes[0] + .2f, spikes[1] + 1 - PlusRun.TALL);
+            hold(creased, .3f, false, false, false);
+            assertEquals(1, creased.hurts());
+            assertEquals(PlusRun.FAILED, creased.quest());
+            assertEquals(1, creased.questFails());
+            at(creased, -1, PlusRun.DROPOFF);
+            assertEquals(PlusRun.FAILED, creased.quest());
+        }
+
+        // Ttosun's race: the next flag reached while her count runs is the winning of it; standing about loses it.
+        run = asked(RunLevels.SHAPED_FROM, RunLevels.TIME);
+        assertTrue("count " + run.questLeft(), run.questLeft() > 6);
+        PlusRun slow = run.copy();
+        int next = -1;
+        for (int flag : run.level().flags) if (flag > run.x() && next < 0) next = flag;
+        run.place(next + .5f, RunLevels.top(run.level(), next) - PlusRun.TALL);
+        run.step(STEP, false, false, false);
+        run.step(STEP, false, false, false);
+        assertEquals(PlusRun.DONE, run.quest());
+        float count = slow.questLeft();
+        for (int step = 0; step < (count + 1) * 60 && slow.quest() == PlusRun.ASKED; step++) slow.step(STEP, false, false, false);
+        assertEquals(PlusRun.FAILED, slow.quest());
+
+        // Something is asked in every land with shape but those where someone waits; and whoever asks it is there, in its first village.
+        int[] kinds = new int[RunLevels.ROOM + 1];
+        for (int number = 1; number <= RunLevels.TOTAL; number++) {
+            RunLevels.Level here = RunLevels.level(number);
+            assertEquals("land " + number, number >= RunLevels.SHAPED_FROM && RunLevels.bossOf(number) < 0, here.quest != 0);
+            if (here.quest == 0) continue;
+            kinds[here.quest]++;
+            int asker = -1;
+            for (int[] item : here.items) if (item[3] >= RunLevels.SOMI && item[0] != PlusRun.STALL && item[0] != PlusRun.DROPOFF && asker < 0) asker = item[3];
+            assertEquals("land " + number, RunLevels.giverOf(here.quest), asker);
+        }
+        for (int kind = RunLevels.CAKES; kind <= RunLevels.ROOM; kind++) assertTrue("never asked: " + kind, kinds[kind] >= 3);
+    }
+
     @Test public void aFlagOnHighGroundBringsHerBackOntoIt() {
         RunLevels.Level level = flat(40);
         for (int column = 10; column < 20; column++) for (int row = FLOOR - 3; row < FLOOR; row++) level.land[row][column] = RunLevels.BLOCK;
@@ -1601,6 +1734,7 @@ public class PlusRunTest {
             int friends = 0, villagers = 0, stalls = 0;
             for (int[] item : level.items) {
                 if (item[0] == PlusRun.STALL) stalls++;
+                else if (item[0] == PlusRun.DROPOFF) assertEquals(RunLevels.LETTER, level.quest);
                 else if (item[3] >= RunLevels.SOMI) villagers++;
                 else if (item[3] != 0) friends++;
                 met[item[3]] = true;
@@ -1664,7 +1798,9 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11, lines);
+        assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
+        assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.GAME + 1, RunStory.ROOMS.length);
         assertEquals(RunLevels.NURI - RunLevels.SOMI + 1, RunStory.MEET.length);
         assertEquals(8, RunStory.ENTER.length);
@@ -1904,6 +2040,7 @@ public class PlusRunTest {
                 if (!shaped) assertEquals(FLOOR, top);
                 assertFalse(PlusRun.solid(level.land[item[2]][item[1]]));
                 if (item[0] == PlusRun.STALL) stalls++;
+                else if (item[0] == PlusRun.DROPOFF) assertEquals(RunLevels.LETTER, level.quest);
                 else if (item[3] == 1) bread++;
                 else if (item[3] == 2) ink++;
                 else if (item[3] >= RunLevels.SOMI) villagers++;

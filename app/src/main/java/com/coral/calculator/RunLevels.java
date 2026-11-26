@@ -32,6 +32,26 @@ final class RunLevels {
      * is not solid; she goes in when she chooses to.
      */
     static final char ENTRY = 'H';
+    /**
+     * What someone in a land may ask of her, which she may do or not: find Boksun's three
+     * rice cakes, which lie out of the way about the land; clear the slimes out of the
+     * cellar, for Inju; carry Somi's letter to Yeseo at the gate without being hurt; reach
+     * the next flag before Ttosun has finished counting; or find the room behind the crack,
+     * for Galpi.
+     */
+    static final int CAKES = 1, CELLAR = 2, LETTER = 3, TIME = 4, ROOM = 5;
+
+    /** What is asked in a land: nothing where someone waits at the end, or before the lands have places off them. */
+    static int questOf(int number) {
+        if (number < SHAPED_FROM || bossOf(number) >= 0) return 0;
+        boolean other = number / 3 % 2 != 0;
+        return number % 3 == 0 ? CELLAR : number % 3 == 2 ? other ? CAKES : ROOM : other ? TIME : LETTER;
+    }
+
+    /** Who asks it. */
+    static int giverOf(int quest) {
+        return quest == CAKES ? BOKSUN : quest == CELLAR ? INJU : quest == LETTER ? SOMI : quest == TIME ? TTOSUN : GALPI;
+    }
     static final int STASH = 0, PASSAGE = 1, ARENA = 2, GAME = 3;
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
@@ -164,6 +184,9 @@ final class RunLevels {
         final List<int[]> rooms = new ArrayList<>();
         /** How many columns the land proper has: what lies beyond is the places its doors lead to. */
         int main;
+        /** What is asked of her in it, or 0; and the out-of-the-way places in it where something may be hidden: the column and row of each. */
+        int quest;
+        final List<int[]> nooks = new ArrayList<>();
         /** Where the place begins in which someone waits, or -1. */
         int arena = -1;
         int gate;
@@ -172,8 +195,10 @@ final class RunLevels {
 
         Level(int number, int columns) {
             this.number = number;
+            this.quest = questOf(number);
             this.chapter = chapterOf(number);
             this.columns = columns;
+            this.main = columns;
             land = new char[ROWS][columns];
             for (char[] row : land) java.util.Arrays.fill(row, AIR);
         }
@@ -231,6 +256,7 @@ final class RunLevels {
         builder.ground(6);
         draft.main = builder.at;
         builder.rooms();
+        builder.asked(draft.gate, gateFloor);
         Level level = new Level(number, builder.at);
         level.main = draft.main;
         level.rooms.addAll(draft.rooms);
@@ -383,6 +409,7 @@ final class RunLevels {
         builder.ground(6);
         draft.main = builder.at;
         builder.rooms();
+        builder.asked(draft.gate, gateFloor);
         Level level = new Level(number, builder.at);
         level.main = draft.main;
         level.rooms.addAll(draft.rooms);
@@ -526,6 +553,20 @@ final class RunLevels {
             passage[4] = at - 1;
             passage[5] = floor;
             level.land[floor - 1][at - 1] = ENTRY;
+        }
+
+        /** What the land's quest needs lying about: three rice cakes in out-of-the-way places, or Yeseo waiting by the gate for a letter. */
+        void asked(int gate, int gateFloor) {
+            if (level.quest == CAKES) {
+                List<int[]> nooks = new ArrayList<>(level.nooks);
+                // Short of three such places, the rest are up on the ledges of the places off the land.
+                for (int[] room : level.rooms) nooks.add(new int[]{room[3] + 5, FLOOR - 3});
+                for (int which : new int[]{0, nooks.size() / 2, nooks.size() - 1}) {
+                    level.items.add(new int[]{PlusRun.CAKE, nooks.get(which)[0], nooks.get(which)[1], 0});
+                }
+            } else if (level.quest == LETTER) {
+                level.items.add(new int[]{PlusRun.DROPOFF, gate - 3, gateFloor - 1, YESEO});
+            }
         }
 
         /** A wall from the top of the land to the bottom, some columns thick. */
@@ -682,6 +723,7 @@ final class RunLevels {
                     // A tower to go up and over: ledges up its near side, its top, and a drop beyond.
                     ground(10);
                     for (int column = from + 4; column <= from + 6; column++) pile(column, 5);
+                    level.nooks.add(new int[]{from + 5, floor - 6});
                     ledge(from + 1, floor - 2, 3);
                     ledge(from + 2, floor - 4, 2);
                     pluses(from + 4, from + 6, floor - 7);
@@ -716,6 +758,8 @@ final class RunLevels {
                     ground(23);
                     int who = SOMI + (level.number + level.items.size()) % (ALTTEUL - SOMI);
                     if (level.chapter == CHAPTERS && random.nextBoolean()) who = NURI;
+                    // In its first village stands whoever has something to ask of her.
+                    if (!inVillage && level.quest != 0) who = giverOf(level.quest);
                     level.decor.add(new int[]{random.nextInt(3), from + 2, floor - 1});
                     level.decor.add(new int[]{3 + random.nextInt(2), from + 6, floor - 1});
                     level.decor.add(new int[]{random.nextInt(3), from + 12, floor - 1});
@@ -736,6 +780,7 @@ final class RunLevels {
                     pile(from + 12, 1);
                     ledge(from + 2, floor - 3, 9);
                     for (int which = 0; which < count; which++) foe(which == 2 ? walker() : MINUS, from + 3 + which * 2 - (which == 4 ? 1 : 0));
+                    level.nooks.add(new int[]{from + 6, floor - 4});
                     pluses(from + 2, from + 10, floor - 5);
                     break;
                 }
@@ -745,6 +790,7 @@ final class RunLevels {
                     pile(from + 11, 1);
                     ledge(from + 2, floor - 3, 8);
                     for (int column : new int[]{3, 5, 6, 8, 10}) foe(SLIME, from + column);
+                    level.nooks.add(new int[]{from + 6, floor - 4});
                     pluses(from + 2, from + 9, floor - 5);
                     break;
                 }
@@ -774,6 +820,7 @@ final class RunLevels {
                     pile(from + 8, 1);
                     ledge(from + 2, floor - 3, 5);
                     level.foes.add(new int[]{MINUS, from + 5, floor - 1, 3});
+                    level.nooks.add(new int[]{from + 4, floor - 4});
                     pluses(from + 2, from + 6, floor - 5);
                     break;
                 }
@@ -781,6 +828,7 @@ final class RunLevels {
                     // An ink gun, and a long open stretch with a crowd in it to empty it into.
                     ground(21);
                     level.weapons.add(new int[]{PlusRun.GUN, from + 1, floor - 1});
+                    level.nooks.add(new int[]{from + 11, floor - 4});
                     shelf(from + 3);
                     pile(from + 20, 1);
                     ledge(from + 5, floor - 3, 13);
@@ -795,6 +843,7 @@ final class RunLevels {
                     // A book, and four in a line for it to go through.
                     ground(14);
                     level.weapons.add(new int[]{PlusRun.BOOK, from + 1, floor - 1});
+                    level.nooks.add(new int[]{from + 8, floor - 4});
                     shelf(from + 3);
                     pile(from + 13, 1);
                     ledge(from + 5, floor - 3, 7);
@@ -806,6 +855,7 @@ final class RunLevels {
                     // A brush, and slimes that crowd round whoever comes in.
                     ground(12);
                     level.weapons.add(new int[]{PlusRun.BRUSH, from + 1, floor - 1});
+                    level.nooks.add(new int[]{from + 7, floor - 4});
                     shelf(from + 3);
                     pile(from + 11, 1);
                     ledge(from + 5, floor - 3, 5);

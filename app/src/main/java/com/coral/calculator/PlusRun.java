@@ -72,6 +72,10 @@ final class PlusRun {
     static final int HOMERUN = 5, COMPLIMENT = 6;
     /** And a stall, which is not picked up: standing at it, what she has collected in this land buys things. */
     static final int STALL = 7;
+    /** And two that have to do with what is asked of her: a rice cake, to be found; and whoever a letter is for, who stays where she is. */
+    static final int CAKE = 8, DROPOFF = 9;
+    /** How what is asked of her stands: not asked yet, being done, done, or not to be done this time. */
+    static final int ASKED = 1, DONE = 2, FAILED = 3;
     /**
      * Her forms, each from a ribbon of its colour, which is the colour her hair turns. Red
      * throws fire and walks on lava. Blue throws water and swims. Brown knocks over whatever
@@ -196,6 +200,8 @@ final class PlusRun {
     private int entered, reveals, roomWins, wave, caught, dice = 12345;
     private float gameLeft, sinceDrop;
     private boolean quitting;
+    private int quest, cakes, questGiven, questsDone, questFails, questFlags;
+    private float questLeft;
     private boolean atStall;
     /** The stalls she has been up to, by the column each stands in: its keeper greets her the first time only. */
     private final java.util.Set<Integer> greeted = new java.util.HashSet<>();
@@ -313,6 +319,13 @@ final class PlusRun {
         gameLeft = other.gameLeft;
         sinceDrop = other.sinceDrop;
         quitting = other.quitting;
+        quest = other.quest;
+        cakes = other.cakes;
+        questGiven = other.questGiven;
+        questsDone = other.questsDone;
+        questFails = other.questFails;
+        questFlags = other.questFlags;
+        questLeft = other.questLeft;
         greeted.addAll(other.greeted);
         locked = other.locked;
         leaving = other.leaving;
@@ -828,6 +841,7 @@ final class PlusRun {
         sinceShot += seconds;
         if (leaving) leave();
         if (quitting) quit();
+        if (quest == ASKED && level.quest == RunLevels.TIME) asked(seconds);
         if (room >= 0) rooms(seconds);
         // A moment after the last of them is down, both ways open.
         if (opening > 0 && (opening -= seconds) <= 0) {
@@ -946,12 +960,26 @@ final class PlusRun {
                 }
                 continue;
             }
+            // Whoever a letter is for stays too: she has it when it is brought to her.
+            if (item[0] == DROPOFF) {
+                if (quest == ASKED && level.quest == RunLevels.LETTER && x < item[1] + 2.4f && x + WIDE > item[1] - .4f && y < item[2] + .9f
+                        && y + TALL > item[2] + .1f) done();
+                continue;
+            }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 items.remove(index);
+                // A rice cake is only found: found before it was asked for, it still counts.
+                if (item[0] == CAKE) {
+                    cakes++;
+                    if (quest == ASKED && cakes >= 3) done();
+                    continue;
+                }
                 taken++;
                 lastTaken = item[0];
                 giver = item[3];
                 take(item[0]);
+                // Whoever has something to ask of her asks it as she hands over what she holds.
+                if (quest == 0 && level.quest != 0 && item[3] == RunLevels.giverOf(level.quest)) ask();
             }
         }
         // A press of the button uses it, once it has rested; the ink gun goes on for as long as the button is held.
@@ -1034,6 +1062,7 @@ final class PlusRun {
         }
         // A flag she has passed, at any height, is where she comes back to; passing the gate is the end.
         float middle = x + WIDE / 2;
+        asked(0);
         // In a place off the land she is neither further on in it nor at its end.
         if (room >= 0) return;
         for (int flag : level.flags) {
@@ -1044,8 +1073,64 @@ final class PlusRun {
                 if (perks.flagHeart && hearts < perks.hearts) hearts++;
             }
         }
-        if (middle >= level.gate && gateOpen()) state = WON;
+        if (middle >= level.gate && middle < level.main && gateOpen()) state = WON;
     }
+
+    /** Something is asked of her: if it is done already it is done; a count begins if it is against one. */
+    private void ask() {
+        quest = ASKED;
+        questGiven++;
+        questFlags = flagsPassed;
+        if (level.quest == RunLevels.TIME) {
+            // A second for every four squares to the next flag, and five over.
+            float far = level.gate;
+            for (int flag : level.flags) if (flag > x && flag < far) far = flag;
+            questLeft = (far - x) / 4 + 5;
+        }
+        if (level.quest == RunLevels.CAKES && cakes >= 3) done();
+        asked(0);
+    }
+
+    /** How what is asked stands is looked at again: a cellar cleared, the room behind the crack found, the flag reached or the count run out. */
+    private void asked(float seconds) {
+        if (quest != ASKED) return;
+        if (level.quest == RunLevels.CELLAR || level.quest == RunLevels.ROOM) {
+            for (int index = 0; index < level.rooms.size(); index++) {
+                int[] one = level.rooms.get(index);
+                boolean cellar = level.quest == RunLevels.CELLAR;
+                if (cellar ? one[0] == RunLevels.ARENA && (roomsDone & 1 << index) != 0 : one[7] != 0 && (roomsFound & 1 << index) != 0) {
+                    done();
+                    return;
+                }
+            }
+        } else if (level.quest == RunLevels.TIME) {
+            if (flagsPassed > questFlags) done();
+            else if ((questLeft -= seconds) <= 0) fail();
+        }
+    }
+
+    /** It is done: fifteen pluses, and a heart if she is short of one. */
+    private void done() {
+        quest = DONE;
+        questsDone++;
+        questLeft = 0;
+        bonus += 15;
+        if (hearts < perks.hearts) hearts++;
+    }
+
+    private void fail() {
+        quest = FAILED;
+        questFails++;
+        questLeft = 0;
+    }
+
+    /** How what is asked of her stands; how many rice cakes she has found; how much longer a count has to run; and counts that only go up of things asked, done and failed. */
+    int quest() { return quest; }
+    int cakes() { return cakes; }
+    float questLeft() { return questLeft; }
+    int questGiven() { return questGiven; }
+    int questsDone() { return questsDone; }
+    int questFails() { return questFails; }
 
     /** What comes of taking something that helps, picked up or bought. */
     private void take(int kind) {
@@ -1435,6 +1520,8 @@ final class PlusRun {
             if (!fell) return true;
         } else {
             hurts++;
+            // A letter that has been through a hurt is not one to hand over.
+            if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
             if (--hearts <= 0) {
                 state = LOST;
                 return true;

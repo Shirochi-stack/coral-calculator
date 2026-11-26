@@ -226,6 +226,10 @@ final class RunGame {
     private int seenGreetings, seenEntered, seenReveals, seenWins;
     /** Which cracks she has had a word about in this land, and which kinds of place off it. */
     private int hinted, saidRoom;
+    private int seenAsked, seenDone, seenFailed;
+    /** How long since what was asked of her was done or lost: its word stays on the screen a while. */
+    private float sinceAsked = 9;
+    private static final int CAKE_PICTURE = 3, LETTER_PICTURE = 4, WATCH_PICTURE = 5, SCROLL_PICTURE = 7;
     /** The name of the line last said; and how much longer what someone met in the land is saying is not to be talked over. */
     private String saying;
     private float personLeft;
@@ -651,6 +655,8 @@ final class RunGame {
         saidCombo = saidLast = saidFlag = saidCharm = false;
         seenGreetings = seenEntered = seenReveals = seenWins = 0;
         hinted = saidRoom = 0;
+        seenAsked = seenDone = seenFailed = 0;
+        sinceAsked = 9;
         personLeft = 0;
         saying = null;
         shake = flash = 0;
@@ -757,6 +763,7 @@ final class RunGame {
         if (shake > 0) shake -= seconds;
         if (flash > 0) flash -= seconds;
         if (personLeft > 0) personLeft -= seconds;
+        sinceAsked += seconds;
         sinceBump += seconds;
         sinceShut += seconds;
         sinceOpened += seconds;
@@ -848,7 +855,11 @@ final class RunGame {
             // Bread with every heart full is worth three pluses instead, and Chikuwa says so.
             boolean full = kind == PlusRun.BREAD && run.bonus() != seenBonus;
             // Someone met in a village has her own word as she hands it over; a ribbon's word is said when her hair turns.
-            if (giver >= RunLevels.SOMI) person(RunStory.MEET[giver - RunLevels.SOMI]);
+            // Whoever has something to ask of her asks it as she hands over what she holds, in place of her usual word.
+            boolean asks = run.questGiven() != seenAsked && run.quest() == PlusRun.ASKED;
+            seenAsked = run.questGiven();
+            if (asks) person(RunStory.ASKS[run.level().quest - 1]);
+            else if (giver >= RunLevels.SOMI) person(RunStory.MEET[giver - RunLevels.SOMI]);
             else if (full) person(RunStory.FULL[0]);
             else if (kind == PlusRun.HOMERUN || kind == PlusRun.COMPLIMENT) person(RunStory.GIFTS[kind - PlusRun.HOMERUN]);
             else if (kind <= PlusRun.NOTES && giver != 0) person(RunStory.TOOK[kind]);
@@ -1035,6 +1046,24 @@ final class RunGame {
             seenBonus = run.bonus();
             speak(RunStory.ROOM_WON[cellar ? 0 : 1], true);
             session.keep("run_roomsdone_" + number, session.tally("run_roomsdone_" + number) | run.roomsDone());
+        }
+        // What was asked of her is done: whoever asked it, or whoever it was for, says so; it is kept, and marked on the map.
+        if (run.questsDone() != seenDone) {
+            seenDone = run.questsDone();
+            seenAsked = run.questGiven();
+            sinceAsked = 0;
+            audio.play("star", .8f);
+            buzz(true);
+            pop(herX, herY - 2.1f, "+ 15");
+            seenBonus = run.bonus();
+            person(RunStory.ASKED[here.quest - 1]);
+            session.keep("run_quest_" + number, 1);
+        }
+        if (run.questFails() != seenFailed) {
+            seenFailed = run.questFails();
+            sinceAsked = 0;
+            audio.play("no", .6f);
+            aside(RunStory.UNDONE[0]);
         }
         // Near a crack with a door behind it she has a word about the draught, once.
         for (int index = 0; index < here.rooms.size() && run.room() < 0; index++) {
@@ -1659,7 +1688,7 @@ final class RunGame {
                 frame(canvas, villagers(), who - RunLevels.SOMI, VILLAGERS, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f, false);
             }
             // What she holds out, over her hands, until it is taken.
-            if (!given && item[0] != PlusRun.STALL && who >= 3) {
+            if (!given && item[0] != PlusRun.STALL && item[0] != PlusRun.DROPOFF && who >= 3) {
                 float holdY = y - tile * 1.15f + (float) Math.sin(clock * 3.2f + item[1]) * tile * .05f;
                 ring(canvas, x - tile * .95f, holdY, 0xFFFFC53D);
                 help(canvas, item[0], x - tile * .95f, holdY, tile * .7f);
@@ -1676,8 +1705,13 @@ final class RunGame {
                 float wide = mark(canvas, signX, head, "Shop", SPEAKER_COLOURS[speaker], true);
                 canvas.restore();
                 if (at) stallSign.set(signX - wide, head - tile * 1.1f, signX + wide, head + tile * .4f);
+            } else if (item[0] == PlusRun.DROPOFF) {
+                // Whoever a letter is for is marked while there is one on its way to her.
+                if (run.quest() == PlusRun.ASKED) mark(canvas, x, head, "Letter", SPEAKER_COLOURS[speaker], false);
             } else if (!given) {
-                mark(canvas, x, head, "!", SPEAKER_COLOURS[speaker], false);
+                // Whoever has something to ask of her is marked as that; the rest, as having something for her.
+                boolean asks = level.quest != 0 && who == RunLevels.giverOf(level.quest) && run.quest() == 0;
+                mark(canvas, x, head, asks ? "Quest" : "!", SPEAKER_COLOURS[speaker], false);
             }
         }
         // What lies about to help, in a ring of its own colour; what a friend holds out is in her hands already.
@@ -1955,6 +1989,7 @@ final class RunGame {
     private void help(Canvas canvas, int kind, float x, float y, float size) {
         if (kind > PlusRun.FORM) pieceIn(canvas, two, RIBBON_ART + kind - PlusRun.FORM - 1, x, y, size, 0);
         else if (kind == PlusRun.HOMERUN || kind == PlusRun.COMPLIMENT) pieceIn(canvas, two, GIFT_ART + kind - PlusRun.HOMERUN, x, y, size, 0);
+        else if (kind == PlusRun.CAKE) pieceIn(canvas, four, CAKE_PICTURE, x, y, size, 0);
         else if (kind <= PlusRun.NOTES) artIn(canvas, BUFF_ART + kind, x, y, size);
     }
 
@@ -2436,6 +2471,26 @@ final class RunGame {
                 under += high + dp(8);
             }
         }
+        // What is asked of her in this land, and how it stands: a scroll, and a few words.
+        int asked = run.level().quest, stands = run.quest();
+        if (asked != 0 && stands != 0 && (stands == PlusRun.ASKED || sinceAsked < 4)) {
+            String words = stands == PlusRun.DONE ? "Done" : stands == PlusRun.FAILED ? "Not this time"
+                    : asked == RunLevels.CAKES ? "Rice cakes  " + run.cakes() + " / 3" : asked == RunLevels.CELLAR ? "Clear the cellar"
+                    : asked == RunLevels.LETTER ? "Letter for Yeseo, unhurt" : asked == RunLevels.TIME ? "Next flag in  " + (int) Math.ceil(run.questLeft()) + " s"
+                    : "Find the hidden room";
+            int picture = asked == RunLevels.CAKES ? CAKE_PICTURE : asked == RunLevels.CELLAR ? CELLAR_PICTURE : asked == RunLevels.LETTER ? LETTER_PICTURE
+                    : asked == RunLevels.TIME ? WATCH_PICTURE : CRACK_PICTURE;
+            text.setTextSize(dp(13.5f));
+            float high = dp(34), wide = text.measureText(words) + dp(50);
+            box.set(safe.left + margin, under, safe.left + margin + wide, under + high);
+            plate(canvas, box, high / 2, 235);
+            paint.setAlpha(255);
+            pieceIn(canvas, four, stands == PlusRun.ASKED ? picture : SCROLL_PICTURE, safe.left + margin + dp(19), under + high / 2, dp(24), 0);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(stands == PlusRun.DONE ? 0xFF2E9E6E : stands == PlusRun.FAILED ? soft : ink);
+            canvas.drawText(words, safe.left + margin + dp(36), under + dp(22), text);
+            under += high + dp(8);
+        }
         // In a cellar that has shut behind her, which wave it is; where pluses fall, how long they will and how many she has.
         if (run.room() >= 0 && run.sealed()) {
             String words = run.wave() > 0 ? "Wave " + run.wave() + " of " + PlusRun.WAVES
@@ -2874,6 +2929,13 @@ final class RunGame {
                 }
                 paint.setAlpha(255);
             }
+        }
+        // A scroll in the corner of each land where what was asked of her has been done.
+        for (int index = firstShown; index < lastShown; index++) {
+            if (session.tally("run_quest_" + (index + 1)) == 0) continue;
+            RectF where = lands[index];
+            paint.setAlpha(255);
+            pieceIn(canvas, four, SCROLL_PICTURE, where.right - where.width() * .1f, where.top + where.width() * .1f, where.width() * .42f, 0);
         }
         // The counter, where her pluses buy what she keeps.
         paint.setStyle(Paint.Style.FILL);
