@@ -988,6 +988,148 @@ public class PlusRunTest {
         assertEquals(0, early.curses());
     }
 
+    @Test public void theButtonThatLetsHerDownDropsHerThroughThinLedgesAndNeverThroughGround() {
+        // Three thin ledges one over another, of both kinds, over solid ground; and beside them a thin ledge over a pit.
+        RunLevels.Level level = flat(60);
+        for (int column = 10; column <= 16; column++) {
+            level.land[FLOOR - 4][column] = RunLevels.LEDGE;
+            level.land[FLOOR - 8][column] = RunLevels.THIN;
+            level.land[FLOOR - 12][column] = RunLevels.LEDGE;
+        }
+        hole(level, 30, 36);
+        for (int column = 30; column <= 36; column++) level.land[FLOOR - 4][column] = RunLevels.LEDGE;
+        level.foes.add(new int[]{RunLevels.MINUS, 12, FLOOR - 13});
+        PlusRun run = new PlusRun(level);
+        float top = FLOOR - 12 - PlusRun.TALL;
+        run.place(14, top - .2f);
+        hold(run, .5f, false, false, false);
+        assertTrue(run.onGround());
+        assertEquals(top, run.y(), .01f);
+        assertTrue(run.droppable());
+        assertEquals(0, run.drops());
+        // A press: she goes down through the one she stands on, and is held by the next.
+        run.down(true);
+        hold(run, .12f, false, false, false);
+        run.down(false);
+        hold(run, 1, false, false, false);
+        assertEquals(1, run.drops());
+        assertEquals(FLOOR - 8 - PlusRun.TALL, run.y(), .01f);
+        assertTrue(run.onGround() && run.droppable());
+        // Held: through every thin ledge she meets, down to the ground, which holds her whatever is held.
+        run.down(true);
+        hold(run, 2, false, false, false);
+        assertEquals(3, run.drops());
+        assertEquals(GROUND, run.y(), .01f);
+        assertTrue(run.onGround());
+        assertFalse(run.droppable());
+        hold(run, 1, false, false, false);
+        assertEquals(GROUND, run.y(), .01f);
+        assertEquals(PlusRun.PLAYING, run.state());
+        assertEquals(0, run.hurts());
+        // What walks on a ledge does not go down with her.
+        PlusRun.Foe walker = run.foes().get(0);
+        assertEquals(FLOOR - 12, walker.y + walker.tall(), .01f);
+        // Over a pit a ledge holds her, held down or not: there is nothing under it to come down on.
+        run.down(false);
+        run.place(33, FLOOR - 4 - PlusRun.TALL - .2f);
+        hold(run, .5f, false, false, false);
+        assertFalse(run.droppable());
+        run.down(true);
+        hold(run, 1.5f, false, false, false);
+        assertEquals(FLOOR - 4 - PlusRun.TALL, run.y(), .01f);
+        assertEquals(3, run.drops());
+        // In the air it brings her down faster than she falls; and, with the wind in her hair, down all the same.
+        PlusRun slow = new PlusRun(flat(60)), fast = new PlusRun(flat(60));
+        slow.place(20, GROUND - 14);
+        fast.place(20, GROUND - 14);
+        fast.down(true);
+        hold(slow, .6f, false, false, false);
+        hold(fast, .6f, false, false, false);
+        assertTrue(fast.y() > slow.y() + 1.5f);
+        assertTrue(fast.speedDown() > slow.speedDown() * 1.3f || fast.onGround());
+        PlusRun flier = new PlusRun(flat(60));
+        flier.lend(PlusRun.GREEN);
+        flier.place(20, GROUND - 6);
+        hold(flier, 1, false, false, true);
+        assertFalse(flier.onGround());
+        flier.down(true);
+        hold(flier, 1.2f, false, false, true);
+        assertTrue(flier.onGround());
+        // Coming down hard on something that takes two blows deals with it at once.
+        RunLevels.Level tough = flat(60);
+        tough.foes.add(new int[]{RunLevels.MINUS, 20, FLOOR - 1, 2});
+        for (boolean hard : new boolean[]{false, true}) {
+            PlusRun stomper = new PlusRun(tough);
+            PlusRun.Foe big = stomper.foes().get(0);
+            stomper.down(hard);
+            for (int step = 0; step < 240 && stomper.flattened() == 0 && stomper.hurts() == 0 && big.left == 2; step++) {
+                if (stomper.onGround() || step == 0) stomper.place(big.x + big.wide() / 2 - PlusRun.WIDE / 2, big.y - 9);
+                stomper.step(STEP, false, false, false);
+            }
+            assertEquals("hard " + hard, hard ? 1 : 0, stomper.flattened());
+            assertEquals(0, stomper.hurts());
+        }
+    }
+
+    @Test public void whateverIsBeatenIsDownAndHurtsNoOneAndIsNoLongerCounted() {
+        // Every sign that walks, hops, shoots or flies in either volume, and the paper target: beaten, each is down, however it was beaten.
+        int[] kinds = {RunLevels.MINUS, RunLevels.TIMES, RunLevels.DIVIDE, RunLevels.THROWER, RunLevels.GUNNER, RunLevels.SLIME, RunLevels.DRAGON, RunLevels.BAR,
+                RunLevels.FAN, RunLevels.WORD, RunLevels.POGO, RunLevels.DRIFTER, RunLevels.SWOOPER, RunLevels.BOMBER, RunLevels.SHOOTER, RunLevels.MITE, RunLevels.WISP,
+                RunLevels.RIME};
+        for (int kind : kinds) {
+            for (int size = 1; size <= 2; size++) {
+                RunLevels.Level level = flat(60);
+                // (The second time round it is one that takes three blows, as the outsized ones of a cellar do.)
+                level.foes.add(size == 1 ? new int[]{kind, 20, FLOOR - 1} : new int[]{kind, 20, FLOOR - 1, 3});
+                PlusRun run = new PlusRun(level);
+                PlusRun.Foe foe = run.foes().get(0);
+                run.lend(PlusRun.BROWN);
+                String what = "kind " + kind + " size " + size;
+                assertFalse(what, foe.flat);
+                run.place(4, GROUND);
+                run.step(STEP, false, false, false);
+                touch(run, foe);
+                assertTrue(what, foe.flat);
+                assertEquals(what, 1, run.flattened());
+                assertEquals(what, 0, run.hurts());
+                // Down, it hurts no one who stands in it, with nothing to keep her from harm; nothing more comes from it; and the time since it went down is kept.
+                float since = foe.act;
+                int thrown = run.thrown();
+                for (int step = 0; step < 240; step++) {
+                    run.bare();
+                    if (run.has(PlusRun.BROWN)) run.drop(PlusRun.BROWN);
+                    run.place(foe.x + foe.wide() / 2 - PlusRun.WIDE / 2, foe.y + foe.tall() - PlusRun.TALL);
+                    run.shots().clear();
+                    run.step(STEP, false, false, false);
+                }
+                assertEquals(what, 0, run.hurts());
+                assertEquals(what, thrown, run.thrown());
+                assertTrue(what, foe.flat && foe.act > since + 3.5f);
+                assertEquals(what, 1, run.flattened());
+            }
+        }
+        // And a times is beaten by each of the ways there are: fire, water, something thrown, something swung, the notes, and brown.
+        for (int way = 0; way < 5; way++) {
+            RunLevels.Level level = flat(60);
+            level.foes.add(new int[]{RunLevels.TIMES, 14, FLOOR - 1});
+            if (way == 4) level.items.add(new int[]{PlusRun.NOTES, 3, FLOOR - 1, 0});
+            PlusRun run = new PlusRun(level);
+            PlusRun.Foe times = run.foes().get(0);
+            if (way == 0) run.lend(PlusRun.RED);
+            if (way == 1) run.lend(PlusRun.BLUE);
+            if (way == 2) run.arm(PlusRun.PEN);
+            if (way == 3) run.arm(PlusRun.SWORD);
+            hold(run, .3f, false, true, false);
+            for (int step = 0; step < 300 && !times.flat && run.hurts() == 0; step++) {
+                if (way != 4) run.place(times.x - (way == 3 ? 1.1f : 3.5f), GROUND);
+                else touch(run, times);
+                run.step(STEP, false, true, false, step % 20 == 0);
+            }
+            assertTrue("way " + way, times.flat);
+            assertEquals("way " + way, 0, run.hurts());
+        }
+    }
+
     @Test public void noPlaceGivesWhiteAndBlackLiesWhereAGreedyHandTakesIt() {
         int tempted = 0, stashed = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
@@ -3645,7 +3787,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1, lines);
         assertEquals(RunLevels.ROOM, RunStory.ASKS.length);
         assertEquals(RunLevels.ROOM, RunStory.ASKED.length);
         assertEquals(RunLevels.TRAMPLE + 1, RunStory.ROOMS.length);

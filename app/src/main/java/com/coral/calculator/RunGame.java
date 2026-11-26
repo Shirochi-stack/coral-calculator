@@ -65,6 +65,8 @@ final class RunGame {
             R.drawable.run_fly_mite, R.drawable.run_fly_wisp, R.drawable.run_fly_rime};
     private static final int[] FLIER_COLOURS = {0xFF3A3340, 0xFF7FA8E0, 0xFF8E86A6, 0xFFE0A21A, 0xFF3A3340, 0xFFF08A2C, 0xFF7FC4EC};
     private final Bitmap[] flierCast = new Bitmap[FLIER_CAST.length];
+    /** A times beaten: two pictures of it. */
+    private Bitmap timesDown;
     /** Where the five of the seven others who speak come among those who do: after the villagers. */
     private static final int FIRST_OTHER = 20;
     /** How many are met in the villages, each with a picture in the row of them; they come after the rest of those who speak. */
@@ -296,7 +298,23 @@ final class RunGame {
     private final boolean[] saidForm = new boolean[PlusRun.WHITE + 1];
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
     private float formLasts = 1, shake, sinceBump = 9, sinceShut = 9, sinceOpened = 9, sinceParry = 9, flash;
-    private int seenGreetings, seenEntered, seenReveals, seenWins, seenCurses;
+    private int seenGreetings, seenEntered, seenReveals, seenWins, seenCurses, seenDrops;
+    /**
+     * What of the story is still to be told in this land, a line after another, in the
+     * bubble at the top, while she plays; whether it is being told; whether the line being
+     * begun is one of its lines; and how long the bubble that is up was to be up in all.
+     */
+    private final List<String[]> talk = new ArrayList<>();
+    private boolean talking, told;
+    private float captionFor = 1;
+    /** In the first land: whether she has yet moved, and jumped, which is what the glow on the arrows and on the jump is for. And whether the palette is to glow. */
+    private boolean hintMoved, hintJumped, glowPalette;
+    /** The button that lets her down through a thin ledge, over the arrows; and whether it is held. */
+    private final RectF downButton = new RectF();
+    private boolean goDown;
+    /** What a card that names something won is: plain, good, or rare. And where what was won flies from, in squares. */
+    private int toastRarity;
+    private float toastX, toastY;
     /** How much longer the screen is darkened by black being put on her. */
     private float darkened;
     /**
@@ -586,6 +604,9 @@ final class RunGame {
         return given.length > 1 ? FORM_NAMES[given[0] - 1] + " and " + FORM_NAMES[given[1] - 1].toLowerCase(java.util.Locale.ROOT) + " ribbons" : "A " + FORM_NAMES[given[0] - 1].toLowerCase(java.util.Locale.ROOT) + " ribbon";
     }
 
+    /** How long a card that names something won is up. */
+    private static final float TOAST = 2.8f;
+
     /** Says in a card of its own that something has been won: at once, or when the card that is on the screen has gone. */
     private void toast(String title, String words, int picture) {
         // One card at a time: behind the one that is up, or behind the card of a place off the land.
@@ -597,8 +618,23 @@ final class RunGame {
         toastTitle = title;
         toastWords = words;
         toastPicture = picture;
-        toastLeft = 3.6f;
-        audio.play("star", .7f);
+        toastLeft = TOAST;
+        // What it is worth looking at: rare for a piece of a heart, a life, a medal or one of the three beaten; good for thirty pluses or more.
+        String all = (title + " " + words).toLowerCase(java.util.Locale.ROOT);
+        int most = 0;
+        java.util.regex.Matcher numbers = java.util.regex.Pattern.compile("\\+ (\\d+)").matcher(all);
+        while (numbers.find()) most = Math.max(most, Integer.parseInt(numbers.group(1)));
+        toastRarity = all.contains("piece of a heart") || all.contains("a life,") || all.contains("medal") || all.contains("is beaten") || all.contains("a heart more") ? 2
+                : most >= 30 || all.contains("ribbon") ? 1 : 0;
+        toastX = run == null ? 0 : run.x() + PlusRun.WIDE / 2;
+        toastY = run == null ? 0 : run.y() + PlusRun.TALL * .4f;
+        audio.play("star", toastRarity == 2 ? .9f : .6f);
+        if (toastRarity == 2) audio.play("win", .5f);
+        // And it bursts out of where she is: coins for the plain, light for the rest.
+        for (int spark = 0; spark < 8 + 6 * toastRarity && run != null; spark++) {
+            double way = random.nextFloat() * Math.PI * 2;
+            bits.add(new float[]{toastX, toastY, (float) Math.cos(way) * (4 + toastRarity), (float) Math.sin(way) * (4 + toastRarity) - 3, .55f, 0});
+        }
     }
 
     /** Whether everything asked of her in a chapter has been done; and, the first time that is found to be so, its medal: two hundred pluses, and her colours half a second sooner. */
@@ -835,6 +871,10 @@ final class RunGame {
         tabs[0].set(safe.left + dp(18), safe.top + dp(80), safe.left + dp(18) + tab, safe.top + dp(114));
         tabs[1].set(tabs[0].right + dp(8), tabs[0].top, tabs[0].right + dp(8) + tab, tabs[0].bottom);
         turnTo(page);
+        // The button that lets her down through a thin ledge: over the arrows and between them, where the thumb that holds them reaches it,
+        // and clear of where she walks. It keeps its place whether it can do anything or not.
+        float downs = Math.max(dp(48), size * .78f), middle = (leftButton.left + rightButton.right) / 2;
+        downButton.set(middle - downs / 2, y - dp(12) - downs, middle + downs / 2, y - dp(12));
         // The stall in a land, or a door: its button over the jump, where her thumb already is.
         stallButton.set(jumpButton.left, jumpButton.top - dp(14) - size, jumpButton.right, jumpButton.top - dp(14));
         // The fifth button, on the right in the row with the rest, so that it never lies over her or over what she is about to walk into:
@@ -907,6 +947,8 @@ final class RunGame {
      */
     private void speak(String[] words, boolean captioned) {
         int who = RunStory.speaker(words);
+        // While the story is being told in the land, what is only by the way is not said over it.
+        if (captioned && talking && !told) return;
         // A line that is still being said is not begun again.
         if (captioned && words[0].equals(saying) && (captionLeft > 0 || audio.speaking())) return;
         saying = words[0];
@@ -914,7 +956,8 @@ final class RunGame {
         if (captioned) {
             caption = said;
             captionWho = who;
-            captionLeft = CAPTION + said.length() * .025f;
+            captionLeft = CAPTION + said.length() * (told ? .045f : .025f);
+            captionFor = captionLeft;
         }
         if (who != 0 || Chatter.DEFAULT_NAME.equals(names.nickname())) audio.say(words[0]);
     }
@@ -929,12 +972,12 @@ final class RunGame {
 
     /** Something said by the way: not while someone met in the land is still speaking. */
     private void aside(String[] words) {
-        if (personLeft <= 0) speak(words, true);
+        if (personLeft <= 0 && !talking) speak(words, true);
     }
 
     /** A passing remark, made only if nothing else is being said. */
     private void remark(String[][] lines) {
-        if (captionLeft <= 0 && personLeft <= 0 && !audio.speaking()) speakAny(lines);
+        if (captionLeft <= 0 && personLeft <= 0 && !talking && !audio.speaking()) speakAny(lines);
     }
 
     /**
@@ -983,9 +1026,10 @@ final class RunGame {
         number = land;
         String[][] intro = RunStory.intro(land);
         // Where the story moves on, it is told as she stands at the start of the land, the first time.
+        // It is told in the bubble at the top, a line after another, while she is already on her way: nothing waits for it.
         if (intro != null && untold("run_intro2", land)) {
             begin(land, false);
-            tell(intro, RunLevels.chapterOf(land), () -> screen = PLAY);
+            java.util.Collections.addAll(talk, intro);
         } else {
             begin(land, true);
         }
@@ -993,6 +1037,11 @@ final class RunGame {
 
     private void begin(int land, boolean greeted) {
         number = land;
+        talk.clear();
+        talking = told = false;
+        hintMoved = hintJumped = false;
+        seenDrops = 0;
+        goDown = false;
         perks = kept();
         // For looking at what losing looks like in a build made for testing: one heart and one life.
         if (BuildConfig.DEBUG && session.tally("run_frail") > 0) {
@@ -1192,8 +1241,8 @@ final class RunGame {
             toast((String) next[0], (String) next[1], (Integer) next[2]);
         }
         // While what was won from whoever fell is rising, everything else waits.
-        if (screen == PLAY && prizeAge >= 0) {
-            if ((prizeAge += seconds) > 5) prizeAge = -1;
+        if (screen == PLAY && prizeAge >= 0 && prizeAge < 2) {
+            prizeAge += seconds;
         } else if (screen == PLAY && fanOpen) {
             // The land waits while she chooses.
         } else if (screen == PLAY && roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
@@ -1202,10 +1251,10 @@ final class RunGame {
             roomResultAge += seconds;
         } else if (screen == PLAY && handAge >= 0) {
             handAge += seconds;
-            // The seal comes down on it.
-            if (handAge > 2 && !handStamped) {
+            // What it was is named, in a card at the top that goes by itself; and the land does not wait.
+            if (handAge > 1.5f && !handStamped) {
                 handStamped = true;
-                audio.play("clang", .5f);
+                toast(handTitle, handWords, handPicture);
                 buzz(true);
             }
             // When whoever thanked her has finished, Halgakos has her say; and then it is over.
@@ -1214,7 +1263,9 @@ final class RunGame {
                 speak(RunStory.PRIZES[handPicture == CAKE_PICTURE ? 2 : 1], true);
             }
             if (handAge > 7.5f || handSaid && handAge > 4 && !audio.speaking() && captionLeft <= 0) handAge = -1;
+            step(seconds);
         } else if (screen == PLAY) {
+            if (prizeAge >= 2 && (prizeAge += seconds) > 3) prizeAge = -1;
             if (roomCardAge >= 0 && (roomCardAge += seconds) > 3.4f) roomCardAge = -1;
             if (roomResultAge >= 0 && (roomResultAge += seconds) > 5.5f) roomResultAge = -1;
             step(seconds);
@@ -1235,7 +1286,25 @@ final class RunGame {
         popWords.add(words);
     }
 
+    /** The story of a land is told a line after another, each for as long as it takes to say or to read, while she plays. */
+    private void talks() {
+        if (talking && audio.speaking()) captionLeft = Math.max(captionLeft, .35f);
+        if (captionLeft > 0 || audio.speaking()) return;
+        if (talk.isEmpty()) {
+            talking = false;
+            return;
+        }
+        talking = told = true;
+        speak(talk.remove(0), true);
+        told = false;
+        personLeft = captionLeft;
+    }
+
     private void step(float seconds) {
+        talks();
+        if (goLeft || goRight) hintMoved = true;
+        if (goJump) hintJumped = true;
+        run.down(goDown);
         int carried = run.weapon(), heartsBefore = run.halves(), lookBefore = look, formBefore = run.form();
         boolean colouredBefore = run.coloured();
         float wasX = run.x() + PlusRun.WIDE / 2, wasY = run.y() + PlusRun.TALL;
@@ -1338,6 +1407,7 @@ final class RunGame {
             hintMix = false;
             session.keep("run_hint_mix", 1);
             speak(RunStory.MIX[0], true);
+            glowPalette = true;
         }
 
         if (run.jumps() != seenJumps) {
@@ -1539,6 +1609,15 @@ final class RunGame {
             seenFizzled = run.fizzled();
             audio.play("parry", .4f);
             pop(run.foeX(), run.foeY() - 1.4f, run.fizzledAt() == RunLevels.WISP ? "Only water!" : "Only fire!");
+        }
+        if (run.drops() != seenDrops) {
+            seenDrops = run.drops();
+            audio.play("flap", .35f);
+            buzz(false);
+        }
+        if (run.droppable() && session.tally("run_hint_down") == 0 && captionLeft <= 0 && personLeft <= 0 && !talking) {
+            session.keep("run_hint_down", 1);
+            speak(RunStory.DOWN[0], true);
         }
         if (run.dives() != seenDives) {
             seenDives = run.dives();
@@ -2162,12 +2241,9 @@ final class RunGame {
             }
             // The buttons over the arrows: one calls on the colour she has chosen, if what she calls on it with has filled; the other chooses the next of hers.
             // While something won is rising, a touch, once it has been seen, sends it on its way.
-            if (prizeAge >= 0) {
-                if (action == MotionEvent.ACTION_DOWN && prizeAge > 1.6f) prizeAge = -1;
-                return;
-            }
-            if (handAge >= 0) {
-                if (action == MotionEvent.ACTION_DOWN && handAge > 2.2f) handAge = -1;
+            // The moment in which something is won from whoever fell is short, and a touch ends it sooner; after it her buttons are hers.
+            if (prizeAge >= 0 && prizeAge < 2) {
+                if (action == MotionEvent.ACTION_DOWN && prizeAge > .8f) prizeAge = 2;
                 return;
             }
             // A card that holds the land is sent on by a touch, once it has been up long enough to be seen.
@@ -2312,6 +2388,7 @@ final class RunGame {
 
     /** The picker opens, and the land waits: with her mix ticked, and whatever of hers she is wearing besides, for as far as she can hold them. */
     private void openPicker(boolean stays) {
+        glowPalette = false;
         int owned = perks.colours & 127;
         if ((herMix & owned) == 0) herMix = 1 << chosen - 1;
         fanOpen = true;
@@ -2467,7 +2544,7 @@ final class RunGame {
     /** Which buttons are held, by however many fingers are down: one may hold an arrow while another jumps. */
     private void held(MotionEvent event) {
         int action = event.getActionMasked();
-        boolean left = false, right = false, up = false, strike = false;
+        boolean left = false, right = false, up = false, strike = false, down = false;
         boolean carrying = run != null && (run.weapon() != PlusRun.UNARMED || run.has(PlusRun.RED) || run.has(PlusRun.BLUE));
         if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
             float low = height * .45f, between = (leftButton.right + rightButton.left) / 2;
@@ -2480,6 +2557,10 @@ final class RunGame {
                 // A finger on one of the buttons over the arrows or over the jump is on that button, not on what is under it.
                 if (perks.colours != 0 && (colourButton.contains(x, y) || nextButton.contains(x, y))) continue;
                 if (run != null && (run.atStall() || run.door() >= 0) && stallButton.contains(x, y)) continue;
+                if (x > downButton.left - dp(8) && x < downButton.right + dp(8) && y > downButton.top - dp(10) && y < downButton.bottom + dp(4)) {
+                    down = true;
+                    continue;
+                }
                 if (y < low) continue;
                 if (x < between) left = true;
                 else if (x < arrows) right = true;
@@ -2493,6 +2574,7 @@ final class RunGame {
         goRight = right;
         goJump = up;
         goStrike = strike;
+        goDown = down;
     }
 
     // Drawing
@@ -2530,6 +2612,24 @@ final class RunGame {
                 control(canvas, leftButton, goLeft, 180, charmed);
                 control(canvas, rightButton, goRight, 0, charmed);
                 control(canvas, jumpButton, goJump, 270, false);
+                // The one that lets her down: lit where it can do something, on a thin ledge or in the air; dim, in its place, where it cannot.
+                boolean lets = run.droppable() || !run.onGround();
+                // (Where it can do nothing and she stands behind it, as at the start of a land, it is all but gone.)
+                float herAt = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herFeet = (run.y() + PlusRun.TALL - cameraY) * tile;
+                boolean over = herAt > downButton.left - tile * .6f && herAt < downButton.right + tile * .6f && herFeet > downButton.top - tile * .2f
+                        && herFeet - tile * 1.7f < downButton.bottom;
+                if (!lets) canvas.saveLayerAlpha(downButton.left - dp(6), downButton.top - dp(6), downButton.right + dp(6), downButton.bottom + dp(8), over ? 36 : 105);
+                control(canvas, downButton, goDown, 90, false);
+                if (!lets) canvas.restore();
+                // In the first land the arrows glow until she has moved, and the jump until she has jumped; and the palette, when she has
+                // been told of it, until she opens it.
+                if (number == 1 && !hintMoved) {
+                    glow(canvas, leftButton);
+                    glow(canvas, rightButton);
+                } else if (number == 1 && !hintJumped) {
+                    glow(canvas, jumpButton);
+                }
+                if (glowPalette && perks.colours != 0 && !fanOpen) glow(canvas, nextButton);
                 if (perks.colours != 0) colourControl(canvas);
                 if (perks.colours != 0 && run.cursed() > 0) {
                     // Under black her ribbon and her palette are barred, and the ribbon says for how much longer.
@@ -2926,6 +3026,9 @@ final class RunGame {
                 paint.setAlpha(255);
             } else if (foe.kind == RunLevels.MINUS || foe.kind == RunLevels.THROWER) {
                 boolean walking = foe.kind == RunLevels.MINUS && second;
+                // (Down, it lies flat a moment and then fades, as everything beaten does.)
+                if (foe.flat && foe.act > 2.4f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
                 if (!foe.flat && foe.dazed > 0 && (int) (clock * 16) % 2 == 0) paint.setAlpha(120);
                 art(canvas, foe.flat ? MINUS_FLAT_ART : MINUS_ART + (walking ? 1 : 0), middle, feet, foe.wide() * tile * 1.3f, turned);
                 paint.setAlpha(255);
@@ -2934,10 +3037,25 @@ final class RunGame {
                     thing(canvas, PlusRun.KNIFE, middle + (foe.leftward ? -1 : 1) * tile * .42f, feet - tile * .22f, tile * .6f,
                             foe.wait < PlusRun.WARNING ? -8 : 72, foe.leftward, true);
                 }
+            } else if (foe.kind == RunLevels.TIMES && foe.flat) {
+                // A times beaten: knocked into the air with its eyes spinning, turning over, and then flat on its back, cracked, its spikes
+                // limp; and after a moment it fades.
+                if (foe.act > 2.4f) continue;
+                if (timesDown == null) timesDown = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_times_down);
+                float up = Math.min(1, foe.act / .45f), tall = foe.tall() * tile * 1.55f * 124 / 110;
+                paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
+                canvas.save();
+                if (up < 1) canvas.rotate((foe.leftward ? 1 : -1) * 200 * up, middle, feet - tall * .4f - (float) Math.sin(up * Math.PI) * tile * 1.1f);
+                cell(canvas, timesDown, up < 1 ? 0 : 1, 2, middle, feet + tile * .05f - (up < 1 ? (float) Math.sin(up * Math.PI) * tile * 1.1f : 0), tall, false);
+                canvas.restore();
+                paint.setAlpha(255);
             } else if (foe.kind == RunLevels.TIMES) {
+                if (foe.dazed > 0 && (int) (clock * 16) % 2 == 0) paint.setAlpha(120);
                 art(canvas, TIMES_ART + (second ? 1 : 0), middle, feet, foe.wide() * tile * 1.25f, turned);
+                paint.setAlpha(255);
             } else {
-                if (foe.flat) paint.setAlpha(110);
+                if (foe.flat && foe.act > 2.4f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(110 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
                 // Low on the ground and stretched in the air.
                 artTall(canvas, DIVIDE_ART + (foe.ground - foe.y > .3f ? 1 : 0), middle, feet, foe.tall() * tile * (foe.flat ? .6f : 1.5f), false);
                 paint.setAlpha(255);
@@ -4377,6 +4495,16 @@ final class RunGame {
      * the size she would be standing so tall, and turned about if asked. Hers were drawn
      * facing right and the others' facing left.
      */
+    /** A ring of light that beats about a button: here is the thing that was just spoken of. */
+    private void glow(Canvas canvas, RectF button) {
+        float beat = .5f + .5f * (float) Math.sin(clock * 6), round = Math.min(button.width(), button.height()) / 2;
+        stroke.setColor(0xFFFFD24A);
+        stroke.setAlpha(Math.round(120 + 135 * beat));
+        stroke.setStrokeWidth(dp(3) + dp(2) * beat);
+        canvas.drawCircle(button.centerX(), button.centerY(), round + dp(4) + dp(5) * beat, stroke);
+        stroke.setAlpha(255);
+    }
+
     /** A button that is no use for now: dark, with a red ring and a bar across it. */
     private void barred(Canvas canvas, RectF button) {
         float x = button.centerX(), y = button.centerY(), round = Math.min(button.width(), button.height()) / 2;
@@ -4646,27 +4774,49 @@ final class RunGame {
                 under += high + dp(8);
             }
         }
-        // Something won, in a card of its own in the middle of the screen, which grows as it comes and fades as it goes.
+        // Something won, named in a small bright card at the top left, under whatever is there already: it slides in, stays a moment,
+        // and goes by itself. What it is flies to the card from where she won it. Its rim says how much of a find it is: plain, gold, or
+        // violet with a sparkle.
         if (toastLeft > 0 && toastTitle != null) {
-            float fade = Math.min(1, toastLeft / .4f), grow = 1 + .12f * Math.max(0, (toastLeft - 3.3f) / .3f);
-            float wide = Math.min(safe.width() - dp(40), dp(330)), high = dp(70), from = safe.centerX() - wide / 2, down = safe.top + safe.height() * .36f;
-            canvas.saveLayerAlpha(from - dp(20), down - dp(20), from + wide + dp(20), down + high + dp(24), Math.round(255 * fade));
-            canvas.scale(grow, grow, safe.centerX(), down + high / 2);
-            box.set(from, down, from + wide, down + high);
-            plate(canvas, box, dp(20), 250);
-            stroke.setColor(0xFFE0B13A);
-            stroke.setStrokeWidth(dp(2.5f));
-            canvas.drawRoundRect(from, down, from + wide, down + high, dp(20), dp(20), stroke);
-            paint.setAlpha(255);
-            if (toastPicture == -HER_PICTURE) round(canvas, 0, from + dp(36), down + high / 2, dp(22));
-            else if (toastPicture < 0) prizePicture(canvas, -toastPicture, from + dp(36), down + high / 2, dp(46));
-            else pieceIn(canvas, four, toastPicture, from + dp(36), down + high / 2, dp(46), 0);
+            float fade = Math.min(1, toastLeft / .35f), in = Math.min(1, (TOAST - toastLeft) / .22f), high = dp(46);
+            text.setTextSize(dp(14));
+            float title = text.measureText(toastTitle);
+            text.setTextSize(dp(11.5f));
+            float wide = Math.min(safe.width() - margin * 2, Math.max(title, text.measureText(toastWords)) + dp(66)), from = safe.left + margin - (1 - in) * dp(46);
+            int rim = toastRarity == 2 ? 0xFF8E5BE8 : toastRarity == 1 ? 0xFFE0A21A : 0xFFB9BEC2;
+            canvas.saveLayerAlpha(from - dp(8), under - dp(8), from + wide + dp(8), under + high + dp(10), Math.round(255 * fade));
+            box.set(from, under, from + wide, under + high);
+            plate(canvas, box, dp(15), 248);
+            stroke.setColor(rim);
+            stroke.setStrokeWidth(dp(toastRarity == 0 ? 1.5f : 2.5f));
+            canvas.drawRoundRect(from, under, from + wide, under + high, dp(15), dp(15), stroke);
+            // What it is: flying in from where it was won for the first moment, then at rest at the head of the card.
+            float iconX = from + dp(25), iconY = under + high / 2, fly = Math.min(1, (TOAST - toastLeft) / .45f), eased = fly * fly * (3 - 2 * fly);
+            float wonX = (toastX - cameraX) * tile, wonY = (toastY - cameraY) * tile;
+            float atX = wonX + (iconX - wonX) * eased, atY = wonY + (iconY - wonY) * eased - (float) Math.sin(eased * Math.PI) * dp(46);
             text.setTextAlign(Paint.Align.LEFT);
+            text.setTextSize(dp(14));
             text.setColor(ink);
-            fitted(canvas, toastTitle, from + dp(68), down + dp(30), dp(16), wide - dp(84));
+            fitted(canvas, toastTitle, from + dp(50), under + dp(19), dp(14), wide - dp(60));
             text.setColor(soft);
-            fitted(canvas, toastWords, from + dp(68), down + dp(51), dp(13), wide - dp(84));
+            fitted(canvas, toastWords, from + dp(50), under + dp(36), dp(11.5f), wide - dp(60));
+            if (toastRarity == 2) {
+                // A sparkle along its top.
+                for (int star = 0; star < 3; star++) {
+                    float twinkle = .5f + .5f * (float) Math.sin(clock * 9 + star * 2.1f);
+                    paint.setAlpha(Math.round(255 * twinkle));
+                    art(canvas, STAR_ART, from + wide * (.3f + .28f * star), under + dp(3), dp(9) + dp(4) * twinkle, false);
+                }
+                paint.setAlpha(255);
+            }
             canvas.restore();
+            paint.setAlpha(Math.round(255 * fade));
+            float size = dp(34) * (1 + .5f * (float) Math.sin(eased * Math.PI));
+            if (toastPicture == -HER_PICTURE) round(canvas, 0, atX, atY, size * .5f);
+            else if (toastPicture < 0) prizePicture(canvas, -toastPicture, atX, atY, size);
+            else pieceIn(canvas, four, toastPicture, atX, atY, size, 0);
+            paint.setAlpha(255);
+            under += high + dp(6);
         }
         // What is asked of her in this land, and how it stands: a scroll, and a few words.
         int asked = run.level().quest, stands = run.quest();
@@ -4796,7 +4946,23 @@ final class RunGame {
         if (captionLeft > 0 && caption != null && (screen == PLAY || screen == STALL)) {
             float fade = Math.min(1, captionLeft / .3f), face = dp(17);
             text.setTextSize(dp(14));
-            List<String> lines = wrap(caption, Math.min(safe.width() - dp(48) - face * 2 - dp(8), dp(300)));
+            float room = Math.min(safe.width() - dp(48) - face * 2 - dp(8), dp(300));
+            List<String> lines = wrap(caption, room);
+            // No more than two lines at once: what is longer is said in two bubbles in turn, parted where a sentence ends, each for its
+            // share of the time.
+            if (lines.size() > 2) {
+                int part = -1, middle = caption.length() / 2;
+                for (int at = 1; at < caption.length() - 1; at++) {
+                    char mark = caption.charAt(at - 1);
+                    if (caption.charAt(at) == ' ' && (mark == '.' || mark == '!' || mark == '?' || mark == ':' || mark == ',')
+                            && (part < 0 || Math.abs(at - middle) < Math.abs(part - middle))) part = at;
+                }
+                if (part > 0) {
+                    boolean first = 1 - captionLeft / Math.max(.1f, captionFor) < part / (float) caption.length();
+                    lines = wrap(first ? caption.substring(0, part) : caption.substring(part + 1), room);
+                }
+                if (lines.size() > 2) lines = lines.subList(0, 2);
+            }
             float wide = text.measureText(RunStory.NAMES[captionWho]);
             for (String one : lines) wide = Math.max(wide, text.measureText(one));
             float high = Math.max(lines.size() * dp(19) + dp(30), face * 2 + dp(14));
@@ -4965,7 +5131,6 @@ final class RunGame {
      */
     private void drawHandOver(Canvas canvas) {
         float age = handAge;
-        canvas.drawColor(Color.argb(Math.round(70 * Math.min(1, age / .4f)), 20, 16, 30));
         float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herY = (run.y() + PlusRun.TALL - cameraY) * tile;
         float came = handRuns ? Math.min(1, age / .55f) : 1, eased = 1 - (1 - came) * (1 - came);
         float way = handX < run.x() ? -1 : 1;
@@ -5010,58 +5175,7 @@ final class RunGame {
             if (handPicture < 0) prizePicture(canvas, -handPicture, atX, atY, big);
             else pieceIn(canvas, four, handPicture, atX, atY, big, 0);
         }
-        // The card that names it, with the guild's seal coming down on it.
-        if (age > 1.5f) {
-            float show = Math.min(1, (age - 1.5f) / .3f), wide = Math.min(safe.width() - dp(36), dp(340)), high = dp(96);
-            float left = safe.centerX() - wide / 2, top = safe.top + safe.height() * .38f + dp(16) * (1 - show);
-            canvas.saveLayerAlpha(left - dp(8), top - dp(8), left + wide + dp(8), top + high + dp(12), Math.round(255 * show));
-            box.set(left, top, left + wide, top + high);
-            plate(canvas, box, dp(22), 250);
-            stroke.setColor(0xFFE0B13A);
-            stroke.setStrokeWidth(dp(3));
-            canvas.drawRoundRect(left, top, left + wide, top + high, dp(22), dp(22), stroke);
-            paint.setAlpha(255);
-            if (handPicture < 0) prizePicture(canvas, -handPicture, left + dp(40), top + high / 2, dp(52));
-            else pieceIn(canvas, four, handPicture, left + dp(40), top + high / 2, dp(52), 0);
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setColor(soft);
-            fitted(canvas, "From " + RunStory.NAMES[FIRST_VILLAGER + handWho - RunLevels.SOMI] + ", with thanks", left + dp(76), top + dp(26), dp(12.5f), wide - dp(150));
-            text.setColor(ink);
-            fitted(canvas, handTitle, left + dp(76), top + dp(52), dp(19), wide - dp(150));
-            text.setColor(soft);
-            fitted(canvas, handWords, left + dp(76), top + dp(75), dp(12.5f), wide - dp(92));
-            canvas.restore();
-            // The seal: down from above, large, onto the corner of the card, where it stays.
-            if (age > 1.85f) {
-                float fall = Math.min(1, (age - 1.85f) / .15f), size = dp(52) * (2.6f - 1.6f * fall);
-                float sealX = left + wide - dp(40), sealY = top + dp(30);
-                canvas.save();
-                canvas.rotate(-14, sealX, sealY);
-                stroke.setColor(0xFFC0392B);
-                stroke.setAlpha(Math.round(255 * fall));
-                stroke.setStrokeWidth(dp(3));
-                canvas.drawCircle(sealX, sealY, size * .46f, stroke);
-                stroke.setStrokeWidth(dp(1.5f));
-                canvas.drawCircle(sealX, sealY, size * .36f, stroke);
-                text.setTextAlign(Paint.Align.CENTER);
-                text.setColor(0xFFC0392B);
-                text.setAlpha(Math.round(255 * fall));
-                text.setTextSize(size * .2f);
-                canvas.drawText("GUILD", sealX, sealY - size * .02f, text);
-                canvas.drawText("SEAL", sealX, sealY + size * .19f, text);
-                text.setAlpha(255);
-                stroke.setAlpha(255);
-                canvas.restore();
-            }
-        }
-        if (age > 2.4f) {
-            text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(Color.WHITE);
-            text.setTextSize(dp(13));
-            text.setAlpha(Math.round(160 + 80 * (float) Math.sin(clock * 5)));
-            canvas.drawText("Tap to go on", safe.centerX(), safe.bottom - dp(36), text);
-            text.setAlpha(255);
-        }
+        // (What it is, is named in a card at the top, as anything won is.)
     }
 
     /** The round body of a button: a soft shadow under it, a rim of light inside its edge, and a little smaller while it is held. */

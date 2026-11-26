@@ -1447,13 +1447,16 @@ final class PlusRun {
         // Letting go early makes for a lower jump, but not for a lower flight off a spring.
         if (!jump && !sprung && speedDown < -SHORT_LEAP) speedDown = -SHORT_LEAP;
         jumpHeld = jump;
-        speedDown = Math.min(FALL, speedDown + GRAVITY * seconds);
+        // Held down in the air, she comes down faster than she falls.
+        boolean plunging = down && !onGround;
+        speedDown = Math.min(plunging ? PLUNGE : FALL, speedDown + GRAVITY * (plunging ? 1.8f : 1) * seconds);
+        if (plunging && speedDown > FALL) plunged = true;
         char about = at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL * .6f));
         // A draught lifts her; and with the wind in her hair she flies for as long as the jump is held.
         if (about == RunLevels.DRAUGHT) speedDown = Math.max(-5, speedDown - (GRAVITY + 24) * seconds);
-        else if (has(GREEN) && jump && !onGround && y > 1) speedDown = Math.max(named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * seconds);
+        else if (has(GREEN) && jump && !down && !onGround && y > 1) speedDown = Math.max(named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * seconds);
         // On the tide she does not drop out of the air: let go of, the jump lets her down slowly.
-        else if (named(TIDE) && !onGround) speedDown = Math.min(speedDown, 2.6f);
+        else if (named(TIDE) && !onGround && !down) speedDown = Math.min(speedDown, 2.6f);
         // Water she cannot swim in lets her down slowly, and out through the bottom.
         if (about == RunLevels.WATER && !has(BLUE)) {
             speedDown = Math.min(speedDown, 3.5f);
@@ -1620,6 +1623,7 @@ final class PlusRun {
                 airJumps = 0;
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
                 offIt = .3f;
+                if (plunged && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
                 beat(foe);
                 // One sign after another without touching the ground: each is worth one plus more than the last.
                 if (foe.flat && ++combo > 1) bonus += combo - 1;
@@ -2623,6 +2627,41 @@ final class PlusRun {
         }
     }
 
+    /** How fast she comes down with the button that lets her down held: half as fast again as she falls. */
+    private static final float PLUNGE = FALL * 1.5f;
+    /** Whether that button is held; whether she has come down faster than a fall since she last stood; and how many ledges she has gone down through. */
+    private boolean down, plunged;
+    private int drops;
+
+    /** The button that lets her down is held, or let go of. */
+    void down(boolean held) { down = held; }
+
+    int drops() { return drops; }
+
+    /**
+     * Whether she stands on a ledge she could be let down through: a thin one, with
+     * something under it to come down on. Solid ground is never one, nor a ledge over
+     * nothing, nor one over spikes, lava or water.
+     */
+    boolean droppable() {
+        if (!onGround || riding >= 0) return false;
+        int row = (int) Math.floor(y + TALL + .05f), column = (int) Math.floor(x + WIDE / 2);
+        char under = at(column, row);
+        return (under == RunLevels.THIN || under == RunLevels.LEDGE) && lands(column, row);
+    }
+
+    /** Whether, under a square, the first thing there is can be stood on. */
+    private boolean lands(int column, int row) {
+        int rows = room >= 0 ? level.land.length : RunLevels.ROWS;
+        for (int below = row + 1; below < rows; below++) {
+            char here = at(column, below);
+            if (here == RunLevels.AIR) continue;
+            return here == RunLevels.THIN || here == RunLevels.LEDGE || here == RunLevels.BLOCK || here == RunLevels.CRUMBLE || here == RunLevels.BELT_LEFT
+                    || here == RunLevels.BELT_RIGHT || here == RunLevels.SLICK;
+        }
+        return false;
+    }
+
     private void moveDown(float by) {
         y += by;
         boolean wasOnGround = onGround;
@@ -2632,13 +2671,21 @@ final class PlusRun {
         int left = (int) Math.floor(x), right = (int) Math.floor(x + WIDE - .001f);
         if (by > 0) {
             int row = (int) Math.floor(y + TALL);
+            // With the button that lets her down held, a thin ledge does not hold her, if there is something under it to come down on.
+            boolean through = down && lands((int) Math.floor(x + WIDE / 2), row);
             for (int column = left; column <= right; column++) {
                 char here = at(column, row);
+                boolean thin = here == RunLevels.THIN || here == RunLevels.LEDGE;
+                if (thin && through && y + TALL - by <= row + .02f) {
+                    if (column == left && y + TALL - by <= row + .0001f) drops++;
+                    continue;
+                }
                 // A ledge, of either kind, holds her only when she comes down onto it from above.
-                if (firm(here) || (here == RunLevels.THIN || here == RunLevels.LEDGE) && y + TALL - by <= row + .02f) {
+                if (firm(here) || thin && y + TALL - by <= row + .02f) {
                     y = row - TALL;
                     speedDown = 0;
                     onGround = true;
+                    plunged = false;
                     sprung = false;
                     wet = false;
                     // Coming down from a height counts as a landing; standing on the ground does not.

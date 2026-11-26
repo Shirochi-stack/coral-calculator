@@ -742,6 +742,10 @@ final class RunStory {
     static final String[][] SHUT_OFF = {
             {"off1", "Hey! She shut one of my colours off. It comes back after the wait Sloppy~♡", "H",
                     PLAYER + "A boss has just switched off one of her magic hair colours in the middle of a fight. Indignant, then steady." + FAST}};
+    /** The first time she stands on a thin ledge with another storey under it. */
+    static final String[][] DOWN = {
+            {"down1", "A thin ledge. Press down and I'll drop through it Sloppy~♡", "H",
+                    PLAYER + "She is standing on a thin platform high up, with more platforms below, and explains the button that drops her through. Helpful, brisk, a little bossy." + FAST}};
     /** When she walks into a way that is shut. */
     static final String[][] SHUT = {
             {"shut1", "Locked. Whoever's in here has the key Sloppy~♡", "H",
@@ -770,7 +774,7 @@ final class RunStory {
         java.util.Collections.addAll(groups, START, SEE, ARMS, TOOK, FULL, SPARED, FELL, BITTEN, SHOT, SPIKED, BATTED, CHARMED, LAST_HEART,
                 SQUISH, COMBO, FLAG, BLOWS, AIM, WON, LOST, SHOP, SEE_LATER, FORMS, GIFTS, BURNED, SANK, QUAKED, SLASHED, PARRIED, BLOWS_LATER,
                 AIM_LATER, MEET, STALL, ENTER, PHASES, SHUT, ROOMS, CRACK, ROOM_WON, ASKS, ASKED, UNDONE, PRIZES, RUMOURS, SHADOW, LIFE, SHIELD, MIX, ROVERS, FLIERS,
-                SHUT_OFF);
+                SHUT_OFF, DOWN);
         return groups.toArray(new String[0][][]);
     }
 }
