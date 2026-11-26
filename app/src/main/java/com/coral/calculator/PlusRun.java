@@ -123,6 +123,8 @@ final class PlusRun {
     static final int BOARD = 200;
     /** And the three who keep a smithy, each at her anvil: Moru, and the two after her. */
     static final int SMITH = 300;
+    /** And whoever deals in the black market. */
+    static final int DEALER = 400;
     private int spot = -1;
 
     /** What she stands at in a building, or -1: a pet on show, by its kind; or a desk, a hundred and the tab of the counter it opens. */
@@ -631,6 +633,13 @@ final class PlusRun {
         int main = UNARMED;
         int[] levels = new int[RunArms.COUNT];
         /**
+         * How much harder she has chosen to have it, at the black market: so many more
+         * blows to every creature and halves of a heart to every hurt. And which rung of the
+         * black arena this is, or none: whoever waits there takes more, behind more of a
+         * shield, and a hurt costs more.
+         */
+        int harder, black;
+        /**
          * What she wears: how many halves of a heart it takes off what a hurt costs, never
          * the last of it; how many more blows her coming down on a creature counts for; and
          * how many times as long nothing hurts her again after a hurt.
@@ -647,6 +656,32 @@ final class PlusRun {
 
     /** A slash wave, from a blade or a brush the smith has worked on. */
     static final int SLASH = 29;
+    /**
+     * The four won in the black arena, and a ball of the cannon's ink as it flies. What a
+     * blow of each is made with. And, of them, counts that only go up, for whoever shows
+     * the game: a katana's draws, how many in a row the last was, its dashes and its cuts
+     * downward; a lance's thrusts and jets; a cannon's great balls; a whip's lashes and
+     * spins. The line of the katana's last dash, and for how much longer it waits to be cut.
+     */
+    static final int KATANA = RunArms.KATANA, LANCE = RunArms.LANCE, CANNON = RunArms.CANNON, WHIP = RunArms.WHIP, INKBALL = 30;
+    static final int CUT = -9, LANCED = -10, SHELLED = -11, WHIPPED = -12;
+    private int cuts, chain, dashes, airCuts, thrusts, jets, shells, lashes, spins;
+    private float sinceCut = 9, dashFrom, dashTo, dashY, dashLeft, spinLeft;
+
+    int cuts() { return cuts; }
+    int chain() { return chain; }
+    int dashes() { return dashes; }
+    int airCuts() { return airCuts; }
+    int thrusts() { return thrusts; }
+    int jets() { return jets; }
+    int shells() { return shells; }
+    int lashes() { return lashes; }
+    int spins() { return spins; }
+    float dashFrom() { return dashFrom; }
+    float dashTo() { return dashTo; }
+    float dashY() { return dashY; }
+    float dashLeft() { return dashLeft; }
+
     /**
      * What the smith's work leaves in the air for a moment: bursts, each where it is, how
      * wide, what made it and how long ago; and where a book's pages burn, each with how
@@ -974,8 +1009,8 @@ final class PlusRun {
     PlusRun(RunLevels.Level level, Perks perks) {
         this.level = level;
         this.perks = perks;
-        tough = RunLevels.toughOf(level.number);
-        bite = RunLevels.biteOf(level.number);
+        tough = RunLevels.toughOf(level.number) + perks.harder;
+        bite = RunLevels.biteOf(level.number) + perks.harder + RunMarket.bites(perks.black);
         halves = perks.hearts * 2;
         lives = perks.lives;
         // What is in her backpack is with her from the start, and what she begins a land with is in her hands.
@@ -998,7 +1033,7 @@ final class PlusRun {
             foe.ground = spec[2] + 1 - foe.tall();
             foe.y = foe.ground;
             foe.home = foe.x;
-            foe.left = waits ? health(spec[0]) : (spec.length > 3 ? spec[3] : 1) + tougher(spec[0]);
+            foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black)) : (spec.length > 3 ? spec[3] : 1) + tougher(spec[0]);
             foe.crowd = RunLevels.crowd(spec);
             if (spec[0] == RunLevels.WORD) foe.y = foe.ground - WORD_HANGS;
             // Each divide starts its hop at a different moment.
@@ -1009,7 +1044,7 @@ final class PlusRun {
                 foe.step = 3;
                 foe.act = .6f;
                 foe.away = level.arena >= 0;
-                foe.shieldMost = strength(spec[0]);
+                foe.shieldMost = strength(spec[0]) + (RunLevels.rover(spec[0]) || strength(spec[0]) <= 0 ? 0 : RunMarket.shields(perks.black));
                 foe.shield = foe.shieldMost;
                 // One met in the middle of a land is not there until she comes near; Blot is twice the size of anything.
                 if (RunLevels.rover(spec[0])) {
@@ -2084,7 +2119,9 @@ final class PlusRun {
         float bite = with == BEAMED ? 3 : with == BLASTED ? RunArms.bite(BOOK, perks.levels[BOOK]) : with == SWORDED ? RunArms.bite(SWORD, perks.levels[SWORD])
                 : with == PLUNGED || with == BOOK || with == STEAM ? 2 : with == GUN ? RunArms.bite(GUN, perks.levels[GUN]) : with == PANELLED ? RunArms.PANEL_BITE
                 : with == PEN || with == KNIFE ? RunArms.bite(with, perks.levels[with]) : with == PAGE ? RunArms.bite(TABLET, perks.levels[TABLET])
-                : with == THROWN_KEY ? RunArms.bite(KEYS, perks.levels[KEYS]) : 1;
+                : with == THROWN_KEY ? RunArms.bite(KEYS, perks.levels[KEYS])
+                : with == CUT ? (chain == 3 && !dashCut ? RunArms.finish(perks.levels[KATANA]) : RunArms.bite(KATANA, perks.levels[KATANA]))
+                : with == LANCED || with == SHELLED || with == WHIPPED ? RunArms.bite(thingOf(with), perks.levels[thingOf(with)]) : 1;
         int weak = weak(foe.kind);
         if (weak != 0 && (with == weak || with == STEAM)) bite += 1;
         // What she holds, the stronger for a find; and a shield with a key in it, from which the next blow that is not a key takes a piece more.
@@ -2303,6 +2340,15 @@ final class PlusRun {
         if (with >= 0) owned |= 1 << with;
         if (with == GUN) rounds = perks.shots;
         if (with == BOOK) books = RunArms.BOOKS;
+    }
+
+    /** She begins somewhere other than the start of the land: and that is where she comes back to. */
+    void begins(float across, float down) {
+        place(across, down);
+        startX = across;
+        startY = down;
+        firmX = across;
+        firmY = down;
     }
 
     /** Puts her somewhere, standing still: for checking the rules from a place of one's choosing. */
@@ -3127,15 +3173,24 @@ final class PlusRun {
 
     /** How many blows the blow being dealt counts for against a creature: by what the smith has made of the thing it is dealt with; or, landed on, by what she wears on her feet. */
     private int power() {
-        if (with == LANDED || with == PLUNGED) return 1 + perks.stomp;
-        int thing = with == PLAIN ? BRUSH : with == SWORDED ? SWORD : with == BLASTED || with == BOOK ? BOOK : with == PEN || with == KNIFE || with == GUN ? with
-                : with == PAGE || with == PANELLED ? TABLET : with == THROWN_KEY ? KEYS : UNARMED;
-        return thing == UNARMED ? 1 : RunArms.blows(thing, perks.levels[thing]);
+        // (Coming down hard with the katana in her hands, its edge comes down with her.)
+        if (with == LANDED || with == PLUNGED) return 1 + perks.stomp + (with == PLUNGED && weapon == KATANA ? RunArms.blows(KATANA, perks.levels[KATANA]) : 0);
+        int thing = thingOf(with);
+        // (The third cut of three in a row, and the cut that follows a dash, count for one more.)
+        return thing == UNARMED ? 1 : RunArms.blows(thing, perks.levels[thing]) + (with == CUT && (chain == 3 || dashCut) ? 1 : 0);
     }
 
+    /** The thing a blow was dealt with, from what the blow is made with; or nothing. */
+    private static int thingOf(int by) {
+        return by == PLAIN ? BRUSH : by == SWORDED ? SWORD : by == BLASTED || by == BOOK ? BOOK : by == PEN || by == KNIFE || by == GUN ? by
+                : by == PAGE || by == PANELLED ? TABLET : by == THROWN_KEY ? KEYS : by == CUT ? KATANA : by == LANCED ? LANCE : by == SHELLED ? CANNON
+                : by == WHIPPED ? WHIP : UNARMED;
+    }
+
+    private boolean dashCut;
+
     private void fell(Foe foe, int by) {
-        int way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : by == PLAIN ? BRUSH + 1 : by == SWORDED ? SWORD + 1 : by == BLASTED || by == BOOK ? BOOK + 1
-                : by == PEN || by == KNIFE || by == GUN ? by + 1 : by == PAGE || by == PANELLED ? TABLET + 1 : by == THROWN_KEY ? KEYS + 1 : -1;
+        int thing = thingOf(by), way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : thing == UNARMED ? -1 : thing + 1;
         fells.add(new int[]{foe.kind, way});
     }
 
@@ -3383,11 +3438,83 @@ final class PlusRun {
                 return;
             }
             shoot(THROWN_KEY, true, fromX, fromY, way * speed, 0, lasts).pierce = RunArms.pierces(KEYS, level);
+        } else if (weapon == KATANA) {
+            drawn(level, way);
+        } else if (weapon == LANCE) {
+            // A thrust: everything in front of her, a long way out and no higher than the lance.
+            thrusts++;
+            float reach = RunArms.reach(LANCE, level) + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - reach : x + WIDE;
+            sweep(LANCED, from, from + reach, y + TALL * .15f, y + TALL * .15f + RunArms.area(LANCE, level));
+            if (RunArms.burst(LANCE, level) > 0) blast(facingLeft ? from : from + reach, y + TALL * .5f, RunArms.burst(LANCE, level), LANCED);
+        } else if (weapon == CANNON) {
+            // A ball of ink, lobbed: it bursts where it lands, or on the first thing it meets.
+            for (int which = 0; which < RunArms.balls(level); which++) {
+                shoot(INKBALL, true, fromX, fromY - .3f, way * (speed + which * 3.5f) + speedAcross * .4f, -9, 3).by = SHELLED;
+            }
+        } else if (weapon == WHIP) {
+            // A lash: what is in front of her, from her feet to well over her head.
+            lashes++;
+            float reach = RunArms.reach(WHIP, level) + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - reach : x + WIDE;
+            sweep(WHIPPED, from, from + reach, y + TALL - RunArms.area(WHIP, level), y + TALL);
+            wave(WHIP, level, way, fromX, fromY);
         } else {
             swing = SWING;
             swungWith = weapon;
             wave(weapon, level, way, fromX, fromY);
         }
+    }
+
+    /**
+     * A stroke that takes everything in a box: every creature in it is dealt a blow as with
+     * something, and what was thrown at her into it is gone. Returns how many it met.
+     */
+    private int sweep(int by, float from, float to, float top, float bottom) {
+        int met = 0;
+        for (int index = 0; index < foes.size(); index++) {
+            Foe foe = foes.get(index);
+            if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x - spare(foe, true) >= to || foe.x + foe.wide() + spare(foe, true) <= from || foe.y - spare(foe, false) >= bottom
+                    || foe.y + foe.tall() <= top) continue;
+            beat(foe, by);
+            met++;
+        }
+        for (int index = shots.size() - 1; index >= 0; index--) {
+            Shot shot = shots.get(index);
+            if (shot.hers || shot.x < from - .2f || shot.x > to + .2f || shot.y < top - .2f || shot.y > bottom + .2f) continue;
+            shots.remove(index);
+            turned++;
+        }
+        return met;
+    }
+
+    /**
+     * The katana is drawn: a cut, further than it looks, and it is back in its sheath. A
+     * tap that comes soon after the last is the next of three in a row, and the third is
+     * the longest and the heaviest. In the air the cut is downward, and she comes down the
+     * faster for it.
+     */
+    private void drawn(int level, float way) {
+        if (!onGround) {
+            airCuts++;
+            chain = 0;
+            sweep(CUT, x - .5f, x + WIDE + .5f, y + TALL * .4f, y + TALL + 1.7f);
+            speedDown = Math.max(speedDown, 11);
+            return;
+        }
+        chain = cuts > 0 && sinceCut <= RunArms.RHYTHM && chain > 0 && chain < 3 ? chain + 1 : 1;
+        sinceCut = 0;
+        cuts++;
+        float reach = RunArms.reach(KATANA, level) + (boost > 0 ? RunArms.BOOST_SWING : 0) + (chain == 3 ? RunArms.FINISH_FAR : 0), from = facingLeft ? x - reach : x + WIDE;
+        sweep(CUT, from, from + reach, y + TALL - RunArms.area(KATANA, level), y + TALL);
+        wave(KATANA, level, way, x + WIDE / 2 + way * .5f, y + TALL * .45f);
+    }
+
+    /** Whether there is room for her at a place along her line: nothing firm in it, and no edge of the land. */
+    private boolean clear(float across) {
+        if (across < 0 || across + WIDE > columns) return false;
+        for (int row = (int) Math.floor(y + .05f); row <= (int) Math.floor(y + TALL - .05f); row++) {
+            for (int column = (int) Math.floor(across + .02f); column <= (int) Math.floor(across + WIDE - .02f); column++) if (firm(at(column, row))) return false;
+        }
+        return true;
     }
 
     /**
@@ -3404,7 +3531,7 @@ final class PlusRun {
             // (A sword's second wave follows a little behind its first.)
             Shot wave = shoot(SLASH, true, fromX - (of == SWORD ? which * way * 1.3f : 0), of == KNIFE ? fromY : y + TALL - tall / 2, way * (float) Math.cos(turn) * speed,
                     (float) Math.sin(turn) * speed, lasts + (of == SWORD ? which * 1.3f / speed : 0));
-            wave.by = of == SWORD ? SWORDED : of == KNIFE ? KNIFE : PLAIN;
+            wave.by = of == SWORD ? SWORDED : of == KNIFE ? KNIFE : of == KATANA ? CUT : of == WHIP ? WHIPPED : PLAIN;
             wave.of = of;
             wave.high = tall / 2;
             wave.pierce = RunArms.waveThrough(of, level) ? 99 : 0;
@@ -3415,10 +3542,13 @@ final class PlusRun {
 
     /** Something of hers has come to its end, against something or where its reach ran out: a pen the smith has worked on bursts there. */
     private void ended(Shot shot) {
-        float wide = shot.kind == PEN && shot.by == PEN ? RunArms.burst(PEN, perks.levels[PEN]) : 0;
+        // (And a ball of the cannon's ink bursts wherever it ends: the great one wider; and its ink may lie there for a while.)
+        boolean ball = shot.kind == INKBALL && shot.by == SHELLED;
+        float wide = shot.kind == PEN && shot.by == PEN ? RunArms.burst(PEN, perks.levels[PEN]) : ball ? (shot.high > 0 ? RunArms.SHELL_WIDE : RunArms.burst(CANNON, perks.levels[CANNON])) : 0;
         if (wide <= 0 || shot.spent || shot.pets || !shot.hers) return;
         shot.spent = true;
-        blast(shot.x, shot.y, wide, PEN);
+        blast(shot.x, shot.y, wide, ball ? SHELLED : PEN);
+        if (ball && RunArms.lies(perks.levels[CANNON]) > 0) fires.add(new float[]{shot.x, shot.y, wide * .8f, RunArms.lies(perks.levels[CANNON]), .45f, 1});
     }
 
     /** An ink blot the smith has worked on has hit something: it splashes, and jumps on to the nearest creature that still stands. */
@@ -3463,9 +3593,17 @@ final class PlusRun {
                 Foe foe = foes.get(at);
                 float across = foe.x + foe.wide() / 2 - fire[0], down = foe.y + foe.tall() / 2 - fire[1];
                 if (foe.flat || absent(foe) || foe.dazed > 0 || across * across + down * down > fire[2] * fire[2]) continue;
-                beat(foe, BLASTED);
+                beat(foe, fire.length > 5 ? SHELLED : BLASTED);
             }
         }
+        // A beat after a dash, everything on its line is cut; and a spin that goes round twice goes round again.
+        sinceCut += seconds;
+        if (dashLeft > 0 && (dashLeft -= seconds) <= 0) {
+            dashCut = true;
+            sweep(CUT, dashFrom, dashTo, dashY, dashY + TALL);
+            dashCut = false;
+        }
+        if (spinLeft > 0 && (spinLeft -= seconds) <= 0) sweep(WHIPPED, x - RunArms.SPIN, x + WIDE + RunArms.SPIN, y + TALL - RunArms.SPIN_TALL, y + TALL);
         for (int index = 0; index < shots.size(); index++) {
             Shot wave = shots.get(index);
             if (wave.kind != SLASH || !wave.wipes) continue;
@@ -3492,6 +3630,47 @@ final class PlusRun {
                 double turn = (key - (count - 1) / 2f) * RunArms.FAN_APART * 2 * Math.PI / 6;
                 shoot(THROWN_KEY, true, fromX, fromY, way * (float) Math.cos(turn) * speed, (float) Math.sin(turn) * speed, lasts).pierce = RunArms.pierces(KEYS, perks.levels[KEYS]);
             }
+            return;
+        }
+        if (weapon == KATANA) {
+            // The dash: along her line as far as there is room and no further than a wall, through whatever stands on it; nothing touches
+            // her as she goes, and a beat later everything on the line is cut.
+            dashes++;
+            float fromX = x;
+            for (float gone = 0; gone < RunArms.DASH && clear(x + way * .25f); gone += .25f) x += way * .25f;
+            dashFrom = Math.min(fromX, x);
+            dashTo = Math.max(fromX, x) + WIDE;
+            dashY = y;
+            dashLeft = RunArms.BEAT;
+            safe = Math.max(safe, RunArms.BEAT + .2f);
+            speedAcross = 0;
+            sinceStrike = RunArms.rest(KATANA, perks.levels[KATANA]) - RunArms.dashRest(perks.levels[KATANA]);
+            return;
+        }
+        if (weapon == LANCE) {
+            // A jet of ink from its nib: straight, fast, and through everything.
+            jets++;
+            Shot jet = shoot(SLASH, true, x + WIDE / 2 + way * .6f, y + TALL * .5f, way * 26, 0, RunArms.jet(perks.levels[LANCE]) / 26);
+            jet.by = LANCED;
+            jet.of = LANCE;
+            jet.high = .35f;
+            jet.pierce = 99;
+            return;
+        }
+        if (weapon == CANNON) {
+            // The great ball: slow, straight, through everything, and a wide burst where it ends.
+            shells++;
+            Shot ball = shoot(INKBALL, true, x + WIDE / 2 + way * .6f, y + TALL * .4f, way * 10, 0, RunArms.SHELL / 10);
+            ball.by = SHELLED;
+            ball.high = .7f;
+            ball.pierce = 99;
+            return;
+        }
+        if (weapon == WHIP) {
+            // The spin: what is on both sides of her; and, worked on, round again.
+            spins++;
+            sweep(WHIPPED, x - RunArms.SPIN, x + WIDE + RunArms.SPIN, y + TALL - RunArms.SPIN_TALL, y + TALL);
+            spinLeft = RunArms.spins(perks.levels[WHIP]) > 1 ? .2f : 0;
             return;
         }
         panels++;
@@ -3669,7 +3848,7 @@ final class PlusRun {
             shot.x += shot.across * seconds;
             shot.y += shot.down * seconds;
             shot.age += seconds;
-            if (shot.kind == BOOK || shot.kind == NUT || shot.kind == ROLL) shot.down += BOOK_WEIGHT * seconds;
+            if (shot.kind == BOOK || shot.kind == NUT || shot.kind == ROLL || shot.kind == INKBALL && shot.high == 0) shot.down += BOOK_WEIGHT * seconds;
             else if (shot.kind == WATER) shot.down += 6 * seconds;
             else if (shot.kind == SAYING) shot.down = (float) Math.cos(shot.age * 7) * 3.2f;
             else if (shot.kind == GLOB) shot.down += BOOK_WEIGHT * seconds;

@@ -116,8 +116,13 @@ final class RunLevels {
     /** The sorts of the two buildings of a village that can be gone into. */
     static int[] buildingsOf(int number, int village) {
         int first = (number + village) % 4, second = (first + 1 + (number / 4 + village) % 3) % 4;
+        // And in one village in five, from the ninth land on, the second of them is the black market.
+        if (number >= MARKET_FROM && (number + village * 3) % 5 == 4) second = MARKET;
         return new int[]{first, second};
     }
+
+    /** The first land with a black market in it. */
+    static final int MARKET_FROM = 9;
 
     /** The first land whose smithy is large enough for all three sisters: before it Moru keeps it alone, and does her sisters' work besides. */
     static final int SISTERS_FROM = 13;
@@ -1246,7 +1251,7 @@ final class RunLevels {
             int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL;
             wall(2);
             int from = at;
-            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL ? 16 : sort == SMITHY ? 18 : 14);
+            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL || sort == MARKET ? 16 : sort == SMITHY ? 18 : 14);
             int to = at - 1;
             wall(2);
             level.land[FLOOR - 1][from + 1] = ENTRY;
@@ -1259,6 +1264,9 @@ final class RunLevels {
                 // And her board of hunts, between the door and her desk.
                 level.items.add(new int[]{PlusRun.SPOT, from + 7, FLOOR - 1, 0, PlusRun.BOARD});
                 pluses(from + 4, from + 6, FLOOR - 1);
+            } else if (sort == MARKET) {
+                // Whoever deals there, at the back of it.
+                level.items.add(new int[]{PlusRun.SPOT, from + 8, FLOOR - 1, 0, PlusRun.DEALER});
             } else if (sort == SMITHY) {
                 // Moru at her anvil; and, where the village is large enough to keep all three, her sisters, each at her own.
                 level.items.add(new int[]{PlusRun.SPOT, from + 5, FLOOR - 1, 0, PlusRun.SMITH});
@@ -1821,6 +1829,7 @@ final class RunLevels {
                         if (sort == PET_SHOP) stands[0] = 300 + level.number % 2;
                         else if (sort == GUILD_HALL) stands[0] = 302 + level.number % 2;
                         else if (sort == SMITHY) stands[0] = 304;
+                        else if (sort == MARKET) stands[0] = 305;
                         // (Its door is not marked in the land itself, as other doors are: what is laid about a land afterwards is laid as it was.)
                         built.add(new int[]{HOUSE, column, floor, 0, column, floor, sort});
                     }

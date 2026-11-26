@@ -70,6 +70,7 @@ CAST = {"chikuwa": (1, 3), "rune": (1, 3), "illya": (1, 4), "tsubakieh": (2, 3)}
 CAST_CELL = (288, 248)
 # How tall the first frame of each is made, in the pixels her own frames are measured in: she stands 190 tall.
 CAST_TALL = {"chikuwa": 198, "rune": 190, "illya": 188, "tsubakieh": 190}
+ARENA_ARMS = (("katana", 7, (400, 248)), ("lance", 6, (380, 248)), ("cannon", 6, (340, 248)), ("whip", 6, (500, 248)))
 SMITHS = ("moru", "pulmu", "sutdol")
 FACES = ("chikuwa", "rune", "illya", "tsubakieh", "mawang", "gokhae", "miri", "gari", "yeobaek", "nuri")
 # The second volume: how many squares its sheet has to a row; and those who wait in it, with how many rows and
@@ -568,6 +569,18 @@ def main():
     # standing, four of running, rising; falling, drawing back, letting go, gathering, the heavy thing, and settling.
     for index, name in enumerate(("tablet", "keys")):
         her_frames(f"arm{6 + index}", f"arm_{name}", (336, 248), 14, 6, report)
+    # And with the four won in the black arena. The katana: fourteen frames, in two rows of seven: standing, four of running, rising,
+    # falling; drawing, the cut, sheathing, the dash gathered, the dash's cut, the cut downward, and after it. The lance, the cannon and
+    # the whip: twelve each, as the tablet-book and the keys have.
+    for index, (name, across, box) in enumerate(ARENA_ARMS):
+        her_frames(f"arm{8 + index}", f"arm_{name}", box, 14, across, report)
+    row = Image.new("RGBA", (256 * 4, 256), (0, 0, 0, 0))
+    for index, thing in enumerate(pieces("weapons3", 1, 4)):
+        scale = 240 / max(thing.size)
+        size = (max(1, round(thing.size[0] * scale)), max(1, round(thing.size[1] * scale)))
+        row.alpha_composite(thing.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA"), (index * 256 + (256 - size[0]) // 2, (256 - size[1]) // 2))
+    clear = Image.new("RGBA", row.size, (0, 0, 0, 0))
+    Image.composite(row, clear, row.getchannel("A").point(lambda value: 255 if value else 0)).save(RES / "run_arms3.webp", lossless=True, quality=100, method=6, exact=True)
     # Their pictures, for the button and the backpack: the tablet-book shut and open, the ring of keys, and one key; each in a square of its own.
     row = Image.new("RGBA", (256 * 4, 256), (0, 0, 0, 0))
     for index, thing in enumerate(pieces("weapons2", 1, 4)):

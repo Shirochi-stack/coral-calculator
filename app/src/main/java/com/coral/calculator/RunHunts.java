@@ -46,8 +46,8 @@ final class RunHunts {
     static final int[] ROVER_FROM = {22, 15, 20};
     /** The ways: how each is said, and how many are asked at first. */
     private static final String[] WAY_WORDS = {"by landing on them", "with the pen", "with a knife", "with a thrown book", "with the brush", "with the sword", "with the ink gun",
-            "with the tablet-book", "with her keys"};
-    private static final int[] WAY_MANY = {12, 8, 8, 6, 8, 8, 8, 10, 8};
+            "with the tablet-book", "with her keys", "with the katana", "with the lance", "with the cannon", "with the whip"};
+    private static final int[] WAY_MANY = {12, 8, 8, 6, 8, 8, 8, 10, 8, 10, 10, 8, 10};
 
     /** What the smith works with, which hunts pay: the names of the three. */
     static final String[] MATERIALS = {"Type metal", "Ink crystal", "Gold leaf"};
