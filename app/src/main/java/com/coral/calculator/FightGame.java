@@ -240,8 +240,15 @@ final class FightGame {
         buttons[LIGHT].set(right - size * 2 - gap, low, right - size - gap, low + size);
         buttons[SPECIAL].set(right - size, high, right, high + size);
         buttons[DODGE].set(right - size * 2 - gap, high, right - size - gap, high + size);
-        float grand = size * 1.14f, middle = right - size - gap / 2, top = high - grand - dp(12);
-        buttons[ULT].set(middle - grand / 2, top, middle + grand / 2, top + grand);
+        float grand = size * 1.14f;
+        if (landscape) {
+            // On a wide screen it goes beside the others, clear of where the two stand.
+            float middle = right - size * 2 - gap * 2 - grand / 2, level = (high + low + size) / 2;
+            buttons[ULT].set(middle - grand / 2, level - grand / 2, middle + grand / 2, level + grand / 2);
+        } else {
+            float middle = right - size - gap / 2, top = high - grand - dp(12);
+            buttons[ULT].set(middle - grand / 2, top, middle + grand / 2, top + grand);
+        }
         groundY = landscape ? height * .8f : height * .6f;
         // Her pictures are read in no larger than she is drawn here, in tenths; a change of screen reads them in again.
         float need = Math.max(.5f, Math.min(1, (float) Math.ceil(Fight.TALL * unit / STANDING * 10.4f) / 10));

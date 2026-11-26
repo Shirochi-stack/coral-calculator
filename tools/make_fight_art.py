@@ -382,7 +382,7 @@ def main():
         frames, whole = fighter(name, report)
         atlases, table = packed(name, frames)
         for index, atlas in enumerate(atlases):
-            atlas.save(RES / f"fight_{name}_{index}.webp", quality=88, alpha_quality=92, method=6)
+            atlas.save(RES / f"fight_{name}_{index}.webp", quality=80, alpha_quality=90, method=6)
         tables.append(table)
         sizes.append([atlas.size for atlas in atlases])
         full.append(whole)
