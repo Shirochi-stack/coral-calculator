@@ -2036,6 +2036,8 @@ final class PlayStage extends View {
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) back();
             return true;
         }
+        // Page brawl is played on a keyboard too.
+        if (fightGame != null && fightGame.key(event)) return true;
         return super.dispatchKeyEvent(event);
     }
 
