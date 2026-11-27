@@ -485,7 +485,7 @@ final class PlusRun {
         }
         boolean was = foe.flat;
         // (From stronger pets a blow on a big one counts twice.)
-        if (perks.petStrong >= 1 && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
+        if (perks.petStrong >= 1 && !RunLevels.boss(foe.kind) && foe.left > BLOW) foe.left -= BLOW;
         beat(foe, SURE);
         if (foe.flat && !was) petKills++;
         return true;
@@ -528,9 +528,9 @@ final class PlusRun {
             puddles.add(new float[]{it.x, it.y, PUDDLE_LASTS});
         }
         // A mini Chikuwa has a roll for her every so often while she is short of a heart: half of one back.
-        if (kind == MINI_CHIKUWA && halves < perks.hearts * 2 && state == PLAYING && (it.gift -= seconds) <= 0) {
+        if (kind == MINI_CHIKUWA && hp < maxHp() && state == PLAYING && (it.gift -= seconds) <= 0) {
             it.gift = GIFT_EVERY;
-            halves++;
+            hp = Math.min(maxHp(), hp + HALF);
             petGifts++;
         }
         // The ring of light: when it is ready, the first thing thrown at her that comes near is turned aside.
@@ -808,8 +808,372 @@ final class PlusRun {
         int defence, stomp;
         /** Her level: how much harder her blows land comes from it. */
         int level = 1;
+        /** The weapon found in the lands that she holds as her own, or 0: what it is counts for more in her hands. */
+        int item;
         float mercy = 1;
+        /** What her skill tree gives her; and the active skills in her slots. */
+        RunSkills.Built skills = new RunSkills.Built();
+        List<RunSkills.Notable> slotted = new ArrayList<>();
+        /** What she wears of what she has found: an armour and two accessories, added up. */
+        RunLoot.Worn worn = RunLoot.NOTHING;
     }
+
+    // How much creatures take
+
+    /** A blow of her first book at her first level, in the tenths creatures' health is counted in. */
+    static final int BLOW = 10;
+    /** Each kind's own health: the minus a blow, the times a little more, a mite less, the big ones more. (Those who wait count blows of their own.) */
+    private static final int[] HEALTH = new int[RunLevels.RIME + 1];
+
+    static {
+        java.util.Arrays.fill(HEALTH, BLOW);
+        HEALTH[RunLevels.DIVIDE] = 8;
+        HEALTH[RunLevels.THROWER] = 9;
+        HEALTH[RunLevels.SLIME] = 12;
+        HEALTH[RunLevels.DRAGON] = 18;
+        HEALTH[RunLevels.BAR] = 16;
+        HEALTH[RunLevels.FAN] = 9;
+        HEALTH[RunLevels.POGO] = 9;
+        HEALTH[RunLevels.DRIFTER] = 9;
+        HEALTH[RunLevels.SWOOPER] = 8;
+        HEALTH[RunLevels.BOMBER] = 12;
+        HEALTH[RunLevels.MITE] = 6;
+    }
+
+    static int healthOf(int kind) { return kind >= 0 && kind < HEALTH.length ? HEALTH[kind] : BLOW; }
+
+    /** The colours of toughness: their names, how many times the health each has, the halves of a heart more its touch costs, and how many times the experience and the chance of a drop. */
+    static final int NORMAL = 0, RED_TIER = 1, PURPLE_TIER = 2, GOLD_TIER = 3, INK_TIER = 4, TIERS = 5;
+    static final String[] TIER_NAMES = {"", "Red", "Purple", "Gold", "Black Ink"};
+    static final int[] TIER_HEALTH = {1, 3, 7, 15, 30}, TIER_BITE = {0, 0, 1, 1, 2}, TIER_XP = {1, 2, 4, 7, 12};
+    static final float[] TIER_DROPS = {1, 1.5f, 2.5f, 4, 6};
+
+    /** In ten thousand creatures of a land, how many are red, purple, gold and black ink: more, and tougher, the further on. */
+    static int[] tierOdds(int number) {
+        if (number <= 6) return new int[]{500, 0, 0, 0};
+        if (number <= 12) return new int[]{1000, 200, 0, 0};
+        if (number <= 18) return new int[]{1300, 400, 0, 0};
+        if (number <= 30) return new int[]{1500, 600, 0, 0};
+        if (number <= 50) return new int[]{1800, 800, number > 40 ? 150 : 0, 0};
+        if (number <= 80) return new int[]{2000, 1100, 400, 50};
+        return new int[]{2000, 1400, 800, 250};
+    }
+
+    /** A creature's colour, the same every time for the same one in the same land. */
+    static int tierOf(int number, int kind, int column, int row) {
+        if (RunLevels.boss(kind) || kind == RunLevels.TARGET || kind == RunLevels.WISP || kind == RunLevels.RIME) return NORMAL;
+        long dice = number * 7919L + column * 104729L + row * 1299709L + kind * 15485863L;
+        dice = dice * 6364136223846793005L + 1442695040888963407L;
+        int roll = (int) ((dice >>> 33) % 10000), sum = 0;
+        int[] odds = tierOdds(number);
+        for (int tier = odds.length; tier >= 1; tier--) {
+            sum += odds[tier - 1];
+            if (roll < sum) return tier;
+        }
+        return NORMAL;
+    }
+
+    /** What a blow of hers counts for against a creature, in tenths: her weapon's blows, made harder by her level. */
+    private int dealt() {
+        // (Attack and the tree's attack make every blow harder; intelligence, those of tomes, staffs and wands.)
+        int thing = thingOf(with);
+        boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
+        float more = 1 + (perks.skills.stats[RunSkills.ATK] + perks.skills.effects[RunSkills.E_ATK_PCT] + (minded ? perks.skills.stats[RunSkills.INT] : 0)) / 100f;
+        return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
+    }
+
+    /** Blows that landed, for showing: where, how much, whether a great one, and how long ago. */
+    private final List<float[]> hits = new ArrayList<>();
+
+    List<float[]> hits() { return hits; }
+
+    // What she wears, felt
+
+    /** Energy, for her specials (what a held button does): how much she has at most, how fast it comes back, what a special costs, and what a blow gives. */
+    static final float ENERGY_MOST = 100, ENERGY_BACK = 12, SPECIAL_COST = 34, SPARK = 2;
+    /** Her shield bar: how long after a hurt before it fills again, and how long each piece takes. */
+    static final float WARD_WAIT = 3, WARD_FILL = 5;
+    /** How long ink-poison lasts on a creature, burning, and freezing; and how often the first two take a blow. */
+    static final float POISON_LASTS = 4, BURN_LASTS = 2, FREEZE_LASTS = 1.4f, POISON_EVERY = 1, BURN_EVERY = .5f;
+    /** What a blow of ink-poison, of burning, and of thorns is made with. */
+    static final int POISONED = -20, BURNT = -21, THORNY = -22;
+    /** HP the last hurt took. */
+    private int lastLost;
+
+    int lastLost() { return lastLost; }
+
+    private float energy = ENERGY_MOST, ward, wardWait, regenClock, critAge = 9, dodgeAge = 9, shrugAge = 9, regenAge = 9;
+    private int regens, dodges, shrugs, crits, wardHurts, poisons, burns, freezes, leeches, thorned, specialsUsed;
+    private float critX, critY;
+
+    /** How much of an effect what she wears gives her, with what is in her hands. */
+    int gear(int effect) { return perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect); }
+
+    /** What her skill tree adds to one of the effects gear has: its passives, and the actives called on just now. */
+    private int skill(int effect) {
+        int[] from = SKILL_OF[effect];
+        if (from == null) return 0;
+        int sum = 0;
+        for (int index = 0; index < from.length; index += 2) sum += (perks.skills.effects[from[index]] + activeEffect(from[index])) * from[index + 1];
+        return sum;
+    }
+
+    /** For each of gear's effects, which of the tree's effects add to it and how many times over. */
+    private static final int[][] SKILL_OF = new int[RunLoot.EFFECTS][];
+
+    static {
+        SKILL_OF[RunLoot.CRIT] = new int[]{RunSkills.E_CRIT, 1};
+        SKILL_OF[RunLoot.CRITX] = new int[]{RunSkills.E_CRITX, 1};
+        SKILL_OF[RunLoot.HASTE] = new int[]{RunSkills.E_HASTE, 1, RunSkills.E_COMBO, 5};
+        SKILL_OF[RunLoot.LEECH] = new int[]{RunSkills.E_LEECH, 1};
+        SKILL_OF[RunLoot.POISON] = new int[]{RunSkills.E_POISON, 1};
+        SKILL_OF[RunLoot.BURN] = new int[]{RunSkills.E_BURN, 1};
+        SKILL_OF[RunLoot.FREEZE] = new int[]{RunSkills.E_FREEZE, 1, RunSkills.E_STUN, 1};
+        SKILL_OF[RunLoot.REACH] = new int[]{RunSkills.E_REACH, 1};
+        SKILL_OF[RunLoot.AREA] = new int[]{RunSkills.E_AREA, 1};
+        SKILL_OF[RunLoot.PIERCE] = new int[]{RunSkills.E_PIERCE, 1, RunSkills.E_PROJECTILES, 1};
+        SKILL_OF[RunLoot.DODGE] = new int[]{RunSkills.E_DODGE, 1};
+        SKILL_OF[RunLoot.THORNS] = new int[]{RunSkills.E_THORNS, 1};
+        SKILL_OF[RunLoot.WARD] = new int[]{RunSkills.E_SHIELD, 1};
+        SKILL_OF[RunLoot.THRIFT] = new int[]{RunSkills.E_SPECIAL_COST, 1};
+        // (Life back: the tree counts HP a second, gear halves of a heart a minute; one HP a second is six halves a minute.)
+        SKILL_OF[RunLoot.REGEN] = new int[]{RunSkills.E_REGEN, 6};
+    }
+
+    // Active skills
+
+    /** Up to three active skills in her slots, how long each is called on for, and what it costs and how long until it can be called again. */
+    static final int SLOTS = 3;
+    static final float ACTIVE_LASTS = 8, ACTIVE_REST = 20, ACTIVE_COST = 30;
+    private final float[] activeLeft = new float[SLOTS], activeRest = new float[SLOTS];
+    /** Divine power: made of energy spent while an active that makes it is called on; full, her next blows are divine for a while. */
+    static final float DP_MOST = 100, DIVINE_LASTS = 6;
+    private float dp, divineLeft;
+    private int activesUsed, divines;
+
+    float dp() { return dp; }
+    float divineLeft() { return divineLeft; }
+    int activesUsed() { return activesUsed; }
+    int divines() { return divines; }
+    float activeLeft(int slot) { return activeLeft[slot]; }
+    float activeRest(int slot) { return activeRest[slot]; }
+
+    /** The active skill in a slot, or null. */
+    RunSkills.Notable active(int slot) { return slot < perks.slotted.size() ? perks.slotted.get(slot) : null; }
+
+    /** She calls on an active skill: if it is there, rested, and she has the energy. Whether she did. */
+    boolean callOn(int slot) {
+        RunSkills.Notable skill = active(slot);
+        if (skill == null || activeRest[slot] > 0 || energy < ACTIVE_COST || state != PLAYING) return false;
+        energy -= ACTIVE_COST;
+        noteSpent(ACTIVE_COST);
+        activeLeft[slot] = ACTIVE_LASTS;
+        activeRest[slot] = ACTIVE_REST;
+        activesUsed++;
+        return true;
+    }
+
+    /** What the actives called on just now add to one of the tree's effects. */
+    private int activeEffect(int effect) {
+        int sum = 0;
+        for (int slot = 0; slot < SLOTS; slot++) {
+            RunSkills.Notable skill = active(slot);
+            if (skill != null && activeLeft[slot] > 0) {
+                if (skill.effect == effect) sum += skill.figure;
+                if (skill.cost == effect) sum += skill.costFigure;
+            }
+        }
+        return sum;
+    }
+
+    /** Energy spent: while an active that makes divine power is called on, a part of it becomes divine power; full, it is let go. */
+    private void noteSpent(float spent) {
+        int making = perks.skills.effects[RunSkills.E_DP] + activeEffect(RunSkills.E_DP);
+        if (making <= 0) return;
+        dp = Math.min(DP_MOST, dp + spent * making / 100f);
+        if (dp >= DP_MOST) {
+            dp = 0;
+            divineLeft = DIVINE_LASTS;
+            divines++;
+        }
+    }
+
+    private void actives(float seconds) {
+        for (int slot = 0; slot < SLOTS; slot++) {
+            if (activeLeft[slot] > 0) activeLeft[slot] -= seconds;
+            if (activeRest[slot] > 0) activeRest[slot] -= seconds;
+        }
+        if (divineLeft > 0) divineLeft -= seconds;
+    }
+
+    float energy() { return energy; }
+    float specialCost() { return SPECIAL_COST * (1 - gear(RunLoot.THRIFT) / 100f); }
+    float ward() { return ward; }
+    int wardMost() { return gear(RunLoot.WARD) + (gear(RunLoot.WARD_HIT) > 0 && gear(RunLoot.WARD) == 0 ? 1 : 0); }
+    /** Counts that only go up: life come back; dodges; hurts shrugged off; great blows; hurts the shield bar took; poisonings, burnings and freezings begun; halves of a heart back from blows; blows of thorns; specials used. */
+    int regens() { return regens; }
+    int dodges() { return dodges; }
+    int shrugs() { return shrugs; }
+    int crits() { return crits; }
+    int wardHurts() { return wardHurts; }
+    int poisons() { return poisons; }
+    int burns() { return burns; }
+    int freezes() { return freezes; }
+    int leeches() { return leeches; }
+    int thorned() { return thorned; }
+    int specialsUsed() { return specialsUsed; }
+    /** How long since the last of these, for showing them; and where the last great blow landed. */
+    float critAge() { return critAge; }
+    float dodgeAge() { return dodgeAge; }
+    float shrugAge() { return shrugAge; }
+    float regenAge() { return regenAge; }
+    float critX() { return critX; }
+    float critY() { return critY; }
+
+    /** What she wears is changed in the middle of a land: it is felt at once, the shield bar no fuller than it now can be. */
+    void wear(RunLoot.Worn worn) {
+        perks.worn = worn;
+        ward = Math.min(ward, wardMost());
+    }
+
+    /** What she wears does, as time goes: energy and life come back, the shield bar fills, and what burns or is poisoned or frozen goes on being so. */
+    private void wearing(float seconds) {
+        energy = Math.min(ENERGY_MOST, energy + ENERGY_BACK * (1 + (gear(RunLoot.ENERGY) + perks.skills.stats[RunSkills.INT] + perks.skills.effects[RunSkills.E_ENERGY]) / 100f) * seconds);
+        critAge += seconds;
+        dodgeAge += seconds;
+        shrugAge += seconds;
+        regenAge += seconds;
+        int most = wardMost();
+        if (ward > most) ward = most;
+        if (wardWait > 0) wardWait -= seconds;
+        else if (ward < most) ward = Math.min(most, ward + seconds / WARD_FILL * (1 + gear(RunLoot.WARD_FAST) / 100f));
+        int regen = gear(RunLoot.REGEN);
+        if (regen > 0 && hp > 0 && hp < maxHp()) {
+            regenClock += seconds * regen / 60f;
+            if (regenClock >= 1) {
+                regenClock -= 1;
+                hp = Math.min(maxHp(), hp + HALF);
+                regens++;
+                regenAge = 0;
+            }
+        } else {
+            regenClock = 0;
+        }
+        for (int index = hits.size() - 1; index >= 0; index--) if ((hits.get(index)[4] += seconds) > .9f) hits.remove(index);
+        for (Foe foe : foes) {
+            foe.struck += seconds;
+            if (foe.flat || foe.away) {
+                foe.poisoned = foe.burning = foe.frozen = 0;
+                continue;
+            }
+            boolean waits = RunLevels.boss(foe.kind);
+            if (foe.frozen > 0) {
+                foe.frozen -= seconds;
+                foe.dazed = Math.max(foe.dazed, Math.min(.12f, Math.max(0, foe.frozen)));
+            }
+            // (Those who wait take a blow of it half as often.)
+            if (foe.poisoned > 0) {
+                foe.poisoned -= seconds;
+                if ((foe.poisonTick += seconds) >= POISON_EVERY * (waits ? 2 : 1)) {
+                    foe.poisonTick = 0;
+                    if (open(foe)) beat(foe, POISONED);
+                }
+            }
+            if (!foe.flat && foe.burning > 0) {
+                foe.burning -= seconds;
+                if ((foe.burnTick += seconds) >= BURN_EVERY * (waits ? 2 : 1)) {
+                    foe.burnTick = 0;
+                    if (open(foe)) beat(foe, BURNT);
+                }
+            }
+        }
+    }
+
+    /** A chance, in a hundred, comes off (a roll only when there is a chance, so that what drops is as it would be without it). */
+    private boolean chance(int inHundred) { return inHundred > 0 && lootRoll(100) < inHundred; }
+
+    /** What she wears does as a blow of hers lands on a creature: how many blows it counts for, harder for her gear and now and then a great blow. */
+    private int geared(Foe foe, int dealt, boolean waits) {
+        if (thingOf(with) == UNARMED) return dealt;
+        if (!waits) {
+            int power = gear(RunLoot.POWER);
+            if (power > 0) {
+                gearSurplus += dealt * power / 100f;
+                int more = (int) gearSurplus;
+                gearSurplus -= more;
+                dealt += more;
+            }
+        }
+        if (chance(gear(RunLoot.CRIT))) {
+            crits++;
+            critAge = 0;
+            critX = foe.x + foe.wide() / 2;
+            critY = foe.y;
+            dealt = waits ? dealt + 1 : Math.round(dealt * (2 + gear(RunLoot.CRITX) / 100f));
+        }
+        // And after it: energy; a piece of shield back, half a heart back, ink-poison, burning, freezing, by chance.
+        energy = Math.min(ENERGY_MOST, energy + SPARK + gear(RunLoot.SPARK));
+        if (ward < wardMost() && chance(gear(RunLoot.WARD_HIT))) ward = Math.min(wardMost(), (float) Math.floor(ward) + 1);
+        if (hp > 0 && hp < maxHp() && chance(gear(RunLoot.LEECH))) {
+            hp = Math.min(maxHp(), hp + HALF);
+            leeches++;
+            regenAge = 0;
+        }
+        if (chance(gear(RunLoot.POISON))) {
+            if (foe.poisoned <= 0) poisons++;
+            foe.poisoned = POISON_LASTS;
+        }
+        if (chance(gear(RunLoot.BURN))) {
+            if (foe.burning <= 0) burns++;
+            foe.burning = BURN_LASTS;
+        }
+        if (!waits && chance(gear(RunLoot.FREEZE))) {
+            if (foe.frozen <= 0) freezes++;
+            foe.frozen = FREEZE_LASTS;
+        }
+        return dealt;
+    }
+
+    private float gearSurplus;
+
+    /** Before a hurt lands: thorns on whatever is touching her; then she may dodge it, shrug it off, or her shield bar takes it. Whether one of those did. */
+    private boolean gearTakes() {
+        int thorns = gear(RunLoot.THORNS);
+        if (thorns > 0) {
+            for (Foe foe : new ArrayList<>(foes)) {
+                if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || RunLevels.boss(foe.kind) && !open(foe)) continue;
+                if (foe.x > x + WIDE + .6f || foe.x + foe.wide() < x - .6f || foe.y > y + TALL + .6f || foe.y + foe.tall() < y - .6f) continue;
+                for (int blow = 0; blow < thorns && !foe.flat; blow++) {
+                    beat(foe, THORNY);
+                    thorned++;
+                }
+            }
+        }
+        wardWait = WARD_WAIT;
+        if (chance(gear(RunLoot.DODGE))) {
+            dodges++;
+            dodgeAge = 0;
+            return true;
+        }
+        if (chance(gear(RunLoot.SHRUG))) {
+            shrugs++;
+            shrugAge = 0;
+            return true;
+        }
+        if (ward >= 1) {
+            ward -= 1;
+            wardHurts++;
+            return true;
+        }
+        return false;
+    }
+
+    /** How far a thing she fights with reaches, and how wide it bursts, and how many it goes through, with what she wears. */
+    private float reachGear(int kind, int level) { return RunArms.reach(kind, level) * (1 + gear(RunLoot.REACH) / 100f); }
+
+    private float areaGear(int kind, int level) { return RunArms.area(kind, level) * (1 + gear(RunLoot.AREA) / 100f); }
+
+    private int piercesGear(int kind, int level) { return RunArms.pierces(kind, level) + gear(RunLoot.PIERCE); }
 
     /** How many more blows a creature of this land takes, and how many more halves of a heart a hurt costs in it: by the land's level. */
     private int tough, bite;
@@ -827,6 +1191,22 @@ final class PlusRun {
      * spins. The line of the katana's last dash, and for how much longer it waits to be cut.
      */
     static final int KATANA = RunArms.KATANA, LANCE = RunArms.LANCE, CANNON = RunArms.CANNON, WHIP = RunArms.WHIP, INKBALL = 30;
+    static final int GREATSWORD = RunArms.GREATSWORD, STAFF = RunArms.STAFF, MACE = RunArms.MACE, HAMMER = RunArms.HAMMER, WAND = RunArms.WAND, SCYTHE = RunArms.SCYTHE;
+    /** What a blow of each of the six is made with. */
+    static final int GREAT = -13, MACED = -14, HAMMERED = -15, BOLTED = -16, SUMMONED = -17, REAPED = -18;
+    private int greats, summons, smashes, slams, bolts, reaps, whirls, quakesMade;
+    private float whirlLeft, reapLeft;
+    /** Where ink splashed as blows landed: the place of each, and how long since. */
+    private final List<float[]> splashes = new ArrayList<>();
+
+    List<float[]> splashes() { return splashes; }
+
+    int greats() { return greats; }
+    int summons() { return summons; }
+    int smashes() { return smashes; }
+    int slams() { return slams; }
+    int bolts() { return bolts; }
+    int reaps() { return reaps; }
     static final int CUT = -9, LANCED = -10, SHELLED = -11, WHIPPED = -12;
     private int cuts, chain, dashes, airCuts, thrusts, jets, shells, lashes, spins;
     private float sinceCut = 9, dashFrom, dashTo, dashY, dashLeft, spinLeft;
@@ -892,6 +1272,19 @@ final class PlusRun {
     /** Whether something in her backpack can be taken in hand: it is there, and it is not empty. */
     boolean usable(int kind) {
         return kind >= 0 && kind < RunArms.COUNT && (owned >> kind & 1) != 0 && (kind != GUN || rounds > 0) && (kind != BOOK || books > 0);
+    }
+
+    /** A weapon found is taken in hand in the middle of a land: into her backpack as its kind, counting for more, and in her hands. */
+    void hold(int code) {
+        int kind = RunArms.kindOf(code);
+        perks.item = code;
+        owned |= 1 << kind;
+        if (state == PLAYING && disarmed <= 0 && !ranging) {
+            previous = weapon;
+            weapon = kind;
+            heldFor = 0;
+            heavied = false;
+        }
     }
 
     /** She takes something else out of her backpack: at once, whatever she is doing. Returns whether she did. */
@@ -1000,6 +1393,8 @@ final class PlusRun {
         float high;
         Foe last;
         boolean wipes, spent;
+        /** A wand's bolt: its element. */
+        int element = -1;
 
         Shot(int kind) {
             this.kind = kind;
@@ -1072,6 +1467,11 @@ final class PlusRun {
         boolean away, unseen, spawned;
         /** Whether what it drops has dropped. */
         boolean dropped;
+        /** For how much longer it is ink-poisoned, burning, frozen; and how long since it last took a blow of poison or of fire. */
+        float poisoned, burning, frozen, poisonTick, burnTick;
+        /** Its colour of toughness (0 as it is drawn, then red, purple, gold, black ink); and how long since a blow last landed on it. */
+        int tier;
+        float struck = 9;
 
         Foe(int kind) {
             this.kind = kind;
@@ -1113,6 +1513,56 @@ final class PlusRun {
     }
 
     private final List<Drop> scattered = new ArrayList<>();
+    /** How much room a drop takes: half its width, and its height (its place is the middle of its bottom). */
+    static final float DROP_HALF = .3f, DROP_TALL = .6f;
+    /** The furthest a drop moves before it is looked at again: well under its height, so nothing is ever passed through. */
+    private static final float DROP_STEP = .2f;
+
+    /** Whether a drop with its bottom middle at a place would be inside anything solid. */
+    boolean dropStuck(float atX, float atY) {
+        int left = (int) Math.floor(atX - DROP_HALF), right = (int) Math.floor(atX + DROP_HALF - .001f);
+        int top = (int) Math.floor(atY - DROP_TALL + .001f), bottom = (int) Math.floor(atY - .001f);
+        for (int column = left; column <= right; column++) for (int row = top; row <= bottom; row++) if (solid(at(column, row))) return true;
+        return false;
+    }
+
+    /** Whether there is something to rest on along the top of a row, under any part of a drop at a place across. */
+    private boolean dropFloor(float atX, int row) {
+        int left = (int) Math.floor(atX - DROP_HALF), right = (int) Math.floor(atX + DROP_HALF - .001f);
+        for (int column = left; column <= right; column++) {
+            char square = at(column, row);
+            if (solid(square) || square == RunLevels.THIN || square == RunLevels.FAKE && at(column, row - 1) != RunLevels.FAKE) return true;
+        }
+        return false;
+    }
+
+    /** A drop begun inside something solid, or left in it, is put in the nearest open place: the middle of its own column if that is free, else straight up. */
+    private void unstick(Drop drop) {
+        if (!dropStuck(drop.x, drop.y)) return;
+        float middle = (float) Math.floor(drop.x) + .5f;
+        if (!dropStuck(middle, drop.y)) {
+            drop.x = middle;
+            return;
+        }
+        for (int up = 0; up <= level.land.length; up++) {
+            float y = (float) Math.floor(drop.y) - up;
+            if (!dropStuck(drop.x, y)) {
+                drop.y = y;
+                return;
+            }
+            if (!dropStuck(middle, y)) {
+                drop.x = middle;
+                drop.y = y;
+                return;
+            }
+        }
+    }
+
+    /** Something has fallen: it is let loose where it is, out of anything solid. */
+    private void loose(Drop drop) {
+        unstick(drop);
+        scattered.add(drop);
+    }
     /** What she has picked up of what fell: pluses, and the things to keep, in order; and how much experience the falls gave her. */
     private int dropPluses, xp;
     private final List<Integer> found = new ArrayList<>();
@@ -1126,9 +1576,9 @@ final class PlusRun {
     /** One of each rarity of thing to keep, and a handful of pluses, thrown out round a place: for looking at them. */
     void scatterAll(float atX, float atY) {
         for (int rarity = RunLoot.WHITE; rarity <= RunLoot.ROSE; rarity++) {
-            scattered.add(new Drop(atX + 1.4f * rarity + 1, atY, 0, -5, RunLoot.code(rarity % 3, Math.min(11, level.chapter), rarity * 3, rarity)));
+            loose(new Drop(atX + 1.4f * rarity + 1, atY, 0, -5, RunLoot.code(rarity % 3, Math.min(11, level.chapter), rarity * 3, rarity)));
         }
-        for (int coin = 0; coin < 8; coin++) scattered.add(new Drop(atX + 3 + coin * .3f, atY - 1, (coin - 4) * .8f, -7, 0));
+        for (int coin = 0; coin < 8; coin++) loose(new Drop(atX + 3 + coin * .3f, atY - 1, (coin - 4) * .8f, -7, 0));
     }
 
     /** What she keeps that has to do with this land: her level among it, which grows while she plays. */
@@ -1154,23 +1604,26 @@ final class PlusRun {
         if (foe.kind == RunLevels.TARGET) return;
         boolean boss = RunLevels.boss(foe.kind) && !foe.spawned, hard = level.chapter >= RunLevels.CHAPTERS * 2;
         int landLevel = RunLevels.levelOf(level.number);
-        xp += RunLoot.xpFor(boss, tough, level.number, perks.level);
+        xp += RunLoot.xpFor(boss, tough, level.number, perks.level) * TIER_XP[foe.tier];
         float middle = foe.x + foe.wide() / 2, top = foe.y + foe.tall() * .4f;
-        int coins = RunLoot.plusesFor(boss, tough);
+        int coins = RunLoot.plusesFor(boss, tough), more = gear(RunLoot.PLUSES);
+        if (more > 0) coins += (coins * more + lootRoll(100)) / 100;
         for (int coin = 0; coin < coins; coin++) {
             float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
-            scattered.add(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
+            loose(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
         }
-        if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel)) {
+        // (Gold and black ink drop as the hardest do.)
+        hard |= foe.tier >= GOLD_TIER;
+        if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel) * TIER_DROPS[foe.tier]) {
             int rarity = RunLoot.rarityOf(boss ? RunLoot.BOSS : hard ? RunLoot.HARD : RunLoot.CREATURE, lootRoll(10000));
-            int code = RunLoot.dropped(Math.min(RunLoot.THEMES.length - 1, level.chapter), rarity, lootRoll(10000), lootRoll(10000));
-            scattered.add(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, code));
+            int code = RunLoot.dropped(boss ? RunLoot.WAITS : hard ? RunLoot.HARDEST : RunLoot.ORDINARY, Math.min(RunLoot.THEMES.length - 1, level.chapter), rarity, lootRoll(10000), lootRoll(10000));
+            loose(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, code));
         }
     }
 
     /** What lies about falls, bounces and comes to rest; pluses near her come to her; things to keep are picked up; what has lain long enough is gone. */
     private void scatter(float seconds) {
-        float reach = Math.max(1.4f, Math.max(perks.reach, magnet > 0 ? MAGNET_REACH : 0)), herX = x + WIDE / 2, herY = y + TALL / 2;
+        float drawn = gear(RunLoot.MAGNET) / 10f, reach = Math.max(1.4f + drawn, Math.max(perks.reach + drawn, magnet > 0 ? MAGNET_REACH : 0)), herX = x + WIDE / 2, herY = y + TALL / 2;
         for (int index = scattered.size() - 1; index >= 0; index--) {
             Drop drop = scattered.get(index);
             drop.age += seconds;
@@ -1197,28 +1650,53 @@ final class PlusRun {
                 found.add(drop.code);
                 continue;
             }
+            // What it rests on can go (a ledge crumbles, a bridge is let down): then it falls again.
+            if (drop.resting && (Math.abs(drop.y - Math.round(drop.y)) > .001f || !dropFloor(drop.x, Math.round(drop.y)))) drop.resting = false;
             if (drop.resting) continue;
+            // (Drawn towards her and let go, it may have been drawn into something.)
+            unstick(drop);
             drop.down = Math.min(16, drop.down + GRAVITY * .85f * seconds);
-            float nextX = drop.x + drop.across * seconds;
-            if (PlusRun.solid(at((int) Math.floor(nextX), (int) Math.floor(drop.y - .1f)))) drop.across = -drop.across * .5f;
-            else drop.x = nextX;
-            float nextY = drop.y + drop.down * seconds;
-            int row = (int) Math.floor(nextY), column = (int) Math.floor(drop.x);
-            char under = at(column, row);
-            boolean lands = drop.down > 0 && (PlusRun.solid(under) || under == RunLevels.THIN || under == RunLevels.LEDGE) && drop.y <= row + .05f;
-            if (lands) {
-                drop.y = row;
-                drop.down = -drop.down * .42f;
-                drop.across *= .55f;
-                if (Math.abs(drop.down) < 1.6f) {
-                    drop.down = 0;
-                    drop.resting = true;
-                }
+            move(drop, seconds);
+            // (Below the land, it is gone.)
+            if (drop.y > level.land.length + 2) scattered.remove(index);
+        }
+    }
+
+    /**
+     * A drop moves for a while, in steps short enough that it never passes into or through anything: it bounces off what it flies into,
+     * and lands on the top of whatever is under any part of it (a ledge, a hatch, the ground of a cave below a pit), bouncing a little less each time.
+     */
+    private void move(Drop drop, float seconds) {
+        float across = drop.across * seconds, down = drop.down * seconds;
+        int steps = Math.max(1, (int) Math.ceil(Math.max(Math.abs(across), Math.abs(down)) / DROP_STEP));
+        for (int step = 0; step < steps; step++) {
+            float nextX = drop.x + across / steps;
+            if (dropStuck(nextX, drop.y)) {
+                drop.across = -drop.across * .5f;
+                across = -across * .5f;
             } else {
-                drop.y = nextY;
-                // (Below the land, it is gone.)
-                if (drop.y > level.land.length + 2) scattered.remove(index);
+                drop.x = nextX;
             }
+            float nextY = drop.y + down / steps;
+            if (down > 0) {
+                int row = (int) Math.floor(nextY);
+                if (drop.y <= row && dropFloor(drop.x, row)) {
+                    drop.y = row;
+                    drop.down = -drop.down * .42f;
+                    drop.across *= .55f;
+                    if (Math.abs(drop.down) < 1.6f) {
+                        drop.down = 0;
+                        drop.across = 0;
+                        drop.resting = true;
+                    }
+                    return;
+                }
+            } else if (dropStuck(drop.x, nextY)) {
+                // Its top meets something: it stops rising and falls.
+                drop.down = 0;
+                return;
+            }
+            drop.y = nextY;
         }
     }
 
@@ -1301,7 +1779,15 @@ final class PlusRun {
     private boolean sprung;
     private float sinceGround = 1, sinceJump = 1, safe;
     /** Her hearts, counted in halves; her lives; and how many of those she has lost here. */
-    private int halves = HEARTS * 2, lives = LIVES, livesLost, state = PLAYING;
+    private int hp = HEARTS * RunSkills.HEART, lives = LIVES, livesLost, state = PLAYING;
+    /** HP in half a heart. */
+    static final int HALF = RunSkills.HEART / 2;
+
+    /** The most HP she can have: her hearts, and what her skill tree gives. */
+    int maxHp() {
+        int base = perks.hearts * RunSkills.HEART + perks.skills.stats[RunSkills.HP];
+        return Math.max(RunSkills.HEART / 2, base + base * perks.skills.effects[RunSkills.E_HP_PCT] / 100);
+    }
     /** The last firm ground she stood on, where a fall puts her back; how much longer she flinches from a hurt, and which way it sent her. */
     private float firmX, firmY, flinch, knock;
     private float sinceCast = 1, sinceBrace = 1, braceX, braceY;
@@ -1322,7 +1808,8 @@ final class PlusRun {
         this.perks = perks;
         tough = RunLevels.toughOf(level.number) + perks.harder;
         bite = RunLevels.biteOf(level.number) + perks.harder + RunMarket.bites(perks.black);
-        halves = perks.hearts * 2;
+        hp = maxHp();
+        ward = wardMost();
         lives = perks.lives;
         // What is in her backpack is with her from the start, and what she begins a land with is in her hands.
         for (int kind = 0; kind < PETS; kind++) if ((perks.petWith >> kind & 1) != 0) join(kind, true);
@@ -1344,7 +1831,10 @@ final class PlusRun {
             foe.ground = spec[2] + 1 - foe.tall();
             foe.y = foe.ground;
             foe.home = foe.x;
-            foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black)) : (spec.length > 3 ? spec[3] : 1) + tougher(spec[0]);
+            foe.tier = waits || !level.tiered ? NORMAL : tierOf(level.number, spec[0], spec[1], spec[2]);
+            foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black))
+                    : healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW;
+            foe.most = foe.left;
             foe.crowd = RunLevels.crowd(spec);
             if (spec[0] == RunLevels.WORD) foe.y = foe.ground - WORD_HANGS;
             // Each divide starts its hop at a different moment.
@@ -1384,6 +1874,9 @@ final class PlusRun {
         surplus = other.surplus;
         xp = other.xp;
         dropPluses = other.dropPluses;
+        energy = other.energy;
+        ward = other.ward;
+        wardWait = other.wardWait;
         found.addAll(other.found);
         for (Drop drop : other.scattered) scattered.add(new Drop(drop));
         rush = other.rush;
@@ -1501,6 +1994,10 @@ final class PlusRun {
             foe.flat = from.flat;
             foe.clock = from.clock;
             foe.dazed = from.dazed;
+        foe.poisoned = from.poisoned;
+        foe.tier = from.tier;
+        foe.burning = from.burning;
+        foe.frozen = from.frozen;
             foe.left = from.left;
             foe.wait = from.wait;
             foe.home = from.home;
@@ -1586,7 +2083,7 @@ final class PlusRun {
         sinceGround = other.sinceGround;
         sinceJump = other.sinceJump;
         safe = other.safe;
-        halves = other.halves;
+        hp = other.hp;
         lives = other.lives;
         livesLost = other.livesLost;
         firmX = other.firmX;
@@ -1706,7 +2203,7 @@ final class PlusRun {
     int refusal(int kind, int cost) {
         if (stallSold(kind) >= stock(kind)) return SOLD_OUT;
         if (kind > FORM && (coloured() || cursed > 0)) return WORN;
-        if (kind == BREAD && halves >= perks.hearts * 2 || kind == SHIELD && shield || kind == ICE && rush > 0) return NEEDLESS;
+        if (kind == BREAD && hp >= maxHp() || kind == SHIELD && shield || kind == ICE && rush > 0) return NEEDLESS;
         return purse() < cost ? POOR : SOLD;
     }
 
@@ -1953,7 +2450,8 @@ final class PlusRun {
             woken++;
         } else {
             // An outsized one is nearly twice the size, and takes six blows.
-            foe.left = (giant ? 6 : 1) + tougher(kind);
+            foe.left = healthOf(kind) * (giant ? 6 : 1) + tougher(kind) * BLOW;
+            foe.most = foe.left;
             if (giant) foe.size = 1.9f;
             foe.dazed = .5f;
         }
@@ -2104,7 +2602,8 @@ final class PlusRun {
                 dice = dice * 1103515245 + 12345;
                 Foe foe = new Foe(level.chapter >= 2 && (dice >>> 12) % 3 == 0 ? RunLevels.SLIME : RunLevels.MINUS);
                 foe.spawned = true;
-                foe.left = 1;
+                foe.left = healthOf(foe.kind);
+                foe.most = foe.left;
                 foe.x = one[3] + 3 + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 6);
                 // Not on top of her.
                 if (Math.abs(foe.x - x) < 2.5f) foe.x = x + (x < (one[3] + one[4]) / 2f ? 4 : -4);
@@ -2329,7 +2828,7 @@ final class PlusRun {
      * jump in the air from her next jump.
      */
     void grant(Perks now) {
-        if (now.hearts > perks.hearts) halves = Math.min(now.hearts * 2, halves + (now.hearts - perks.hearts) * 2);
+        if (now.hearts > perks.hearts) hp = Math.min(now.hearts * RunSkills.HEART + perks.skills.stats[RunSkills.HP], hp + (now.hearts - perks.hearts) * RunSkills.HEART);
         if (now.lives > perks.lives) lives += now.lives - perks.lives;
         perks.hearts = now.hearts;
         perks.lives = now.lives;
@@ -2366,7 +2865,7 @@ final class PlusRun {
         perks.defence = now.defence;
         perks.stomp = now.stomp;
         perks.mercy = now.mercy;
-        halves = Math.max(1, Math.min(halves, perks.hearts * 2));
+        hp = Math.max(HALF, Math.min(hp, maxHp()));
     }
 
     /** Whether she has a second jump in the air to her name. */
@@ -2686,8 +3185,9 @@ final class PlusRun {
     /** Whether she has just been knocked back, and cannot be again for a moment. */
     boolean safe() { return safe > 0; }
     /** Her hearts: how many she has any of, and the same counted in halves; her lives; and how many of those she has lost in this land. */
-    int hearts() { return (halves + 1) / 2; }
-    int halves() { return halves; }
+    int hearts() { return (hp + RunSkills.HEART - 1) / RunSkills.HEART; }
+    int halves() { return (hp + HALF - 1) / HALF; }
+    int hp() { return hp; }
     int lives() { return lives; }
     int livesLost() { return livesLost; }
     /** Whether she is flinching from a hurt just now. */
@@ -2748,7 +3248,7 @@ final class PlusRun {
     }
 
     /** Takes a heart from her, and never her last: for checking what gives one back. */
-    void wound() { halves = Math.max(1, halves - 2); }
+    void wound() { hp = Math.max(HALF, hp - RunSkills.HEART); }
 
     /** Puts something in her hands: for checking the rules, and for looking at them. */
     void arm(int with) {
@@ -2802,6 +3302,8 @@ final class PlusRun {
             }
         }
         scatter(seconds);
+        wearing(seconds);
+        actives(seconds);
         // The moment of the black ribbon: nothing else moves.
         if (moment > 0) {
             momentous(seconds);
@@ -2906,7 +3408,7 @@ final class PlusRun {
             sinceGround = 1;
             onGround = false;
             jumps++;
-        } else if (pressed && !onGround && airJumps < (perks.wings ? 1 : 0) + (named(STEAMS) ? 1 : 0)) {
+        } else if (pressed && !onGround && airJumps < (perks.wings ? 1 : 0) + (named(STEAMS) ? 1 : 0) + gear(RunLoot.AIR)) {
             // With her wings, one more jump in the air; and in steam, which lifts her, another.
             // With her wings, one more jump in the air.
             speedDown = -LEAP * .88f;
@@ -2962,7 +3464,7 @@ final class PlusRun {
 
         for (int index = pluses.size() - 1; index >= 0; index--) {
             int[] plus = pluses.get(index);
-            float far = Math.max(perks.reach, magnet > 0 ? MAGNET_REACH : 0);
+            float far = Math.max(perks.reach + gear(RunLoot.MAGNET) / 10f, magnet > 0 ? MAGNET_REACH : 0);
             boolean drawn = far > 0 && Math.hypot(plus[0] + .5f - x - WIDE / 2, plus[1] + .5f - y - TALL / 2) < far;
             if (drawn || x < plus[0] + .8f && x + WIDE > plus[0] + .2f && y < plus[1] + .8f && y + TALL > plus[1] + .2f) {
                 pluses.remove(index);
@@ -3047,9 +3549,9 @@ final class PlusRun {
             }
             // A shrine takes a heart from whoever has more than one, and gives its ribbon; from anyone else it takes nothing and gives nothing.
             if (item[0] == SHRINE) {
-                if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f && halves > 2 && cursed <= 0) {
+                if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f && hp > RunSkills.HEART && cursed <= 0) {
                     items.remove(index);
-                    halves -= 2;
+                    hp -= RunSkills.HEART;
                     shrines++;
                     tookX = item[1] + .5f;
                     tookY = item[2] + .5f;
@@ -3136,14 +3638,17 @@ final class PlusRun {
         sinceBrace += seconds;
         if (mastered) shine(seconds, strike);
         {
-            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= RunArms.rest(weapon, perks.levels[weapon]);
+            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= restOf(weapon) * (1 - gear(RunLoot.HASTE) / 100f);
             if (used) use();
             // Held, a tablet-book opens its panel and a ring of keys goes out in a fan: once for each hold. (With the white that is truly
             // hers the hold is her beam's.)
             if (weapon != UNARMED && RunArms.heavy(weapon) && strike && !mastered) {
                 heldFor += seconds;
-                if (heldFor >= RunArms.CHARGE && !heavied) {
+                if (heldFor >= RunArms.CHARGE && !heavied && energy >= specialCost()) {
                     heavied = true;
+                    energy -= specialCost();
+                    noteSpent(specialCost());
+                    specialsUsed++;
                     heavy();
                 }
             } else {
@@ -3228,14 +3733,14 @@ final class PlusRun {
                 airJumps = 0;
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
                 offIt = .3f;
-                if (plunged && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
+                if (plunged && !RunLevels.boss(foe.kind) && foe.left > BLOW) foe.left -= BLOW;
                 beat(foe, plunged ? PLUNGED : LANDED);
                 // One sign after another without touching the ground: each is worth one plus more than the last.
                 if (foe.flat && ++combo > 1) bonus += Math.min(4, combo - 1);
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
                 knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
-                if (hurt(false)) return;
+                if (hurt(false, 2 + TIER_BITE[foe.tier])) return;
             }
         }
         if (y > bottomAt((int) Math.floor(x + WIDE / 2)) + 1) {
@@ -3617,8 +4122,8 @@ final class PlusRun {
 
     /** A heart back, if she is short of one: a whole one, or as much of one as she is short of. */
     private boolean heal() {
-        if (halves >= perks.hearts * 2) return false;
-        halves = Math.min(perks.hearts * 2, halves + 2);
+        if (hp >= maxHp()) return false;
+        hp = Math.min(maxHp(), hp + RunSkills.HEART);
         return true;
     }
 
@@ -3674,6 +4179,36 @@ final class PlusRun {
         with = by;
         beat(foe);
         with = PLAIN;
+        // Ink splashes where it lands (no more than a few at once).
+        if (splashes.size() < 12) splashes.add(new float[]{foe.x + foe.wide() / 2, foe.y + foe.tall() * .5f, 0});
+        // A mace's smash, and a hammer's blow worked on to the last step, leave what they hit reeling (not those who wait).
+        if (!foe.flat && !RunLevels.boss(foe.kind) && (by == MACED || by == HAMMERED && perks.levels[HAMMER] >= 3)) {
+            foe.dazed = Math.max(foe.dazed, perks.levels[MACE] >= 1 || by == HAMMERED ? .9f : .6f);
+        }
+    }
+
+    /** A wand's bolt has hit something: what its element does. */
+    private void elemental(Shot shot, Foe hit) {
+        if (shot.element == RunArms.FIRE) fires.add(new float[]{shot.x, shot.y, 1.1f, 1.6f, .45f});
+        else if (shot.element == RunArms.ICE && !hit.flat && !RunLevels.boss(hit.kind)) hit.dazed = Math.max(hit.dazed, 1.1f);
+        else if (shot.element == RunArms.INKY) blast(shot.x, shot.y, 1.2f, BOLTED);
+        else if (shot.element == RunArms.LIGHTNING && shot.chain > 0) {
+            Foe next = null;
+            float best = 5 * 5;
+            for (Foe foe : foes) {
+                if (foe == hit || foe.flat || absent(foe) || foe.kind == RunLevels.TARGET) continue;
+                float across = foe.x + foe.wide() / 2 - shot.x, down = foe.y + foe.tall() / 2 - shot.y, far = across * across + down * down;
+                if (far < best) {
+                    best = far;
+                    next = foe;
+                }
+            }
+            if (next == null) return;
+            Shot jump = sendAt(next, BOLTED, WAND, shot.x, shot.y, RunArms.speed(WAND) * 1.4f, 6, 1);
+            jump.element = RunArms.LIGHTNING;
+            jump.chain = shot.chain - 1;
+            jump.last = hit;
+        }
     }
 
     /** What the blow being dealt is made with: nothing in particular; something nothing stands against; or the kind of thing thrown. */
@@ -3698,14 +4233,16 @@ final class PlusRun {
         if (with == LANDED || with == PLUNGED) return 1 + perks.stomp + (with == PLUNGED && weapon == KATANA ? RunArms.blows(KATANA, perks.levels[KATANA]) : 0);
         int thing = thingOf(with);
         // (The third cut of three in a row, and the cut that follows a dash, count for one more.)
-        return thing == UNARMED ? 1 : RunArms.blows(thing, perks.levels[thing]) + (with == CUT && (chain == 3 || dashCut) ? 1 : 0);
+        int found = perks.item != 0 && thing == RunArms.kindOf(perks.item) ? RunArms.itemBlows(perks.item) : 0;
+        return thing == UNARMED ? 1 : Math.max(1, RunArms.blows(thing, perks.levels[thing]) + found) + (with == CUT && (chain == 3 || dashCut) ? 1 : 0);
     }
 
     /** The thing a blow was dealt with, from what the blow is made with; or nothing. */
     private static int thingOf(int by) {
         return by == PLAIN ? BRUSH : by == SWORDED ? SWORD : by == BLASTED || by == BOOK ? BOOK : by == PEN || by == KNIFE || by == GUN ? by
                 : by == PAGE || by == PANELLED ? TABLET : by == THROWN_KEY ? KEYS : by == CUT ? KATANA : by == LANCED ? LANCE : by == SHELLED ? CANNON
-                : by == WHIPPED ? WHIP : UNARMED;
+                : by == WHIPPED ? WHIP : by == GREAT ? GREATSWORD : by == SUMMONED ? STAFF : by == MACED ? MACE : by == HAMMERED ? HAMMER : by == BOLTED ? WAND
+                : by == REAPED ? SCYTHE : UNARMED;
     }
 
     private boolean dashCut;
@@ -3734,20 +4271,23 @@ final class PlusRun {
         foeY = foe.y + foe.tall();
         if (waits) blows++;
         // One with a key in it: the next blow that is not a key counts twice.
-        if (!waits && foe.unlocked > 0 && with != THROWN_KEY && foe.left > 1) {
-            foe.left--;
+        if (!waits && foe.unlocked > 0 && with != THROWN_KEY && foe.left > BLOW) {
+            foe.left -= BLOW;
             foe.unlocked = 0;
             doubled++;
         }
         // Against a creature a blow counts for as many as the smith has made what dealt it count for; against those who wait, for one.
         // (And her level makes a part of a blow more, gathered up into whole ones.)
-        int levelled = 0;
-        if (!waits) {
-            surplus += RunLoot.power(perks.level) - 1;
-            levelled = (int) surplus;
-            surplus -= levelled;
+        int dealt = geared(foe, waits ? 1 : dealt(), waits);
+        foe.struck = 0;
+        if (hits.size() < 24) hits.add(new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0});
+        // A creature is knocked back a little, away from her, where there is room.
+        if (!waits && foe.left > dealt && !RunLevels.flier(foe.kind)) {
+            float push = (foe.x + foe.wide() / 2 < x + WIDE / 2 ? -1 : 1) * .22f, to = foe.x + push;
+            int row = (int) Math.floor(foe.y + foe.tall() - .05f);
+            if (!solid(at((int) Math.floor(push < 0 ? to : to + foe.wide()), row))) foe.x = to;
         }
-        if ((foe.left -= waits ? 1 : power() + levelled) <= 0) {
+        if ((foe.left -= dealt) <= 0) {
             foe.left = 0;
             foe.flat = true;
             foe.y = foe.ground;
@@ -3923,7 +4463,8 @@ final class PlusRun {
         if (living >= 3) return;
         Foe foe = new Foe(kind);
         foe.spawned = true;
-        foe.left = 1;
+        foe.left = healthOf(kind);
+        foe.most = foe.left;
         float lo = level.arena >= 0 ? level.arena + 1.3f : 0, hi = (level.arena >= 0 ? level.gate - .3f : columns) - foe.wide();
         foe.x = Math.max(lo, Math.min(hi, middle - foe.wide() / 2));
         foe.ground = floor - foe.tall();
@@ -3934,6 +4475,181 @@ final class PlusRun {
         born.add(foe);
     }
 
+    /** How long the thing in her hands rests between uses: less for a weapon found of a better rarity; an ink gun that is a machine gun, far less. */
+    private float restOf(int kind) {
+        float rest = RunArms.rest(kind, perks.levels[kind]);
+        if (perks.item == 0 || RunArms.kindOf(perks.item) != kind) return rest;
+        return rest * RunArms.itemRest(perks.item) * (kind == GUN && RunArms.machine(perks.item) ? .4f : 1);
+    }
+
+    /** How far the thing in her hands reaches: further for a weapon found of a better rarity. */
+    private float reachOf(int kind) {
+        float reach = reachGear(kind, perks.levels[kind]) + (boost > 0 ? RunArms.BOOST_SWING : 0);
+        return perks.item != 0 && RunArms.kindOf(perks.item) == kind ? reach * RunArms.itemReach(perks.item) : reach;
+    }
+
+    /** The creatures nearest her, up to so many, within a reach: what spirits and bolts go after. */
+    private List<Foe> nearest(int count, float within) {
+        List<Foe> near = new ArrayList<>();
+        for (Foe foe : foes) if (!foe.flat && !absent(foe) && foe.kind != RunLevels.TARGET && Math.hypot(foe.x + foe.wide() / 2 - x - WIDE / 2, foe.y + foe.tall() / 2 - y - TALL / 2) < within) near.add(foe);
+        near.sort((one, other) -> Float.compare(Math.abs(one.x - x) + Math.abs(one.y - y), Math.abs(other.x - x) + Math.abs(other.y - y)));
+        return near.size() > count ? near.subList(0, count) : near;
+    }
+
+    /** A spirit or a bolt sent at a creature, or straight ahead if there is none. */
+    private Shot sendAt(Foe at, int by, int of, float fromX, float fromY, float speed, float reach, float way) {
+        float across = way, down = 0;
+        if (at != null) {
+            float toX = at.x + at.wide() / 2 - fromX, toY = at.y + at.tall() / 2 - fromY, far = Math.max(.3f, (float) Math.hypot(toX, toY));
+            across = toX / far;
+            down = toY / far;
+        }
+        Shot shot = shoot(SLASH, true, fromX, fromY, across * speed, down * speed, reach / speed);
+        shot.by = by;
+        shot.of = of;
+        shot.high = .4f;
+        return shot;
+    }
+
+    /** The six found in the lands, used: what a tap does with each. Whether it was one of them. */
+    private boolean useFound(int level, float way, float fromX, float fromY) {
+        if (weapon == GREATSWORD) {
+            // A great swing: what is in front of her and well over her head; worked on, a wave ahead too.
+            greats++;
+            float reach = reachOf(GREATSWORD), from = facingLeft ? x - reach : x + WIDE;
+            sweep(GREAT, from, from + reach, y + TALL - areaGear(GREATSWORD, level), y + TALL);
+            swing = SWING * 1.5f;
+            swungWith = GREATSWORD;
+            if (level >= 3) wave(SWORD, 2, way, fromX, fromY);
+        } else if (weapon == STAFF) {
+            // Spirits, at the nearest creatures.
+            summons++;
+            List<Foe> near = nearest(level >= 1 ? 3 : 2, reachOf(STAFF));
+            int count = level >= 1 ? 3 : 2;
+            for (int spirit = 0; spirit < count; spirit++) {
+                Shot sent = sendAt(near.isEmpty() ? null : near.get(spirit % near.size()), SUMMONED, STAFF, fromX, fromY - .3f - spirit * .25f, RunArms.speed(STAFF), reachOf(STAFF), way);
+                sent.pierce = level >= 2 ? 99 : 0;
+            }
+        } else if (weapon == MACE) {
+            // A smash at arm's length: what it hits reels.
+            smashes++;
+            float reach = reachOf(MACE), from = facingLeft ? x - reach : x + WIDE;
+            sweep(MACED, from, from + reach, y + TALL - areaGear(MACE, level), y + TALL);
+            swing = SWING;
+            swungWith = MACE;
+        } else if (weapon == HAMMER) {
+            // Slammed down: what is in front of her, and a shockwave along the ground both ways.
+            slams++;
+            float reach = reachOf(HAMMER), from = facingLeft ? x - reach : x + WIDE, quake = level >= 1 ? 3.4f : 2.6f;
+            sweep(HAMMERED, from, from + reach, y + TALL - 1.4f, y + TALL);
+            sweep(HAMMERED, x - quake, x + WIDE + quake, y + TALL - .7f, y + TALL + .2f);
+            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, 0, 0});
+            quakesMade++;
+            swing = SWING;
+            swungWith = HAMMER;
+        } else if (weapon == WAND) {
+            // A bolt of its element, at the nearest thing in front of her, or straight ahead.
+            bolts++;
+            int element = perks.item != 0 && RunArms.kindOf(perks.item) == WAND ? RunArms.element(perks.item) : RunArms.ICE;
+            List<Foe> near = nearest(2, reachOf(WAND));
+            for (int which = 0; which < (level >= 2 ? 2 : 1); which++) {
+                Foe at = null;
+                for (Foe foe : near) if (at == null && (foe.x > x) == !facingLeft) at = foe;
+                Shot bolt = sendAt(at, BOLTED, WAND, fromX, fromY - which * .4f, RunArms.speed(WAND), reachOf(WAND), way);
+                bolt.element = element;
+                bolt.chain = element == RunArms.LIGHTNING ? 2 : 0;
+                bolt.pierce = level >= 3 ? 99 : 0;
+            }
+        } else if (weapon == SCYTHE) {
+            // A wide arc in front of her, and behind her too.
+            reaps++;
+            float reach = reachOf(SCYTHE), from = facingLeft ? x - reach : x + WIDE, behind = facingLeft ? x + WIDE : x - reach * .55f;
+            float top = y + TALL - areaGear(SCYTHE, level) - (level >= 1 ? .3f : 0);
+            sweep(REAPED, from, from + reach, top, y + TALL);
+            sweep(REAPED, behind, behind + reach * .55f, top, y + TALL);
+            swing = SWING * 1.3f;
+            swungWith = SCYTHE;
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    /** The six found in the lands, held: the heavy thing of each. Whether it was one of them. */
+    private boolean heavyFound(int level, float way) {
+        if (weapon == GREATSWORD) {
+            // A spinning slam: both sides of her, and the ground cracks.
+            greats++;
+            float wide = 2.5f + (level >= 2 ? .8f : 0);
+            sweep(GREAT, x - wide, x + WIDE + wide, y + TALL - 2, y + TALL + .2f);
+            booms.add(new float[]{x + WIDE / 2, y + TALL, wide, 0, 0});
+            quakesMade++;
+            return true;
+        }
+        if (weapon == STAFF) {
+            // The great summoning: a ring of spirits going out after everything near.
+            summons++;
+            int count = level >= 3 ? 16 : 8;
+            List<Foe> near = nearest(count, 12);
+            for (int spirit = 0; spirit < count; spirit++) {
+                double turn = spirit * Math.PI * 2 / count;
+                Foe at = near.isEmpty() ? null : near.get(spirit % near.size());
+                Shot sent = sendAt(at, SUMMONED, STAFF, x + WIDE / 2 + (float) Math.cos(turn) * .8f, y + TALL / 2 + (float) Math.sin(turn) * .8f, RunArms.speed(STAFF) * .9f, 12,
+                        (float) Math.cos(turn));
+                sent.pierce = 99;
+            }
+            return true;
+        }
+        if (weapon == MACE) {
+            // A whirl round her, and round again once the smith has worked on it.
+            whirls++;
+            sweep(MACED, x - 1.8f, x + WIDE + 1.8f, y + TALL - 1.8f, y + TALL);
+            whirlLeft = level >= 2 ? .25f : 0;
+            return true;
+        }
+        if (weapon == HAMMER) {
+            // A leap and a slam: a shockwave far along the ground both ways.
+            slams++;
+            float quake = level >= 2 ? 6.5f : 5;
+            speedDown = Math.min(speedDown, -7);
+            sweep(HAMMERED, x - quake, x + WIDE + quake, y + TALL - 1, y + TALL + .3f);
+            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, 0, 0});
+            quakesMade++;
+            return true;
+        }
+        if (weapon == WAND) {
+            // A fan of bolts.
+            bolts++;
+            int element = perks.item != 0 && RunArms.kindOf(perks.item) == WAND ? RunArms.element(perks.item) : RunArms.ICE;
+            for (int which = 0; which < 5; which++) {
+                double turn = (which - 2) * .22;
+                Shot bolt = shoot(SLASH, true, x + WIDE / 2 + way * .5f, y + TALL * .45f, way * (float) Math.cos(turn) * RunArms.speed(WAND), (float) Math.sin(turn) * RunArms.speed(WAND),
+                        reachOf(WAND) / RunArms.speed(WAND));
+                bolt.by = BOLTED;
+                bolt.of = WAND;
+                bolt.high = .4f;
+                bolt.element = element;
+                bolt.chain = element == RunArms.LIGHTNING ? 1 : 0;
+            }
+            return true;
+        }
+        if (weapon == SCYTHE) {
+            // The reaping spin; and its hook pulls what stands in front of her close.
+            reaps++;
+            float hook = level >= 3 ? 6 : 4.5f;
+            for (Foe foe : foes) {
+                if (foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || Math.abs(foe.y + foe.tall() - y - TALL) > 1.5f) continue;
+                float ahead = facingLeft ? x - foe.x - foe.wide() : foe.x - x - WIDE;
+                if (ahead < 0 || ahead > hook) continue;
+                foe.x = facingLeft ? x - foe.wide() - .4f : x + WIDE + .4f;
+            }
+            sweep(REAPED, x - 3, x + WIDE + 3, y + TALL - 2.2f, y + TALL);
+            reapLeft = level >= 2 ? .25f : 0;
+            return true;
+        }
+        return false;
+    }
+
     /** She uses what she carries: throws it, fires it, or begins a swing of it. */
     private void use() {
         sinceStrike = 0;
@@ -3942,9 +4658,10 @@ final class PlusRun {
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
         // How fast it flies and how far it reaches are the table's; a find of something she has already makes it reach a third as far again.
         int level = perks.levels[weapon];
-        float speed = RunArms.speed(weapon), lasts = speed > 0 ? RunArms.reach(weapon, level) / speed * (boost > 0 ? RunArms.BOOST_FAR : 1) : 0;
+        float speed = RunArms.speed(weapon), lasts = speed > 0 ? reachGear(weapon, level) / speed * (boost > 0 ? RunArms.BOOST_FAR : 1) : 0;
+        if (useFound(level, way, fromX, fromY)) return;
         if (weapon == PEN || weapon == KNIFE) {
-            shoot(weapon, true, fromX, fromY, way * speed, 0, lasts).pierce = RunArms.pierces(weapon, level);
+            shoot(weapon, true, fromX, fromY, way * speed, 0, lasts).pierce = piercesGear(weapon, level);
             if (weapon == KNIFE) wave(KNIFE, level, way, fromX, fromY);
         } else if (weapon == BOOK) {
             shoot(BOOK, true, fromX, fromY - .3f, way * speed + speedAcross * .4f, -11, 3);
@@ -3971,14 +4688,14 @@ final class PlusRun {
                 sinceStrike = RunArms.rest(KEYS, level) - .12f;
                 return;
             }
-            shoot(THROWN_KEY, true, fromX, fromY, way * speed, 0, lasts).pierce = RunArms.pierces(KEYS, level);
+            shoot(THROWN_KEY, true, fromX, fromY, way * speed, 0, lasts).pierce = piercesGear(KEYS, level);
         } else if (weapon == KATANA) {
             drawn(level, way);
         } else if (weapon == LANCE) {
             // A thrust: everything in front of her, a long way out and no higher than the lance.
             thrusts++;
-            float reach = RunArms.reach(LANCE, level) + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - reach : x + WIDE;
-            sweep(LANCED, from, from + reach, y + TALL * .15f, y + TALL * .15f + RunArms.area(LANCE, level));
+            float reach = reachGear(LANCE, level) + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - reach : x + WIDE;
+            sweep(LANCED, from, from + reach, y + TALL * .15f, y + TALL * .15f + areaGear(LANCE, level));
             if (RunArms.burst(LANCE, level) > 0) blast(facingLeft ? from : from + reach, y + TALL * .5f, RunArms.burst(LANCE, level), LANCED);
         } else if (weapon == CANNON) {
             // A ball of ink, lobbed: it bursts where it lands, or on the first thing it meets.
@@ -3988,8 +4705,8 @@ final class PlusRun {
         } else if (weapon == WHIP) {
             // A lash: what is in front of her, from her feet to well over her head.
             lashes++;
-            float reach = RunArms.reach(WHIP, level) + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - reach : x + WIDE;
-            sweep(WHIPPED, from, from + reach, y + TALL - RunArms.area(WHIP, level), y + TALL);
+            float reach = reachGear(WHIP, level) + (boost > 0 ? RunArms.BOOST_SWING : 0), from = facingLeft ? x - reach : x + WIDE;
+            sweep(WHIPPED, from, from + reach, y + TALL - areaGear(WHIP, level), y + TALL);
             wave(WHIP, level, way, fromX, fromY);
         } else {
             swing = SWING;
@@ -4037,8 +4754,8 @@ final class PlusRun {
         chain = cuts > 0 && sinceCut <= RunArms.RHYTHM && chain > 0 && chain < 3 ? chain + 1 : 1;
         sinceCut = 0;
         cuts++;
-        float reach = RunArms.reach(KATANA, level) + (boost > 0 ? RunArms.BOOST_SWING : 0) + (chain == 3 ? RunArms.FINISH_FAR : 0), from = facingLeft ? x - reach : x + WIDE;
-        sweep(CUT, from, from + reach, y + TALL - RunArms.area(KATANA, level), y + TALL);
+        float reach = reachGear(KATANA, level) + (boost > 0 ? RunArms.BOOST_SWING : 0) + (chain == 3 ? RunArms.FINISH_FAR : 0), from = facingLeft ? x - reach : x + WIDE;
+        sweep(CUT, from, from + reach, y + TALL - areaGear(KATANA, level), y + TALL);
         wave(KATANA, level, way, x + WIDE / 2 + way * .5f, y + TALL * .45f);
     }
 
@@ -4138,6 +4855,9 @@ final class PlusRun {
             dashCut = false;
         }
         if (spinLeft > 0 && (spinLeft -= seconds) <= 0) sweep(WHIPPED, x - RunArms.SPIN, x + WIDE + RunArms.SPIN, y + TALL - RunArms.SPIN_TALL, y + TALL);
+        if (whirlLeft > 0 && (whirlLeft -= seconds) <= 0) sweep(MACED, x - 1.8f, x + WIDE + 1.8f, y + TALL - 1.8f, y + TALL);
+        if (reapLeft > 0 && (reapLeft -= seconds) <= 0) sweep(REAPED, x - 3, x + WIDE + 3, y + TALL - 2.2f, y + TALL);
+        for (int index = splashes.size() - 1; index >= 0; index--) if ((splashes.get(index)[2] += seconds) > .5f) splashes.remove(index);
         for (int index = 0; index < shots.size(); index++) {
             Shot wave = shots.get(index);
             if (wave.kind != SLASH || !wave.wipes) continue;
@@ -4154,15 +4874,16 @@ final class PlusRun {
     /** The heavy thing: the tablet-book's panel, which takes all that stands in it and wipes away what is thrown into it; or the whole ring of keys, in a fan. */
     private void heavy() {
         float way = facingLeft ? -1 : 1;
-        sinceStrike = RunArms.rest(weapon, perks.levels[weapon]) - RunArms.heavyRest(weapon);
+        sinceStrike = restOf(weapon) - RunArms.heavyRest(weapon) * (1 - gear(RunLoot.SPECIAL) / 100f);
         strikes++;
+        if (heavyFound(perks.levels[weapon], way)) return;
         if (weapon == KEYS) {
             fans++;
-            float fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f, speed = RunArms.speed(KEYS), lasts = RunArms.reach(KEYS, perks.levels[KEYS]) / speed;
+            float fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f, speed = RunArms.speed(KEYS), lasts = reachGear(KEYS, perks.levels[KEYS]) / speed;
             int count = RunArms.fan(perks.levels[KEYS]);
             for (int key = 0; key < count; key++) {
                 double turn = (key - (count - 1) / 2f) * RunArms.FAN_APART * 2 * Math.PI / 6;
-                shoot(THROWN_KEY, true, fromX, fromY, way * (float) Math.cos(turn) * speed, (float) Math.sin(turn) * speed, lasts).pierce = RunArms.pierces(KEYS, perks.levels[KEYS]);
+                shoot(THROWN_KEY, true, fromX, fromY, way * (float) Math.cos(turn) * speed, (float) Math.sin(turn) * speed, lasts).pierce = piercesGear(KEYS, perks.levels[KEYS]);
             }
             return;
         }
@@ -4309,8 +5030,8 @@ final class PlusRun {
      */
     private void swung() {
         boolean brush = swungWith == BRUSH;
-        float ahead = RunArms.reach(swungWith, perks.levels[swungWith]) + (boost > 0 ? RunArms.BOOST_SWING : 0), behind = brush ? .3f : 0;
-        float top = y + TALL - RunArms.area(swungWith, perks.levels[swungWith]), bottom = y + TALL;
+        float ahead = reachGear(swungWith, perks.levels[swungWith]) + (boost > 0 ? RunArms.BOOST_SWING : 0), behind = brush ? .3f : 0;
+        float top = y + TALL - areaGear(swungWith, perks.levels[swungWith]), bottom = y + TALL;
         float from = facingLeft ? x - ahead : x - behind, to = facingLeft ? x + WIDE + behind : x + WIDE + ahead;
         for (Foe foe : foes) {
             if (foe.flat || absent(foe) || foe.dazed > 0 || foe.x - spare(foe, true) >= to || foe.x + foe.wide() + spare(foe, true) <= from || foe.y - spare(foe, false) >= bottom
@@ -4432,7 +5153,8 @@ final class PlusRun {
                         // A slime drinks fire, and steam: it is not beaten by it but grows on it, half as big again, and takes two blows after.
                         shots.remove(index);
                         resize(foe, 1.5f);
-                        foe.left = 2;
+                        foe.left = 2 * BLOW;
+                        foe.most = Math.max(foe.most, foe.left);
                         drunk++;
                     } else if (foe.dazed <= 0) {
                         beat(foe, shot.by);
@@ -4446,6 +5168,7 @@ final class PlusRun {
                         }
                         // What the smith has made of an ink gun: its blot splashes, and jumps on.
                         if (shot.kind == GUN) blotted(shot, foe);
+                        if (shot.element >= 0) elemental(shot, foe);
                         // A book, fire and steam go on through, and so does what the mirror has sent back, but not through those who wait at the end.
                         // And so does what the smith has made go through: a wave or a key through all it meets, a pen through so many, none of them twice.
                         boolean on = (shot.kind == BOOK || shot.kind == FIRE || shot.kind == STEAM || shot.through || shot.pierce > 0) && !RunLevels.boss(foe.kind);
@@ -4546,6 +5269,10 @@ final class PlusRun {
      */
     private boolean hurt(boolean fell, int costs) {
         if (!fell && (notes > 0 || worn[BLACK] > 0)) return false;
+        if (!fell && gearTakes()) {
+            safe = SAFE * perks.mercy;
+            return true;
+        }
         // The further on the land, the more a hurt costs; and what she wears takes some of it off again, never the last half.
         if (!fell) costs = Math.max(1, costs + bite - perks.defence);
         // Three colours and more are a prism, through which whatever lands on her lands by half.
@@ -4561,18 +5288,22 @@ final class PlusRun {
             if (room >= 0 && wave > 0) arenaHurts++;
             // A letter that has been through a hurt is not one to hand over.
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
-            halves -= costs;
+            int lost = costs * HALF;
+            if (!fell) lost = Math.max(Math.max(1, lost / 10), lost - perks.skills.stats[RunSkills.DEF] - lost * Math.max(0, perks.skills.effects[RunSkills.E_DEF_PCT]) / 100);
+            hp -= lost;
+            lastLost = lost;
         }
         safe = SAFE * perks.mercy;
-        if (halves <= 0) {
-            halves = 0;
+        if (hp <= 0) {
+            hp = 0;
             if (--lives <= 0) {
                 lives = 0;
                 state = LOST;
                 return true;
             }
             livesLost++;
-            halves = perks.hearts * 2;
+            hp = maxHp();
+        ward = wardMost();
             fade(false);
             cursed = 0;
             // Whatever was in the air is gone by the time she is back.

@@ -1062,7 +1062,7 @@ public class PlusRunTest {
             PlusRun stomper = new PlusRun(tough);
             PlusRun.Foe big = stomper.foes().get(0);
             stomper.down(hard);
-            for (int step = 0; step < 240 && stomper.flattened() == 0 && stomper.hurts() == 0 && big.left == 2; step++) {
+            for (int step = 0; step < 240 && stomper.flattened() == 0 && stomper.hurts() == 0 && big.left == 2 * PlusRun.BLOW; step++) {
                 if (stomper.onGround() || step == 0) stomper.place(big.x + big.wide() / 2 - PlusRun.WIDE / 2, big.y - 9);
                 stomper.step(STEP, false, false, false);
             }
@@ -1740,21 +1740,21 @@ public class PlusRunTest {
         // A key: one blow, and it sticks: for a while the next blow that is not a key counts twice.
         run.step(STEP, false, false, false, true);
         assertEquals(PlusRun.THROWN_KEY, run.shots().get(0).kind);
-        for (int step = 0; step < 60 && big.left == 4; step++) {
+        for (int step = 0; step < 60 && big.left == 4 * PlusRun.BLOW; step++) {
             big.x = big.home;
             run.step(STEP, false, false, false);
         }
-        assertEquals(3, big.left);
+        assertEquals(3 * PlusRun.BLOW, big.left);
         assertEquals(RunArms.UNLOCKS, big.unlocked, .1f);
         assertEquals(0, run.doubled());
         assertTrue(run.switchTo(PlusRun.PEN));
         hold(run, .3f, false, false, false);
         run.step(STEP, false, false, false, true);
-        for (int step = 0; step < 60 && big.left == 3; step++) {
+        for (int step = 0; step < 60 && big.left == 3 * PlusRun.BLOW; step++) {
             big.x = big.home;
             run.step(STEP, false, false, false);
         }
-        assertEquals(1, big.left);
+        assertEquals(PlusRun.BLOW, big.left);
         assertEquals(1, run.doubled());
         assertEquals(0, big.unlocked, 0);
         // Held: the whole ring, in a fan.
@@ -2168,11 +2168,11 @@ public class PlusRunTest {
         run.place(45, GROUND);
         PlusRun.Foe tough = run.foes().get(1);
         tough.dazed = 0;
-        for (int step = 0; step < 60 * 4 && tough.left == 3; step++) {
+        for (int step = 0; step < 60 * 4 && tough.left == 3 * PlusRun.BLOW; step++) {
             tough.x = tough.home;
             run.step(STEP, false, false, false);
         }
-        assertEquals(2, tough.left);
+        assertEquals(2 * PlusRun.BLOW, tough.left);
         assertTrue(tough.dazed > 1);
 
         // The cat: what is close to it, and nothing further off; and often.
@@ -2234,7 +2234,7 @@ public class PlusRunTest {
             run.step(STEP, false, false, false);
         }
         assertTrue(moth.flat);
-        assertEquals(9, run.foes().get(0).left);
+        assertEquals(9 * PlusRun.BLOW, run.foes().get(0).left);
         assertEquals(1, run.petStrikes());
         for (PlusRun.Foe foe : run.foes()) foe.dazed = 0;
         for (int step = 0; step < 60 * 8 && run.petStrikes() < 3; step++) {
@@ -2451,13 +2451,13 @@ public class PlusRunTest {
         run.place(20, GROUND);
         run.adopt(PlusRun.MINI_RUNE);
         PlusRun.Foe tough = run.foes().get(0);
-        for (int step = 0; step < 60 * 4 && tough.left == 3; step++) {
+        for (int step = 0; step < 60 * 4 && tough.left == 3 * PlusRun.BLOW; step++) {
             tough.x = tough.home;
             run.place(20, GROUND);
             run.step(STEP, false, false, false);
         }
         assertEquals(0, run.hurts());
-        assertEquals(2, tough.left);
+        assertEquals(2 * PlusRun.BLOW, tough.left);
         assertTrue(tough.dazed > 1);
         RunLevels.Level pen = flat(70);
         pen.arena = 20;
@@ -2488,7 +2488,7 @@ public class PlusRunTest {
         }
         assertEquals(0, run.hurts());
         assertTrue("strikes " + run.petStrikes(), run.petStrikes() >= 5);
-        assertEquals(30 - run.petStrikes(), run.foes().get(0).left, 1);
+        assertEquals((30 - run.petStrikes()) * PlusRun.BLOW, run.foes().get(0).left, PlusRun.BLOW);
         assertFalse(run.foes().get(1).flat);
 
         // The one with white wings: a ray, from a long way off, slowly; and a ring of light that turns aside one thing thrown at her, and
@@ -2752,7 +2752,7 @@ public class PlusRunTest {
         }
         assertEquals(0, run.hurts());
         assertEquals(1, run.petStrikes());
-        assertEquals(7, big.left);
+        assertEquals(7 * PlusRun.BLOW, big.left);
         RunLevels.Level pen = flat(70);
         pen.arena = 20;
         pen.foes.add(new int[]{RunLevels.GUARD, 34, FLOOR - 1});
@@ -3528,7 +3528,7 @@ public class PlusRunTest {
         hold(run, .3f, false, true, false);
         assertEquals(PlusRun.GUN, run.weapon());
         PlusRun.Foe big = run.foes().get(4);
-        assertEquals(3, big.left);
+        assertEquals(3 * PlusRun.BLOW, big.left);
         assertTrue(big.wide() > run.foes().get(0).wide());
         for (int step = 0; step < 240; step++) run.step(STEP, false, false, false, true);
         // Four in a row: one, two and three more for the second, third and fourth. And the big one is down after three shots.
@@ -3781,7 +3781,7 @@ public class PlusRunTest {
                     there++;
                     if (counted.add(foe)) {
                         seen++;
-                        if (foe.size > 1.5f && foe.left == 6) {
+                        if (foe.size > 1.5f && foe.left == 6 * PlusRun.healthOf(foe.kind)) {
                             giants++;
                             assertTrue("giant came as " + seen + " of " + host.length, seen > host.length - RunLevels.GIANTS - (one[10] != 0 ? 1 : 0));
                         }
@@ -4867,7 +4867,7 @@ public class PlusRunTest {
                 assertEquals(spec[0], foe.kind);
                 if (RunLevels.boss(spec[0])) continue;
                 boolean spared = spec[0] == RunLevels.TARGET || spec[0] == RunLevels.WISP || spec[0] == RunLevels.RIME;
-                assertEquals("land " + number, (spec.length > 3 ? spec[3] : 1) + (spared ? 0 : run.tough()), foe.left);
+                assertEquals("land " + number, PlusRun.healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * PlusRun.TIER_HEALTH[foe.tier] + (spared ? 0 : run.tough()) * PlusRun.BLOW, foe.left);
                 if (!spared) tougher++;
             }
             assertTrue("land " + number + " has " + tougher, tougher > 5);
@@ -4878,11 +4878,11 @@ public class PlusRunTest {
         PlusRun run = new PlusRun(level);
         PlusRun.Foe foe = run.foes().get(0);
         assertEquals(1, run.tough());
-        assertEquals(2, foe.left);
+        assertEquals(2 * PlusRun.BLOW, foe.left);
         run.bare();
         run.place(foe.x + foe.wide() / 2 - PlusRun.WIDE / 2, foe.y - PlusRun.TALL - .4f);
-        for (int step = 0; step < 30 && foe.left == 2; step++) run.step(STEP, false, false, false);
-        assertEquals(1, foe.left);
+        for (int step = 0; step < 30 && foe.left == 2 * PlusRun.BLOW; step++) run.step(STEP, false, false, false);
+        assertEquals(PlusRun.BLOW, foe.left);
         assertFalse(foe.flat);
         assertTrue(run.fells().isEmpty());
         foe.dazed = 0;
@@ -5136,12 +5136,12 @@ public class PlusRunTest {
             run.arm(PlusRun.KNIFE);
             PlusRun.Foe big = run.foes().get(0);
             big.dazed = 0;
-            assertEquals(3, big.left);
+            assertEquals(3 * PlusRun.BLOW, big.left);
             run.step(STEP, false, false, false, true);
             // (Only the knife itself: its waves are taken out of the air.)
             for (int index = run.shots().size() - 1; index >= 0; index--) if (run.shots().get(index).kind == PlusRun.SLASH) run.shots().remove(index);
             still(run, .6f);
-            assertEquals("level " + level, left[level], Math.max(0, big.left));
+            assertEquals("level " + level, left[level] * PlusRun.BLOW, Math.max(0, big.left));
             assertEquals(level == RunArms.LEVELS, big.flat);
         }
     }
@@ -5942,7 +5942,7 @@ public class PlusRunTest {
             big.dazed = 0;
             big.x = big.home;
             strike(run);
-            assertEquals(left, big.left);
+            assertEquals(left * PlusRun.BLOW, big.left);
             still(run, .4f);
         }
         // Held, she dashes: so far along her line, through whatever stands on it; nothing on it is cut until a beat later, and then all of it is.
@@ -6816,7 +6816,7 @@ public class PlusRunTest {
             assertEquals("form " + form, form == PlusRun.RED ? 0 : 1, wet.flattened());
             if (form == PlusRun.RED) {
                 assertTrue(slime.size > 1.4f);
-                assertEquals(2, slime.left);
+                assertEquals(2 * PlusRun.BLOW, slime.left);
                 assertFalse(slime.flat);
             }
         }
@@ -7599,7 +7599,9 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length
+                // (The two lines about sloppy copies in the lands, her line with the game's name in it, and the keys.)
+                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.
@@ -7693,7 +7695,12 @@ public class PlusRunTest {
      * it can reach the gate, the land can be crossed.
      */
     private static PlusRun cross(RunLevels.Level level, float seconds) {
-        PlusRun run = new PlusRun(level);
+        // (At the level the land is for: its coloured creatures take more than a blow at the first level.)
+        PlusRun.Perks perks = new PlusRun.Perks();
+        perks.level = RunLoot.recommended(level.number);
+        perks.hearts += RunLoot.hearts(perks.level);
+        perks.defence = RunLoot.guard(perks.level);
+        PlusRun run = new PlusRun(level, perks);
         float furthest = run.x(), since = 0;
         while (run.state() == PlusRun.PLAYING && run.time() < seconds) {
             // Fallen into a cave under the land, it makes for the vine up out of it, and climbs it.
@@ -7795,7 +7802,7 @@ public class PlusRunTest {
             PlusRun run = cross(unguarded(RunLevels.level(number)), 240);
             assertEquals("land " + number + " stopped at " + run.x() + " of " + run.columns() + " with " + run.hearts() + " hearts" + around(run),
                     PlusRun.WON, run.state());
-            assertEquals("land " + number, PlusRun.HEARTS, run.hearts());
+            assertEquals("land " + number, run.maxHearts(), run.hearts());
         }
     }
 
@@ -7818,7 +7825,9 @@ public class PlusRunTest {
             PlusRun run = cross(unguarded(RunLevels.level(number)), 400);
             assertEquals("land " + number + " stopped at " + run.x() + " of " + run.columns() + " with " + run.hearts() + " hearts" + around(run),
                     PlusRun.WON, run.state());
-            assertEquals("land " + number, PlusRun.HEARTS, run.hearts());
+            // (Its coloured creatures can cost a bot that only jumps and stomps a heart or two now and then; never a life.)
+            assertTrue("land " + number + " with " + run.hearts(), run.hearts() >= 1 && run.livesLost() == 0);
+            if (run.hearts() < PlusRun.HEARTS) System.out.println("CROSSED land " + number + " with " + run.hearts() + " hearts");
         }
     }
 

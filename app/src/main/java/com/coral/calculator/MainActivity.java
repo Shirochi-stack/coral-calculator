@@ -235,7 +235,7 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         play.setBackgroundResource(android.R.drawable.list_selector_background);
         content.addView(play);
         TextView about = new TextView(this);
-        about.setText("Halgakos Calculator " + BuildConfig.VERSION_NAME + "\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
+        about.setText(getString(R.string.app_title) + " " + BuildConfig.VERSION_NAME + "\n\nLong-press the display to copy a result.\nCalculations and history stay on this device.");
         about.setTextSize(18); about.setTextColor(0xFF777777); about.setPadding(0, dp(20), 0, dp(8));
         content.addView(about);
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Settings").setView(content).setPositiveButton("Done", null).create();

@@ -109,7 +109,9 @@ final class RunGame {
     private static final int[] STALL_FORMS = {PlusRun.RED, PlusRun.BLUE, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.PURPLE, PlusRun.BROWN};
     private static final int[] ARMED = {R.drawable.halgakos_arm0, R.drawable.halgakos_arm1, R.drawable.halgakos_arm2,
             R.drawable.halgakos_arm3, R.drawable.halgakos_arm4, R.drawable.halgakos_arm5, R.drawable.halgakos_arm6, R.drawable.halgakos_arm7,
-            R.drawable.halgakos_arm8, R.drawable.halgakos_arm9, R.drawable.halgakos_arm10, R.drawable.halgakos_arm11};
+            R.drawable.halgakos_arm8, R.drawable.halgakos_arm9, R.drawable.halgakos_arm10, R.drawable.halgakos_arm11,
+            R.drawable.halgakos_arm12, R.drawable.halgakos_arm13, R.drawable.halgakos_arm14, R.drawable.halgakos_arm15, R.drawable.halgakos_arm16,
+            R.drawable.halgakos_arm17};
     /**
      * The katana has fourteen pictures of her: after the seven of standing, running, rising
      * and falling come drawing, the cut, sheathing, the dash gathered, the dash's cut, the
@@ -235,9 +237,9 @@ final class RunGame {
     /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
     private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800, 950, 900, 1200, 1500};
     /** The counter's tabs, and what stands under each. */
-    private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms"};
-    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}};
-    private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2;
+    private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms", "Vanity"};
+    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
+    private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2, VANITY_TAB = 6;
     private final RectF[] counterTabs = new RectF[TAB_NAMES.length], petCells = new RectF[PlusRun.PETS];
     private final RectF petAct = new RectF(), armsAct = new RectF();
     private int counterTab, shownWares, petOn;
@@ -329,7 +331,7 @@ final class RunGame {
     private final class Sheet {
         final int resource, across;
         Bitmap bitmap;
-        float[] wide, tall;
+        float[] wide, tall, low;
 
         Sheet(int resource, int across) {
             this.resource = resource;
@@ -342,21 +344,24 @@ final class RunGame {
             int side = bitmap.getWidth() / across, count = across * (bitmap.getHeight() / side);
             wide = new float[count];
             tall = new float[count];
+            low = new float[count];
             int[] pixels = new int[side * side];
             for (int which = 0; which < count; which++) {
                 bitmap.getPixels(pixels, 0, side, which % across * side, which / across * side, side, side);
-                int left = side, right = -1, top = side;
+                int left = side, right = -1, top = side, bottom = -1;
                 for (int y = 0; y < side; y++) {
                     for (int x = 0; x < side; x++) {
                         if (pixels[y * side + x] >>> 24 > 40) {
                             left = Math.min(left, x);
                             right = Math.max(right, x);
                             top = Math.min(top, y);
+                            bottom = Math.max(bottom, y);
                         }
                     }
                 }
                 wide[which] = right < left ? 1 : Math.min(1, 2 * Math.max(side / 2f - left, right + 1 - side / 2f) / side);
                 tall[which] = right < left ? 1 : (side - top) / (float) side;
+                low[which] = right < left ? 0 : (side - 1 - bottom) / (float) side;
             }
             return bitmap;
         }
@@ -477,6 +482,11 @@ final class RunGame {
     private PlusRun.Perks perks = new PlusRun.Perks();
     private float cameraX, cameraY;
     private boolean goLeft, goRight, goJump, goStrike;
+    /** The keys held, and what the fingers on the buttons hold, which together are what she does; and whether keys are what is being used. */
+    private final RunKeys keys = new RunKeys();
+    private boolean touchLeft, touchRight, touchJump, touchStrike, touchDown, keyed;
+    /** The keys have been used in the first land, and she has yet to say which are which. */
+    private boolean keysHintDue;
     /** A press of the jump or of the button for what she carries that has not been acted on yet: a tap may be over before the next moment of the game. */
     private boolean jumpPressed, strikePressed;
     private int seenJumps, seenLandings, seenCollected, seenFlattened, seenHurts, seenSprings, seenFlags, seenBlows;
@@ -517,6 +527,21 @@ final class RunGame {
     private boolean goDown;
     /** What a card that names something won is: plain, good, or rare. And where what was won flies from, in squares. */
     private int toastRarity;
+    /** A toast's picture that is a thing found: this much and its number. */
+    private static final int LOOT_PICTURE = 1000000;
+    /**
+     * The pictures of everything that can be found and worn, in one sheet of squares sixteen to a row: the weapons, twelve kinds in each
+     * chapter's look; the twelve rose weapons; the thirty armours; the thirty accessories; and the smiths' twelve pieces.
+     */
+    private Bitmap lootIcons;
+    private static final int LOOT_ICON = 128, LOOT_COLUMNS = 16, ROSE_ICONS = 144, ARMOUR_ICONS = 156, ACCESSORY_ICONS = 186, SMITH_ICONS = 216, ADDITION_ICON = 228;
+    /** Her bag, open over the screen: from where; which tab, which page; the thing looked at (its place in the bag) or a worn slot; and its parts. */
+    private boolean bagOpen;
+    private int bagFrom, bagTab, bagPage, bagOn = -1, bagSlot = -1, seenWardHurts;
+    private float wardFlash = 9;
+    private final RectF bagCard = new RectF(), bagAct = new RectF(), bagPrev = new RectF(), bagNext = new RectF(), packBag = new RectF();
+    private final RectF[] bagCells = new RectF[24], bagTabs = new RectF[4], bagSlots = new RectF[3];
+    private int[] bagShown = new int[0];
     private float toastX, toastY;
     /** How much longer the screen is darkened by black being put on her. */
     private float darkened;
@@ -787,6 +812,16 @@ final class RunGame {
         // Her level: her blows land harder for it, a hurt costs less, and now and then it is a heart more.
         kept.level = herLevel();
         kept.hearts += RunLoot.hearts(kept.level);
+        // What she wears of what she has found.
+        kept.worn = RunLoot.worn(session.note("run_worn"));
+        // The weapon found that she has taken in hand: in her backpack as its kind, and what she begins every land with.
+        int hand = handCode();
+        if (hand != 0) {
+            int kind = RunArms.kindOf(hand);
+            kept.item = hand;
+            kept.pack |= 1 << kind;
+            kept.main = kind;
+        }
         // And how much harder she has chosen to have it, at the black market.
         kept.harder = hard();
         // The white that is truly hers, once it has been won in the last land: hers to call on in any land.
@@ -883,18 +918,17 @@ final class RunGame {
         paint.setAlpha(255);
         if (friend <= 3) {
             int who = friend == 0 ? CHIKUWA : friend == 1 ? RUNE : friend == 2 ? ILLYA : TSUBAKIEH;
-            frame(canvas, cast(who), friend <= 1 && near ? 1 : 0, CAST_FRAMES[who], x, feet, size, false);
+            if (friend <= 1 && near) frame(canvas, cast(who), 1, CAST_FRAMES[who], x, feet, size, false);
+            else frame(canvas, idleSheet(IDLE_CAST[who]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, size, false);
         } else if (friend == 13) {
-            Bitmap queen = face(10);
-            float tall = tile * 1.7f, wide = tall * queen.getWidth() / queen.getHeight();
-            target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
-            canvas.drawBitmap(queen, null, target, paint);
+            cell(canvas, idleSheet(R.drawable.run_idle_nuri), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, tile * 1.7f, false);
         } else if (friend == 16) {
             Bitmap sheet = smith(0);
-            cell(canvas, sheet, near ? 3 : 0, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+            if (near) cell(canvas, sheet, 3, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+            else cell(canvas, idleSheet(IDLE_SMITHS[0]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
             head = feet - tile * 1.6f;
         } else if (friend >= 17) {
-            frame(canvas, villagers(), friend == 17 ? RunLevels.INJU - RunLevels.SOMI : 0, VILLAGERS, x, feet - (near ? Math.abs((float) Math.sin(clock * 6)) * tile * .08f : 0), size * .72f, false);
+            frame(canvas, idleSheet(IDLE_VILLAGERS[friend == 17 ? RunLevels.INJU - RunLevels.SOMI : 0]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, size * .72f, false);
             head = feet - tile * 1.55f;
         } else {
             int kind = friend == 4 ? RunLevels.GUARD : friend == 5 ? RunLevels.BUTLER : friend == 6 ? RunLevels.GOKHAE : friend == 7 ? RunLevels.BYEORU : friend == 8 ? RunLevels.MIRI
@@ -902,8 +936,9 @@ final class RunGame {
                     : RunLevels.PARTY;
             int which = kind - RunLevels.GOKHAE;
             // (The twins stand together.)
-            if (kind == RunLevels.MIRI) frame(canvas, later(which + 1), 0, LATER_FRAMES[which + 1], x + tile * .95f, feet, size, false);
-            frame(canvas, later(which), 0, LATER_FRAMES[which], x, feet, size, false);
+            if (kind == RunLevels.MIRI) frame(canvas, idleSheet(IDLE_LATER[which + 1]), idleFrame(5100 + friend), IDLE_FRAMES, x + tile * .95f, feet, size, false);
+            if (IDLE_LATER[which] != 0) frame(canvas, idleSheet(IDLE_LATER[which]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, size, false);
+            else frame(canvas, later(which), 0, LATER_FRAMES[which], x, feet, size, false);
         }
         if (pledged) {
             paint.setAlpha(255);
@@ -1539,6 +1574,16 @@ final class RunGame {
 
     /** A small picture of a piece to wear, by its place: a helm, a coat, a boot, a charm on its cord. */
     private void gearIcon(Canvas canvas, int slot, float x, float y, float size, int colour) {
+        // Each piece of each set has its own picture; the set is known by its colour (anything else, the best of them).
+        int set = 2;
+        for (int index = 0; index < SET_COLOURS.length; index++) if (SET_COLOURS[index] == colour) set = index;
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        drawIcon(canvas, SMITH_ICONS + set * RunGear.SLOTS + slot, x, y, size * 1.7f);
+    }
+
+    /** The old drawn shape of a piece, no longer used. */
+    private void gearShape(Canvas canvas, int slot, float x, float y, float size, int colour) {
         float half = size / 2;
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(colour);
@@ -1859,7 +1904,8 @@ final class RunGame {
         boolean idle = (int) (clock * .45f + which * 1.7f) % 5 == 0;
         int frame = pleased ? 3 : making ? ((int) (hammered * 7) % 2 == 0 ? 1 : 2) : idle ? ((int) (clock * 3.2f) % 2 == 0 ? 1 : 2) : 0;
         Bitmap sheet = smith(which);
-        cell(canvas, sheet, frame, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+        if (frame == 0) cell(canvas, idleSheet(IDLE_SMITHS[which]), idleFrame(6000 + which), IDLE_FRAMES, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+        else cell(canvas, sheet, frame, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
         boolean at = run.spot() == item[4];
         mark(canvas, x, feet - tile * (at ? 1.75f : 1.65f), which == 0 ? "Forge" : which == 1 ? "Armour" : "Trade", SPEAKER_COLOURS[which == 0 ? 18 : FIRST_SMITH + which - 1], false);
     }
@@ -2370,15 +2416,58 @@ final class RunGame {
         paint.setAlpha(255);
     }
 
-    /** What a thing to keep looks like, small: for a weapon, the thing to fight with nearest it; armour and accessories by their icons, in its colour. */
+    /** Which of the pictures in the sheet of them a thing found is: a weapon by its kind and chapter (the rose's its own), armour and accessories each their own. */
+    static int iconOf(int code) { return RunLoot.iconOf(code); }
+
+    /** One of the pictures in the sheet, as a square of a size about a place. */
+    private void drawIcon(Canvas canvas, int index, float x, float y, float size) {
+        if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
+        int column = index % LOOT_COLUMNS, row = index / LOOT_COLUMNS;
+        source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        canvas.drawBitmap(lootIcons, source, target, paint);
+    }
+
+    /** What a thing found looks like: its own picture. */
     private void lootIcon(Canvas canvas, int code, float x, float y, float size, int colour) {
-        int type = RunLoot.type(code), base = RunLoot.base(code);
-        if (type == RunLoot.WEAPON) {
-            int[] like = {PlusRun.SWORD, PlusRun.KATANA, PlusRun.SWORD, PlusRun.BOOK, PlusRun.BOOK, PlusRun.SWORD, PlusRun.PEN, PlusRun.SWORD, PlusRun.SWORD, PlusRun.PEN, PlusRun.GUN, PlusRun.SWORD};
-            thing(canvas, like[base % like.length], x, y, size, 35, false, false);
-        } else {
-            gearIcon(canvas, type == RunLoot.ARMOUR ? RunGear.HELM : RunGear.CHARM, x, y, size * .8f, colour);
+        drawIcon(canvas, iconOf(code), x, y, size * 1.25f);
+    }
+
+    /** A rarity's colour, the rose's changing as it is looked at. */
+    private int rarityColour(int rarity) { return rarity == RunLoot.ROSE ? RunLoot.rose(clock) : RunLoot.COLOURS[Math.max(0, Math.min(RunLoot.ROSE, rarity))]; }
+
+    /** A thing found in a frame of its rarity: a tile tinted with it and a rim of it, glowing from gold up; and its picture in it. Or an empty frame. */
+    private void lootFrame(Canvas canvas, int code, RectF where, boolean picked) {
+        float round = where.width() * .2f;
+        paint.setStyle(Paint.Style.FILL);
+        if (code == 0) {
+            paint.setColor(dark ? 0xFF2C3033 : 0xFFF1F2F3);
+            canvas.drawRoundRect(where, round, round, paint);
+            stroke.setColor(picked ? CalculatorLayout.CORAL : dark ? 0xFF4A4F54 : 0xFFD0D3D6);
+            stroke.setStrokeWidth(dp(picked ? 2.5f : 1.5f));
+            canvas.drawRoundRect(where, round, round, stroke);
+            paint.setColor(Color.BLACK);
+            return;
         }
+        int rarity = RunLoot.rarity(code), colour = rarityColour(rarity);
+        if (rarity >= RunLoot.GOLD) glowAt(canvas, where.centerX(), where.centerY(), where.width() * .62f, colour, 110 + (int) (40 * Math.sin(clock * 3)));
+        paint.setAlpha(255);
+        if (rarity == RunLoot.ROSE) {
+            // The rose's tile: rose pink, gold and a changing colour across it, so it is never taken for another rarity.
+            paint.setShader(new android.graphics.LinearGradient(where.left, where.top, where.right, where.bottom, new int[]{0xFFFFB3D6, 0xFFFFE08A, mixed(colour, Color.WHITE, .35f)},
+                    null, android.graphics.Shader.TileMode.CLAMP));
+        } else {
+            paint.setShader(new android.graphics.LinearGradient(where.left, where.top, where.left, where.bottom, mixed(colour, dark ? 0xFF1E2124 : Color.WHITE, .55f),
+                    mixed(colour, dark ? 0xFF15171A : 0xFFE8EAEC, .3f), android.graphics.Shader.TileMode.CLAMP));
+        }
+        canvas.drawRoundRect(where, round, round, paint);
+        paint.setShader(null);
+        stroke.setColor(picked ? CalculatorLayout.CORAL : rarity == RunLoot.ROSE ? mixed(0xFFFF4F9A, 0xFFE0A21A, .5f + .5f * (float) Math.sin(clock * 3)) : mixed(colour, Color.BLACK, .15f));
+        stroke.setStrokeWidth(dp(picked ? 3 : rarity >= RunLoot.GOLD ? 2.5f : 1.8f));
+        canvas.drawRoundRect(where, round, round, stroke);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        drawIcon(canvas, iconOf(code), where.centerX(), where.centerY(), where.width() * .92f);
     }
 
     /** In homes: a loose floorboard, a little askew, glinting now and then; and a diary page, glowing softly where it lies. */
@@ -2436,6 +2525,253 @@ final class RunGame {
         canvas.restore();
     }
 
+    /** A layer of hearts' colour over the red of the heart: none for the first; gold, purple, orange, blue, green after. */
+    private final android.graphics.ColorFilter[] heartFilters = new android.graphics.ColorFilter[RunSkills.LAYER_COLOURS.length];
+
+    private android.graphics.ColorFilter heartFilter(int layer) {
+        if (layer <= 0 || layer >= heartFilters.length) return null;
+        if (heartFilters[layer] == null) {
+            int colour = RunSkills.LAYER_COLOURS[layer];
+            heartFilters[layer] = new android.graphics.LightingColorFilter(0xFF000000 | colour & 0xFFFFFF, 0x00202020);
+        }
+        return heartFilters[layer];
+    }
+
+    /** A piece of her shield bar: a small shield, blue as far as it is filled. */
+    private void drawWard(Canvas canvas, float x, float y, float size, float full) {
+        path.reset();
+        float half = size / 2;
+        path.moveTo(x - half, y - half * .8f);
+        path.quadTo(x, y - half * 1.1f, x + half, y - half * .8f);
+        path.lineTo(x + half * .85f, y + half * .1f);
+        path.quadTo(x + half * .5f, y + half * .8f, x, y + half * 1.1f);
+        path.quadTo(x - half * .5f, y + half * .8f, x - half * .85f, y + half * .1f);
+        path.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(dark ? 0xFF2C3440 : 0xFFDDE6F0);
+        canvas.drawPath(path, paint);
+        if (full > 0) {
+            canvas.save();
+            canvas.clipRect(x - size, y + half * 1.1f - size * 1.1f * full, x + size, y + size);
+            paint.setShader(new android.graphics.LinearGradient(x, y - half, x, y + half, 0xFF9AD4FF, 0xFF2F7FE0, android.graphics.Shader.TileMode.CLAMP));
+            canvas.drawPath(path, paint);
+            paint.setShader(null);
+            canvas.restore();
+        }
+        stroke.setColor(full >= 1 ? 0xFF1F5FB0 : dark ? 0xFF5A6470 : 0xFF8FA3B8);
+        stroke.setStrokeWidth(dp(1.4f));
+        canvas.drawPath(path, stroke);
+        paint.setColor(Color.BLACK);
+    }
+
+    /** Her energy, for her specials, beside her level: a bar of ink-blue, bright when there is enough for one. */
+    private void drawEnergy(Canvas canvas, float left, float top) {
+        float wide = dp(96), high = dp(22), part = run.energy() / PlusRun.ENERGY_MOST, cost = run.specialCost() / PlusRun.ENERGY_MOST;
+        box.set(left, top, left + wide, top + high);
+        plate(canvas, box, high / 2, 235);
+        // A small bolt.
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF3F7FE0);
+        path.reset();
+        float bx = left + dp(12), by = top + high / 2;
+        path.moveTo(bx + dp(2), by - dp(7));
+        path.lineTo(bx - dp(4), by + dp(1));
+        path.lineTo(bx, by + dp(1));
+        path.lineTo(bx - dp(2), by + dp(7));
+        path.lineTo(bx + dp(4), by - dp(1));
+        path.lineTo(bx, by - dp(1));
+        path.close();
+        canvas.drawPath(path, paint);
+        float from = left + dp(22), to = left + wide - dp(9);
+        paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+        canvas.drawRoundRect(from, by - dp(3), to, by + dp(3), dp(3), dp(3), paint);
+        paint.setColor(run.energy() >= run.specialCost() ? 0xFF3F7FE0 : 0xFF8FA3B8);
+        if (part > 0) canvas.drawRoundRect(from, by - dp(3), from + (to - from) * part, by + dp(3), dp(3), dp(3), paint);
+        // Where one special's worth ends.
+        paint.setColor(dark ? 0xFFF3F3F3 : 0xFF1F2328);
+        canvas.drawRect(from + (to - from) * Math.min(1, cost) - dp(.75f), by - dp(4), from + (to - from) * Math.min(1, cost) + dp(.75f), by + dp(4), paint);
+        paint.setColor(Color.BLACK);
+    }
+
+    /**
+     * What her gear does that is seen in the land: on creatures, frost over one frozen, bubbles rising off one ink-poisoned, flames on one
+     * burning; and words where a great blow landed, and over her when she dodges or shrugs a hurt off.
+     */
+    private void drawGearMarks(Canvas canvas) {
+        for (PlusRun.Foe foe : run.foes()) {
+            if (foe.flat || foe.away || foe.poisoned <= 0 && foe.burning <= 0 && foe.frozen <= 0) continue;
+            float left = (foe.x - cameraX) * tile, top = (foe.y - cameraY) * tile, wide = foe.wide() * tile, tall = foe.tall() * tile;
+            if (left < -tile * 2 || left > width + tile) continue;
+            if (foe.frozen > 0) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFA8E6FF);
+                paint.setAlpha(Math.round(110 * Math.min(1, foe.frozen / .3f)));
+                canvas.drawRoundRect(left - tile * .05f, top - tile * .05f, left + wide + tile * .05f, top + tall + tile * .05f, tile * .2f, tile * .2f, paint);
+                paint.setColor(Color.WHITE);
+                paint.setAlpha(230);
+                for (int flake = 0; flake < 3; flake++) {
+                    float fx = left + wide * (.2f + .3f * flake), fy = top + tall * (.25f + .2f * (flake % 2));
+                    canvas.drawLine(fx - tile * .08f, fy, fx + tile * .08f, fy, stroke(0xFFFFFFFF, dp(1.5f)));
+                    canvas.drawLine(fx, fy - tile * .08f, fx, fy + tile * .08f, stroke);
+                }
+            }
+            if (foe.poisoned > 0) {
+                paint.setStyle(Paint.Style.FILL);
+                for (int bubble = 0; bubble < 3; bubble++) {
+                    float rise = (clock * .9f + bubble * .33f) % 1;
+                    paint.setColor(bubble == 1 ? 0xFF8E5BE8 : 0xFF5FBF6A);
+                    paint.setAlpha(Math.round(220 * (1 - rise)));
+                    canvas.drawCircle(left + wide * (.25f + .25f * bubble), top - rise * tile * .7f, tile * (.07f + .03f * bubble), paint);
+                }
+            }
+            if (foe.burning > 0) {
+                glowAt(canvas, left + wide / 2, top + tall * .55f, Math.max(wide, tall) * .7f, 0xFFFF8A2A, 150 + (int) (60 * Math.sin(clock * 20)));
+                paint.setStyle(Paint.Style.FILL);
+                for (int flame = 0; flame < 3; flame++) {
+                    float flick = (float) Math.sin(clock * 14 + flame * 2) * tile * .05f, fx = left + wide * (.2f + .3f * flame), fy = top + tall * .25f;
+                    path.reset();
+                    path.moveTo(fx - tile * .1f, fy + tile * .12f);
+                    path.quadTo(fx - tile * .02f + flick, fy - tile * .1f, fx + flick, fy - tile * .28f);
+                    path.quadTo(fx + tile * .06f + flick, fy - tile * .05f, fx + tile * .1f, fy + tile * .12f);
+                    path.close();
+                    paint.setColor(flame == 1 ? 0xFFFFD34A : 0xFFFF6A2A);
+                    paint.setAlpha(230);
+                    canvas.drawPath(path, paint);
+                }
+            }
+        }
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        if (run.critAge() < .8f) {
+            float rise = run.critAge() / .8f;
+            text.setColor(0xFFFFC433);
+            text.setAlpha(Math.round(255 * (1 - rise * rise)));
+            fitted(canvas, "Great blow!", (run.critX() - cameraX) * tile, (run.critY() - cameraY) * tile - rise * tile * .8f, dp(15), dp(160));
+        }
+        float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herY = (run.y() - cameraY) * tile - tile * .3f;
+        if (run.dodgeAge() < .7f || run.shrugAge() < .7f) {
+            float age = Math.min(run.dodgeAge(), run.shrugAge()), rise = age / .7f;
+            text.setColor(0xFF7FE7DA);
+            text.setAlpha(Math.round(255 * (1 - rise)));
+            fitted(canvas, run.dodgeAge() <= run.shrugAge() ? "Dodged" : "Shrugged off", herX, herY - rise * tile * .6f, dp(13.5f), dp(140));
+        }
+        text.setAlpha(255);
+        text.setTypeface(Typeface.DEFAULT);
+    }
+
+    /** Each colour of toughness's bar of health: plain red, then its own colour. */
+    private static final int[] TIER_BARS = {0xFFE0362F, 0xFFFF4A3A, 0xFFB463FF, 0xFFFFC433, 0xFF6A4CC8};
+    private final android.graphics.ColorFilter[] tierFilters = new android.graphics.ColorFilter[PlusRun.TIERS];
+    private android.graphics.ColorFilter struck;
+
+    /**
+     * A colour of toughness laid over a creature's own picture: its light and dark kept, so its outline and face still read, and its colours
+     * turned toward red, purple, gold, or the near-black of ink. Plain creatures as they are drawn.
+     */
+    private android.graphics.ColorFilter tierFilter(int tier) {
+        if (tier <= PlusRun.NORMAL || tier >= PlusRun.TIERS) return null;
+        if (tierFilters[tier] == null) {
+            float[][] tints = {{0, 0, 0}, {1f, .26f, .22f}, {.58f, .24f, 1f}, {1f, .8f, .28f}, {.3f, .25f, .42f}};
+            float[] keepOf = {0, .3f, .3f, .28f, .2f}, bright = {0, 1.45f, 1.4f, 1.5f, .95f};
+            float k = 1 - keepOf[tier], s = bright[tier];
+            float[] c = tints[tier];
+            float[] m = new float[20];
+            // (Its light lifted a little first, so that a creature drawn near black takes the colour too; its outline stays the darkest of it.)
+            for (int row = 0; row < 3; row++) {
+                m[row * 5] = keepOf[tier] * (row == 0 ? 1 : 0) + k * s * c[row] * .3f * .75f;
+                m[row * 5 + 1] = keepOf[tier] * (row == 1 ? 1 : 0) + k * s * c[row] * .59f * .75f;
+                m[row * 5 + 2] = keepOf[tier] * (row == 2 ? 1 : 0) + k * s * c[row] * .11f * .75f;
+                m[row * 5 + 4] = k * s * c[row] * (tier == PlusRun.INK_TIER ? 30 : 64);
+            }
+            m[18] = 1;
+            tierFilters[tier] = new android.graphics.ColorMatrixColorFilter(m);
+        }
+        return tierFilters[tier];
+    }
+
+    /** The white of a blow landing: everything of the picture lifted near to white for a moment. */
+    private android.graphics.ColorFilter struckFilter() {
+        if (struck == null) struck = new android.graphics.LightingColorFilter(0xFF606060, 0x00B8B8B8);
+        return struck;
+    }
+
+    /**
+     * Blows landing: a spark where each landed, ink splashing out from it (ink, never anything else), and the number it took off rising and
+     * fading, gold and bigger for a great blow. A heavy blow shakes the screen a little.
+     */
+    private void drawHits(Canvas canvas, int first, int last) {
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        for (float[] hit : run.hits()) {
+            if (hit[0] < first - 2 || hit[0] > last + 2) continue;
+            if (hit[6] == 0) {
+                hit[6] = 1;
+                if (perks.item != 0 && RunLoot.rarity(perks.item) >= RunLoot.RED && RunArms.kindOf(perks.item) == run.weapon()) shake = Math.max(shake, .12f);
+                if (hit[3] > 0 || hit[2] >= 3 * PlusRun.BLOW) shake = Math.max(shake, hit[3] > 0 ? .14f : .08f);
+            }
+            float age = hit[4], x = (hit[0] - cameraX) * tile, y = (hit[1] - cameraY) * tile + tile * .25f;
+            // The spark.
+            if (age < .14f) {
+                float through = age / .14f, reach = tile * (.25f + .35f * through);
+                stroke.setColor(0xFFFFF4C2);
+                stroke.setAlpha(Math.round(255 * (1 - through)));
+                stroke.setStrokeWidth(tile * .05f);
+                for (int ray = 0; ray < 6; ray++) {
+                    double turn = ray * Math.PI / 3 + hit[0];
+                    canvas.drawLine(x + (float) Math.cos(turn) * reach * .35f, y + (float) Math.sin(turn) * reach * .35f, x + (float) Math.cos(turn) * reach, y + (float) Math.sin(turn) * reach, stroke);
+                }
+                stroke.setAlpha(255);
+            }
+            // The ink.
+            if (age < .35f) {
+                float through = age / .35f;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFF1B2152);
+                paint.setAlpha(Math.round(220 * (1 - through)));
+                for (int drop = 0; drop < 7; drop++) {
+                    double turn = drop * 0.9 + hit[1] * 3;
+                    float far = tile * (.15f + .5f * through) * (.6f + .4f * (drop % 3) / 2f);
+                    canvas.drawCircle(x + (float) Math.cos(turn) * far, y + (float) Math.sin(turn) * far + through * through * tile * .3f, tile * (.07f - .03f * through) * (drop % 2 == 0 ? 1 : .7f), paint);
+                }
+                paint.setAlpha(255);
+            }
+            // The number.
+            boolean great = hit[3] > 0;
+            float rise = age / .9f, size = dp(great ? 19 : 14) * (age < .1f ? 1 + (1 - age / .1f) * .4f : 1);
+            text.setTextSize(size);
+            String said = String.valueOf((int) hit[2]) + (great ? "!" : "");
+            float tx = x + (float) Math.sin(hit[0] * 7) * tile * .15f, ty = y - tile * .5f - rise * tile * .9f;
+            int alpha = Math.round(255 * Math.min(1, (1 - rise) * 2.5f));
+            stroke.setColor(0xFF1F2328);
+            stroke.setStrokeWidth(dp(3));
+            stroke.setAlpha(alpha);
+            Paint.Style was = text.getStyle();
+            text.setStyle(Paint.Style.STROKE);
+            text.setStrokeWidth(dp(3.5f));
+            text.setColor(0xFF1F2328);
+            text.setAlpha(alpha);
+            canvas.drawText(said, tx, ty, text);
+            text.setStyle(was);
+            text.setStrokeWidth(0);
+            text.setColor(great ? 0xFFFFC433 : Color.WHITE);
+            text.setAlpha(alpha);
+            canvas.drawText(said, tx, ty, text);
+            stroke.setAlpha(255);
+        }
+        text.setAlpha(255);
+        text.setTypeface(Typeface.DEFAULT);
+        paint.setColor(Color.BLACK);
+    }
+
+    /** The stroke paint, in a colour and width. */
+    private Paint stroke(int colour, float wide) {
+        stroke.setColor(colour);
+        stroke.setStrokeWidth(wide);
+        return stroke;
+    }
+
     private void drawDiary(Canvas canvas) {
         if (diaryText == null || diaryAge >= DIARY_SHOWN) return;
         float shown = Math.min(1, Math.min(diaryAge / .3f, (DIARY_SHOWN - diaryAge) / .5f));
@@ -2476,6 +2812,7 @@ final class RunGame {
         if (decor[0] == 400) {
             if (villageArch == null) villageArch = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_village_arch);
             float wide = tile * 4.2f, tall = wide * villageArch.getHeight() / villageArch.getWidth();
+            feet += grounded(villageArch, tall);
             target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
             canvas.drawBitmap(villageArch, null, target, paint);
             // Its name on its board, in letters burnt into the wood.
@@ -2494,6 +2831,7 @@ final class RunGame {
             landmarkOf = chapter;
         }
         float tall = tile * 5.2f, wide = tall * landmark.getWidth() / landmark.getHeight();
+        feet += grounded(landmark, tall);
         target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
         canvas.drawBitmap(landmark, null, target, paint);
     }
@@ -2515,10 +2853,33 @@ final class RunGame {
     /** A piece of furniture standing on the floor at a place, its middle there, so wide. */
     private void standing(Canvas canvas, Bitmap picture, float x, float floor, float wide) {
         float tall = wide * picture.getHeight() / picture.getWidth();
+        floor += grounded(picture, tall);
         paint.setAlpha(255);
         target.set(x - wide / 2, floor - tall, x + wide / 2, floor);
         canvas.drawBitmap(picture, null, target, paint);
     }
+
+    /** For each picture, the part of its height at the bottom that is clear across all of it. */
+    private final java.util.Map<Bitmap, Float> clearBottoms = new java.util.IdentityHashMap<>();
+
+    private float clearBottom(Bitmap picture) {
+        Float known = clearBottoms.get(picture);
+        if (known != null) return known;
+        int wide = picture.getWidth(), tall = picture.getHeight(), from = tall * 2 / 3;
+        int[] pixels = new int[wide * (tall - from)];
+        float share = 0;
+        try {
+            picture.getPixels(pixels, 0, wide, 0, from, wide, tall - from);
+            share = Standing.clearRows(pixels, wide, tall - from) / (float) tall;
+        } catch (RuntimeException unreadable) {
+            // (A picture whose pixels cannot be read stands where it is drawn.)
+        }
+        clearBottoms.put(picture, share);
+        return share;
+    }
+
+    /** How much lower a picture drawn this tall stands, so that its lowest drawn row is on the ground (and a pixel into it). */
+    private float grounded(Bitmap picture, float tall) { return tall * clearBottom(picture) + dp(1); }
 
     /** The pet shop's pedestals, one for each pet, its cushion in that pet's colour, and its shelf. How far up a pedestal its cushion's top is, as a part of its width. */
     private Bitmap pedestals, petShelf;
@@ -2688,15 +3049,76 @@ final class RunGame {
         int which = behind ? 1 : 0;
         if (whiteArt[which] == null) whiteArt[which] = BitmapFactory.decodeResource(context.getResources(), behind ? R.drawable.halgakos_back : R.drawable.halgakos_white);
         Bitmap[] set = looks.get(drawn());
-        if (set == null) return whiteArt[which];
+        if (set == null) return dressed(behind ? "back" : "white", whiteArt[which]);
         int slot = 3 + ARMED.length + which;
         if (set[slot] == null) set[slot] = dyed(whiteArt[which], drawn());
-        return set[slot];
+        return dressed(behind ? "back" : "white", set[slot]);
     }
 
     private Bitmap later(int who) {
         if (laterCast[who] == null) laterCast[who] = BitmapFactory.decodeResource(context.getResources(), LATER_CAST[who]);
         return laterCast[who];
+    }
+
+    // Idling
+
+    /**
+     * Six frames of idling for each of those who stand in the world: as they are drawn, a blink, a glance, two of a habit of their own, and
+     * a special thing they do now and then. The villagers, by their place in the sheet of them; the four friends; the three smiths; Nuri; and
+     * those of the black arena and the story who stand as friends in the third volume, by their place among the later cast (or none).
+     */
+    private static final int IDLE_FRAMES = 6;
+    private static final int[] IDLE_VILLAGERS = {R.drawable.run_idle_somi, R.drawable.run_idle_inju, R.drawable.run_idle_boksun, R.drawable.run_idle_ttosun,
+            R.drawable.run_idle_galpi, R.drawable.run_idle_yeseo, R.drawable.run_idle_nabi, R.drawable.run_idle_moru, R.drawable.run_idle_altteul};
+    private static final int[] IDLE_CAST = {R.drawable.run_idle_chikuwa, R.drawable.run_idle_rune, R.drawable.run_idle_illya, R.drawable.run_idle_tsubakieh};
+    private static final int[] IDLE_SMITHS = {R.drawable.run_idle_smith_moru, R.drawable.run_idle_smith_pulmu, R.drawable.run_idle_smith_sutdol};
+    private static final int[] IDLE_LATER = {R.drawable.run_idle_gokhae, R.drawable.run_idle_miri, R.drawable.run_idle_gari, R.drawable.run_idle_yeobaek, 0,
+            R.drawable.run_idle_mawang, R.drawable.run_idle_guard, R.drawable.run_idle_butler, R.drawable.run_idle_byeoru, R.drawable.run_idle_jupan,
+            R.drawable.run_idle_sumbi, R.drawable.run_idle_pads, R.drawable.run_idle_party, 0, 0, 0, 0, 0};
+    private final java.util.Map<Integer, Bitmap> idleSheets = new java.util.HashMap<>();
+    /** For each one idling: when the next thing begins, what is being done (or -1), when it began, and how many things have been done. */
+    private final java.util.Map<Integer, float[]> idling = new java.util.HashMap<>();
+
+    private Bitmap idleSheet(int drawable) {
+        Bitmap sheet = idleSheets.get(drawable);
+        if (sheet == null) {
+            sheet = BitmapFactory.decodeResource(context.getResources(), drawable);
+            idleSheets.put(drawable, sheet);
+        }
+        return sheet;
+    }
+
+    /** What things take: a blink, a glance, a habit, the special thing. */
+    private static final float[] IDLE_LASTS = {.14f, 1.2f, 1.6f, 1.8f};
+
+    /**
+     * The frame one of them is at, by who it is: as drawn most of the time; and, at moments of its own (never two of them together), a
+     * blink, a glance, its habit back and forth, or its special thing. Only the drawn frame changes; nothing is moved.
+     */
+    private int idleFrame(int id) {
+        float[] state = idling.get(id);
+        if (state == null) {
+            java.util.Random first = new java.util.Random(id * 7919L);
+            state = new float[]{clock + .5f + first.nextFloat() * 4, -1, 0, 0};
+            idling.put(id, state);
+        }
+        if (state[0] - clock > 60) state[0] = clock + 2;
+        if (state[1] < 0 && clock >= state[0]) {
+            java.util.Random dice = new java.util.Random(id * 104729L + (long) state[3]++);
+            int roll = dice.nextInt(100);
+            state[1] = roll < 50 ? 0 : roll < 65 ? 1 : roll < 90 ? 2 : 3;
+            state[2] = clock;
+        }
+        if (state[1] < 0) return 0;
+        int doing = (int) state[1];
+        float into = clock - state[2];
+        if (into >= IDLE_LASTS[doing] || into < 0) {
+            java.util.Random dice = new java.util.Random(id * 15485863L + (long) state[3]);
+            state[1] = -1;
+            state[0] = clock + 1.4f + dice.nextFloat() * 3.6f;
+            return 0;
+        }
+        return doing == 0 ? 1 : doing == 1 ? 2 : doing == 2 ? (into % .8f < .4f ? 3 : 4) : 5;
     }
 
     private Bitmap villagers() {
@@ -2825,26 +3247,48 @@ final class RunGame {
 
     private Bitmap herPet() {
         Bitmap[] set = looks.get(drawn());
-        return set != null ? set[0] : pet;
+        return dressed("pet", set != null ? set[0] : pet);
     }
 
     private Bitmap herJump() {
         Bitmap[] set = looks.get(drawn());
-        return set != null ? set[1] : jump;
+        return dressed("jump", set != null ? set[1] : jump);
     }
 
     /** The sheet of her hurt, thrown and fallen, in a colour: so that she does not lose in pink what she was wearing in red. */
     private Bitmap herLose(int form) {
         Bitmap[] set = looks.get(form);
-        return set != null ? set[2] : lose;
+        return dressed("lose", set != null ? set[2] : lose);
     }
 
     private Bitmap herArmed(int weapon) {
         int form = drawn();
         Bitmap[] set = looks.get(form);
-        if (set == null) return armed(weapon);
+        if (set == null) return dressed("arm" + weapon, armed(weapon));
         if (set[3 + weapon] == null) set[3 + weapon] = dyedArm(armed(weapon), weapon, form);
-        return set[3 + weapon];
+        return dressed("arm" + weapon, set[3 + weapon]);
+    }
+
+    /** Vanity: what she is dressed in at the moment (her own look, her gear, or her chosen outfit), and a sheet of her in it. See {@link RunVanity}. */
+    private VanityArt vanityArt;
+    private RunVanity.Style vanityStyle;
+    private long vanityAt = -1000;
+
+    private RunVanity.Style vanityNow() {
+        long now = System.currentTimeMillis();
+        if (now - vanityAt > 250 || now < vanityAt) {
+            vanityAt = now;
+            RunVanity.Keep kept = RunVanity.on(session);
+            vanityStyle = RunVanity.styleFor(RunVanity.mode(kept), RunVanity.outfit(kept), RunVanity.mode(kept) == RunVanity.GEAR ? wornNow() : null, RunVanity.ears(kept), RunVanity.horns(kept));
+        }
+        return vanityStyle;
+    }
+
+    private Bitmap dressed(String sheet, Bitmap from) {
+        RunVanity.Style style = vanityNow();
+        if (style == null) return from;
+        if (vanityArt == null) vanityArt = new VanityArt(context);
+        return vanityArt.sheet(sheet, from, style);
     }
 
     /** Who waits at the end of a land, by her colour, her name, and where she is among those who speak (below nothing for Zero and King Slime, who do not). */
@@ -2882,6 +3326,7 @@ final class RunGame {
         // keeps the size it was given.)
         boolean reshaped = shelf != null && !shelf.closed() && (width != this.width || height != this.height);
         if (reshaped) shelf.close();
+        if (boutique != null && !boutique.closed() && (width != this.width || height != this.height)) boutique.close();
         this.width = width;
         this.height = height;
         safe.set(insets);
@@ -2964,7 +3409,7 @@ final class RunGame {
         goButton.set(lands[from].left, under, lands[last].right, under + dp(48));
         text.setTextSize(dp(26));
         float from0 = safe.left + dp(18) + text.measureText("Plus run") + dp(12), to = soundButton.left - dp(8);
-        shopButton.set(Math.max(from0, to - dp(128)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
+        shopButton.set(Math.max(from0, to - dp(160)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
         // The way into the gallery: her cringing face with its name under it, at the foot of the map on the right, across from her
         // and clear of what she says. Where there is little room under the lands it is smaller, and loses its name before its face.
         float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
@@ -2974,6 +3419,7 @@ final class RunGame {
 
     void close() {
         if (shelf != null) shelf.close();
+        if (boutique != null) boutique.close();
         audio.close();
     }
 
@@ -2982,6 +3428,7 @@ final class RunGame {
         // (A clip being watched is over with: what follows it waits to be gone on with. So is a film; and the gallery is shut.)
         if (video != null) video.skip();
         if (shelf != null) shelf.close();
+        if (boutique != null) boutique.close();
         if (screen == PLAY) pause();
         audio.hush();
     }
@@ -2993,6 +3440,11 @@ final class RunGame {
             video.skip();
             return true;
         }
+        // The boutique: Back is out of it, to the counter.
+        if (boutique != null && !boutique.closed()) {
+            boutique.close();
+            return true;
+        }
         // The gallery: Back is out of a picture being looked at, and then out of the gallery, to the map.
         if (shelf != null && !shelf.closed()) {
             if (!shelf.back()) shelf.close();
@@ -3002,6 +3454,11 @@ final class RunGame {
         // Whatever sheet is open over the screen is what Back closes: her backpack, or the colours opened out.
         if (packOpen) {
             packOpen = false;
+            audio.play("tap", .3f);
+            return true;
+        }
+        if (bagOpen) {
+            bagOpen = false;
             audio.play("tap", .3f);
             return true;
         }
@@ -3234,6 +3691,13 @@ final class RunGame {
             int clip = session.tally("run_clip");
             session.keep("run_clip", 0);
             showClip(clip, stage, null);
+        }
+        // (And the guild counter, at a tab, for looking at it.)
+        if (BuildConfig.DEBUG && screen == MAP && video == null && session.tally("run_counter") > 0) {
+            counterTab = Math.min(TAB_NAMES.length - 1, session.tally("run_counter") - 1);
+            session.keep("run_counter", 0);
+            counterFrom = MAP;
+            screen = SHOP;
         }
         if (!galleryNews && !petNews || video != null || shelf != null && !shelf.closed()) return;
         boolean free = screen == MAP || screen == PLAY && finale == NO_FINALE && !talking && captionLeft <= 0 && personLeft <= 0;
@@ -3506,6 +3970,8 @@ final class RunGame {
         popWords.clear();
         cameraX = 0;
         cameraY = restingCamera();
+        woodReset = true;
+        camFeet = -99;
         screen = PLAY;
         captionLeft = 0;
         // And, in the last land, the flight or the land unmade at once, for looking at them.
@@ -5326,10 +5792,24 @@ final class RunGame {
         if (refused > 0) refused -= seconds;
         if (knockAge >= 0 && (knockAge += seconds) > KNOCK) knockAge = -1;
         if (shake > 0) shake -= seconds;
+        woodSeconds += seconds;
         if (flash > 0) flash -= seconds;
         if (personLeft > 0) personLeft -= seconds;
         // A card that says something was won is read while the land is on the screen: it does not run out behind a pause.
         if (toastLeft > 0 && screen == PLAY) toastLeft -= seconds;
+        wardFlash += seconds;
+        gripChanged += seconds;
+        // The keys, said once the story told as the first land begins is over (said over it, it would not be heard).
+        if (keysHintDue && screen == PLAY && !(talking && !told) && captionLeft <= 0) {
+            keysHintDue = false;
+            session.keep("run_keys_said", 1);
+            speak(RunStory.KEYS[0], true);
+        }
+        // The first time the map is open with nothing else to say: her line with the game's name in it.
+        if (screen == MAP && video == null && captionLeft <= 0 && personLeft <= 0 && session.tally("run_title_said") == 0 && clock > 1.5f) {
+            session.keep("run_title_said", 1);
+            speak(RunStory.TITLE_LINE[0], false);
+        }
         if (screen == PLAY && video == null) {
             clearedAge += seconds;
             diaryAge += seconds;
@@ -5488,9 +5968,14 @@ final class RunGame {
         // Where the land is taller than the screen, the view goes up and down with her.
         // Down in a cave under the land, the view follows her there, as deep as the land goes.
         boolean deep = run.level().under != null && run.room() < 0 && run.y() + PlusRun.TALL > RunLevels.ROWS - .5f;
+        // (The height it follows: her feet when she stands somewhere a good way off from the last; in the air, only once she is well above
+        // or below it. A step, a jump or a hop onto a ledge leaves it where it is.)
+        float feet = run.y() + PlusRun.TALL;
+        if (camFeet < -50 || run.entered() != seenEntered) camFeet = feet;
+        else if (run.onGround() ? Math.abs(feet - camFeet) > CAMERA_STILL : feet > camFeet + 3 || feet < camFeet - 4.5f) camFeet = feet;
         float level = deep ? Math.max(0, Math.min(run.level().land.length - down, run.y() + PlusRun.TALL - down * .55f))
                 : down >= RunLevels.ROWS ? restingCamera()
-                : Math.max(0, Math.min(RunLevels.ROWS - down, run.y() + PlusRun.TALL - down * .62f));
+                : Math.max(0, Math.min(RunLevels.ROWS - down, camFeet - down * .62f));
         if (run.room() >= 0) {
             // A place off the land has a floor and a ceiling of its own: an arena's are far apart, and the view follows her between them.
             int[] in = run.level().rooms.get(run.room());
@@ -5506,7 +5991,9 @@ final class RunGame {
         } else if (run.entered() != seenEntered) {
             cameraY = level;
         }
-        if (!held) cameraY += (level - cameraY) * Math.min(1, seconds * 6);
+        // Gently; but quickly when she is near the bottom or the top of the view.
+        float fromTop = feet - cameraY, pace = fromTop > down * .86f || fromTop < down * .18f ? 9 : 2.5f;
+        if (!held) cameraY += (level - cameraY) * Math.min(1, seconds * pace);
         if (squash > 0) squash -= seconds;
         float herX = run.x() + PlusRun.WIDE / 2, herY = run.y() + PlusRun.TALL;
         // The colour she is drawn in: when it changes, the one fades into the other.
@@ -6333,7 +6820,8 @@ final class RunGame {
             int code = run.found().get(seenFound++);
             session.keepNote("run_bag", RunLoot.note(RunLoot.add(RunLoot.bag(session.note("run_bag")), code)));
             int rarity = RunLoot.rarity(code);
-            toast(RunLoot.RARITIES[rarity] + ": " + RunLoot.name(code), "In her bag  ·  " + RunLoot.TYPES[RunLoot.type(code)], 0);
+            toast(RunLoot.RARITIES[rarity] + ": " + RunLoot.name(code), "In her bag  ·  " + RunLoot.TYPES[RunLoot.type(code)]
+                    + (RunLoot.type(code) == RunLoot.WEAPON ? "" : "  ·  open it to wear"), LOOT_PICTURE + code);
             toastRarity = rarity >= RunLoot.GOLD ? 2 : rarity >= RunLoot.BLUE ? 1 : 0;
             audio.play(rarity >= RunLoot.GOLD ? "unlock" : "tap", 1);
             if (rarity == RunLoot.ROSE) speak(RunStory.LEVEL[0], true);
@@ -6777,9 +7265,14 @@ final class RunGame {
 
     void touch(MotionEvent event) {
         int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) keyed = false;
         float x = event.getX(), y = event.getY();
         if (packOpen) {
             if (action == MotionEvent.ACTION_DOWN) packTouch(x, y);
+            return;
+        }
+        if (bagOpen) {
+            if (action == MotionEvent.ACTION_DOWN) bagTouch(x, y);
             return;
         }
         if (huntsOpen) {
@@ -7005,6 +7498,8 @@ final class RunGame {
             } else if (counterTab == ARMS_TAB && armsAct.contains(x, y)) {
                 audio.play("tap", .5f);
                 openPack(MAP);
+            } else if (counterTab == VANITY_TAB) {
+                vanityTouch(x, y);
             }
         } else if (screen == STALL) {
             for (int index = 0; index < stallWares.length; index++) {
@@ -7326,14 +7821,121 @@ final class RunGame {
                 else up = true;
             }
         }
+        touchLeft = left;
+        touchRight = right;
+        touchJump = up;
+        touchStrike = strike;
+        touchDown = down;
+        goBreath = breath;
+        together();
+    }
+
+    /** What she does: what the fingers hold and what the keys hold, either; a jump or a strike begun by either is pressed. */
+    private void together() {
+        boolean up = touchJump || keys.held(RunKeys.JUMP), strike = touchStrike || keys.held(RunKeys.STRIKE | RunKeys.SPECIAL);
         if (up && !goJump) jumpPressed = true;
         if (strike && !goStrike) strikePressed = true;
-        goLeft = left;
-        goRight = right;
+        goLeft = touchLeft || keys.held(RunKeys.LEFT);
+        goRight = touchRight || keys.held(RunKeys.RIGHT);
         goJump = up;
         goStrike = strike;
-        goDown = down;
-        goBreath = breath;
+        goDown = touchDown || keys.held(RunKeys.DOWN);
+    }
+
+    /**
+     * A key, down or up. In a land: held keys are added to what the buttons hold; Q or Tab changes what she holds; E is the button over the
+     * jump; S or Down at a door goes through it. On a card: Enter, Space or J says yes to its first choice; on a story page, turns it. Esc
+     * is Back, which the stage gives as Back. Whether the key was one of the game's.
+     */
+    boolean key(int keyCode, boolean down) {
+        int does = RunKeys.of(keyCode);
+        if (does == 0 || does == RunKeys.BACK) return false;
+        int fresh = keys.press(keyCode, down);
+        if (down) keyed = true;
+        boolean sheet = packOpen || bagOpen || huntsOpen || smithOpen || marketOpen || fanOpen;
+        if (screen == PLAY && run != null && !sheet) {
+            // (Once the story being told as the land begins is over: said over it, it would not be heard.)
+            if (fresh != 0 && number == 1 && session.tally("run_keys_said") == 0) keysHintDue = true;
+            if ((fresh & RunKeys.SWAP) != 0 && run.nextUp() != PlusRun.UNARMED) {
+                run.swap();
+                buzz(false);
+            }
+            if ((fresh & RunKeys.EXTRA) != 0) overJump();
+            if ((fresh & RunKeys.DOWN) != 0 && !run.atStall() && run.door() >= 0) {
+                idle();
+                run.enter();
+            }
+            // (A card that holds the land, or something won rising, is sent on by a key as by a touch.)
+            if (fresh != 0) {
+                if (prizeAge >= 0 && prizeAge < 2 && prizeAge > .8f) prizeAge = 2;
+                if (roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds() && roomCardAge > .5f) roomCardAge = 3.1f;
+                if (roomResultAge >= 0 && roomResultAge < 2.6f && roomResultAge > .8f) roomResultAge = 2.6f;
+            }
+            together();
+            return true;
+        }
+        together();
+        if ((fresh & (RunKeys.CONFIRM | RunKeys.JUMP | RunKeys.STRIKE)) == 0 || sheet) return true;
+        if (screen == STORY) {
+            if (++line >= telling.length) {
+                endStory();
+            } else {
+                speak(telling[line], false);
+                audio.play("page", .5f);
+            }
+        } else if ((screen == PAUSED || screen == RESULT) && pillCount > 0 && (fresh & RunKeys.CONFIRM) != 0) {
+            act(pillActions[0]);
+        } else if (screen == STALL && pillCount > 0 && (fresh & RunKeys.CONFIRM) != 0) {
+            carryOut(pillActions[0]);
+        }
+        return true;
+    }
+
+    /** The button over the jump, used by its key: a gate's warp, a building's counter, a pet to swap, a door, a stall. */
+    private void overJump() {
+        if (run.door() < 0 && !run.atStall() && run.spot() < 0 && atGate()) {
+            warp();
+        } else if (run.door() < 0 && !run.atStall() && run.spot() >= 0) {
+            int what = run.spot();
+            audio.play("tap", .5f);
+            idle();
+            if (what == PlusRun.BOARD) openHunts();
+            else if (what == PlusRun.MACHINE) crank();
+            else if (what == PlusRun.DEALER) openMarket();
+            else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
+            else {
+                counterFrom = PLAY;
+                counterTab = what < 100 ? PETS_TAB : what - 100;
+                if (what < 100) petOn = what;
+                screen = SHOP;
+                speak(RunStory.SHOP[0], false);
+            }
+        } else if (run.door() < 0 && !run.atStall() && run.petOffer() >= 0) {
+            run.swapPet();
+            buzz(true);
+        } else if (!run.atStall() && run.door() >= 0) {
+            idle();
+            run.enter();
+        } else if (run.atStall()) {
+            audio.play("tap", .5f);
+            idle();
+            screen = STALL;
+            pills("Back to the land", RESUME, "Guild counter", COUNTER);
+        }
+    }
+
+    /** The mouse wheel: in her bag, the next page or the one before. */
+    boolean wheel(float turned) {
+        if (!bagOpen || turned == 0) return false;
+        bagPage = Math.max(0, bagPage + (turned < 0 ? 1 : -1));
+        audio.play("page", .4f);
+        return true;
+    }
+
+    /** Everything let go: the window has gone from the front, or the land is left. */
+    void letGo() {
+        keys.clear();
+        together();
     }
 
     // Drawing
@@ -7415,6 +8017,8 @@ final class RunGame {
             drawFlights(canvas, screen == PLAY ? 1 / 60f : 0);
             if (screen == PLAY && (roomCardAge >= 0 || roomResultAge >= 0)) drawRoomCards(canvas);
             if (screen == PLAY) {
+                // (While keys are used, the buttons are all but gone; a touch brings them back.)
+                if (keyed) canvas.saveLayerAlpha(0, 0, width, height, 60);
                 // Charmed, the arrows are the wrong way round, and show it.
                 boolean charmed = run.charmed() > 0;
                 control(canvas, leftButton, goLeft, 180, charmed);
@@ -7482,6 +8086,7 @@ final class RunGame {
                         label(canvas, stallButton, "Swap");
                     }
                 }
+                if (keyed) canvas.restore();
             } else if (screen == STALL) {
                 canvas.drawColor(0x8C000000);
                 drawStall(canvas);
@@ -7507,9 +8112,377 @@ final class RunGame {
         }
         // Her backpack, over whatever is there.
         if (packOpen) drawPack(canvas);
+        if (bagOpen) drawBag(canvas);
         if (huntsOpen) drawHunts(canvas);
         if (smithOpen) drawSmithy(canvas);
         if (marketOpen) drawMarket(canvas);
+    }
+
+    // Her bag
+
+    /** Her bag is opened, from where her backpack was. */
+    private void openBag(int from) {
+        bagOpen = true;
+        bagFrom = from;
+        bagOn = -1;
+        bagSlot = -1;
+        bagPage = 0;
+        goLeft = goRight = goJump = goStrike = false;
+        jumpPressed = strikePressed = false;
+        audio.play("page", .6f);
+    }
+
+    private static final String[] BAG_TABS = {"All", "Weapons", "Armour", "Accessories"};
+
+    /** What is in it, as places in it, for the tab: the rarest first, and of one rarity the latest found first. */
+    private int[] bagOrder(List<Integer> bag) {
+        List<Integer> places = new ArrayList<>();
+        for (int index = 0; index < bag.size(); index++) if (bagTab == 0 || RunLoot.type(bag.get(index)) == bagTab - 1) places.add(index);
+        places.sort((one, other) -> {
+            int rare = Integer.compare(RunLoot.rarity(bag.get(other)), RunLoot.rarity(bag.get(one)));
+            return rare != 0 ? rare : Integer.compare(other, one);
+        });
+        int[] order = new int[places.size()];
+        for (int index = 0; index < order.length; index++) order[index] = places.get(index);
+        return order;
+    }
+
+    /** The weapon found that she has taken in hand, or 0; kept as the number of the thing. */
+    private int handCode() {
+        String note = session.note("run_hand");
+        try {
+            int code = note == null || note.isEmpty() ? 0 : Integer.parseInt(note.trim());
+            return code != 0 && RunLoot.type(code) == RunLoot.WEAPON ? code : 0;
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    /** A weapon found is taken in hand: kept, and in a land put in her hands at once. */
+    private void takeInHand(int code) {
+        session.keepNote("run_hand", String.valueOf(code));
+        perks = kept();
+        if (run != null) run.hold(code);
+        audio.play("unlock", .8f);
+        buzz(true);
+    }
+
+    /** What she wears, as it is kept. */
+    private RunLoot.Worn wornNow() { return RunLoot.worn(session.note("run_worn")); }
+
+    /** What she wears is changed: kept, and felt at once in a land. */
+    private void wearNow(RunLoot.Worn worn) {
+        session.keepNote("run_worn", RunLoot.note(worn));
+        perks = kept();
+        if (run != null) run.wear(worn);
+        audio.play("unlock", .8f);
+        buzz(false);
+    }
+
+    /** How many of a thing she is wearing. */
+    private static int wearing(RunLoot.Worn worn, int code) { return (worn.armour == code ? 1 : 0) + (worn.first == code ? 1 : 0) + (worn.second == code ? 1 : 0); }
+
+    /** The thing looked at: a worn slot's, or the bag's. */
+    private int bagLooked(List<Integer> bag, RunLoot.Worn worn) {
+        if (bagSlot >= 0) return bagSlot == 0 ? worn.armour : bagSlot == 1 ? worn.first : worn.second;
+        return bagOn >= 0 && bagOn < bag.size() ? bag.get(bagOn) : 0;
+    }
+
+    private void bagTouch(float x, float y) {
+        List<Integer> bag = RunLoot.bag(session.note("run_bag"));
+        RunLoot.Worn worn = wornNow();
+        for (int slot = 0; slot < 3; slot++) {
+            if (bagSlots[slot] != null && bagSlots[slot].contains(x, y)) {
+                bagSlot = slot;
+                bagOn = -1;
+                audio.play("tap", .5f);
+                return;
+            }
+        }
+        for (int tab = 0; tab < 4; tab++) {
+            if (bagTabs[tab] != null && bagTabs[tab].contains(x, y)) {
+                bagTab = tab;
+                bagPage = 0;
+                audio.play("tap", .5f);
+                return;
+            }
+        }
+        for (int cell = 0; cell < bagCells.length; cell++) {
+            if (bagCells[cell] == null || bagCells[cell].isEmpty() || !bagCells[cell].contains(x, y) || cell >= bagShown.length) continue;
+            bagOn = bagShown[cell];
+            bagSlot = -1;
+            audio.play("tap", .5f);
+            return;
+        }
+        if (!bagPrev.isEmpty() && bagPrev.contains(x, y)) {
+            bagPage = Math.max(0, bagPage - 1);
+            audio.play("page", .4f);
+            return;
+        }
+        if (!bagNext.isEmpty() && bagNext.contains(x, y)) {
+            bagPage++;
+            audio.play("page", .4f);
+            return;
+        }
+        if (!bagAct.isEmpty() && bagAct.contains(x, y)) {
+            int code = bagLooked(bag, worn), type = RunLoot.type(code);
+            if (type == RunLoot.WEAPON) {
+                takeInHand(code);
+                return;
+            }
+            if (bagSlot >= 0) {
+                // Taken off.
+                wearNow(new RunLoot.Worn(bagSlot == 0 ? 0 : worn.armour, bagSlot == 1 ? 0 : worn.first, bagSlot == 2 ? 0 : worn.second));
+                bagSlot = -1;
+            } else if (type == RunLoot.ARMOUR) {
+                wearNow(new RunLoot.Worn(code, worn.first, worn.second));
+            } else if (type == RunLoot.ACCESSORY) {
+                // Into an empty place; with both full, in place of the less rare of the two.
+                boolean firstFree = worn.first == 0, secondFree = worn.second == 0;
+                boolean intoFirst = firstFree || !secondFree && RunLoot.rarity(worn.first) <= RunLoot.rarity(worn.second);
+                wearNow(intoFirst ? new RunLoot.Worn(worn.armour, code, worn.second) : new RunLoot.Worn(worn.armour, worn.first, code));
+            }
+            return;
+        }
+        if (!bagCard.contains(x, y)) {
+            bagOpen = false;
+            audio.play("tap", .3f);
+        }
+    }
+
+    /**
+     * Her bag: what she wears at its head, an armour and two accessories, with what a set of them adds; tabs for what is in it; the things
+     * themselves, each in a frame of its rarity, a page at a time; and the card of the one looked at: what it is, for which class, what it
+     * does, and a button that puts it on or takes it off. Weapons found are kept for when they can be held.
+     */
+    private void drawBag(Canvas canvas) {
+        canvas.drawColor(0x99000000);
+        List<Integer> bag = RunLoot.bag(session.note("run_bag"));
+        RunLoot.Worn worn = wornNow();
+        // Wide: three columns, what she wears and the tabs, the things, and the card. Tall: all in one column.
+        boolean side = safe.width() > safe.height() * 1.15f;
+        float pad = dp(14), wide = Math.min(safe.width() - dp(24), dp(side ? 900 : 440));
+        float columnWide = side ? (wide - pad * 4) / 3 : wide - pad * 2;
+        int columns = 5, rows = 4;
+        float slot = side ? Math.min(dp(58), (columnWide - dp(20)) / 3) : dp(58);
+        float headTall = dp(30) + dp(16) + slot + dp(10) + (side ? dp(46) + dp(70) : dp(38)), detailTall = dp(226), cell, tall;
+        if (side) {
+            tall = Math.min(safe.height() - dp(16), pad * 2 + Math.max(headTall, Math.max(dp(30) + detailTall, dp(30) + columnWide / columns * rows + dp(34))));
+            cell = Math.min(columnWide / columns, (tall - pad * 2 - dp(30) - dp(34)) / rows);
+        } else {
+            float room = safe.height() - dp(16) - pad * 2 - headTall - dp(34) - detailTall;
+            cell = Math.min(columnWide / columns, room / rows);
+            tall = pad * 2 + headTall + cell * rows + dp(34) + detailTall;
+        }
+        float left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
+        bagCard.set(left, top, left + wide, top + tall);
+        plate(canvas, bagCard, dp(22), 255);
+        float x = left + pad, y = top + pad;
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        fitted(canvas, "Bag", x, y + dp(18), dp(20), dp(80));
+        text.setTypeface(Typeface.DEFAULT);
+        text.setColor(soft);
+        text.setTextAlign(Paint.Align.RIGHT);
+        fitted(canvas, bag.size() + " of " + RunLoot.BAG + " found", side ? x + columnWide : left + wide - pad, y + dp(17), dp(12), columnWide - dp(70));
+        y += dp(30);
+        // What she wears.
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        fitted(canvas, "Wearing", x, y + dp(11), dp(11.5f), dp(120));
+        y += dp(16);
+        String[] slotNames = {"Armour", "Accessory", "Accessory"};
+        int[] wornCodes = {worn.armour, worn.first, worn.second};
+        for (int index = 0; index < 3; index++) {
+            if (bagSlots[index] == null) bagSlots[index] = new RectF();
+            bagSlots[index].set(x + index * (slot + dp(10)), y, x + index * (slot + dp(10)) + slot, y + slot);
+            lootFrame(canvas, wornCodes[index], bagSlots[index], bagSlot == index);
+            if (wornCodes[index] == 0) {
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(soft);
+                fitted(canvas, slotNames[index], bagSlots[index].centerX(), bagSlots[index].centerY() + dp(4), dp(10.5f), slot - dp(8));
+            } else {
+                // Its slot named under it, so an accessory is never taken for something else.
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(soft);
+                fitted(canvas, slotNames[index], bagSlots[index].centerX(), bagSlots[index].bottom + dp(10), dp(9.5f), slot);
+            }
+        }
+        // What a set adds: beside the slots, or under them when wide.
+        String setWords = worn.set >= 2 ? RunLoot.THEMES[Math.min(11, RunLoot.theme(worn.armour))] + " set of three: +1 shield, 10% harder blows, life back"
+                : worn.set == 1 ? RunLoot.THEMES[Math.min(11, RunLoot.theme(worn.armour))] + " set of two: +1 shield piece" : "Armour and an accessory of one chapter make a set";
+        text.setTextAlign(Paint.Align.LEFT);
+        float setX = side ? x : x + 3 * (slot + dp(10)), setY = side ? y + slot + dp(32) : y + dp(16);
+        List<String> setLines = wrapSized(setWords, x + columnWide - setX, dp(11.5f));
+        text.setColor(worn.set > 0 ? 0xFF3F7FC4 : soft);
+        for (int line = 0; line < Math.min(4, setLines.size()); line++) canvas.drawText(setLines.get(line), setX, setY + line * dp(14), text);
+        y += slot + dp(22) + (side ? dp(46) : 0);
+        // Tabs: in a row, or two rows of two when wide.
+        int across = side ? 2 : 4;
+        float tabWide = (columnWide - dp(6) * (across - 1)) / across;
+        for (int tab = 0; tab < 4; tab++) {
+            if (bagTabs[tab] == null) bagTabs[tab] = new RectF();
+            float tx = x + (tab % across) * (tabWide + dp(6)), ty = y + (tab / across) * dp(34);
+            bagTabs[tab].set(tx, ty, tx + tabWide, ty + dp(28));
+            smithButton(canvas, bagTabs[tab], BAG_TABS[tab], bagTab == tab, CalculatorLayout.CORAL);
+        }
+        y += side ? dp(70) : dp(38);
+        float gridX = side ? left + pad * 2 + columnWide : x, gridY = side ? top + pad + dp(30) : y;
+        // The things, a page at a time.
+        int[] order = bagOrder(bag);
+        int perPage = columns * rows, pages = Math.max(1, (order.length + perPage - 1) / perPage);
+        bagPage = Math.min(bagPage, pages - 1);
+        bagShown = new int[Math.max(0, Math.min(perPage, order.length - bagPage * perPage))];
+        for (int index = 0; index < bagCells.length; index++) {
+            if (bagCells[index] == null) bagCells[index] = new RectF();
+            bagCells[index].setEmpty();
+        }
+        float gridLeft = gridX + (columnWide - cell * columns) / 2;
+        for (int index = 0; index < bagShown.length; index++) {
+            int place = order[bagPage * perPage + index];
+            bagShown[index] = place;
+            float cx = gridLeft + (index % columns) * cell, cy = gridY + (index / columns) * cell;
+            bagCells[index].set(cx + dp(3), cy + dp(3), cx + cell - dp(3), cy + cell - dp(3));
+            int code = bag.get(place);
+            lootFrame(canvas, code, bagCells[index], place == bagOn && bagSlot < 0);
+            // Worn: a small mark.
+            if (wearing(worn, code) > 0) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(CalculatorLayout.CORAL);
+                canvas.drawCircle(bagCells[index].right - cell * .1f, bagCells[index].top + cell * .1f, cell * .07f, paint);
+                paint.setColor(Color.BLACK);
+            }
+        }
+        if (order.length == 0) {
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(soft);
+            fitted(canvas, bagTab == 0 ? "Nothing yet: creatures drop things now and then" : "None of these yet", gridX + columnWide / 2, gridY + cell * rows / 2, dp(13), columnWide);
+        }
+        float pagesY = gridY + cell * rows + dp(4);
+        bagPrev.setEmpty();
+        bagNext.setEmpty();
+        if (pages > 1) {
+            float middle = gridX + columnWide / 2;
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(ink);
+            fitted(canvas, (bagPage + 1) + " / " + pages, middle, pagesY + dp(19), dp(13), dp(80));
+            if (bagPage > 0) {
+                bagPrev.set(middle - dp(100), pagesY + dp(2), middle - dp(44), pagesY + dp(28));
+                smithButton(canvas, bagPrev, "‹", true, 0xFF8A5A33);
+            }
+            if (bagPage < pages - 1) {
+                bagNext.set(middle + dp(44), pagesY + dp(2), middle + dp(100), pagesY + dp(28));
+                smithButton(canvas, bagNext, "›", true, 0xFF8A5A33);
+            }
+        }
+        // The card of the one looked at: the third column when wide, else under the things.
+        float cardX = side ? left + pad * 3 + columnWide * 2 : x, cardY = side ? top + pad + dp(30) : pagesY + dp(34);
+        drawBagCard(canvas, bagLooked(bag, worn), worn, bag, cardX, cardY, columnWide, top + tall - pad);
+    }
+
+    /** Words wrapped at a size. */
+    private List<String> wrapSized(String words, float wide, float size) {
+        text.setTextSize(size);
+        return wrap(words, wide);
+    }
+
+    /** The card of a thing in her bag, or of one she wears: its picture, its name in its rarity's colour, what it is and for whom, what it does, and its button. */
+    private void drawBagCard(Canvas canvas, int code, RunLoot.Worn worn, List<Integer> bag, float x, float y, float wide, float bottom) {
+        bagAct.setEmpty();
+        if (code == 0) {
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(soft);
+            fitted(canvas, bagSlot >= 0 ? "Nothing worn here: pick something from the bag" : "Tap something to see what it does", x + wide / 2, y + dp(40), dp(12.5f), wide);
+            return;
+        }
+        int rarity = RunLoot.rarity(code), type = RunLoot.type(code);
+        RectF picture = new RectF(x, y, x + dp(64), y + dp(64));
+        lootFrame(canvas, code, picture, false);
+        float words = x + dp(76);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        text.setColor(rarity == RunLoot.WHITE ? ink : mixed(rarityColour(rarity), dark ? Color.WHITE : Color.BLACK, dark ? .1f : .25f));
+        fitted(canvas, RunLoot.name(code), words, y + dp(18), dp(15), wide - dp(76));
+        text.setTypeface(Typeface.DEFAULT);
+        // Which slot it goes in, in a small coloured tag over its picture.
+        String slotWord = type == RunLoot.WEAPON ? "WEAPON" : type == RunLoot.ARMOUR ? "ARMOUR" : "ACCESSORY";
+        text.setTextSize(dp(9.5f));
+        float tagWide = text.measureText(slotWord) + dp(10);
+        RectF tag = new RectF(x + dp(32) - tagWide / 2, y + dp(56), x + dp(32) + tagWide / 2, y + dp(70));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(type == RunLoot.WEAPON ? 0xFFB46A2A : type == RunLoot.ARMOUR ? 0xFF3F7FC4 : 0xFF8E5BE8);
+        canvas.drawRoundRect(tag, dp(7), dp(7), paint);
+        paint.setColor(Color.BLACK);
+        text.setColor(Color.WHITE);
+        text.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(slotWord, tag.centerX(), tag.bottom - dp(3.5f), text);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        int[] does = RunLoot.does(code);
+        String kind = type == RunLoot.WEAPON ? "Weapon" : type == RunLoot.ARMOUR ? "Armour  ·  leans to " + (RunLoot.leansTo(RunLoot.base(code)) == RunLoot.ANY ? "every class"
+                : RunLoot.CLASS_NAMES[RunLoot.leansTo(RunLoot.base(code))]) : "Accessory  ·  " + (does[0] == RunLoot.ANY ? "any weapon" : "for " + RunLoot.CLASS_NAMES[does[0]]);
+        fitted(canvas, RunLoot.RARITIES[rarity] + "  ·  " + kind, words, y + dp(37), dp(11.5f), wide - dp(76));
+        if (type != RunLoot.WEAPON && does[0] != RunLoot.ANY) {
+            fitted(canvas, RunLoot.CLASS_HOLDS[does[0]], words, y + dp(54), dp(10.5f), wide - dp(76));
+        } else if (type == RunLoot.ARMOUR && RunLoot.leansTo(RunLoot.base(code)) != RunLoot.ANY) {
+            fitted(canvas, RunLoot.CLASS_HOLDS[RunLoot.leansTo(RunLoot.base(code))], words, y + dp(54), dp(10.5f), wide - dp(76));
+        }
+        float line = y + dp(86);
+        text.setTextSize(dp(12.5f));
+        if (type == RunLoot.WEAPON) {
+            text.setColor(ink);
+            int usedAs = RunArms.kindOf(code);
+            String used = RunArms.NAMES[usedAs] + ": " + (RunArms.itemBlows(code) > 0 ? "+" + RunArms.itemBlows(code) + (RunArms.itemBlows(code) == 1 ? " blow" : " blows") + ", " : "")
+                    + Math.round((RunArms.itemReach(code) - 1) * 100) + "% further, " + Math.round((1 - RunArms.itemRest(code)) * 100) + "% quicker"
+                    + (usedAs == PlusRun.GUN && RunArms.machine(code) ? ". A machine gun" : "") + (usedAs == RunArms.WAND ? ". Its element: " + RunArms.ELEMENTS[RunArms.element(code)] : "") + ". ";
+            for (String one : wrapSized((RunLoot.addition(code) ? "The plus-book she began with, before she had a book of her own: found again. " : "")
+                    + used + RunArms.does(usedAs), wide, dp(12.5f))) {
+                canvas.drawText(one, x, line, text);
+                line += dp(16.5f);
+            }
+        } else {
+            for (int pair = 0; pair * 2 + 2 < does.length; pair++) {
+                int effect = does[1 + pair * 2];
+                boolean leaning = type == RunLoot.ARMOUR && effect == RunLoot.POWER;
+                text.setColor(pair == 0 ? CalculatorLayout.CORAL : ink);
+                String said = RunLoot.said(effect, does[2 + pair * 2]) + (leaning ? " (" + (RunLoot.leansTo(RunLoot.base(code)) == RunLoot.ANY ? "every class"
+                        : RunLoot.CLASS_NAMES[RunLoot.leansTo(RunLoot.base(code))]) + ")" : "");
+                fitted(canvas, "•  " + said, x, line, dp(12.5f), wide);
+                line += dp(17);
+            }
+            // What more it would do at a better rarity.
+            if (type == RunLoot.ACCESSORY && rarity < RunLoot.RED && RunLoot.base(code) != RunLoot.ROSE_OF_HALGAKOS) {
+                text.setColor(soft);
+                fitted(canvas, rarity < RunLoot.GOLD ? "Gold and better do more besides" : "Red and better do more besides", x, line, dp(11), wide);
+                line += dp(15);
+            }
+        }
+        // The button.
+        bagAct.set(x, bottom - dp(40), x + wide, bottom);
+        boolean worn1 = bagSlot >= 0;
+        boolean canWear = type != RunLoot.WEAPON && !worn1 && wearing(worn, code) < count(bag, code) && (type == RunLoot.ARMOUR || wearing(worn, code) < 2);
+        if (type == RunLoot.WEAPON) {
+            boolean held = handCode() == code;
+            smithButton(canvas, bagAct, held ? "In her hands" : "Take it in hand", !held, CalculatorLayout.CORAL);
+            if (held) bagAct.setEmpty();
+            return;
+        }
+        if (worn1) {
+            smithButton(canvas, bagAct, "Take it off", true, 0xFF8A5A33);
+        } else if (canWear) {
+            smithButton(canvas, bagAct, type == RunLoot.ARMOUR && worn.armour != 0 ? "Wear it in place of what she has on" : "Wear it", true, CalculatorLayout.CORAL);
+        } else {
+            String why = type == RunLoot.WEAPON ? "Held from the smiths' next work" : "She is wearing it";
+            smithButton(canvas, bagAct, why, false, CalculatorLayout.CORAL);
+            bagAct.setEmpty();
+        }
+    }
+
+    private static int count(List<Integer> bag, int code) {
+        int count = 0;
+        for (int one : bag) if (one == code) count++;
+        return count;
     }
 
     /** Her backpack is opened: from a land, where the land waits; from the pause; or from the map. */
@@ -7537,6 +8510,11 @@ final class RunGame {
         if (!packWear.isEmpty() && packWear.contains(x, y)) {
             packOpen = false;
             openSmith(RunGear.PULMU, MAP);
+            return;
+        }
+        if (packBag.contains(x, y)) {
+            packOpen = false;
+            openBag(packFrom);
             return;
         }
         if (!packAct.isEmpty() && packAct.contains(x, y)) {
@@ -7586,14 +8564,16 @@ final class RunGame {
         text.setColor(soft);
         text.setTextAlign(Paint.Align.RIGHT);
         packWear.setEmpty();
-        if (inLand) {
-            fitted(canvas, "what she has found, and what is hers", left + wide - pad, top + pad + dp(17), dp(12), wide - pad * 2 - dp(110));
-        } else {
-            // From the map: a button to what she wears.
+        // Her bag of what she has found: in a land and from the map. From the map, also a button to what the smiths made her.
+        float bagRight = left + wide - pad;
+        if (!inLand) {
             packWear.set(left + wide - pad - dp(132), top + pad - dp(2), left + wide - pad, top + pad + dp(26));
             smithButton(canvas, packWear, "What she wears  ›", true, 0xFF3F7FC4);
-            text.setTextAlign(Paint.Align.RIGHT);
+            bagRight = packWear.left - dp(8);
         }
+        packBag.set(bagRight - dp(78), top + pad - dp(2), bagRight, top + pad + dp(26));
+        smithButton(canvas, packBag, "Bag  ›", true, 0xFFB46A2A);
+        text.setTextAlign(Paint.Align.RIGHT);
         float y = top + pad + dp(30);
         for (int kind = 0; kind < RunArms.COUNT; kind++) {
             if ((owned >> kind & 1) == 0) {
@@ -7733,19 +8713,19 @@ final class RunGame {
             canvas.restore();
             return;
         }
-        canvas.save();
-        canvas.rotate(shot.age * 540, x, y);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF7FE7DA);
-        paint.setAlpha(110);
-        canvas.drawRoundRect(x - size * .62f, y - size * .78f, x + size * .62f, y + size * .78f, size * .2f, size * .2f, paint);
-        paint.setColor(Color.WHITE);
+        // A page of her own book: pink glow, and two fainter pages behind it fanning out the way it came.
+        glowAt(canvas, x, y, size * 1.1f, 0xFFFF7AB8, 150);
         paint.setAlpha(255);
-        canvas.drawRoundRect(x - size * .46f, y - size * .62f, x + size * .46f, y + size * .62f, size * .08f, size * .08f, paint);
-        paint.setColor(0xFF2FB5A8);
-        for (int line = 0; line < 4; line++) canvas.drawRect(x - size * .3f, y - size * .42f + line * size * .25f, x + size * (line == 3 ? .05f : .3f), y - size * .34f + line * size * .25f, paint);
-        paint.setColor(Color.BLACK);
-        canvas.restore();
+        float back = shot.across < 0 ? 1 : -1;
+        for (int behind = 2; behind >= 0; behind--) {
+            canvas.save();
+            float bx = x + back * behind * size * .55f, by = y + (behind == 1 ? -1 : 1) * behind * size * .18f;
+            canvas.rotate(shot.age * 540 - behind * 35, bx, by);
+            paint.setAlpha(behind == 0 ? 255 : behind == 1 ? 130 : 70);
+            halgaBit(canvas, 0, bx, by, size * 1.6f);
+            canvas.restore();
+        }
+        paint.setAlpha(255);
     }
 
     /** The panel of translation her tablet-book opens: a pane of light in front of her with lines of writing in it, there for a third of a second. */
@@ -7755,9 +8735,13 @@ final class RunGame {
         float near = (panelX - cameraX) * tile, top = (panelY - cameraY) * tile, far = near + (panelLeft ? -1 : 1) * wide * open;
         float from = Math.min(near, far), to = Math.max(near, far);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF7FE7DA);
+        paint.setColor(0xFFFF8AC4);
         paint.setAlpha(Math.round(120 * (1 - through)));
         canvas.drawRoundRect(from, top, to, top + tall, tile * .2f, tile * .2f, paint);
+        // Her stamp in the middle of it, pressed in and fading.
+        paint.setAlpha(Math.round(255 * (1 - through)));
+        halgaBit(canvas, 1, (from + to) / 2, top + tall / 2, Math.min(tall, to - from) * (.7f + .3f * Math.min(1, through * 3)));
+        paint.setAlpha(255);
         stroke.setColor(Color.WHITE);
         stroke.setStrokeWidth(tile * .07f);
         stroke.setAlpha(Math.round(255 * (1 - through)));
@@ -7771,6 +8755,17 @@ final class RunGame {
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);
         stroke.setAlpha(255);
+    }
+
+    /** Her own book's page, and its stamp. */
+    private Bitmap halgaBits;
+
+    private void halgaBit(Canvas canvas, int which, float x, float y, float size) {
+        if (halgaBits == null) halgaBits = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_halga_bits);
+        int side = halgaBits.getHeight();
+        source.set(which * side, 0, which * side + side, side);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        canvas.drawBitmap(halgaBits, source, target, paint);
     }
 
     /** One of the four pictures that go with the tablet-book and the keys, its middle at a place. */
@@ -7790,7 +8785,13 @@ final class RunGame {
     /** The sky of a chapter over the whole screen, drifting by at a fifth of the land's pace. */
     /** The paper trees: four drawings, in a strip; and the line on which the wood behind the land stands, as it was last drawn. */
     private Bitmap paperTrees;
-    private float woodLine = -1;
+    private float woodLine = -1, camFeet = -99;
+    /** How far her feet must be from the height the view follows, standing, before it follows them. */
+    static final float CAMERA_STILL = 1.2f;
+    /** The wood's ground, in rows of the land: where it stands, where it is going, and the view it was last at rest with; and time since it was last drawn. */
+    private float woodGround = -1, woodTarget = -1, woodCamera, woodSeconds;
+    private boolean woodReset;
+
     private static final float WOOD_PACE = .45f, WOOD_EVERY = 4.6f;
 
     /**
@@ -7926,9 +8927,21 @@ final class RunGame {
         if (paperTrees == null) paperTrees = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_paper_trees);
         if (paperTrees == null) return;
         int middle = Math.max(0, Math.min(run.columns() - 1, (int) (cameraX + width / tile / 2)));
-        int ground = RunLevels.top(level, middle);
-        float line = ground < 0 ? woodLine : (ground - cameraY) * tile + tile * .35f;
-        woodLine = woodLine < 0 ? line : woodLine + (line - woodLine) * .06f;
+        // The wood's ground: the land's usual height over a wide stretch about the middle of the view (the middle of its heights, so a step,
+        // a ledge or a pit makes no difference), moved to only when it is well away from where the wood stands now, and then slowly.
+        float usual = RunLevels.usualGround(level, middle);
+        if (woodGround < 0 || woodReset) {
+            woodGround = woodTarget = usual;
+            woodCamera = cameraY;
+            woodReset = false;
+        }
+        if (usual >= 0 && Math.abs(usual - woodTarget) > RunLevels.WOOD_STILL) woodTarget = usual;
+        float rate = Math.min(1, woodSeconds * 1.1f);
+        woodGround += (woodTarget - woodGround) * rate;
+        woodCamera += (cameraY - woodCamera) * Math.min(1, woodSeconds * .9f);
+        woodSeconds = 0;
+        // (And the view going up and down moves it only by half as much: it is further off than the land.)
+        woodLine = (woodGround - woodCamera) * tile - (cameraY - woodCamera) * tile * RunLevels.WOOD_FOLLOWS + tile * .35f;
         int kinds = 4, cellWide = paperTrees.getWidth() / kinds, cellTall = paperTrees.getHeight();
         float back = cameraX * WOOD_PACE;
         int first = (int) Math.floor(back / WOOD_EVERY) - 2, last = (int) Math.ceil((back + width / tile) / WOOD_EVERY) + 2;
@@ -8032,6 +9045,16 @@ final class RunGame {
      * quarter turn lays one flat with its point to the right; mirrored, to the left.
      */
     private void thing(Canvas canvas, int kind, float x, float y, float tall, float degrees, boolean mirrored, boolean byTheHandle) {
+        if (kind >= RunArms.GREATSWORD) {
+            int held = perks != null ? perks.item : 0;
+            int index = held != 0 && RunArms.kindOf(held) == kind ? iconOf(held) : RunArms.baseOf(kind) * 12;
+            canvas.save();
+            canvas.translate(x, y);
+            if (mirrored) canvas.scale(-1, 1);
+            drawIcon(canvas, index, 0, 0, tall * 1.4f);
+            canvas.restore();
+            return;
+        }
         if (kind >= PlusRun.KATANA) {
             // The four won in the black arena: pictures of their own, each lying level.
             if (arms3 == null) arms3 = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_arms3);
@@ -8074,6 +9097,8 @@ final class RunGame {
         float across = sheet.wide[which], up = sheet.tall[which];
         source.set(Math.round(left + side * (1 - across) / 2), Math.round(top + side * (1 - up)), Math.round(left + side * (1 + across) / 2), top + side);
         if (across > .98f) source.inset(1, 0);
+        // (Its clear rows at the bottom are under the ground.)
+        bottom += wide * sheet.low[which] / across + dp(1);
         target.set(middle - wide / 2, bottom - wide * up / across, middle + wide / 2, bottom);
         canvas.save();
         if (turned) canvas.scale(-1, 1, middle, bottom);
@@ -8387,21 +9412,22 @@ final class RunGame {
             float x = (item[1] + 1.55f - cameraX) * tile, y = (item[2] + 1 - cameraY) * tile;
             int who = item[3];
             paint.setAlpha(255);
+            int idleId = who * 1000 + item[1];
             if (who <= 2) {
-                frame(canvas, cast(who - 1), given ? 2 : near ? 1 : 0, CAST_FRAMES[who - 1], x, y, tile * 1.62f, false);
+                int pose = given ? 2 : near ? 1 : 0;
+                if (pose == 0) frame(canvas, idleSheet(IDLE_CAST[who - 1]), idleFrame(idleId), IDLE_FRAMES, x, y, tile * 1.62f, false);
+                else frame(canvas, cast(who - 1), pose, CAST_FRAMES[who - 1], x, y, tile * 1.62f, false);
             } else if (who == 3 || who == 4) {
-                frame(canvas, cast(who == 3 ? TSUBAKIEH : ILLYA), 0, CAST_FRAMES[who == 3 ? TSUBAKIEH : ILLYA], x, y, tile * 1.62f, false);
+                frame(canvas, idleSheet(IDLE_CAST[who == 3 ? TSUBAKIEH : ILLYA]), idleFrame(idleId), IDLE_FRAMES, x, y, tile * 1.62f, false);
             } else if (who == RunLevels.NURI) {
-                Bitmap queen = face(10);
-                float tall = tile * 1.7f, wide = tall * queen.getWidth() / queen.getHeight();
-                target.set(x - wide / 2, y - tall, x + wide / 2, y);
-                canvas.drawBitmap(queen, null, target, paint);
+                cell(canvas, idleSheet(R.drawable.run_idle_nuri), idleFrame(idleId), IDLE_FRAMES, x, y, tile * 1.7f, false);
             } else {
-                // A little hop when she comes near, and when it has been given.
-                float hop = near && !given ? Math.abs((float) Math.sin(clock * 6)) * tile * .08f : 0;
+                // (No hop: everyone stands still, and only idles.)
+                float hop = 0;
                 // Nabi by the pet shop's door looks into her shop, to the right, where her pets are; she and Inju each stand behind a counter of their own.
                 boolean keeps = item[0] == PlusRun.SPOT && (who == RunLevels.NABI || who == RunLevels.INJU);
-                frame(canvas, villagers(), who - RunLevels.SOMI, VILLAGERS, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f, keeps && who == RunLevels.NABI);
+                frame(canvas, idleSheet(IDLE_VILLAGERS[who - RunLevels.SOMI]), idleFrame(idleId), IDLE_FRAMES, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f,
+                        keeps && who == RunLevels.NABI);
                 if (keeps) {
                     furniture();
                     standing(canvas, who == RunLevels.NABI ? counterPets : deskGuild, x + (who == RunLevels.NABI ? tile * .25f : -tile * .1f), y + tile * .04f, tile * (who == RunLevels.NABI ? 1.6f : 1.8f));
@@ -8524,8 +9550,17 @@ final class RunGame {
             }
         }
         for (PlusRun.Foe foe : run.foes()) {
+            paint.setColorFilter(null);
             if (foe.x + foe.wide() < first - 9 || foe.x > last + 9) continue;
             float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, feet = (foe.y + foe.tall() - cameraY) * tile;
+            if (!RunLevels.boss(foe.kind)) {
+                // Gold glows faintly; black ink has a dark aura that breathes.
+                if (!foe.flat && (foe.tier == PlusRun.RED_TIER || foe.tier == PlusRun.PURPLE_TIER)) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * .95f, TIER_BARS[foe.tier], 70);
+                if (!foe.flat && foe.tier == PlusRun.GOLD_TIER) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * 1.1f, 0xFFFFD45A, 120 + (int) (40 * Math.sin(clock * 3 + foe.x)));
+                if (!foe.flat && foe.tier == PlusRun.INK_TIER) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * 1.2f, 0xFF1A1030, 170 + (int) (50 * Math.sin(clock * 2 + foe.x)));
+                paint.setAlpha(255);
+                paint.setColorFilter(foe.struck < .1f && !foe.flat ? struckFilter() : tierFilter(foe.tier));
+            }
             boolean second = (int) (clock * 6 + foe.x) % 2 != 0;
             // The pictures face left, and are turned about to go right.
             boolean turned = !foe.leftward && !foe.flat;
@@ -8553,8 +9588,8 @@ final class RunGame {
             } else if (foe.kind >= RunLevels.SLIME) {
                 // The signs of the second volume: two pictures of each about its business, and two of its going, after which it fades.
                 int which = SIGN_ART + (foe.kind - RunLevels.SLIME) * 4 + (foe.flat ? (foe.act < .22f ? 2 : 3) : second ? 1 : 0);
-                if (foe.flat && foe.act > 1.6f) continue;
-                if (foe.flat) paint.setAlpha(Math.round(255 * Math.min(1, (1.6f - foe.act) / .5f)));
+                if (foe.flat && foe.act > 1f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (1f - foe.act) / .4f))));
                 else if (foe.dazed > 0 && (int) (clock * 16) % 2 == 0) paint.setAlpha(120);
                 boolean stretched = foe.kind == RunLevels.BAR;
                 if (stretched) piece(canvas, two, which, middle, feet + tile * .06f, foe.wide() * tile * 1.25f, turned);
@@ -8563,8 +9598,8 @@ final class RunGame {
             } else if (foe.kind == RunLevels.MINUS || foe.kind == RunLevels.THROWER) {
                 boolean walking = foe.kind == RunLevels.MINUS && second;
                 // (Down, it lies flat a moment and then fades, as everything beaten does.)
-                if (foe.flat && foe.act > 2.4f) continue;
-                if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
+                if (foe.flat && foe.act > 1f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (1f - foe.act) / .4f))));
                 if (!foe.flat && foe.dazed > 0 && (int) (clock * 16) % 2 == 0) paint.setAlpha(120);
                 art(canvas, foe.flat ? MINUS_FLAT_ART : MINUS_ART + (walking ? 1 : 0), middle, feet, foe.wide() * tile * 1.3f, turned);
                 paint.setAlpha(255);
@@ -8576,10 +9611,10 @@ final class RunGame {
             } else if (foe.kind == RunLevels.TIMES && foe.flat) {
                 // A times beaten: knocked into the air with its eyes spinning, turning over, and then flat on its back, cracked, its spikes
                 // limp; and after a moment it fades.
-                if (foe.act > 2.4f) continue;
+                if (foe.act > 1.3f) continue;
                 if (timesDown == null) timesDown = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_times_down);
                 float up = Math.min(1, foe.act / .45f), tall = foe.tall() * tile * 1.55f * 124 / 110;
-                paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
+                paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (1.3f - foe.act) / .4f))));
                 canvas.save();
                 if (up < 1) canvas.rotate((foe.leftward ? 1 : -1) * 200 * up, middle, feet - tall * .4f - (float) Math.sin(up * Math.PI) * tile * 1.1f);
                 cell(canvas, timesDown, up < 1 ? 0 : 1, 2, middle, feet + tile * .05f - (up < 1 ? (float) Math.sin(up * Math.PI) * tile * 1.1f : 0), tall, false);
@@ -8590,8 +9625,8 @@ final class RunGame {
                 art(canvas, TIMES_ART + (second ? 1 : 0), middle, feet, foe.wide() * tile * 1.25f, turned);
                 paint.setAlpha(255);
             } else {
-                if (foe.flat && foe.act > 2.4f) continue;
-                if (foe.flat) paint.setAlpha(Math.round(110 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
+                if (foe.flat && foe.act > 1f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(110 * Math.max(0, Math.min(1, (1f - foe.act) / .4f))));
                 // Low on the ground and stretched in the air.
                 artTall(canvas, DIVIDE_ART + (foe.ground - foe.y > .3f ? 1 : 0), middle, feet, foe.tall() * tile * (foe.flat ? .6f : 1.5f), false);
                 paint.setAlpha(255);
@@ -8602,18 +9637,23 @@ final class RunGame {
                 }
             }
         }
+        paint.setColorFilter(null);
+        drawHits(canvas, first, last);
         // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
         for (PlusRun.Foe foe : run.foes()) {
-            if (foe.flat || foe.left <= 1 || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
-            int marks = Math.min(6, foe.left);
-            float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, over = (foe.y - cameraY) * tile - tile * .2f, each = tile * .17f;
-            for (int index = 0; index < marks; index++) {
-                float px = middle + (index - (marks - 1) / 2f) * each;
-                paint.setStyle(Paint.Style.FILL);
+            if (foe.flat || foe.most <= PlusRun.BLOW || foe.left >= foe.most || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
+            float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, over = (foe.y - cameraY) * tile - tile * .22f;
+            float wide = Math.max(tile * .9f, foe.wide() * tile), high = tile * .11f, part = Math.max(0, foe.left / (float) foe.most);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xCC15171A);
+            canvas.drawRoundRect(middle - wide / 2 - tile * .03f, over - high / 2 - tile * .03f, middle + wide / 2 + tile * .03f, over + high / 2 + tile * .03f, high, high, paint);
+            paint.setColor(TIER_BARS[foe.tier]);
+            canvas.drawRoundRect(middle - wide / 2, over - high / 2, middle - wide / 2 + wide * part, over + high / 2, high / 2, high / 2, paint);
+            if (foe.struck < .2f) {
                 paint.setColor(Color.WHITE);
-                canvas.drawCircle(px, over, tile * .075f, paint);
-                paint.setColor(0xFFE0362F);
-                canvas.drawCircle(px, over, tile * .052f, paint);
+                paint.setAlpha(Math.round(255 * (1 - foe.struck / .2f)));
+                canvas.drawRoundRect(middle - wide / 2, over - high / 2, middle + wide / 2, over + high / 2, high / 2, high / 2, paint);
+                paint.setAlpha(255);
             }
             paint.setColor(Color.BLACK);
         }
@@ -10476,16 +11516,18 @@ final class RunGame {
             int moving = !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
             int pose = dashAge < .3f ? KATANA_DASH : dashAge < .62f ? KATANA_AFTER : dashAge < .8f ? KATANA_SHEATHE : run.heldFor() > .14f ? KATANA_GATHER
                     : airAge < .3f ? KATANA_DOWN : cutAge < .05f ? KATANA_DRAW : cutAge < .2f ? KATANA_CUT : cutAge < .33f ? KATANA_SHEATHE : moving;
-            frame(canvas, herArmed(weapon), pose, KATANA_FRAMES, feetX, feetY, tall, leftward);
+            boolean fast = pose == KATANA_CUT || pose == KATANA_DASH || pose == KATANA_DOWN || pose == KATANA_DRAW;
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, fast)) frame(canvas, herArmed(weapon), pose, KATANA_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon >= PlusRun.TABLET) {
             int pose = beaming ? (run.beam() > 0 ? MAIN_HEAVY : MAIN_GATHER) : sinceHeavy < .3f ? MAIN_HEAVY : sinceHeavy < .5f ? MAIN_SETTLE
                     : run.heldFor() > .12f ? MAIN_GATHER : sinceUse < .09f ? MAIN_BACK : sinceUse < .26f ? MAIN_GO
                     : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
-            frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
+            weaponAura(canvas, weapon, feetX + (leftward ? -1 : 1) * tall * .32f, feetY - tall * .5f, tall);
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward)) frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon != PlusRun.UNARMED) {
             int pose = sinceUse < .22f || run.swinging() >= 0 ? ARMED_USE : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL)
                     : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
-            frame(canvas, herArmed(weapon), pose, ARMED_FRAMES, feetX, feetY, tall, leftward);
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == ARMED_USE)) frame(canvas, herArmed(weapon), pose, ARMED_FRAMES, feetX, feetY, tall, leftward);
         } else {
             int pose;
             if (!run.onGround()) {
@@ -10497,6 +11539,179 @@ final class RunGame {
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
         }
         paint.setAlpha(255);
+    }
+
+    // Her hands, for a weapon found
+
+    private final Bitmap[] gripSheets = new Bitmap[RunGrips.KINDS.length], gripOvers = new Bitmap[RunGrips.KINDS.length];
+    /** The frame drawn last for the weapon in her hands, and how long since it changed: for the smear of a fast swing. */
+    private int lastGripFrame = -1;
+    private float gripChanged = 9;
+
+    /** The icon of the weapon she holds, if it is a weapon found of this kind; or -1. */
+    int heldIcon(int weapon) { return RunGrips.heldIcon(perks.item, weapon); }
+
+    /**
+     * She holds a weapon found, of a kind with a grip: drawn from her grip frame (in her form's colour, and dressed as she is), the weapon the
+     * item's own picture along the frame's line, and her hands over it. Whether she was drawn so.
+     */
+    private boolean gripped(Canvas canvas, int weapon, int pose, float feetX, float feetY, float tall, boolean leftward) {
+        return gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == MAIN_GO || pose == MAIN_HEAVY || pose == MAIN_BACK);
+    }
+
+    private boolean gripped(Canvas canvas, int weapon, int pose, float feetX, float feetY, float tall, boolean leftward, boolean fast) {
+        int grip = RunGrips.of(weapon), icon = heldIcon(weapon);
+        if (grip < 0 || icon < 0) return false;
+        float[] line = pose < RunGrips.LINES[grip].length ? RunGrips.LINES[grip][pose] : null;
+        // (A katana found, out of its sheath in her hands: its blade drawn out; at her hip, sheathed as its icon.)
+        if (weapon == PlusRun.KATANA && !RunLoot.paper(perks.item) && pose < RunGrips.HIP[grip].length && !RunGrips.HIP[grip][pose]) icon = RunGrips.bladeIcon(perks.item);
+        short[] axis = RunGrips.axis(icon);
+        if (line == null || axis == null) return false;
+        if (gripSheets[grip] == null) {
+            int body = context.getResources().getIdentifier("run_grip_" + RunGrips.NAMES[grip], "drawable", context.getPackageName());
+            int over = context.getResources().getIdentifier("run_grip_" + RunGrips.NAMES[grip] + "_over", "drawable", context.getPackageName());
+            if (body == 0 || over == 0) return false;
+            gripSheets[grip] = BitmapFactory.decodeResource(context.getResources(), body);
+            gripOvers[grip] = BitmapFactory.decodeResource(context.getResources(), over);
+        }
+        int frames = RunGrips.FRAMES[grip], form = drawn();
+        Bitmap body = dressed("grip" + weapon, form == 0 ? gripSheets[grip] : dyedGrip(grip, form)), over = gripOvers[grip];
+        // Where a point of the cell is on the screen: as frame() places the cell.
+        float scale = tall / (pet.getHeight() / (float) PetArt.FRAMES.length), cw = body.getWidth() / (float) frames, ch = body.getHeight();
+        float down = grounded(body, ch * scale);
+        // The smear: on a fast frame, the weapon where it was a moment ago too, fading.
+        if (pose != lastGripFrame) {
+            gripChanged = 0;
+        }
+        float[] was = lastGripFrame >= 0 && lastGripFrame < RunGrips.LINES[grip].length ? RunGrips.LINES[grip][lastGripFrame] : null;
+        canvas.save();
+        if (leftward) canvas.scale(-1, 1, feetX, feetY);
+        canvas.translate(feetX - cw * scale / 2, feetY + down - ch * scale);
+        canvas.scale(scale, scale);
+        if (fast && was != null && gripChanged < .2f) {
+            for (int ghost = 3; ghost >= 1; ghost--) {
+                float through = ghost / 4f;
+                float[] mix = {was[0] + (line[0] - was[0]) * (1 - through), was[1] + (line[1] - was[1]) * (1 - through), was[2] + (line[2] - was[2]) * (1 - through),
+                        was[3] + (line[3] - was[3]) * (1 - through)};
+                heldWeapon(canvas, icon, axis, mix, weapon, Math.round(90 * (1 - through) * (1 - gripChanged / .2f)));
+            }
+        }
+        // The slash trail along where its tip went: the real thing's bright, in its rarity's colour and wider the rarer; paper's thin and plain.
+        if (fast && was != null && gripChanged < .25f) {
+            boolean plain = RunLoot.paper(perks.item);
+            int rarity = RunLoot.rarity(perks.item);
+            float fade = 1 - gripChanged / .25f;
+            path.reset();
+            path.moveTo(was[2], was[3]);
+            float midX = (was[2] + line[2]) / 2 + (line[1] - was[1]) * .3f, midY = (was[3] + line[3]) / 2 - (line[0] - was[0]) * .3f;
+            path.quadTo(midX, midY, line[2], line[3]);
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            stroke.setColor(plain ? 0xFFE8E4DA : rarityColour(Math.max(RunLoot.BLUE, rarity)));
+            stroke.setAlpha(Math.round((plain ? 120 : 200) * fade));
+            stroke.setStrokeWidth(plain ? 4 : 8 + rarity * 3);
+            canvas.drawPath(path, stroke);
+            if (!plain) {
+                stroke.setColor(Color.WHITE);
+                stroke.setAlpha(Math.round(230 * fade));
+                stroke.setStrokeWidth(3 + rarity);
+                canvas.drawPath(path, stroke);
+            }
+            stroke.setAlpha(255);
+            stroke.setStrokeCap(Paint.Cap.BUTT);
+        }
+        heldWeapon(canvas, icon, axis, line, weapon, 255);
+        // A gleam along a real blade now and then.
+        if (!RunLoot.paper(perks.item)) {
+            float gleam = (clock * .7f + weapon * .3f) % 2.2f;
+            if (gleam < 1) {
+                float gx = line[0] + (line[2] - line[0]) * (.4f + .6f * gleam), gy = line[1] + (line[3] - line[1]) * (.4f + .6f * gleam);
+                glowAt(canvas, gx, gy, 14, 0xFFFFFFFF, Math.round(200 * (float) Math.sin(gleam * Math.PI)));
+                paint.setAlpha(255);
+            }
+        }
+        canvas.restore();
+        lastGripFrame = pose;
+        frame(canvas, body, pose, frames, feetX, feetY, tall, leftward);
+        frame(canvas, over, pose, frames, feetX, feetY, tall, leftward);
+        return true;
+    }
+
+    /** The weapon's own picture laid along a grip line (in the cell's own pixels): its handle at the grip, its tip toward where the line points. */
+    private void heldWeapon(Canvas canvas, int icon, short[] axis, float[] line, int weapon, int alpha) {
+        float hx = axis[1], hy = axis[2], tx = axis[3], ty = axis[4];
+        float iconLength = (float) Math.hypot(tx - hx, ty - hy), lineLength = (float) Math.hypot(line[2] - line[0], line[3] - line[1]);
+        // (Never smaller than reads at the game's size: a knife or a pen is shown as long as a third of her.)
+        float length = Math.max(lineLength, weapon == PlusRun.KNIFE || weapon == PlusRun.PEN ? 75 : 0) * 1.05f;
+        float scale = length / Math.max(1, iconLength);
+        double angle = Math.atan2(line[3] - line[1], line[2] - line[0]) - Math.atan2(ty - hy, tx - hx);
+        canvas.save();
+        canvas.translate(line[0], line[1]);
+        canvas.rotate((float) Math.toDegrees(angle));
+        canvas.scale(scale, scale);
+        canvas.translate(-hx, -hy);
+        if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
+        int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
+        source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        target.set(0, 0, LOOT_ICON, LOOT_ICON);
+        int was = paint.getAlpha();
+        paint.setAlpha(alpha);
+        canvas.drawBitmap(lootIcons, source, target, paint);
+        paint.setAlpha(was);
+        canvas.restore();
+    }
+
+    /** A grip sheet in her form's colour, made once for each. */
+    private final android.util.SparseArray<Bitmap> dyedGrips = new android.util.SparseArray<>();
+
+    private Bitmap dyedGrip(int grip, int form) {
+        int key = grip * 64 + form;
+        Bitmap made = dyedGrips.get(key);
+        if (made == null) {
+            made = dyedArm(gripSheets[grip], RunGrips.KINDS[grip], form);
+            dyedGrips.put(key, made);
+        }
+        return made;
+    }
+
+    /** About the weapon found in her hands, by its rarity: a glow from gold; flames and lightning from red; the rose's changing colour and petals. */
+    private void weaponAura(Canvas canvas, int weapon, float x, float y, float tall) {
+        int item = perks.item;
+        if (item == 0 || RunArms.kindOf(item) != weapon) return;
+        int rarity = RunLoot.rarity(item);
+        if (rarity < RunLoot.GOLD) return;
+        int colour = rarityColour(rarity);
+        glowAt(canvas, x, y, tall * (.35f + .05f * rarity), colour, 90 + (int) (40 * Math.sin(clock * 5)));
+        paint.setStyle(Paint.Style.FILL);
+        if (rarity == RunLoot.RED) {
+            // Flames licking up, and now and then a crack of lightning.
+            for (int flame = 0; flame < 4; flame++) {
+                float rise = (clock * 1.6f + flame * .25f) % 1, fx = x + (float) Math.sin(clock * 7 + flame * 1.7f) * tall * .12f, fy = y + tall * .1f - rise * tall * .35f;
+                paint.setColor(flame % 2 == 0 ? 0xFFFF6A2A : 0xFFFFD34A);
+                paint.setAlpha(Math.round(220 * (1 - rise)));
+                canvas.drawCircle(fx, fy, tall * .045f * (1 - rise * .6f), paint);
+            }
+            if ((int) (clock * 3) % 4 == 0) {
+                stroke.setColor(0xFFFFF4C2);
+                stroke.setStrokeWidth(tall * .012f);
+                path.reset();
+                path.moveTo(x - tall * .1f, y - tall * .2f);
+                path.lineTo(x, y - tall * .08f);
+                path.lineTo(x - tall * .04f, y + tall * .02f);
+                path.lineTo(x + tall * .1f, y + tall * .15f);
+                canvas.drawPath(path, stroke);
+            }
+        } else if (rarity == RunLoot.ROSE) {
+            // Petals turning about it.
+            for (int petal = 0; petal < 5; petal++) {
+                double turn = clock * 1.8 + petal * Math.PI * 2 / 5;
+                paint.setColor(RunLoot.rose(clock + petal * .4f));
+                paint.setAlpha(220);
+                canvas.drawOval(x + (float) Math.cos(turn) * tall * .22f - tall * .03f, y + (float) Math.sin(turn) * tall * .14f - tall * .018f,
+                        x + (float) Math.cos(turn) * tall * .22f + tall * .03f, y + (float) Math.sin(turn) * tall * .14f + tall * .018f, paint);
+            }
+        }
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
     }
 
     /** Halgakos with nothing in her hands, her feet at a place, as tall as asked when she stands. */
@@ -10760,6 +11975,7 @@ final class RunGame {
     private void cell(Canvas canvas, Bitmap sheet, int index, int count, float feetX, float feetY, float tall, boolean turned) {
         int wide = sheet.getWidth() / count;
         float scale = tall / sheet.getHeight();
+        feetY += grounded(sheet, tall);
         source.set(index * wide, 0, index * wide + wide, sheet.getHeight());
         target.set(feetX - wide * scale / 2, feetY - tall, feetX + wide * scale / 2, feetY);
         canvas.save();
@@ -10865,6 +12081,7 @@ final class RunGame {
     private void frame(Canvas canvas, Bitmap sheet, int index, int count, float feetX, float feetY, float tall, boolean turned) {
         float scale = tall / (pet.getHeight() / (float) PetArt.FRAMES.length);
         int wide = sheet.getWidth() / count;
+        feetY += grounded(sheet, sheet.getHeight() * scale);
         source.set(index * wide, 0, index * wide + wide, sheet.getHeight());
         target.set(feetX - wide * scale / 2, feetY - sheet.getHeight() * scale, feetX + wide * scale / 2, feetY);
         canvas.save();
@@ -10886,34 +12103,71 @@ final class RunGame {
     }
 
     private void drawHud(Canvas canvas) {
+        drawGearMarks(canvas);
+        if (run.wardHurts() != seenWardHurts) {
+            seenWardHurts = run.wardHurts();
+            wardFlash = 0;
+            audio.play("tap", .8f);
+        }
         // Her hearts, her lives and her pluses, in a plate at the top. The hearts are hearts, and empty by halves; the lives are her own
         // face and a count beside it, so that the two are never taken for each other.
-        int hearts = run.maxHearts(), halves = run.halves();
-        float tall = dp(44), margin = dp(10), heart = hearts > 5 ? dp(15) : hearts > 3 ? dp(18) : dp(22);
+        int mostHp = run.maxHp(), hp = run.hp(), allHearts = Math.max(1, (mostHp + RunSkills.HEART - 1) / RunSkills.HEART), hearts = Math.min(RunSkills.ROW, allHearts),
+                halves = run.halves(), wards = run.wardMost();
+        float tall = dp(wards > 0 ? 58 : 44), margin = dp(10), heart = hearts > 5 ? dp(15) : hearts > 3 ? dp(18) : dp(22);
         text.setTextSize(dp(15));
         text.setTextAlign(Paint.Align.LEFT);
         String count = "+ " + run.collected() + " of " + run.total(), lives = "× " + run.lives();
         float livesWide = dp(26) + text.measureText(lives) + dp(10);
         box.set(safe.left + margin, safe.top + margin, safe.left + margin + dp(20) + heart * hearts + dp(8) + livesWide + text.measureText(count) + dp(16),
                 safe.top + margin + tall);
-        float plateLeft = box.left, plateMiddle = box.centerY();
-        plate(canvas, box, tall / 2, 235);
+        float plateLeft = box.left, plateMiddle = box.centerY(), plateTop = box.top;
+        plate(canvas, box, dp(22), 235);
+        // Her shield bar, over her hearts: a shield for each piece, filling as it comes back; a flash as one takes a hurt.
+        if (wards > 0) {
+            plateMiddle += dp(7);
+            float ward = run.ward();
+            for (int index = 0; index < wards; index++) drawWard(canvas, plateLeft + dp(16) + dp(15) * index, plateTop + dp(10), dp(12), Math.max(0, Math.min(1, ward - index)));
+            if (wardFlash < .5f) glowAt(canvas, plateLeft + dp(16) + dp(15) * Math.min(wards - 1, (int) ward), plateTop + dp(10), dp(16), 0xFF6FB8FF, Math.round(220 * (1 - wardFlash / .5f)));
+            paint.setAlpha(255);
+        }
+        // Life coming back: a glow over her hearts.
+        if (run.regenAge() < .8f) {
+            float through = run.regenAge() / .8f;
+            glowAt(canvas, plateLeft + dp(14) + heart * Math.min(hearts - .5f, halves / 2f), plateMiddle, heart * (1 + through), 0xFFFF7A9A, Math.round(200 * (1 - through)));
+            paint.setAlpha(255);
+        }
         for (int index = 0; index < hearts; index++) {
             float middle = plateLeft + dp(14) + heart * (index + .5f), bottom = plateMiddle + heart * .42f;
-            int has = Math.max(0, Math.min(2, halves - index * 2));
+            // The layer showing at this place, and how full its heart is; under it, the layer below, full, if there is one.
+            float[] shown = RunSkills.heart(index, hp, mostHp);
+            int layer = (int) shown[0];
+            float fill = shown[1];
             // Down to the last of them, they beat.
-            float size = heart * .92f * (halves <= 2 && has > 0 ? 1 + .1f * (float) Math.sin(clock * 9) : 1);
-            if (has < 2) {
+            float size = heart * .92f * (hp <= RunSkills.HEART && fill > 0 ? 1 + .1f * (float) Math.sin(clock * 9) : 1);
+            if (layer > 0) {
+                paint.setAlpha(255);
+                paint.setColorFilter(heartFilter(layer - 1));
+                art(canvas, HEART_ART, middle, bottom, size, false);
+            } else if (fill < 1) {
+                paint.setColorFilter(null);
                 paint.setAlpha(60);
                 art(canvas, HEART_ART, middle, bottom, size, false);
             }
-            if (has > 0) {
+            if (fill > 0) {
                 paint.setAlpha(255);
+                paint.setColorFilter(heartFilter(layer));
                 canvas.save();
-                if (has == 1) canvas.clipRect(middle - heart, bottom - heart * 1.2f, middle, bottom + heart * .2f);
+                if (fill < 1) canvas.clipRect(middle - heart, bottom - heart * 1.2f, middle - heart * .46f + heart * .92f * fill, bottom + heart * .2f);
                 art(canvas, HEART_ART, middle, bottom, size, false);
                 canvas.restore();
             }
+            paint.setColorFilter(null);
+        }
+        // Past three hearts, her HP, small, under them.
+        if (allHearts > 3) {
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(soft);
+            fitted(canvas, hp + " / " + mostHp + " HP", plateLeft + dp(14), plateMiddle + heart * .42f + dp(10), dp(9.5f), heart * hearts);
         }
         paint.setAlpha(255);
         // What she wears, under her hearts: a small picture of each piece, in the colour of its set.
@@ -10941,7 +12195,7 @@ final class RunGame {
         text.setColor(run.lives() <= 1 ? 0xFFE0362F : ink);
         canvas.drawText(lives, livesAt + dp(26), plateMiddle + dp(5.5f), text);
         text.setColor(ink);
-        canvas.drawText(count, livesAt + livesWide, plateMiddle + dp(5.5f), text);
+        fitted(canvas, count, livesAt + livesWide, plateMiddle + dp(5.5f), dp(15), dp(400));
         plate(canvas, pauseButton, tall / 2, 235);
         paint.setColor(ink);
         canvas.drawRoundRect(pauseButton.centerX() - dp(7), pauseButton.centerY() - dp(8), pauseButton.centerX() - dp(2.5f), pauseButton.centerY() + dp(8), dp(1.5f), dp(1.5f), paint);
@@ -10949,6 +12203,7 @@ final class RunGame {
         paint.setColor(Color.BLACK);
         float under = safe.top + margin + tall + dp(8), round = dp(36), x = safe.left + margin;
         drawLevel(canvas, x, under);
+        if (RunArms.heavy(run.weapon()) || run.energy() < PlusRun.ENERGY_MOST - .5f) drawEnergy(canvas, x + dp(128), under);
         under += dp(30);
         if (run.pet() >= 0) {
             float face = dp(run.herd().size() > 2 ? 30 : 42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
@@ -11058,7 +12313,7 @@ final class RunGame {
             float title = text.measureText(toastTitle);
             text.setTextSize(dp(11.5f));
             float wide = Math.min(safe.width() - margin * 2 - (run.pet() >= 0 ? dp(50) : 0), Math.max(title, text.measureText(toastWords)) + dp(66)), from = safe.left + margin - (1 - in) * dp(46);
-            int rim = toastRarity == 2 ? 0xFF8E5BE8 : toastRarity == 1 ? 0xFFE0A21A : 0xFFB9BEC2;
+            int rim = toastPicture >= LOOT_PICTURE ? rarityColour(RunLoot.rarity(toastPicture - LOOT_PICTURE)) : toastRarity == 2 ? 0xFF8E5BE8 : toastRarity == 1 ? 0xFFE0A21A : 0xFFB9BEC2;
             canvas.saveLayerAlpha(from - dp(8), under - dp(8), from + wide + dp(8), under + high + dp(10), Math.round(255 * fade));
             box.set(from, under, from + wide, under + high);
             plate(canvas, box, dp(15), 248);
@@ -11087,7 +12342,10 @@ final class RunGame {
             canvas.restore();
             paint.setAlpha(Math.round(255 * fade));
             float size = dp(34) * (1 + .5f * (float) Math.sin(eased * Math.PI));
-            if (toastPicture == -HER_PICTURE) round(canvas, 0, atX, atY, size * .5f);
+            if (toastPicture >= LOOT_PICTURE) {
+                box.set(atX - size * .55f, atY - size * .55f, atX + size * .55f, atY + size * .55f);
+                lootFrame(canvas, toastPicture - LOOT_PICTURE, new RectF(box), false);
+            } else if (toastPicture == -HER_PICTURE) round(canvas, 0, atX, atY, size * .5f);
             else if (toastPicture < 0) prizePicture(canvas, -toastPicture, atX, atY, size);
             else pieceIn(canvas, four, toastPicture, atX, atY, size, 0);
             paint.setAlpha(255);
@@ -11412,7 +12670,7 @@ final class RunGame {
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(can ? Color.WHITE : CalculatorLayout.CORAL);
             text.setTextSize(dp(14));
-            canvas.drawText(gone ? "Gone" : "+ " + STALL_COSTS[index], box.centerX(), box.centerY() + dp(5), text);
+            fitted(canvas, gone ? "Gone" : "+ " + STALL_COSTS[index], box.centerX(), box.centerY() + dp(5), text.getTextSize(), box.width() - dp(8));
         }
     }
 
@@ -11624,10 +12882,60 @@ final class RunGame {
 
     /** Writes a line no wider than there is room for: smaller, if that is what it takes. */
     private void fitted(Canvas canvas, String words, float x, float y, float size, float room) {
+        if (words.contains("+ ") && PLUS_AMOUNT.matcher(words).find()) {
+            plusFitted(canvas, words, x, y, size, room);
+            return;
+        }
         text.setTextSize(size);
         float wide = text.measureText(words);
         if (wide > room) text.setTextSize(size * room / wide);
         canvas.drawText(words, x, y, text);
+    }
+
+    /** An amount of pluses, as it is written: a "+" before a number. */
+    private static final java.util.regex.Pattern PLUS_AMOUNT = java.util.regex.Pattern.compile("\\+ (?=\\d)");
+    /** Her plus: the glossy one, and the plain bold one for small sizes. */
+    private Bitmap plusCoin;
+
+    private void plusIcon(Canvas canvas, float x, float y, float size, int alpha) {
+        if (plusCoin == null) plusCoin = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_plus_coin);
+        int which = size < dp(22) ? 1 : 0, side = plusCoin.getHeight();
+        source.set(which * side, 0, which * side + side, side);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        int was = paint.getAlpha();
+        paint.setAlpha(alpha);
+        canvas.drawBitmap(plusCoin, source, target, paint);
+        paint.setAlpha(was);
+    }
+
+    /** Words with amounts of pluses in them: each "+" drawn as her plus, the whole fitted to the room and placed as the text is aligned. */
+    private void plusFitted(Canvas canvas, String words, float x, float y, float size, float room) {
+        String[] parts = PLUS_AMOUNT.split(words, -1);
+        text.setTextSize(size);
+        float wide = plusWide(parts, size);
+        if (wide > room) {
+            size *= room / wide;
+            text.setTextSize(size);
+            wide = plusWide(parts, size);
+        }
+        Paint.Align align = text.getTextAlign();
+        float at = align == Paint.Align.LEFT ? x : align == Paint.Align.CENTER ? x - wide / 2 : x - wide, icon = size * 1.12f;
+        text.setTextAlign(Paint.Align.LEFT);
+        for (int index = 0; index < parts.length; index++) {
+            canvas.drawText(parts[index], at, y, text);
+            at += text.measureText(parts[index]);
+            if (index < parts.length - 1) {
+                plusIcon(canvas, at + icon / 2, y - size * .36f, icon, text.getAlpha());
+                at += icon + size * .14f;
+            }
+        }
+        text.setTextAlign(align);
+    }
+
+    private float plusWide(String[] parts, float size) {
+        float wide = 0;
+        for (String part : parts) wide += text.measureText(part);
+        return wide + (parts.length - 1) * (size * 1.12f + size * .14f);
     }
 
     /**
@@ -12139,6 +13447,16 @@ final class RunGame {
     }
 
     /** The heading of the map and of the counter: a name, a line under it, and the round button that leaves. */
+    /** The guild counter's picture: Halgakos sitting in a shopping cart, as she was drawn, in a square about a place. */
+    private Bitmap cartArt;
+
+    private void cart(Canvas canvas, float x, float y, float size) {
+        if (cartArt == null) cartArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_cart);
+        paint.setAlpha(255);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        canvas.drawBitmap(cartArt, null, target, paint);
+    }
+
     private void heading(Canvas canvas, String title, String under) {
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(ink);
@@ -12319,11 +13637,14 @@ final class RunGame {
             if (bought(which) < UP_COSTS[which].length && locked(which) == null && bank() >= UP_COSTS[which][bought(which)]) enough = true;
         }
         plate(canvas, shopButton, shopButton.height() / 2, 235);
+        // Its own picture: Halgakos in her cart, at its start; its words beside her.
+        float cartSize = shopButton.height() * .9f, wordsAt = shopButton.left + cartSize + dp(4), wordsRoom = shopButton.right - dp(10) - wordsAt;
+        cart(canvas, shopButton.left + dp(4) + cartSize / 2, shopButton.centerY(), cartSize);
         text.setTextAlign(Paint.Align.CENTER);
         text.setColor(ink);
-        fitted(canvas, shopButton.width() < dp(96) ? "Counter" : "Guild counter", shopButton.centerX(), shopButton.top + dp(15.5f), dp(12), shopButton.width() - dp(20));
+        fitted(canvas, wordsRoom < dp(86) ? "Counter" : "Guild counter", wordsAt + wordsRoom / 2, shopButton.top + dp(15.5f), dp(12), wordsRoom);
         text.setColor(CalculatorLayout.CORAL);
-        fitted(canvas, "+ " + bank() + "  ›", shopButton.centerX(), shopButton.bottom - dp(6.5f), dp(13), shopButton.width() - dp(20));
+        fitted(canvas, "+ " + bank() + "  ›", wordsAt + wordsRoom / 2, shopButton.bottom - dp(6.5f), dp(13), wordsRoom);
         if (enough) {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(CalculatorLayout.CORAL);
@@ -12410,6 +13731,9 @@ final class RunGame {
         canvas.drawColor(dark ? 0xAA000000 : 0x77FFFFFF);
         int bank = bank();
         heading(canvas, "Guild counter", "What she buys here she keeps in every land  \u00B7  + " + bank + " to spend");
+        // Its picture beside its name: Halgakos in her cart.
+        text.setTextSize(dp(26));
+        cart(canvas, safe.left + dp(18) + text.measureText("Guild counter") + dp(28), safe.top + dp(29), dp(44));
         // The tabs: one row; the open one is filled.
         // (The row is shared out by the length of their words, so that every word is the same size.)
         float across = Math.min(safe.width() - dp(28), dp(460)), from = safe.centerX() - across / 2, worded = 0, lettered = dp(12.5f);
@@ -12520,12 +13844,194 @@ final class RunGame {
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(Color.WHITE);
             fitted(canvas, "Open her backpack  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
+        } else if (counterTab == VANITY_TAB) {
+            drawVanityTab(canvas, left, under, across, bank);
         } else if (counterTab == 1) {
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(soft);
             fitted(canvas, "Her wings are what there is to buy for how she moves, so far.", left + dp(6), under + dp(14), dp(12.5f), across - dp(12));
         }
         text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /** Vanity at the counter: the toggle's three settings, and a row for each outfit. */
+    private final RectF[] vanityModes = {new RectF(), new RectF(), new RectF()}, vanityRows = new RectF[RunVanity.count()];
+
+    private RunVanity.Keep vanityKeep() { return RunVanity.on(session); }
+
+    private final RectF boutiqueAct = new RectF(), picturesAct = new RectF();
+    private final RectF[] vanityParts = {new RectF(), new RectF()};
+    private RunBoutique boutique;
+
+    /** The boutique is laid over the game, with the game's voice and sounds lent to it. */
+    private void openBoutique() { openBoutique(0); }
+
+    private void openBoutique(int page) {
+        if (boutique != null && !boutique.closed()) return;
+        audio.hush();
+        int[] edges = {Math.round(safe.left), Math.round(safe.top), Math.round(width - safe.right), Math.round(height - safe.bottom)};
+        boutique = RunBoutique.over(stage, session, dark, edges, new RunBoutique.Host() {
+            @Override public void say(String name) { audio.say(name); }
+
+            @Override public boolean speaking() { return audio.speaking(); }
+
+            @Override public void hush() { audio.hush(); }
+
+            @Override public void play(String effect) { audio.play(effect, .5f); }
+
+            @Override public void closed() { vanityAt = -1000; }
+        });
+        if (boutique != null) boutique.page(page);
+    }
+
+    private void vanityTouch(float x, float y) {
+        for (int part = 0; part < 2; part++) {
+            if (vanityParts[part].isEmpty() || !vanityParts[part].contains(x, y)) continue;
+            boolean ears = part == 0;
+            int now = ears ? RunVanity.ears(vanityKeep()) : RunVanity.horns(vanityKeep()), count = ears ? RunVanity.EARS.length : RunVanity.HORNS.length;
+            // The next she has, round to her own.
+            for (int step = 1; step <= count; step++) {
+                int next = (now + step) % count;
+                if (RunVanity.wearPart(vanityKeep(), ears, next)) break;
+            }
+            if (RunVanity.mode(vanityKeep()) != RunVanity.VANITY) RunVanity.setMode(vanityKeep(), RunVanity.VANITY);
+            vanityAt = -1000;
+            audio.play("star", .6f);
+            return;
+        }
+        if (!picturesAct.isEmpty() && picturesAct.contains(x, y)) {
+            audio.play("tap", .5f);
+            openBoutique(2);
+            return;
+        }
+        if (!boutiqueAct.isEmpty() && boutiqueAct.contains(x, y)) {
+            audio.play("tap", .5f);
+            openBoutique();
+            return;
+        }
+        for (int mode = 0; mode < vanityModes.length; mode++) {
+            if (vanityModes[mode].contains(x, y)) {
+                RunVanity.setMode(vanityKeep(), mode);
+                vanityAt = -1000;
+                audio.play("tap", .5f);
+                return;
+            }
+        }
+        for (int outfit = 0; outfit < vanityRows.length; outfit++) {
+            if (vanityRows[outfit] == null || !vanityRows[outfit].contains(x, y)) continue;
+            if (RunVanity.owns(vanityKeep(), outfit)) {
+                // Tapping the one she has on takes it off.
+                RunVanity.choose(vanityKeep(), RunVanity.outfit(vanityKeep()) == outfit ? -1 : outfit);
+                if (RunVanity.mode(vanityKeep()) == RunVanity.DEFAULT) RunVanity.setMode(vanityKeep(), RunVanity.VANITY);
+                audio.play("star", .6f);
+            } else if (RunVanity.QUEST[outfit] >= 0) {
+                openBoutique();
+                return;
+            } else if (RunVanity.buy(vanityKeep(), outfit)) {
+                RunVanity.setMode(vanityKeep(), RunVanity.VANITY);
+                audio.play("buy", .6f);
+                buzz(true);
+            } else {
+                audio.play("no", .5f);
+            }
+            vanityAt = -1000;
+            return;
+        }
+    }
+
+    private void drawVanityTab(Canvas canvas, float left, float top, float across, int bank) {
+        int mode = RunVanity.mode(vanityKeep()), chosen = RunVanity.outfit(vanityKeep());
+        float gap = dp(6), each = (across - gap * 2) / 3;
+        for (int one = 0; one < 3; one++) {
+            RectF at = vanityModes[one];
+            at.set(left + one * (each + gap), top, left + one * (each + gap) + each, top + dp(34));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(one == mode ? CalculatorLayout.CORAL : dark ? 0xFF2F3336 : 0xFFF1F3F4);
+            canvas.drawRoundRect(at, dp(17), dp(17), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(one == mode ? Color.WHITE : ink);
+            fitted(canvas, RunVanity.MODE_NAMES[one], at.centerX(), at.centerY() + dp(5), dp(13.5f), each - dp(10));
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        fitted(canvas, RunVanity.MODE_DOES[mode] + "  \u00B7  it never changes what she can do", left + dp(6), top + dp(52), dp(12), across - dp(12));
+        float y = top + dp(62);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        for (int part = 0; part < 2; part++) {
+            boolean ears = part == 0;
+            int now = ears ? RunVanity.ears(vanityKeep()) : RunVanity.horns(vanityKeep());
+            vanityParts[part].set(left, y, left + across, y + dp(40));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(dark ? 0xFF2F3336 : 0xFFF1F3F4);
+            canvas.drawRoundRect(vanityParts[part], dp(20), dp(20), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(soft);
+            fitted(canvas, ears ? "Ears" : "Horns", left + dp(16), vanityParts[part].centerY() + dp(5), dp(13), dp(60));
+            text.setColor(ink);
+            fitted(canvas, (ears ? RunVanity.EARS[now] : RunVanity.HORNS[now]) + "  \u203A", left + dp(76), vanityParts[part].centerY() + dp(5), dp(14.5f), across - dp(92));
+            y += dp(46);
+        }
+        float split = across * .62f;
+        boutiqueAct.set(left, y, left + split, y + dp(36));
+        picturesAct.set(left + split + dp(6), y, left + across, y + dp(36));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(CalculatorLayout.CORAL);
+        canvas.drawRoundRect(boutiqueAct, dp(18), dp(18), paint);
+        canvas.drawRoundRect(picturesAct, dp(18), dp(18), paint);
+        paint.setColor(Color.BLACK);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(Color.WHITE);
+        fitted(canvas, "Tulle & Thread, the boutique  \u203A", boutiqueAct.centerX(), boutiqueAct.centerY() + dp(5), dp(13.5f), boutiqueAct.width() - dp(20));
+        fitted(canvas, "Pictures  \u203A", picturesAct.centerX(), picturesAct.centerY() + dp(5), dp(13.5f), picturesAct.width() - dp(16));
+        y += dp(44);
+        text.setTextAlign(Paint.Align.LEFT);
+        // How she looks in it now: in the air, hurt, and with the sword in hand.
+        float tall = dp(96), feet = y + tall;
+        frame(canvas, herJump(), 1, JUMP_FRAMES, left + across * .2f, feet, tall, false);
+        frame(canvas, herLose(0), HIT, LOSE_FRAMES, left + across * .5f, feet, tall, false);
+        frame(canvas, herArmed(PlusRun.SWORD), 7, ARMED_FRAMES, left + across * .8f, feet, tall, false);
+        y = feet + dp(8);
+        for (int outfit = 0; outfit < vanityRows.length; outfit++) {
+            if (vanityRows[outfit] == null) vanityRows[outfit] = new RectF();
+            RectF at = vanityRows[outfit];
+            if (!RunVanity.ready(outfit)) {
+                at.setEmpty();
+                continue;
+            }
+            if (y + dp(56) > safe.bottom - dp(6)) {
+                at.setEmpty();
+                continue;
+            }
+            at.set(left, y, left + across, y + dp(50));
+            y += dp(56);
+            boolean hers = RunVanity.owns(vanityKeep(), outfit), on = chosen == outfit, quest = RunVanity.QUEST[outfit] >= 0, can = !hers && !quest && bank >= RunVanity.PRICES[outfit];
+            plate(canvas, at, dp(16), 245);
+            RunVanity.Style style = RunVanity.STYLES[outfit];
+            int[] swatch = {style.dark, style.mid, style.light, style.trim != 0 ? style.trim : style.mid};
+            paint.setStyle(Paint.Style.FILL);
+            for (int dot = 0; dot < 4 && style.art == null; dot++) {
+                paint.setColor(swatch[dot]);
+                canvas.drawCircle(at.left + dp(22), at.top + dp(10) + dot * dp(9.5f), dp(4f), paint);
+            }
+            paint.setColor(Color.BLACK);
+            float words = at.left + dp(42), price = dp(86), room = at.right - words - price - dp(18);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            fitted(canvas, RunVanity.NAMES[outfit], words, at.top + dp(21), dp(14.5f), room);
+            text.setColor(soft);
+            fitted(canvas, RunVanity.DOES[outfit], words, at.top + dp(39), dp(10.5f), room);
+            box.set(at.right - dp(12) - price, at.centerY() - dp(16), at.right - dp(12), at.centerY() + dp(16));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(on ? CalculatorLayout.CORAL : hers ? (dark ? 0xFF2F3336 : 0xFFEDEEEE) : can ? CalculatorLayout.CORAL : dark ? 0xFF44292E : 0xFFFCE9EB);
+            canvas.drawRoundRect(box, dp(18), dp(18), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(on || can ? Color.WHITE : hers ? soft : CalculatorLayout.CORAL);
+            fitted(canvas, on ? "Wearing" : hers ? "Wear" : quest ? "Quest" : "+ " + RunVanity.PRICES[outfit], box.centerX(), box.centerY() + dp(5.5f), dp(14), price - dp(14));
+        }
     }
 
     /**

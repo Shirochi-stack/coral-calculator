@@ -121,7 +121,9 @@ final class PlayView extends LinearLayout implements PlaySession.Listener {
         }
         LayoutParams closeParams = new LayoutParams(px(HEADER_BUTTON), px(HEADER));
         closeParams.leftMargin = px(GAP);
-        header.addView(headerButton(CompanionIcon.CLOSE, "Close the games", host::onClose), closeParams);
+        // On the app's own screen the games are the front of the app: the corner goes back to the calculator.
+        header.addView(full ? headerButton(CompanionIcon.CALCULATOR, "Open the calculator", host::onClose)
+                : headerButton(CompanionIcon.CLOSE, "Close the games", host::onClose), closeParams);
         addView(header, new LayoutParams(LayoutParams.MATCH_PARENT, px(HEADER)));
 
         // What Halgakos has to say about the game, read out as it changes.

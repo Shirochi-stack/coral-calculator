@@ -1,0 +1,12 @@
+plugins {
+    id 'com.android.asset-pack'
+}
+
+// Every outfit drawn whole, every frame of every sheet, as lossy WebP: delivered with the install, apart from the base module's
+// 200 MB. The debug build (the GitHub APK) carries the same files, see app/build.gradle.
+assetPack {
+    packName = 'vanity'
+    dynamicDelivery {
+        deliveryType = 'install-time'
+    }
+}

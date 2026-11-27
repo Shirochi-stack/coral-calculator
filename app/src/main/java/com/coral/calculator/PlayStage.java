@@ -1977,6 +1977,19 @@ final class PlayStage extends View {
 
     // Touches and keys
 
+    /** The mouse wheel, for a mouse: Plus run's bag turns its pages with it. */
+    @Override public boolean onGenericMotionEvent(MotionEvent event) {
+        if (runGame != null && event.getAction() == MotionEvent.ACTION_SCROLL
+                && runGame.wheel(event.getAxisValue(MotionEvent.AXIS_VSCROLL))) return true;
+        return super.onGenericMotionEvent(event);
+    }
+
+    /** Gone from the front: every key let go, so nothing stays held. */
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (!focused && runGame != null) runGame.letGo();
+    }
+
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (runGame != null) {
             runGame.touch(event);
@@ -2032,10 +2045,15 @@ final class PlayStage extends View {
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        // Plus run's keys, for a keyboard (Esc is Back, below).
+        if (runGame != null && event.getAction() != KeyEvent.ACTION_MULTIPLE
+                && runGame.key(event.getKeyCode(), event.getAction() == KeyEvent.ACTION_DOWN)) return true;
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK || event.getKeyCode() == KeyEvent.KEYCODE_ESCAPE) {
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) back();
             return true;
         }
+        // Page brawl is played on a keyboard too.
+        if (fightGame != null && fightGame.key(event)) return true;
         return super.dispatchKeyEvent(event);
     }
 

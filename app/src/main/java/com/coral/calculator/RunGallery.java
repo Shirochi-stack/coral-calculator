@@ -21,8 +21,8 @@ import java.util.List;
  * All of these only ever become true, so nothing that has opened closes again.
  */
 final class RunGallery {
-    static final int VIDEOS = 0, BOARDS = 1, PICTURES = 2;
-    static final String[] SHELVES = {"Videos", "Storyboards and cast", "Pictures"};
+    static final int VIDEOS = 0, BOARDS = 1, PICTURES = 2, VANITY = 3;
+    static final String[] SHELVES = {"Videos", "Storyboards and cast", "Pictures", "Vanity"};
     /** What is kept: how many things were open when she last said so, and when the gallery was last looked into. */
     static final String TOLD = "run_gallery_count", LOOKED = "run_gallery_seen";
 

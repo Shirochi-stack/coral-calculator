@@ -1404,7 +1404,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         try {
             app.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP));
         } catch (RuntimeException blocked) {
-            Toast.makeText(app, "Open Halgakos Calculator from your home screen", Toast.LENGTH_SHORT).show();
+            Toast.makeText(app, "Open Halgakos from your home screen", Toast.LENGTH_SHORT).show();
         }
     }
 
