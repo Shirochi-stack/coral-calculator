@@ -738,6 +738,12 @@ def for_phone(film, limit=28_000_000):
     seconds = float(source.duration) / 1e6
     source.close()
     target = film.with_name(film.stem + "-for-phone.mp4")
+    if film.stat().st_size <= limit:
+        # Small enough as it is: the copy is the film itself, not a second making of it that would be no smaller.
+        import shutil
+
+        shutil.copyfile(film, target)
+        return target
     rate = int((limit * 8 / seconds - 128_000) * .93)
     while True:
         source = av.open(str(film))
