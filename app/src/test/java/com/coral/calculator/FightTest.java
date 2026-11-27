@@ -910,6 +910,222 @@ public class FightTest {
         assertTrue(floor.contains(FightPose.of(fight, down, 0, 0)));
     }
 
+    /** How a fight went, in a few numbers: to tell whether the side that plays itself plays as it did. */
+    static String fingerprint(int left, int right, int leftLevel, int rightLevel, long seed) {
+        Fight fight = new Fight(left, right, leftLevel, rightLevel, seed);
+        Fight.Pad nothing = new Fight.Pad();
+        for (int step = 0; step < 60 * 400 && fight.phase() != Fight.MATCH_OVER; step++) fight.step(STEP, nothing);
+        return fight.hits() + "/" + fight.blocks() + "/" + fight.moves() + "/" + fight.falls() + "/" + fight.dodges() + "/" + fight.winner() + "/" + fight.round() + "/"
+                + Math.round(fight.fighters[0].health * 100) + "/" + Math.round(fight.fighters[1].health * 100) + "/" + Math.round(fight.left() * 100);
+    }
+
+    @Test public void atNormalTheSideThatPlaysItselfPlaysExactlyAsItDidBefore() {
+        // Recorded before there was any choice of how hard it is: the same seeds must give the same fights to the last hundredth.
+        String[] before = {"30/9/67/6/9/0/2/6500/0/4370", "36/3/50/6/1/1/2/0/4500/4728", "18/0/16/2/0/1/2/0/10000/5125",
+                "29/8/43/4/1/0/2/8280/0/5125", "32/2/48/6/1/1/2/0/5800/4815", "18/0/17/2/0/1/2/0/10000/4625",
+                "45/5/63/9/6/0/3/4820/0/5003", "26/0/34/5/0/1/2/0/7800/5207", "18/0/17/2/0/1/2/0/10000/4802"};
+        int index = 0;
+        for (int seed = 1; seed <= 3; seed++) {
+            assertEquals(before[index++], fingerprint(Fight.HALGAKOS, Fight.CHIKUWA, 2, 2, seed));
+            assertEquals(before[index++], fingerprint(Fight.RUNE, Fight.TSUBAKIEH, 0, 3, seed * 7));
+            assertEquals(before[index++], fingerprint(Fight.ILLYA, Fight.HALGAKOS, -1, 1, seed * 11));
+        }
+    }
+
+    /** The side that plays itself, at a level and how hard, against one who stands still: the mean length of the runs of blows it lands, and its air dashes. */
+    private static float[] combos(int how, int level, long seed, int kind) {
+        Fight fight = new Fight(Fight.CHIKUWA, kind, -1, level, seed);
+        fight.setStyle(1, how);
+        fight.fighters[0].x = Fight.WIDE / 2 - 1;
+        fight.fighters[1].x = Fight.WIDE / 2 + 1;
+        Fight.Pad nothing = new Fight.Pad();
+        int runs = 0, longest = 0, total = 0, seen = 0;
+        for (int step = 0; step < 60 * 30 && fight.phase() != Fight.MATCH_OVER; step++) {
+            fight.fighters[0].health = Fight.fullHealth(Fight.CHIKUWA);
+            fight.step(STEP, nothing);
+            // Each blow that lands on the one who stands still: the first of a run, or one more of it.
+            if (fight.hits() != seen) {
+                seen = fight.hits();
+                if (fight.hitSide() != 0) continue;
+                int combo = fight.fighters[1].combo;
+                if (combo == 1) runs++;
+                total++;
+                longest = Math.max(longest, combo);
+            }
+        }
+        return new float[]{runs == 0 ? 0 : total / (float) runs, longest, fight.airDashes()};
+    }
+
+    @Test public void hardLandsLongerCombosThanNormalAndEasyShorter() {
+        // All five, and the three who fight up close: the two who throw things land them one at a time whoever plays them.
+        float[] mean = new float[Fight.STYLES], close = new float[Fight.STYLES], longest = new float[Fight.STYLES];
+        int dashes = 0, normalDashes = 0;
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            for (long seed = 1; seed <= 4; seed++) {
+                for (int how = Fight.EASY; how <= Fight.BRUTAL; how++) {
+                    int level = how == Fight.EASY ? 0 : how == Fight.NORMAL ? 2 : 3;
+                    float[] one = combos(how, level, seed * 37 + kind, kind);
+                    mean[how] += one[0] / 20;
+                    if (kind <= Fight.TSUBAKIEH) close[how] += one[0] / 12;
+                    longest[how] = Math.max(longest[how], one[1]);
+                    if (how >= Fight.HARD) dashes += one[2];
+                    if (how <= Fight.NORMAL) normalDashes += one[2];
+                }
+            }
+        }
+        System.out.println("NOTE COMBOS mean " + java.util.Arrays.toString(mean) + " up close " + java.util.Arrays.toString(close) + " longest "
+                + java.util.Arrays.toString(longest) + " dashes " + dashes);
+        assertTrue(java.util.Arrays.toString(mean), mean[Fight.EASY] < mean[Fight.NORMAL] && mean[Fight.NORMAL] < mean[Fight.HARD]);
+        assertTrue(java.util.Arrays.toString(close), close[Fight.HARD] > close[Fight.NORMAL] * 1.3f);
+        // Brutal mixes in more of what lands alone (punishes, smashes from the air), but its combos are longer than normal too.
+        assertTrue(java.util.Arrays.toString(close), close[Fight.BRUTAL] > close[Fight.NORMAL] * 1.15f);
+        assertTrue(mean[Fight.EASY] < 1.3f);
+        assertTrue(longest[Fight.HARD] >= 4);
+        // Hard and brutal dash in the air; easy and normal never do.
+        assertTrue("dashed " + dashes, dashes > 0);
+        assertEquals(0, normalDashes);
+    }
+
+    @Test public void theHardestBeatTheEasiestAndHardIsHarderThanNormal() {
+        // The same fighter on both sides, so only how she plays differs: hard and brutal against normal at the top of the ladder
+        // and in the middle of it, and easy against normal at its start.
+        int[][] pairs = {{Fight.HARD, 3, Fight.NORMAL, 3}, {Fight.HARD, 3, Fight.NORMAL, 2}, {Fight.BRUTAL, 3, Fight.NORMAL, 3}, {Fight.EASY, 0, Fight.NORMAL, 1}};
+        int[] won = new int[pairs.length];
+        int fights = 0;
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            for (long seed = 1; seed <= 2; seed++) {
+                fights++;
+                for (int index = 0; index < pairs.length; index++) {
+                    int[] pair = pairs[index];
+                    Fight fight = new Fight(kind, kind, pair[1], pair[3], seed * 91 + kind + index * 1000);
+                    fight.setStyle(0, pair[0]);
+                    fight.setStyle(1, pair[2]);
+                    Fight.Pad nothing = new Fight.Pad();
+                    for (int step = 0; step < 60 * 600 && fight.phase() != Fight.MATCH_OVER; step++) fight.step(STEP, nothing);
+                    if (fight.winner() == 0) won[index]++;
+                }
+            }
+        }
+        System.out.println("NOTE AGAINST NORMAL of " + fights + ": hard at the top " + won[0] + ", hard in the middle " + won[1] + ", brutal " + won[2]
+                + ", easy at the start " + won[3]);
+        assertTrue(won[0] >= fights * .6f);
+        assertTrue(won[1] >= fights * .8f);
+        assertTrue(won[2] >= fights * .7f);
+        assertTrue(won[3] <= fights * .3f);
+    }
+
+    /** Jumps, and when she is at the top of it presses an arrow twice: toward the other (1) or away (-1). */
+    private static void dashInTheAir(Fight fight, int way, Fight.Pad other) {
+        Fight.Pad pad = new Fight.Pad();
+        pad.jump = true;
+        fight.step(STEP, pad, other);
+        pad.jump = false;
+        hold(fight, .25f, pad, other);
+        boolean right = way > 0 != fight.fighters[0].facingLeft;
+        for (int tap = 0; tap < 2; tap++) {
+            pad.left = !right;
+            pad.right = right;
+            fight.step(STEP, pad, other);
+            pad.left = false;
+            pad.right = false;
+            fight.step(STEP, pad, other);
+        }
+    }
+
+    @Test public void anArrowTwiceInTheAirIsADashOnceAJumpAndASmashMayComeOutOfIt() throws Exception {
+        Fight fight = apart(Fight.HALGAKOS, Fight.CHIKUWA, 8);
+        float from = fight.fighters[0].x;
+        dashInTheAir(fight, 1, null);
+        Fight.Fighter her = fight.fighters[0];
+        assertEquals(Fight.AIRDASH, her.state);
+        assertEquals(1, fight.airDashes());
+        float high = her.y;
+        Fight shown = new Fight(Fight.HALGAKOS, Fight.CHIKUWA, -1, -1, 0);
+        java.util.List<Integer> frames = new java.util.ArrayList<>();
+        Fight.Pad nothing = new Fight.Pad();
+        while (her.state == Fight.AIRDASH) {
+            // It goes along the line of the ground, at her height, and both devices show the same frame of it.
+            assertEquals(high, her.y, .001f);
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            fight.write(new java.io.DataOutputStream(bytes));
+            shown.read(new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray())));
+            int pose = FightPose.of(fight, her, 0, 0);
+            assertEquals(pose, FightPose.of(shown, shown.fighters[0], 0, 0));
+            if (frames.isEmpty() || frames.get(frames.size() - 1) != pose) frames.add(pose);
+            fight.step(STEP, nothing, null);
+        }
+        assertEquals(java.util.Arrays.asList(FightFrames.ADF1, FightFrames.ADF2, FightFrames.ADF3), frames);
+        assertTrue("went " + (her.x - from), her.x - from > 2);
+        // Once a jump: pressed again in the same jump it is nothing.
+        Fight.Pad pad = new Fight.Pad();
+        for (int tap = 0; tap < 2; tap++) {
+            pad.right = true;
+            fight.step(STEP, pad, null);
+            pad.right = false;
+            fight.step(STEP, pad, null);
+        }
+        assertEquals(1, fight.airDashes());
+        rest(fight, 1.5f);
+        assertEquals(0, her.y, 0);
+        // On the ground the same is a dash along it, as it always was; and after landing she may dash in the air again.
+        dashInTheAir(fight, -1, null);
+        assertEquals(2, fight.airDashes());
+        assertEquals(Fight.AIRDASH, her.state);
+        assertEquals(FightFrames.ADB1, FightPose.of(fight, her, 0, 0));
+        assertTrue(her.across * (her.facingLeft ? -1 : 1) < 0);
+
+        // A smash out of a dash: it comes down further along than one from a plain jump, and does what a smash does.
+        Fight dashed = apart(Fight.CHIKUWA, Fight.HALGAKOS, 4.5f), plain = apart(Fight.CHIKUWA, Fight.HALGAKOS, 4.5f);
+        dashInTheAir(dashed, 1, null);
+        Fight.Pad smash = new Fight.Pad();
+        hold(dashed, .08f, smash, null);
+        smash.heavy = true;
+        dashed.step(STEP, smash, null);
+        assertEquals(Fight.SMASH, dashed.fighters[0].move);
+        smash.heavy = false;
+        Fight.Pad jump = new Fight.Pad();
+        jump.jump = true;
+        plain.step(STEP, jump, null);
+        jump.jump = false;
+        hold(plain, .38f, jump, null);
+        jump.heavy = true;
+        plain.step(STEP, jump, null);
+        jump.heavy = false;
+        for (int frame = 0; frame < 120 && (dashed.quakes() == 0 || plain.quakes() == 0); frame++) {
+            dashed.step(STEP, smash, null);
+            plain.step(STEP, jump, null);
+        }
+        assertTrue("came down at " + dashed.quakeX() + " against " + plain.quakeX(), dashed.quakeX() > plain.quakeX() + 1);
+        rest(dashed, 1);
+        assertEquals(hurt(Fight.CHIKUWA, Fight.SMASH), lost(dashed, 1), .01f);
+        assertEquals(Fight.SMASH, dashed.fighters[0].move == Fight.SMASH ? Fight.SMASH : Fight.SMASH);
+
+        // In two devices' play the other side dashes in the air by the same arrows, sent as they always were.
+        Fight two = new Fight(Fight.TSUBAKIEH, Fight.ILLYA, -1, -1, 1);
+        Fight.Pad theirs = new Fight.Pad();
+        theirs.jump = true;
+        two.step(STEP, new Fight.Pad(), theirs);
+        theirs.jump = false;
+        hold(two, .25f, new Fight.Pad(), theirs);
+        for (int tap = 0; tap < 2; tap++) {
+            Fight.Pad sent = new Fight.Pad();
+            sent.set(1);
+            two.step(STEP, new Fight.Pad(), sent);
+            sent.set(0);
+            two.step(STEP, new Fight.Pad(), sent);
+        }
+        assertEquals(Fight.AIRDASH, two.fighters[1].state);
+        // Her own frames of it, pictures of their own, at her size.
+        if (FightFrames.AIRDASHED[Fight.HALGAKOS]) {
+            Set<String> places = new HashSet<>();
+            for (int frame : new int[]{FightFrames.ADF1, FightFrames.ADF2, FightFrames.ADF3, FightFrames.ADB1, FightFrames.ADB2, FightFrames.ADB3, FightFrames.TOP,
+                    FightFrames.ADODGE, FightFrames.BDODGE2}) {
+                short[] at = FightFrames.FRAMES[Fight.HALGAKOS][frame];
+                assertTrue(places.add(at[0] + " " + at[1] + " " + at[2]));
+            }
+        }
+    }
+
     // In the air
 
     @Test public void threeQuickBlowsInTheAirAndNoMore() {

@@ -28,7 +28,7 @@ final class Fight {
     static final int HALGAKOS = 0, CHIKUWA = 1, TSUBAKIEH = 2, RUNE = 3, ILLYA = 4, FIGHTERS = 5;
     /** What a fighter is doing. */
     static final int IDLE = 0, WALK = 1, JUMP = 2, BLOCK = 3, ATTACK = 4, HIT = 5, DOWN = 6, RISE = 7, WON = 8, OUT = 9, DASH = 10,
-            BACKSTEP = 11, LAND = 12, DODGE = 13;
+            BACKSTEP = 11, LAND = 12, DODGE = 13, AIRDASH = 14;
     /**
      * Her moves. The first four are what the buttons begin: a quick blow, a heavy one, her
      * special and her ultimate. Then the second to fifth of the quick chain and of the heavy
@@ -53,6 +53,16 @@ final class Fight {
     /** How long after a blow the next press still goes on with its chain; how long a dodge lasts, how much of it nothing can touch her, and how long before the next. */
     static final float CHAIN_WINDOW = .3f, DODGE_SECONDS = .34f, DODGE_SAFE = .22f, DODGE_REST = .9f;
     static final float DASH_SECONDS = .26f, BACKSTEP_SECONDS = .24f, LAND_SECONDS = .09f;
+    /** How long a dash in the air lasts: she holds her height for it and goes along the line of the ground. */
+    static final float AIRDASH_SECONDS = .22f;
+    /**
+     * How hard the side that plays itself is to beat, on the ladder: easy, as it always was (normal), hard and brutal.
+     * Easy is slow and strikes once at a time; normal is as it was; hard and brutal chain real combos, punish what misses,
+     * guard and dodge more, choose their moment for the ultimate, and dash in the air.
+     */
+    static final int EASY = 0, NORMAL = 1, HARD = 2, BRUTAL = 3, STYLES = 4;
+    /** What one who plays herself at hard or brutal does in a combo, step by step. */
+    private static final int P_QUICK = 1, P_HEAVY = 2, P_SPECIAL = 3, P_LAUNCH = 4, P_JUMP = 5, P_AIR = 6, P_SMASH = 7, P_DASH = 8;
     /** How fast Tsubakieh's home run sends them upward, and how long the fight stops as the bat lands. */
     static final float HOMER_UP = 21, HOMER_STOP = .2f, DROP_UP = 11.6f;
     /** The hardest the other side plays, from 0. */
@@ -216,6 +226,8 @@ final class Fight {
     static final class Pad {
         boolean left, right, jump, block, light, heavy, special, dodge, ultimate;
         int taps;
+        /** For one who plays herself only, never sent: the arrow she holds is taken as pressed twice, for a dash. */
+        boolean dash;
 
         void clear() {
             left = false;
@@ -228,6 +240,7 @@ final class Fight {
             dodge = false;
             ultimate = false;
             taps = 0;
+            dash = false;
         }
 
         /** What is held down as one number, a bit for each, to send to another device. */
@@ -282,6 +295,9 @@ final class Fight {
         float dodgeRest;
         int airMoves;
         boolean airDodged;
+        /** Whether she has dashed in this jump; and how fast a smash begun out of a dash still carries her along. */
+        boolean airDashed;
+        float carry;
         /** How many dodges of hers have made a blow miss that would have landed; and whether this one has yet. */
         int slips;
         private boolean slipped;
@@ -320,6 +336,11 @@ final class Fight {
     final Fighter[] fighters = new Fighter[2];
     private final List<Shot> shots = new ArrayList<>();
     private final int[] level = new int[2];
+    /** How hard each side that plays itself is (see EASY to BRUTAL); and, at hard and up, the combo she is in the middle of. */
+    private final int[] style = {NORMAL, NORMAL};
+    private final int[][] plan = new int[2][];
+    private final int[] planAt = new int[2], planWait = new int[2];
+    private final float[] planAge = new float[2], planWaited = new float[2];
     private final Pad[] minds = {new Pad(), new Pad()};
     private final float[] thinking = new float[2];
     private final Random random;
@@ -328,7 +349,7 @@ final class Fight {
     private int phase = FIGHTING, round = 1, flourisher = -1, lastWinner = -1;
     private float phaseClock, roundClock = ROUND_SECONDS, time;
     /** Counts that only go up, for whoever shows the fight to tell what has just happened; and where the last blow landed. */
-    private int hits, blocks, throwsMade, falls, moves, quakes, dodges, clashes;
+    private int hits, blocks, throwsMade, falls, moves, quakes, dodges, clashes, airDashes;
     private float hitX, hitY, quakeX;
     private boolean hitHard, hitGrand;
     private int hitSide;
@@ -421,6 +442,13 @@ final class Fight {
     float quakeX() { return quakeX; }
     int dodges() { return dodges; }
     int clashes() { return clashes; }
+    /** Dashes made in the air. */
+    int airDashes() { return airDashes; }
+
+    /** How hard a side that plays itself is: one of EASY to BRUTAL. Only the side's own play changes; nothing is sent of it. */
+    void setStyle(int side, int how) { style[side] = Math.max(EASY, Math.min(BRUTAL, how)); }
+
+    int style(int side) { return style[side]; }
     /** Where the last blow landed, whether it was a heavy one, and on which side's fighter. */
     float hitX() { return hitX; }
     float hitY() { return hitY; }
@@ -473,6 +501,7 @@ final class Fight {
         out.writeInt(quakes);
         out.writeInt(dodges);
         out.writeInt(clashes);
+        out.writeInt(airDashes);
         out.writeFloat(hitX);
         out.writeFloat(hitY);
         out.writeFloat(quakeX);
@@ -549,6 +578,7 @@ final class Fight {
         quakes = in.readInt();
         dodges = in.readInt();
         clashes = in.readInt();
+        airDashes = in.readInt();
         hitX = in.readFloat();
         hitY = in.readFloat();
         quakeX = in.readFloat();
@@ -734,6 +764,7 @@ final class Fight {
         boolean twice = left && me.sinceLeft <= DOUBLE_TAP || right && me.sinceRight <= DOUBLE_TAP;
         if (left) me.sinceLeft = 0;
         if (right) me.sinceRight = 0;
+        if (pad.dash && pad.left != pad.right && level[me.side] >= 0) twice = true;
         // Her ultimate, gone for while the other's is under way and has not yet landed, is a clash, whatever she is in the middle of.
         if (ultimate && me.charged() && me.state != OUT && pending(foe)) {
             clash(me);
@@ -760,12 +791,33 @@ final class Fight {
             }
             return;
         }
+        if (me.state == AIRDASH) {
+            // Along the line of the ground at her height; a heavy blow out of it is the smash, still carrying her the way she dashed.
+            me.x += me.across * seconds;
+            if (heavy) {
+                float dashing = me.across;
+                begin(me, foe, SMASH);
+                me.carry = dashing * .5f;
+            } else if (light && me.airMoves < 3) {
+                me.across *= .5f;
+                begin(me, foe, AIR1 + me.airMoves);
+            } else if (me.clock >= AIRDASH_SECONDS) {
+                me.state = JUMP;
+                me.clock = 1;
+                me.across *= .45f;
+                me.up = 0;
+            }
+            return;
+        }
         if (me.state == JUMP) {
             me.x += me.across * seconds;
             me.guarding = pad.block;
             if (dodge && !me.airDodged && me.dodgeRest <= 0) {
                 me.airDodged = true;
                 dodge(me, pad);
+            } else if (twice && pad.left != pad.right && !me.airDashed && (level[me.side] < 0 || style[me.side] >= HARD)) {
+                // An arrow pressed twice in the air is a dash, toward the other or away from her, once a jump.
+                airDash(me, pad.left ? -1 : 1);
             } else if (special && me.rest[SPECIAL] <= 0) {
                 begin(me, foe, AIR_SPECIAL);
             } else if (heavy) {
@@ -832,6 +884,7 @@ final class Fight {
             me.across = pad.left == pad.right ? 0 : (pad.left ? -1 : 1) * SPEED[me.kind] * .9f;
             me.airMoves = 0;
             me.airDodged = false;
+            me.airDashed = false;
             me.followed = false;
             me.guarding = false;
         } else if (pad.block) {
@@ -884,6 +937,18 @@ final class Fight {
         dodges++;
     }
 
+    /** A dash in the air: she holds her height and goes along the line of the ground, the way given, for a moment. */
+    private void airDash(Fighter me, float way) {
+        me.state = AIRDASH;
+        me.move = -1;
+        me.clock = 0;
+        me.up = 0;
+        me.airDashed = true;
+        me.guarding = false;
+        me.across = way * SPEED[me.kind] * 2.8f;
+        airDashes++;
+    }
+
     private void begin(Fighter me, Fighter foe, int move) {
         me.state = ATTACK;
         me.move = move;
@@ -893,6 +958,7 @@ final class Fight {
         me.queued = 0;
         me.followed = false;
         me.mark = 0;
+        me.carry = 0;
         me.chain = chainStep(move);
         me.guarding = false;
         int slot = slot(move);
@@ -1060,7 +1126,7 @@ final class Fight {
                 me.y += me.up * seconds * .3f;
             } else {
                 me.up = -PLUNGE;
-                me.x += (me.facingLeft ? -1 : 1) * 2 * seconds;
+                me.x += ((me.facingLeft ? -1 : 1) * 2 + me.carry) * seconds;
                 me.y += me.up * seconds;
             }
             if (me.y <= 0 && me.clock >= move.startup) {
@@ -1162,7 +1228,8 @@ final class Fight {
                 me.state = IDLE;
                 me.clock = 0;
             }
-        } else if (me.state == JUMP || me.state == ATTACK || me.state == DODGE || me.state == LAND || me.state == DASH || me.state == BACKSTEP) {
+        } else if (me.state == JUMP || me.state == ATTACK || me.state == DODGE || me.state == LAND || me.state == DASH || me.state == BACKSTEP
+                || me.state == AIRDASH) {
             // The round ended with her in the middle of something: she comes down and stands.
             me.y = Math.max(0, me.y + me.up * seconds);
             me.up -= GRAVITY * seconds;
@@ -1371,6 +1438,121 @@ final class Fight {
      * that lands she follows with the next of its chain, the better she is the more surely.
      * The worse she is, the more often she guesses wrong or stands about.
      */
+    /** Whether the other is open: in the middle of a blow that has missed, or a smash that came down on nothing. */
+    private static boolean open(Fighter her) {
+        if (her.state != ATTACK) return false;
+        if (her.move == SMASH) return her.landed == 2;
+        Move move = her.doing();
+        return !her.hitLanded && move.shot == NOTHING && her.clock > move.startup + move.active;
+    }
+
+    /** A good moment for an ultimate: the other reeling, open, or getting up. */
+    private static boolean goodMoment(Fighter her) { return her.state == HIT || her.state == RISE || open(her); }
+
+    /**
+     * At hard and up, whether to begin a combo now, and which: a blow that missed is punished; up close a chain of five,
+     * a chain confirmed into her special, or a launch followed by her special while the other is in the air; from a little
+     * way off, in over the top with a blow in the air and the smash, or a dash in the air and the smash out of it.
+     */
+    private boolean startPlan(Fighter me, Fighter foe, float gap) {
+        if (me.state != IDLE && me.state != WALK && me.state != BLOCK) return false;
+        if (foe.state == DOWN || foe.state == RISE || foe.state == OUT) return false;
+        boolean brutal = style[me.side] == BRUTAL, special = me.rest[SPECIAL] <= 0;
+        float reach = MOVES[me.kind][LIGHT].reach + BODY / 2 + .2f;
+        // A chain of one kind of blow: each stuns for long enough that the next of the same kind lands before the other can move;
+        // a heavy blow after a quick one is slower to come and does not.
+        int[] chain = special && random.nextFloat() < .4f ? new int[]{P_QUICK, P_QUICK, P_QUICK, P_SPECIAL}
+                : new int[]{P_QUICK, P_QUICK, P_QUICK, P_QUICK, P_QUICK};
+        if (open(foe) && gap <= reach + .3f && random.nextFloat() < (brutal ? .95f : .7f)) return plan(me, chain);
+        // Up close, not at the very end of her reach: each blow pushes the other back, and a combo begun from too far runs out of reach.
+        if (gap <= reach - .35f && random.nextFloat() < (brutal ? .9f : .7f)) {
+            if (special && random.nextFloat() < .25f) return plan(me, new int[]{P_LAUNCH, P_SPECIAL});
+            return plan(me, chain);
+        }
+        boolean ranged = WANTS[me.kind] > 2.5f;
+        if (gap > 2.2f && gap < 4.6f && random.nextFloat() < (brutal ? .45f : .25f) * (ranged ? .4f : 1)) {
+            return plan(me, random.nextFloat() < .5f ? new int[]{P_JUMP, P_DASH, P_SMASH} : new int[]{P_JUMP, P_AIR, P_SMASH});
+        }
+        return false;
+    }
+
+    private boolean plan(Fighter me, int[] steps) {
+        plan[me.side] = steps;
+        planAt[me.side] = 0;
+        planWait[me.side] = -1;
+        planAge[me.side] = 0;
+        return true;
+    }
+
+    /** What she is doing, as one number: to tell when what was pressed has begun. */
+    private static int doingCode(Fighter me) { return me.state * 100 + me.move + 1; }
+
+    /**
+     * The next step of the combo she is in, pressed when the one before it has landed (a hit confirmed), or for what is
+     * done in the air when she is high enough. A step that misses, or a combo that goes on too long, is given up.
+     */
+    private Pad planned(Fighter me, Fighter foe, Pad pad, float seconds) {
+        pad.clear();
+        int side = me.side;
+        int[] steps = plan[side];
+        boolean toLeft = foe.x < me.x, air = me.state == JUMP || me.state == AIRDASH || me.state == ATTACK && me.inAir();
+        if ((planAge[side] += seconds) > 2.5f || me.state == HIT || me.state == DOWN || me.state == BLOCK && planAt[side] > 0) {
+            plan[side] = null;
+            return pad;
+        }
+        if (planWait[side] >= 0) {
+            // What was pressed last has not begun yet.
+            if (doingCode(me) == planWait[side] && (planWaited[side] += seconds) < .6f) return pad;
+            planWait[side] = -1;
+            if (planAt[side] >= steps.length) {
+                plan[side] = null;
+                return pad;
+            }
+        }
+        int next = steps[planAt[side]], before = planAt[side] == 0 ? 0 : steps[planAt[side] - 1];
+        boolean go;
+        if (before == 0) {
+            go = true;
+        } else if (next == P_QUICK || next == P_HEAVY || next == P_SPECIAL) {
+            Move move = me.doing();
+            boolean landed = me.state == ATTACK && (me.hitLanded || move.shot != NOTHING && me.landed > 0
+                    || style[side] == BRUTAL && foe.state == BLOCK && me.clock >= move.startup);
+            if (me.state != ATTACK || !landed && me.clock > move.startup + move.active + .02f) {
+                plan[side] = null;
+                return pad;
+            }
+            go = landed;
+        } else if (next == P_AIR || next == P_DASH) {
+            if (!air) {
+                plan[side] = null;
+                return pad;
+            }
+            go = me.state == JUMP && (next == P_DASH ? me.up < 5 : me.up < 7 && Math.abs(foe.x - me.x) < 2.4f);
+        } else if (next == P_SMASH) {
+            if (!air) {
+                plan[side] = null;
+                return pad;
+            }
+            go = before == P_DASH ? me.state == AIRDASH && me.clock >= .07f
+                    : me.state == JUMP || me.state == ATTACK && (me.hitLanded || me.clock > me.doing().startup + me.doing().active);
+        } else {
+            go = true;
+        }
+        if (!go) return pad;
+        switch (next) {
+            case P_QUICK: case P_AIR: pad.light = true; break;
+            case P_HEAVY: case P_SMASH: pad.heavy = true; break;
+            case P_SPECIAL: pad.special = true; break;
+            case P_LAUNCH: pad.block = true; pad.heavy = true; break;
+            case P_JUMP: pad.jump = true; pad.left = toLeft; pad.right = !toLeft; break;
+            default: pad.dash = true; pad.left = toLeft; pad.right = !toLeft; break;
+        }
+        planWait[side] = doingCode(me);
+        planWaited[side] = 0;
+        planAt[side]++;
+        return pad;
+    }
+
     private Pad think(Fighter me, Fighter foe, float seconds) {
         Pad pad = minds[me.side];
         pad.light = false;
@@ -1379,17 +1561,29 @@ final class Fight {
         pad.jump = false;
         pad.dodge = false;
         pad.ultimate = false;
-        int skill = level[me.side];
-        float sharp = new float[]{.25f, .5f, .75f, .95f}[skill];
+        pad.dash = false;
+        int skill = level[me.side], mood = style[me.side];
+        float sharp = mood == BRUTAL ? 1 : new float[]{.25f, .5f, .75f, .95f}[skill];
         float gap = Math.abs(foe.x - me.x);
+        // At hard and up, a combo she is in the middle of goes on before anything else.
+        if (mood >= HARD && plan[me.side] != null) return planned(me, foe, pad, seconds);
         // In the middle of a blow of a chain that has landed, the next; coming down on the other from a jump, the smash.
         if (me.state == ATTACK && !me.followed && me.chain >= 1 && me.chain < 5 && me.clock >= me.doing().startup + me.doing().active) {
             me.followed = true;
             // Something thrown has not landed yet: she goes on with it or not as she pleases.
             boolean worth = me.hitLanded || me.doing().shot != NOTHING && random.nextFloat() < .5f;
-            if (worth && random.nextFloat() < new float[]{.2f, .45f, .7f, .9f}[skill]) {
-                if (random.nextFloat() < .3f) pad.heavy = true;
-                else pad.light = true;
+            // Easy strikes once at a time and goes on with nothing.
+            float follow = mood == EASY ? 0 : mood >= HARD ? 1 : new float[]{.2f, .45f, .7f, .9f}[skill];
+            if (worth && random.nextFloat() < follow) {
+                // Hard and brutal go on with the same kind of blow, which is what lands; the others choose.
+                if (mood >= HARD) {
+                    if (heavyKind(me.move)) pad.heavy = true;
+                    else pad.light = true;
+                } else if (random.nextFloat() < .3f) {
+                    pad.heavy = true;
+                } else {
+                    pad.light = true;
+                }
             }
             return pad;
         }
@@ -1401,9 +1595,20 @@ final class Fight {
             }
             return pad;
         }
+        // Hard and brutal do not press anything else in the middle of a blow: what is pressed then would be done next, and break the chain.
+        if (mood >= HARD && me.state == ATTACK) return pad;
         if ((thinking[me.side] -= seconds) > 0) return pad;
-        thinking[me.side] = new float[]{.5f, .34f, .22f, .13f}[skill] * (.7f + random.nextFloat() * .6f);
+        float pace = mood == EASY ? 1.5f : mood == HARD ? .7f : mood == BRUTAL ? .5f : 1;
+        thinking[me.side] = new float[]{.5f, .34f, .22f, .13f}[skill] * (.7f + random.nextFloat() * .6f) * pace;
         pad.clear();
+        if (mood >= HARD && startPlan(me, foe, gap)) return planned(me, foe, pad, seconds);
+        if (mood >= HARD && foe.state != ATTACK && gap > MOVES[me.kind][LIGHT].reach + BODY / 2 - .15f && gap < MOVES[me.kind][LIGHT].reach + BODY / 2 + .8f
+                && WANTS[me.kind] < 2.5f + (gap < 1.6f ? 9 : 0) && random.nextFloat() < .8f) {
+            // At the edge of her reach she steps in before she strikes, so that what she begins can be carried through.
+            pad.left = foe.x < me.x;
+            pad.right = !pad.left;
+            return pad;
+        }
         float want = WANTS[me.kind];
         boolean ranged = want > 2.5f, toLeft = foe.x < me.x;
         boolean danger = foe.state == ATTACK && foe.doing().shot == NOTHING && gap < foe.doing().reach + 1.2f;
@@ -1414,10 +1619,11 @@ final class Fight {
                 flood |= shot.kind == FLOOD;
             }
         }
-        if (danger && random.nextFloat() < sharp * .85f) {
+        // Easy seldom guards; hard and brutal more often.
+        if (danger && random.nextFloat() < sharp * .85f * (mood == EASY ? .5f : mood >= HARD ? 1.1f : 1)) {
             if (flood || random.nextFloat() < .15f) {
                 pad.jump = true;
-            } else if (skill >= 2 && me.dodgeRest <= 0 && random.nextFloat() < .3f) {
+            } else if (skill >= 2 && me.dodgeRest <= 0 && random.nextFloat() < (mood == BRUTAL ? .55f : mood == HARD ? .45f : .3f)) {
                 // The better ones slip a blow now and then instead of taking it on the guard.
                 pad.dodge = true;
                 pad.left = !toLeft && random.nextBoolean();
@@ -1427,7 +1633,7 @@ final class Fight {
             }
         } else if (random.nextFloat() > sharp + .2f) {
             // Standing about.
-        } else if (me.charged() && (gap <= ULTIMATE_REACH[me.kind] || pending(foe))) {
+        } else if (me.charged() && (pending(foe) || gap <= ULTIMATE_REACH[me.kind] && (mood < HARD || goodMoment(foe)))) {
             // Her own ultimate when it would reach, or to meet the other's before it lands.
             pad.ultimate = true;
         } else if (gap > want + .7f) {
