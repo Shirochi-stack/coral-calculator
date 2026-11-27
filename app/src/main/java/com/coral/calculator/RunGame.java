@@ -1414,6 +1414,23 @@ final class RunGame {
         text.setTextAlign(Paint.Align.LEFT);
     }
 
+    private Bitmap boutiqueHouse, keeperArt;
+
+    /** Tulle at her counter, in the boutique of a village: her six pictures, one after another (she never moves between them), and a mark over her. */
+    private void drawKeeper(Canvas canvas, int[] item) {
+        float x = (item[1] + 1.6f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .12f;
+        if (keeperArt == null) keeperArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_vanity_npc);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF8A5A4A);
+        canvas.drawRect(x - tile * 1.3f, feet - tile * .5f, x + tile * 1.3f, floor, paint);
+        paint.setColor(0xFFB98672);
+        canvas.drawRect(x - tile * 1.35f, feet - tile * .55f, x + tile * 1.35f, feet - tile * .43f, paint);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        cell(canvas, keeperArt, RunBoutique.frameAt(clock), 6, x, feet - tile * .5f, tile * 1.75f, false);
+        mark(canvas, x, feet - tile * 2.45f, "Boutique", 0xFFE0709F, false);
+    }
+
     /** Whoever deals in the black market, on a step at the back of it, with what she is over her head. */
     private void drawDealer(Canvas canvas, int[] item) {
         float x = (item[1] + 1.6f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .55f;
@@ -4062,6 +4079,7 @@ final class RunGame {
         StringBuilder words = new StringBuilder("Guild hall, pet shop, smithy");
         for (int sort : RunLevels.townOf(number)) {
             if (sort == RunLevels.GACHA) words.append(", ribbon gacha");
+            if (sort == RunLevels.BOUTIQUE) words.append(", Tulle and Thread");
             if (sort == RunLevels.MARKET) words.append(", black market");
         }
         return words.append(" · the arch is a portal").toString();
@@ -6763,7 +6781,8 @@ final class RunGame {
                 // And a card that says what it is and what to do in it: before anything in it begins, where something is about to.
                 if (kind == RunLevels.HOUSE) {
                     int sort = here.rooms.get(in)[14];
-                    toast(LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
+                    toast(sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
+                            : sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
                             : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
                             : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
                             : sort == RunLevels.MARKET ? "Harder lands, the black arena, and what tokens buy"
@@ -7383,6 +7402,10 @@ final class RunGame {
                     openMarket();
                     return;
                 }
+                if (what == PlusRun.BOUTIQUE) {
+                    openBoutique(0);
+                    return;
+                }
                 if (what >= PlusRun.SMITH) {
                     openSmith(what - PlusRun.SMITH, PLAY);
                     return;
@@ -7960,6 +7983,7 @@ final class RunGame {
             if (what == PlusRun.BOARD) openHunts();
             else if (what == PlusRun.MACHINE) crank();
             else if (what == PlusRun.DEALER) openMarket();
+            else if (what == PlusRun.BOUTIQUE) openBoutique(0);
             else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
             else {
                 counterFrom = PLAY;
@@ -8139,7 +8163,7 @@ final class RunGame {
                         else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
                         label(canvas, stallButton, what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.DEALER ? "Market" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -9445,7 +9469,11 @@ final class RunGame {
                 drawVillagePiece(canvas, decor, level);
                 continue;
             }
-            if (decor[0] == 306) {
+            if (decor[0] == 307) {
+                // (The vanity boutique: a picture of its own.)
+                if (boutiqueHouse == null) boutiqueHouse = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_vanity_shop);
+                cell(canvas, boutiqueHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else if (decor[0] == 306) {
                 // (The ribbon gacha: a picture of its own.)
                 if (gachaHouse == null) gachaHouse = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_gacha_house);
                 cell(canvas, gachaHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
@@ -9753,6 +9781,7 @@ final class RunGame {
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
                 if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
+                else if (item[4] == PlusRun.BOUTIQUE) drawKeeper(canvas, item);
                 else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] >= PlusRun.SMITH) drawSmith(canvas, item);
                 else drawBoard(canvas, item);
@@ -10482,6 +10511,15 @@ final class RunGame {
             } else if (sort == RunLevels.SMITHY) {
                 canvas.drawRect(x - round * .5f, y - round * .5f, x + round * .5f, y - round * .1f, paint);
                 canvas.drawRect(x - round * .1f, y - round * .1f, x + round * .1f, y + round * .65f, paint);
+            } else if (sort == RunLevels.BOUTIQUE) {
+                // (A coat hanger, for the boutique.)
+                path.reset();
+                path.moveTo(x - round * .7f, y + round * .45f);
+                path.lineTo(x, y - round * .1f);
+                path.lineTo(x + round * .7f, y + round * .45f);
+                path.close();
+                canvas.drawPath(path, paint);
+                canvas.drawCircle(x, y - round * .35f, round * .2f, paint);
             } else if (sort == RunLevels.GACHA) {
                 // (A ribbon, for the ribbon gacha.)
                 paint.setColor(Color.BLACK);

@@ -255,7 +255,7 @@ public class RunBoutiqueTest {
         assertTrue(RunVanity.buy(bought, 3));
         int open = 0;
         for (VanityPictures.Picture picture : VanityPictures.ALL) if (VanityPictures.open(bought, picture)) open++;
-        assertEquals(2, open);
+        assertEquals(1, open);
         // The Cringe gallery lists them under Vanity, and a row reads.
         for (RunGallery.Item item : VanityPictures.items()) {
             assertEquals(RunGallery.VANITY, item.shelf);
@@ -273,6 +273,59 @@ public class RunBoutiqueTest {
             VanityQuests.hand(quest, 2);
         }
         assertTrue(VanityPictures.open(quest, VanityPictures.ALL.get(2)));
+    }
+
+    @Test public void theBoutiqueStandsInRosemarrowAndNowhereElse() {
+        for (int number = 1; number <= RunLevels.COUNT + 6; number++) {
+            if (!RunLevels.villageLand(number)) continue;
+            RunLevels.Level level = RunLevels.level(number);
+            boolean here = RunLevels.chapterOf(number) == RunLevels.BOUTIQUE_CHAPTER;
+            assertEquals("land " + number, here, java.util.Arrays.stream(RunLevels.townOf(number)).anyMatch(sort -> sort == RunLevels.BOUTIQUE));
+            boolean picture = false, door = false, keeper = false;
+            for (int[] decor : level.decor) picture |= decor[0] == 307;
+            for (int[] room : level.rooms) {
+                if (room[0] == RunLevels.HOUSE && room[14] == RunLevels.BOUTIQUE) {
+                    door = true;
+                    // Tulle is at her counter inside, between the room's own walls.
+                    for (int[] item : level.items) keeper |= item[0] == PlusRun.SPOT && item[4] == PlusRun.BOUTIQUE && item[1] > room[3] && item[1] < room[4];
+                }
+            }
+            assertEquals("its picture, land " + number, here, picture);
+            assertEquals("its door, land " + number, here, door);
+            assertEquals("its keeper, land " + number, here, keeper);
+        }
+    }
+
+    @Test public void combinationPicturesOpenOnlyWhenBothPartsAreHers() {
+        Save save = new Save();
+        save.keep("run_bank", 99999);
+        VanityPictures.Picture both = null, horns = null, ears = null;
+        for (VanityPictures.Picture picture : VanityPictures.ALL) {
+            if (picture.id.equals("p_bunny_nohorns")) both = picture;
+            if (picture.id.equals("p_nohorns")) horns = picture;
+            if (picture.id.equals("p_bunny")) ears = picture;
+        }
+        assertNotNull(both);
+        // (Whether a part can be bought at all depends on whether its pictures are in the app; the rule is the same either way.)
+        save.keep(RunVanity.EARS_OWN_KEY, 1 << 3);
+        VanityPictures.refresh(save);
+        assertTrue(VanityPictures.open(save, ears));
+        assertFalse(VanityPictures.open(save, both));
+        assertFalse(VanityPictures.open(save, horns));
+        save.keep(RunVanity.HORNS_OWN_KEY, 1 << 1);
+        VanityPictures.refresh(save);
+        assertTrue(VanityPictures.open(save, horns));
+        assertTrue(VanityPictures.open(save, both));
+        // Elf ears with no cat ears needs elf ears and no ears; elf ears alone opens the one with cat ears.
+        save.keep(RunVanity.HORNS_OWN_KEY, 1 << 2);
+        VanityPictures.refresh(save);
+        for (VanityPictures.Picture picture : VanityPictures.ALL) {
+            if (picture.id.equals("p_elf")) assertFalse(VanityPictures.open(save, picture));
+            if (picture.id.equals("p_elf_cat")) assertTrue(VanityPictures.open(save, picture));
+        }
+        save.keep(RunVanity.EARS_OWN_KEY, 1 << 3 | 1 << 1);
+        VanityPictures.refresh(save);
+        for (VanityPictures.Picture picture : VanityPictures.ALL) if (picture.id.equals("p_elf")) assertTrue(VanityPictures.open(save, picture));
     }
 
     @Test public void theBoutiqueOpensFromTheGuildCounter() throws Exception {

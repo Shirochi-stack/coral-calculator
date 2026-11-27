@@ -133,6 +133,8 @@ final class PlusRun {
     static final int DEALER = 400;
     /** And the machine of the ribbon gacha. */
     static final int MACHINE = 500;
+    /** And Tulle, who keeps the vanity boutique that stands in Rosemarrow: a counter she is at. */
+    static final int BOUTIQUE = 600;
     /**
      * A pot of black ink, which stands in the later lands and throws the black curse: how
      * often, for how long it swells before it does, from how far off it throws, and how
