@@ -53,7 +53,8 @@ is read by its name from the environment or from the project's .env, whatever th
 the name, and is never printed or written anywhere.
 
 The request is the one BytePlus documents (read 2026-11-27):
-https://ai.byteplus.com/ark/region:ap-southeast-1/docs/create-video-generation-task-api
+https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api
+and the models, what each makes and takes, are listed at https://docs.byteplus.com/en/docs/modelark/model-list
 """
 import argparse
 import base64
