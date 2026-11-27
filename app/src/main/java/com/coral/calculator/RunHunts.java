@@ -47,8 +47,10 @@ final class RunHunts {
     /** The ways: how each is said, and how many are asked at first. */
     private static final String[] WAY_WORDS = {"by landing on them", "with the pen", "with a knife", "with a thrown book", "with the brush", "with the sword", "with the ink gun",
             "with the tablet-book", "with her keys", "with the katana", "with the lance", "with the cannon", "with the whip", "with a greatsword", "with a summoning staff",
-            "with a mace", "with a war hammer", "with a wand", "with a scythe"};
-    private static final int[] WAY_MANY = {12, 8, 8, 6, 8, 8, 8, 10, 8, 10, 10, 8, 10, 8, 10, 8, 8, 10, 8};
+            "with a mace", "with a war hammer", "with a wand", "with a scythe", "paper trees"};
+    private static final int[] WAY_MANY = {12, 8, 8, 6, 8, 8, 8, 10, 8, 10, 10, 8, 10, 8, 10, 8, 8, 10, 8, 4};
+    /** The way that is no way of beating anything: paper trees cut down, from the land they are first in. */
+    static final int TREES = RunArms.COUNT + 1;
 
     /** What the smith works with, which hunts pay: the names of the three. */
     static final String[] MATERIALS = {"Type metal", "Ink crystal", "Gold leaf"};
@@ -98,6 +100,7 @@ final class RunHunts {
                     if (open >= CELLAR_FROM) of.add(new int[]{sort, tier >= 3 ? PlusRun.RANK_S : PlusRun.RANK_A});
                 } else {
                     of.add(new int[]{sort, LANDING});
+                    if (open >= RunLevels.TREES_FROM) of.add(new int[]{sort, TREES});
                     for (int weapon = 0; weapon < RunArms.COUNT; weapon++) if ((owned >> weapon & 1) != 0) of.add(new int[]{sort, weapon + 1});
                 }
                 // Which of a sort comes first goes round with the hunts that have gone up.
@@ -127,7 +130,11 @@ final class RunHunts {
             for (int one : GROUPS[what(hunt)]) if (one == kind) return true;
             return false;
         }
-        return sort(hunt) == BY_WAY && way == what(hunt) && !RunLevels.boss(kind);
+        return sort(hunt) == BY_WAY && way == what(hunt) && what(hunt) != TREES && !RunLevels.boss(kind);
+    }
+
+    /** Whether a paper tree cut down counts for it. */
+    static boolean countsTree(int hunt) { return sort(hunt) == BY_WAY && what(hunt) == TREES;
     }
 
     /** Whether one of the three beaten counts for it; and a cellar cleared at a rank. */
@@ -137,7 +144,7 @@ final class RunHunts {
     /** Whether anything can be done towards it in a land. */
     static boolean here(int hunt, RunLevels.Level level) {
         int sort = sort(hunt);
-        if (sort == BY_WAY) return true;
+        if (sort == BY_WAY) return what(hunt) != TREES || !level.trees.isEmpty();
         if (sort == CELLAR) {
             for (int[] room : level.rooms) if (room[0] == RunLevels.ARENA) return true;
             return false;
@@ -153,7 +160,8 @@ final class RunHunts {
     static String words(int hunt) {
         int sort = sort(hunt), what = what(hunt), many = many(hunt);
         return sort == OF_KIND ? "Beat " + many + " " + GROUP_NAMES[what] : sort == ROVER ? "Beat " + ROVER_NAMES[what]
-                : sort == CELLAR ? "Clear a cellar at rank " + (what == PlusRun.RANK_S ? "S" : "A or better") : "Beat " + many + " creatures " + WAY_WORDS[what];
+                : sort == CELLAR ? "Clear a cellar at rank " + (what == PlusRun.RANK_S ? "S" : "A or better")
+                : what == TREES ? "Cut down " + many + " paper trees" : "Beat " + many + " creatures " + WAY_WORDS[what];
     }
 
     static String brief(int hunt) {
