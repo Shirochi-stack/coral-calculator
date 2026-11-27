@@ -55,6 +55,9 @@ film is a handful of requests and not one for every shot.
     python tools/make_cutscene.py BOARD --edit --with kling                 joins the takes of one model into the film (BOARD-kling.mp4), with their own sound
     python tools/make_cutscene.py BOARD --edit --with kling --song FILE     the same picture with a song laid over in place of the takes' sound (BOARD-kling-edited.mp4)
 Beside each film a copy under 28 MB is written, the same size and sound at a lower bit rate (...-for-phone.mp4).
+The edit takes whatever takes are in the folder under a name (A-NAME-....mp4), not only those this tool asked for: takes made
+elsewhere (--with magi, for clips made on a website) are joined the same way, whatever their size, speed or length: each is
+fitted into the film's picture, read by its own clock, and cut or held on its last frame to its thirty seconds.
 
 Of Kling (kling/v4/reference-to-video on fal) a take is asked shot by shot, each with its
 seconds and at most 512 letters, with the first shot's still as the first frame, the other
@@ -811,7 +814,7 @@ def edit_takes(board, folder, which, song=None):
         return width
 
     def chosen(part):
-        made = sorted((folder / "takes").glob(f"{part['name']}-{which}-*.mp4"), key=lambda clip: clip.stat().st_mtime)
+        made = sorted((clip for clip in (folder / "takes").glob(f"{part['name']}-{which}-*.mp4") if "for-phone" not in clip.name), key=lambda clip: clip.stat().st_mtime)
         return folder / "takes" / picks[f"{part['name']}-{which}"] if f"{part['name']}-{which}" in picks else made[-1] if made else None
 
     # Where each shot really begins and ends: a take cuts near where it was asked to, not on it, so the cuts are looked for in the take
@@ -889,11 +892,28 @@ def edit_takes(board, folder, which, song=None):
         clip = chosen(part)
         used.append(clip.name if clip else "its stills")
         video = cv2.VideoCapture(str(clip)) if clip else None
+        speed = (video.get(cv2.CAP_PROP_FPS) or fps) if video is not None else fps
         last = numpy.zeros((tall, wide, 3), numpy.uint8)
+        read, fitted = -1, last
         for step in range(count):
             if video is not None:
-                ok, frame = video.read()
-                frame = last if not ok else cv2.resize(frame, (wide, tall), interpolation=cv2.INTER_LANCZOS4) if frame.shape[:2] != (tall, wide) else frame
+                # The take's own clock: the picture it shows at this moment, whatever its frames a second; past its end, its last one.
+                want = int(round(step / fps * speed))
+                while read < want:
+                    ok, raw = video.read()
+                    if not ok:
+                        break
+                    read += 1
+                    if raw.shape[:2] == (tall, wide):
+                        fitted = raw
+                    else:
+                        # Fitted whole into the film's picture, with black beside it if its shape is another.
+                        ratio = min(wide / raw.shape[1], tall / raw.shape[0])
+                        size = (int(round(raw.shape[1] * ratio)), int(round(raw.shape[0] * ratio)))
+                        fitted = numpy.zeros((tall, wide, 3), numpy.uint8)
+                        x, y = (wide - size[0]) // 2, (tall - size[1]) // 2
+                        fitted[y:y + size[1], x:x + size[0]] = cv2.resize(raw, size, interpolation=cv2.INTER_LANCZOS4)
+                frame = fitted
             else:
                 now = step / fps
                 at = 0
