@@ -1,0 +1,237 @@
+{
+ "about": "The opening: ninety seconds at 16:9, cut on the bars of its song (a bar is two seconds; a new song changes 'bar', and the bars of the shots if it is built otherwise). Every shot is made from its still and the reference sheets of whoever is in it; names, words and the title are put on by tools/make_cutscene.py, never asked of the video model.",
+ "model": "dreamina-seedance-2-5-flash-261115",
+ "made_from": "references",
+ "resolution": "720p",
+ "ratio": "16:9",
+ "generate_audio": false,
+ "sheets": {
+  "H": {
+   "name": "Halgakos",
+   "file": "sheets/halgakos.png"
+  },
+  "C": {
+   "name": "Chikuwa",
+   "file": "sheets/chikuwa.png"
+  },
+  "R": {
+   "name": "Rune",
+   "file": "sheets/rune.png"
+  },
+  "I": {
+   "name": "Illya",
+   "file": "sheets/illya.png"
+  },
+  "T": {
+   "name": "Tsubakieh",
+   "file": "sheets/tsubakieh.png"
+  }
+ },
+ "bar": 2.0,
+ "song": "opening-song.wav",
+ "words": "song.json",
+ "title": {
+  "text": "Calculation, Translation,\nand Sloppy~♡",
+  "under": "Halgakos Calculator",
+  "from": 86.0
+ },
+ "style": "2D anime opening animation, clean cel shading, crisp line art, soft pastel colours. The character designs and the art style of the first frame are held exactly, for the whole shot. Lively, bouncy, comic timing. Nobody speaks and nobody sings: mouths only smile, gasp or chew. No text, no subtitles, no captions, no logos, no watermark. One continuous shot with no cuts.",
+ "shots": [
+  {
+   "name": "S01",
+   "bar": 0,
+   "bars": 2,
+   "cast": "",
+   "still": "stills/S01.png",
+   "frame": "A bright summer sky full of soft white clouds seen from high up, a pastel storybook town of red roofs far below. A thick old green book with gold corners tumbles down through the sky in the upper middle of the picture, its cover flapping, a few loose pages trailing behind it. No people.",
+   "prompt": "The green book tumbles down through the clouds, turning over and over and shedding loose pages, and the camera falls after it toward the little town below."
+  },
+  {
+   "name": "S02",
+   "bar": 2,
+   "bars": 2,
+   "cast": "H",
+   "card": {
+    "name": "Halgakos",
+    "says": "Translator. On her day off.",
+    "side": "right"
+   },
+   "still": "stills/S02.png",
+   "frame": "Halgakos strolls along a sunny shopping street of a pastel storybook town, seen from the knees up a little left of the middle, holding an ice cream cone with one pink scoop in her right hand, her eyes closed in a blissful smile, her tail curled happily, her wings folded. Room in the lower right of the picture is calm and empty.",
+   "prompt": "She strolls along swinging her free arm, takes a happy lick of the ice cream, her tail swaying and her ears twitching; shop awnings and a few leaves drift past. Gentle sideways camera."
+  },
+  {
+   "name": "S03",
+   "bar": 4,
+   "bars": 2,
+   "cast": "H",
+   "still": "stills/S03.png",
+   "frame": "The same sunny street. Halgakos in mid step in the middle of the picture, about to lick her ice cream cone, eyes closed, unaware; directly above her head, close, the thick green book is falling toward her with a round shadow already on her hair; small speed lines above the book.",
+   "prompt": "The book lands on her head with a comic bonk, her eyes go wide and spin, she wobbles, and the pink scoop pops off the cone and sails up out of the picture; the book drops to the pavement and falls open, glowing."
+  },
+  {
+   "name": "S04",
+   "bar": 6,
+   "bars": 2,
+   "cast": "",
+   "still": "stills/S04.png",
+   "frame": "Low camera on the cobbled street. The thick green book lies open on the ground in the middle, shining with golden light, and out of its pages pour dozens of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes, and little letters with wings, scattering in every direction past the camera; shop fronts behind. Only a pair of black shoes and stockinged ankles of someone standing at the edge of the picture.",
+   "prompt": "The little numeral and plus-sign creatures stream out of the glowing book and scamper off in all directions, some tumbling over each other, winged letters fluttering up past the camera; the light from the book pulses."
+  },
+  {
+   "name": "S05",
+   "bar": 8,
+   "bars": 2,
+   "cast": "H",
+   "still": "stills/S05.png",
+   "frame": "Close on Halgakos from the chest up in the middle of the picture, deadpan and unimpressed with half-closed eyes, holding up an ice cream cone with no ice cream on it; behind her, out of focus, small cute creatures shaped like numerals and plus signs with tiny legs and round eyes run riot along the street.",
+   "prompt": "She looks at the empty cone, lets out a long sigh with drooping ears, then narrows her eyes, tosses the cone aside, draws a big pink pocket calculator from behind her back like a sword and jabs a thumb at herself."
+  },
+  {
+   "name": "S06",
+   "bar": 10,
+   "bars": 2,
+   "cast": "H",
+   "still": "stills/S06.png",
+   "frame": "Very close over her shoulder: Halgakos's two hands hold a big pink pocket calculator with round blank keys, both thumbs poised over the keys; a strand of pink hair and the edge of a black sleeve with a white frill in the picture; a blurred street beyond. Little sparks of golden light sit on the keys.",
+   "prompt": "Her thumbs hammer the keys faster and faster, each press popping out a little glowing plus sign that floats up, the calculator's screen glowing brighter until it flashes."
+  },
+  {
+   "name": "S07",
+   "bar": 12,
+   "bars": 2,
+   "cast": "H",
+   "still": "stills/S07.png",
+   "frame": "Halgakos in a sprinter's crouch on the street, seen from the side and a little in front, one hand on the ground and the calculator in the other, wings half spread, tail up, a wide determined grin; dust at her heels; the street stretching away ahead of her.",
+   "prompt": "She cracks her thumbs, springs forward, spreads her mismatched wings and takes off down the street close above the cobbles, dust and loose pages whirling behind her; the camera whips round to follow."
+  },
+  {
+   "name": "S08",
+   "bar": 14,
+   "bars": 2,
+   "cast": "H",
+   "still": "stills/S08.png",
+   "frame": "Halgakos hovers in the bright sky above the pastel town, full figure in the middle of the picture, wings spread wide, the pink calculator raised in her right hand and the open green book in her left, a confident wink; loose pages and glowing plus signs circle around her like a ring. Heroic, like the title pose of an anime opening.",
+   "prompt": "The camera circles her slowly as she strikes two poses in turn: she thrusts the calculator up high, then swings the open book forward, winks and points straight at the viewer, pages and plus signs swirling round her."
+  },
+  {
+   "name": "S09",
+   "bar": 16,
+   "bars": 3,
+   "cast": "H",
+   "still": "stills/S09.png",
+   "frame": "A sunny classroom. Halgakos as a strict teacher stands at the left of a wide green chalkboard that has nothing on it but a few chalk doodles of plus signs and stars, a wooden pointer in her hand resting on the board, wearing small round glasses, a smug closed-mouth smile, looking at the viewer.",
+   "prompt": "She raps the chalkboard twice with the pointer, turns to the viewer, pushes up her glasses so they flash, and wags the pointer at the viewer with a smug little smile; then she folds her arms and nods, satisfied; chalk dust puffs."
+  },
+  {
+   "name": "S10",
+   "bar": 19,
+   "bars": 3,
+   "cast": "H",
+   "still": "stills/S10.png",
+   "frame": "The town street seen from the side, the camera level with the rooftops and looking a little down. Halgakos, full figure in the upper middle of the picture, drops through the air feet first in side view, her legs straight and together, her arms out for balance, her wings half open, her hair streaming up, grinning; her skirt hangs modestly. Well below her on the cobbles a cute round blob of dark blue ink with big worried eyes looks up at her. Speed lines above her.",
+   "prompt": "She hangs in the air for a moment, grinning, while the ink blob looks up and gulps; then she drops and lands on it with both feet and it squashes perfectly flat, like a sheet of paper, with a puff of ink droplets; she bounces once, stands on the flat sheet and throws a V sign with a grin."
+  },
+  {
+   "name": "S11",
+   "bar": 22,
+   "bars": 2,
+   "cast": "C",
+   "card": {
+    "name": "Chikuwa",
+    "says": "Feeds everyone. Mostly bread.",
+    "side": "left"
+   },
+   "still": "stills/S11.png",
+   "frame": "A bakery stall on the town street. Chikuwa, a little right of the middle, seen from the knees up, beams at the viewer with her arms full of golden bread rolls, a fish-cake stick held in her mouth; one of the small cute creatures shaped like numerals and plus signs with tiny legs and round eyes sits on the counter with a bread roll stuffed in its mouth, looking baffled. The lower left of the picture is calm.",
+   "prompt": "She bounces on her toes with her twin tails swinging, holds a bread roll out toward the viewer with a beaming smile, and tosses another over her shoulder; the little creature on the counter chews, puzzled."
+  },
+  {
+   "name": "S12",
+   "bar": 24,
+   "bars": 2,
+   "cast": "R",
+   "card": {
+    "name": "Rune",
+    "says": "Makes the ink. Cries it, too.",
+    "side": "right"
+   },
+   "still": "stills/S12.png",
+   "frame": "A dim cosy archive of tall bookshelves lit by one warm lamp. Rune, a little left of the middle, sits on the floor hugging her knees beside an open ink bottle, big wobbling tears of dark blue ink running down her cheeks and pooling on the floor around her, looking up at the viewer with a trembling little smile. The lower right of the picture is calm.",
+   "prompt": "She sniffles, her shoulders hitch, and fat tears of dark blue ink roll down and plop into the spreading puddle; she wipes one eye with her sleeve, smearing ink across her cheek, and gives a wobbly smile."
+  },
+  {
+   "name": "S13",
+   "bar": 26,
+   "bars": 2,
+   "cast": "I",
+   "card": {
+    "name": "Illya",
+    "says": "The heroine. Self-appointed.",
+    "side": "left"
+   },
+   "still": "stills/S13.png",
+   "frame": "A theatre stage with red curtains and one bright spotlight. Illya stands a little right of the middle, full figure, in a magical-girl pose with a feather quill held like a wand above her head, winking, pink sparkles and hearts around her. The lower left of the picture is calm.",
+   "prompt": "She twirls once on the spot with her long hair flying out, sweeps the quill in an arc that leaves a trail of pink sparkles and hearts, and ends in a pose with a wink at the viewer as the spotlight flares."
+  },
+  {
+   "name": "S14",
+   "bar": 28,
+   "bars": 2,
+   "cast": "T",
+   "card": {
+    "name": "Tsubakieh",
+    "says": "Has a bat. Normally.",
+    "side": "right"
+   },
+   "still": "stills/S14.png",
+   "frame": "A quiet street corner. Tsubakieh stands a little left of the middle, seen from the knees up, perfectly blank-faced with round dot eyes, a white baseball bat resting on her shoulder; behind her a bent lamp post and a dented post box, and three of the small cute creatures shaped like numerals and plus signs with tiny legs and round eyes with bumps on their heads hiding behind a barrel. The lower right of the picture is calm.",
+   "prompt": "Without any change in her blank face she slowly lowers the bat from her shoulder and sets its tip gently on the ground, then raises her free hand in a tiny peace sign; the little creatures behind the barrel shiver."
+  },
+  {
+   "name": "S15",
+   "bar": 30,
+   "bars": 3,
+   "cast": "HCRIT",
+   "still": "stills/S15.png",
+   "frame": "All five run toward the viewer down the middle of the town street, full figures side by side: Halgakos in front in the middle with the pink calculator, Chikuwa at her right munching a bread roll, Rune at her left with ink tears streaming behind her, Illya further right posing as she runs, Tsubakieh further left with the bat over her shoulder and a blank face. Behind them a wave of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes and flying pages fills the street.",
+   "prompt": "They run toward the viewer, hair and ribbons streaming, each in her own way: Halgakos sprinting with her wings out, Chikuwa munching, Rune crying as she runs, Illya skipping with sparkles, Tsubakieh jogging blank-faced; the wave of little creatures and pages rolls along behind them."
+  },
+  {
+   "name": "S16",
+   "bar": 33,
+   "bars": 3,
+   "cast": "H",
+   "still": "stills/S16.png",
+   "frame": "Halgakos floats in a soft golden sky among drifting pages, seen from the waist up in the middle of the picture, the green book open in her left hand, her right hand reaching up gently for one of several small glowing ribbon bookmarks, blank and pale gold, that drift down around her like petals; a soft careful smile.",
+   "prompt": "One by one she catches three of the drifting golden ribbons with great care, between finger and thumb, and tucks each between the pages of the open book, which glows a little brighter each time; she smiles softly."
+  },
+  {
+   "name": "S17",
+   "bar": 36,
+   "bars": 3,
+   "cast": "HCRIT",
+   "still": "stills/S17.png",
+   "frame": "The town square. The five stand back to back in a ring in the middle of the picture, in battle poses: Halgakos aiming the pink calculator like a blaster, Chikuwa with bread rolls ready to throw, Rune holding a big ink bottle, Illya with her quill raised, Tsubakieh with the bat ready; all around them a ring of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes closes in. Dynamic low angle.",
+   "prompt": "All five strike at once: a beam of golden light bursts from the calculator, bread rolls fly, a wave of ink splashes out, a spiral of pink sparkles sweeps round, the bat swings; the little creatures pop one after another into tidy rows of sparkles."
+  },
+  {
+   "name": "S18",
+   "bar": 39,
+   "bars": 3,
+   "cast": "HCRIT",
+   "still": "stills/S18.png",
+   "frame": "A wide sunset sky above the town. All five leap into the air together, full figures in a row across the middle of the picture, arms thrown up, Halgakos in the middle holding the green book closed above her head; pages and sparkles whirl around them. Joyful, like the last pose of an anime opening.",
+   "prompt": "They leap up together and hang in the air with arms thrown up as the tidy rows of sparkles stream into the green book, which snaps shut in Halgakos's hands; the camera pulls back and up into the sunset sky."
+  },
+  {
+   "name": "S19",
+   "bar": 42,
+   "bars": 3,
+   "cast": "HCRIT",
+   "still": "stills/S19.png",
+   "frame": "Evening on the town street, warm lamps. In the lower half of the picture the five stand together, seen from the waist up: Halgakos in the middle looking mournfully at an empty ice cream cone, Chikuwa beside her kindly holding out a bread roll, Rune, Illya and Tsubakieh around them. The whole upper half of the picture is open evening sky with a few stars and nothing else in it.",
+   "prompt": "Chikuwa pushes the bread roll into Halgakos's hand; Halgakos sighs with drooping ears, then takes a bite and smiles in spite of herself, and the others laugh without a sound; the camera drifts slowly up toward the evening sky."
+  }
+ ]
+}

@@ -392,6 +392,9 @@ final class RunGame {
      * beat after it is won. What the Mother's blocks say, and the names she has for someone.
      */
     private static final int ARISING = 4, RIDE = 5, RIDDEN = 6;
+    /** And while a clip is being watched: nothing of the land goes on under it. The clip, while there is one. */
+    private static final int WATCHING = 7;
+    private RunVideo video;
     private static final String[] BLOCK_WORDS = {"Mr.", "Miss", "Sir", "Madam"}, NAME_WORDS = {"Missy", "young lady", "little one", "dear girl", "Lulu"};
     private RunRide ride;
     private Bitmap rideArt, motherArt, pagesSky;
@@ -2738,12 +2741,19 @@ final class RunGame {
 
     /** Left for the home screen: a run stops on its pause, and whoever was speaking stops, so that it can be come back to as it stands. */
     void hold() {
+        // (A clip being watched is over with: what follows it waits to be gone on with.)
+        if (video != null) video.skip();
         if (screen == PLAY) pause();
         audio.hush();
     }
 
     /** The Back key: out of a run to its pause, out of the story, the counter or a card to the map; false to leave the game. */
     boolean back() {
+        // A clip being watched is what Back ends, as a tap does.
+        if (video != null) {
+            video.skip();
+            return true;
+        }
         // Whatever sheet is open over the screen is what Back closes: her backpack, or the colours opened out.
         if (packOpen) {
             packOpen = false;
@@ -2921,6 +2931,11 @@ final class RunGame {
         smithOpen = false;
         marketOpen = false;
         hammerer = -1;
+        // (A clip still being watched is put away, and nothing follows it: this is another beginning.)
+        if (video != null) {
+            finale = NO_FINALE;
+            video.skip();
+        }
         finale = NO_FINALE;
         flight = null;
         ride = null;
@@ -3170,6 +3185,31 @@ final class RunGame {
         audio.play("flap", .9f);
         buzz(true);
         if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "flight");
+    }
+
+    /**
+     * The clip of the reveal is laid over the land and played. When it is over, by itself or by a tap, the rest of what is read is
+     * told; if it could not be played, the line it stands for is told first, as it was before there was a clip. Her voice is in the
+     * clip, saying the player's name as she was recorded saying it: so it is heard as her other lines are, with the game's sound on
+     * and that name unchanged; if not, the clip is silent, and its words are under it all the same.
+     */
+    private void watch() {
+        screen = PLAY;
+        finale = WATCHING;
+        finaleAge = 0;
+        idle();
+        captionLeft = 0;
+        String[][] all = RunStory.REVEAL;
+        int chapter = RunLevels.chapterOf(number);
+        boolean heard = audio.on() && Chatter.DEFAULT_NAME.equals(names.nickname());
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "watch");
+        video = RunVideo.over(stage, R.raw.run_cut_mother, heard, names.named(RunStory.CUT_SAYS), played -> {
+            video = null;
+            if (finale != WATCHING) return;
+            finale = FLOWN;
+            finaleAge = 0;
+            tell(java.util.Arrays.copyOfRange(all, played ? RunStory.CUT_AT + 1 : RunStory.CUT_AT, all.length), chapter, this::rise);
+        });
     }
 
     /** Whether there is anything after the flight: there is, since what is read from the book is there to be told. */
@@ -3669,13 +3709,17 @@ final class RunGame {
             }
         } else if (finale == FLOWN) {
             if (finaleAge > 4.4f && fourth()) {
-                // What the book says is read, as it was written; and then she comes.
-                if (RunStory.REVEAL.length > 0) tell(RunStory.REVEAL, RunLevels.chapterOf(number), this::rise);
+                // What the book says is read, as it was written, as far as where Halgakos names the great evil: that is watched,
+                // if it can be; and then the rest is told, and she comes.
+                if (RunStory.REVEAL.length > 0) tell(java.util.Arrays.copyOfRange(RunStory.REVEAL, 0, RunStory.CUT_AT), RunLevels.chapterOf(number), this::watch);
                 else rise();
             } else if (finaleAge > 4.4f) {
                 run.flown();
                 finish(true);
             }
+        } else if (finale == WATCHING) {
+            // (The clip has its own time.)
+            finaleAge = 0;
         } else if (finale == ARISING) {
             if (finaleAge > 4) {
                 finale = RIDE;
@@ -6642,7 +6686,10 @@ final class RunGame {
 
     /** What is on the screen behind everything else: the land; or, at the end of the last land, the sky over it, or the land as it is unmade. */
     private void drawLand(Canvas canvas) {
-        if (finale == FLIGHT || finale == FLOWN) {
+        if (finale == WATCHING) {
+            // (Under a clip there is nothing to see.)
+            canvas.drawColor(Color.BLACK);
+        } else if (finale == FLIGHT || finale == FLOWN) {
             drawFlight(canvas);
         } else if (finale >= ARISING) {
             drawRide(canvas);
