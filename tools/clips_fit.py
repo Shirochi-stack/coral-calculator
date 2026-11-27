@@ -1,4 +1,4 @@
-﻿"""
+"""
 Fits the recorded voices of a clip to its untouched picture, and makes the review copy. Used by tools/make_clips.py (fit, cut, review).
 
 The mouth timing comes from the picture's own sound: the model that made the clip made the speech with the mouth, so where its sound is
@@ -180,38 +180,82 @@ def fit_lines(voices, windows, total, bed, rate=RATE, mute=True):
     return track, placed
 
 
-def font(size, wide=False):
-    for name in (["malgun.ttf", "msyh.ttc", "YuGothM.ttc", "segoeui.ttf"] if wide else ["segoeuib.ttf", "arialbd.ttf"]):
-        try:
-            return ImageFont.truetype(name, size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
+FONTS = {"en": ("segoeuib.ttf", "arialbd.ttf"), "ja": ("YuGothB.ttc", "meiryob.ttc", "YuGothM.ttc"), "ko": ("malgunbd.ttf", "malgun.ttf"), "zh": ("msyhbd.ttc", "msyh.ttc")}
+FONT_DIR = pathlib.Path(r"C:\Windows\Fonts")
+NO_LINE_START = set("。、，．！？）」』】〉》”’%:;!?),.…ー～")
 
 
-def captioned(frame_image, text, size=44):
-    """A frame with its caption at the bottom: white with a dark outline."""
+def font_path(lang):
+    for name in FONTS.get(lang, FONTS["en"]):
+        if (FONT_DIR / name).exists():
+            return FONT_DIR / name
+    return None
+
+
+def font(size, lang="en"):
+    path = font_path(lang)
+    return ImageFont.truetype(str(path), size) if path else ImageFont.load_default()
+
+
+def missing_glyphs(text, lang):
+    """The characters of a text that the font for its language has no glyph for."""
+    from fontTools.ttLib import TTFont
+
+    path = font_path(lang)
+    cmap = TTFont(str(path), fontNumber=0).getBestCmap()
+    return sorted({c for c in text if not c.isspace() and ord(c) not in cmap})
+
+
+def wrapped(draw, text, f, width, lang):
+    """Lines no wider than width: by character in Japanese and Chinese (nothing that closes may begin a line), by word in the others."""
+    by_char = lang in ("ja", "zh")
+    tokens = list(text) if by_char else text.split(" ")
+    lines, line = [], ""
+    for token in tokens:
+        trial = line + token if by_char else (line + " " + token).strip()
+        if draw.textlength(trial, font=f) <= width or not line:
+            line = trial
+            # a single long word is broken by character
+            while not by_char and draw.textlength(line, font=f) > width and len(line) > 1:
+                cut = len(line) - 1
+                while cut > 1 and draw.textlength(line[:cut], font=f) > width:
+                    cut -= 1
+                lines.append(line[:cut])
+                line = line[cut:]
+        elif by_char and token in NO_LINE_START:
+            line = trial
+        else:
+            lines.append(line)
+            line = token
+    if line:
+        lines.append(line)
+    return lines
+
+
+def captioned(frame_image, text, size=None, foot=None, lang="en"):
+    """A frame with its caption near the bottom: white on a dark outline, centred, wrapped to 88% of the width in at most three lines (the letters are made smaller to fit if need be)."""
     image = frame_image.copy()
     draw = ImageDraw.Draw(image)
-    f = font(size, wide=any(ord(c) > 0x2e80 for c in text))
-    words, lines, line = text.split(" "), [], ""
-    for w in words:
-        trial = (line + " " + w).strip()
-        if draw.textlength(trial, font=f) > image.width * .86 and line:
-            lines.append(line)
-            line = w
-        else:
-            line = trial
-    lines.append(line)
-    y = image.height - 70 - len(lines) * (size + 8)
+    size = size or round(min(image.width, image.height) * .048)
+    width = image.width * .88
+    least = round(size * .62)
+    while True:
+        f = font(size, lang)
+        lines = wrapped(draw, text, f, width, lang)
+        if len(lines) <= 3 or size <= least:
+            break
+        size = max(least, round(size * .93))
+    step = round(size * 1.22)
+    y = (int(image.height * foot) if foot else image.height - round(image.height * .06)) - len(lines) * step
+    y = max(4, y)
     for l in lines:
         x = (image.width - draw.textlength(l, font=f)) / 2
-        draw.text((x, y), l, font=f, fill="white", stroke_width=4, stroke_fill="black")
-        y += size + 8
+        draw.text((x, y), l, font=f, fill="white", stroke_width=max(2, size // 11), stroke_fill="black")
+        y += step
     return image
 
 
-def write_video(source, target, audio, captions=None, bitrate=None, size=None, fps=None, holds=()):
+def write_video(source, target, audio, captions=None, bitrate=None, size=None, fps=None, holds=(), foot=None, words=None, lang='en'):
     """
     The source picture, with an audio track laid under it (mono floats at RATE), and captions [(begin, end, words)] drawn on if given.
     The picture is re-encoded (H.264) at `bitrate`; with no captions and no size it is the same size as the source.
@@ -244,7 +288,7 @@ def write_video(source, target, audio, captions=None, bitrate=None, size=None, f
         if captions:
             for begin, end, words in captions:
                 if begin <= t <= end:
-                    image = captioned(image, words, 46 if image.height >= 1000 else 30)
+                    image = captioned(image, words, None, foot, lang)
                     break
         for packet in vs.encode(av.VideoFrame.from_image(image)):
             out.mux(packet)

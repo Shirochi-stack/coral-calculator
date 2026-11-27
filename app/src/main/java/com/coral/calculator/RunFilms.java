@@ -54,6 +54,14 @@ final class RunFilms {
     }
 
     /**
+     * The same for what was chosen: the prologue with Halgakos speaking Japanese has a picture of its own, slowed between 0:05 and 0:30
+     * so that her Japanese lines there are said at natural speed (it runs eleven seconds longer, its sound and its captions with it).
+     */
+    static String picture(int film, boolean upright, int choice, int tongue) {
+        return film == PROLOGUE && choice == HALGAKOS && tongue == JAPANESE ? "prologue_ja" : picture(film, upright);
+    }
+
+    /**
      * The names of the sound that goes with a film, the one wanted first and then what to fall back on: what was
      * chosen for it, in the language chosen if it is Halgakos, or in English where that language has not been recorded.
      * The model's own sound belongs to its picture, so the idol song's is the one for the shape shown.
@@ -62,8 +70,10 @@ final class RunFilms {
         String base = film == PROLOGUE ? "prologue" : "idol";
         if (choice == MODEL) return new String[]{film == PROLOGUE ? "prologue_o" : upright ? "idol_tall_m" : "idol_wide_m"};
         if (choice == LEGACY) return new String[]{base + "_l"};
-        if (tongue > ENGLISH && tongue < TONGUES.length) return new String[]{base + "_h_" + TONGUES[tongue], base + "_h"};
-        return new String[]{base + "_h"};
+        // Her voice in the idol song is timed to the mouths of the picture shown, which differ a little from one shape to the other.
+        String voice = film == PROLOGUE ? "prologue_h" : upright ? "idol_tall_h" : "idol_wide_h";
+        if (tongue > ENGLISH && tongue < TONGUES.length) return new String[]{voice + "_" + TONGUES[tongue], voice};
+        return new String[]{voice};
     }
 
     /** The name of the file of what is written under a sound in a language, or null where nothing is written (captions off). */

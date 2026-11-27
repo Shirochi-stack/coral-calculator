@@ -1,0 +1,123 @@
+The idol song's lines, and the shorter forms each can be said in, for the mouths of the film that are too short for the whole line.
+The film picks, for each mouth, the longest form that fits it at a natural pace (stretched by no more than 1.15). Only words are cut. The user's own lyrics,
+dist/cutscenes/lyrics-from-user.txt, are untouched. Each block: the line as it was (English, then Japanese, Korean, Chinese), then its short form and its single word or call.
+
+EN  Lights up. You're staring. How cute.  ->  Lights up. How cute.  ->  How cute.
+JA  ライトアップ。見とれてるの？ かーわいい。  ->  ライトアップ。かわいい。  ->  かわいい。
+KO  조명 켜졌다. 넋 놓고 보네? 귀여워라.  ->  조명 켜졌다. 귀여워.  ->  귀여워.
+ZH  灯亮了。看呆了？真可爱。  ->  灯亮了。真可爱。  ->  可爱。
+
+EN  Five of us. Try to keep count.  ->  Five of us.  ->  Five.
+JA  私たちは五人。数え間違えないでね。  ->  私たち五人。  ->  五人。
+KO  우리는 다섯. 세는 거 놓치지 마.  ->  우리 다섯.  ->  다섯.
+ZH  我们五个人。别数错了。  ->  我们五个。  ->  五个。
+
+EN  Book's open. Story's mine. Sing.  ->  Book's open. Sing.  ->  Sing.
+JA  本が開いた。物語は私のもの。歌って。  ->  本が開いた。歌って。  ->  歌って。
+KO  책이 열렸어. 이야기는 내 거야. 노래해.  ->  책이 열렸어. 노래해.  ->  노래해.
+ZH  书打开了。故事归我。唱吧。  ->  书开了。唱吧。  ->  唱！
+
+EN  Loud. I'll tell you if it's right.  ->  Loud.  ->  Louder!
+JA  大きな声で。合ってるか教えてあげる。  ->  大きく。  ->  もっと！
+KO  크게. 맞는지 내가 말해 줄게.  ->  크게.  ->  더!
+ZH  大声点。对不对我会告诉你。  ->  大声点。  ->  大声！
+
+EN  Hands up. Higher. Don't get shy.  ->  Hands up.  ->  Up!
+JA  手を上げて。もっと高く。恥ずかしがらないの。  ->  手を上げて。  ->  上げて。
+KO  손 들어. 더 높이. 부끄러워하지 마.  ->  손 들어.  ->  위로.
+ZH  举起手。再高点。别害羞。  ->  举起手。  ->  举手。
+
+EN  Call my name. Slowly. Right.  ->  Call my name.  ->  My name.
+JA  私の名前を呼んで。ゆっくり。そう。  ->  名前を呼んで。  ->  呼んで。
+KO  내 이름을 불러 봐. 천천히. 그래.  ->  내 이름 불러.  ->  불러.
+ZH  叫我的名字。慢一点。对了。  ->  叫我名字。  ->  叫！
+
+EN  Squish, Sloppy~♡ — eyes up, zaako!  ->  Sloppy~♡ — eyes up!  ->  Eyes up!
+JA  スクイッシュ、Sloppy~♡ ——顔を上げて、ざぁこ！  ->  Sloppy~♡ ——顔上げて！  ->  顔上げて！
+KO  스퀴시, Sloppy~♡ ——눈 들어, 허접!  ->  Sloppy~♡ ——눈 들어!  ->  눈 들어!
+ZH  啪叽，Sloppy~♡ ——抬起头，杂鱼！  ->  Sloppy~♡ ——抬头！  ->  抬头！
+
+EN  Squish, Sloppy~♡ — five colors, don't choke!  ->  Sloppy~♡ — five colors!  ->  Five colors!
+JA  スクイッシュ、Sloppy~♡ ——五色よ、むせないでね！  ->  Sloppy~♡ ——五色！  ->  五色！
+KO  스퀴시, Sloppy~♡ ——다섯 가지 색이야, 사레들리지 마!  ->  Sloppy~♡ ——다섯 색!  ->  다섯 색!
+ZH  啪叽，Sloppy~♡ ——五种颜色，别呛着！  ->  Sloppy~♡ ——五色！  ->  五色！
+
+EN  Miss the beat and I restart you —  ->  Miss the beat —  ->  Beat!
+JA  リズムを外したら最初からやり直し——  ->  リズム外したら——  ->  リズム！
+KO  박자 놓치면 처음부터 다시 시켜——  ->  박자 놓치면——  ->  박자!
+ZH  跟丢节拍我就让你重来——  ->  漏拍就重来——  ->  节拍！
+
+EN  Squish, Sloppy~♡ — up on your feet!  ->  Sloppy~♡ — up!  ->  Up!
+JA  スクイッシュ、Sloppy~♡ ——立ち上がって！  ->  Sloppy~♡ ——立って！  ->  立って！
+KO  스퀴시, Sloppy~♡ ——일어서!  ->  Sloppy~♡ ——일어서!  ->  일어서!
+ZH  啪叽，Sloppy~♡ ——站起来！  ->  Sloppy~♡ ——站起来！  ->  站起来！
+
+EN  Pink. Center. Obviously.  ->  Pink. Center.  ->  Pink.
+JA  ピンク。センター。当然でしょ。  ->  ピンク。センター。  ->  ピンク。
+KO  핑크. 센터. 당연하지.  ->  핑크. 센터.  ->  핑크.
+ZH  粉色。中心。理所当然。  ->  粉色。中心。  ->  粉色。
+
+EN  Red. Warm. Still not bread.  ->  Red. Warm.  ->  Red.
+JA  赤。あったかい。まだパンじゃない。  ->  赤。あったかい。  ->  赤。
+KO  빨강. 따뜻해. 그래도 빵은 아니야.  ->  빨강. 따뜻해.  ->  빨강.
+ZH  红色。温暖。还是不是面包。  ->  红色。温暖。  ->  红色。
+
+EN  Blue. Crying. We can all see.  ->  Blue. Crying.  ->  Blue.
+JA  青。泣き虫。みんな見てるよ。  ->  青。泣き虫。  ->  青。
+KO  파랑. 울보. 다 보이거든.  ->  파랑. 울보.  ->  파랑.
+ZH  蓝色。爱哭。大家都看见了。  ->  蓝色。爱哭。  ->  蓝色。
+
+EN  Gold. Lead. You can watch.  ->  Gold. Lead.  ->  Gold.
+JA  金。リード。あなたは見てて。  ->  金。リード。  ->  金。
+KO  금색. 리드. 넌 구경이나 해.  ->  금색. 리드.  ->  금색.
+ZH  金色。领唱。你就看着吧。  ->  金色。领唱。  ->  金色。
+
+EN  Down the runway. Don't let go.  ->  Down the runway.  ->  Runway.
+JA  ランウェイを進んで。手を離さないで。  ->  ランウェイ。  ->  進んで。
+KO  런웨이를 따라가. 놓지 마.  ->  런웨이.  ->  걸어.
+ZH  沿着 T 台走。别松手。  ->  走T台。  ->  走！
+
+EN  You're holding on like it's a favor.  ->  Hold on.  ->  Hold.
+JA  お願いされたみたいにしがみついてる。  ->  しがみついてる。  ->  必死。
+KO  무슨 부탁이라도 받은 것처럼 매달리네.  ->  꽉 잡아.  ->  잡아.
+ZH  你抓得那么紧，像是在帮我的忙。  ->  抓紧了。  ->  抓紧。
+
+EN  Not bad. For you. You kept the beat.  ->  Not bad. For you.  ->  Not bad.
+JA  悪くない。あなたにしては。リズムは守れたね。  ->  悪くない。  ->  いいね。
+KO  나쁘지 않아. 너치곤. 박자 잘 맞췄네.  ->  나쁘지 않아.  ->  좋아.
+ZH  还不错。对你来说。你跟上了节拍。  ->  还不错。  ->  不错。
+
+EN  Once more. Up. That was easy.  ->  Once more. Up.  ->  Again.
+JA  もう一回。上へ。簡単だったでしょ。  ->  もう一回。  ->  もう。
+KO  한 번 더. 위로. 쉬웠지.  ->  한 번 더.  ->  다시.
+ZH  再来一次。起来。很简单吧。  ->  再来。  ->  再来！
+
+EN  Squish, Sloppy~♡ — you want the encore.  ->  Sloppy~♡ — encore!  ->  Encore!
+JA  スクイッシュ、Sloppy~♡ ——アンコール、したいんでしょ。  ->  Sloppy~♡ ——アンコール！  ->  アンコール！
+KO  스퀴시, Sloppy~♡ ——앙코르가 듣고 싶구나.  ->  Sloppy~♡ ——앙코르!  ->  앙코르!
+ZH  啪叽，Sloppy~♡ ——你想要安可。  ->  Sloppy~♡ ——安可！  ->  安可！
+
+EN  Squish, Sloppy~♡ — five colors, say it!  ->  Sloppy~♡ — say it!  ->  Say it!
+JA  スクイッシュ、Sloppy~♡ ——五色よ、言ってみて！  ->  Sloppy~♡ ——言って！  ->  言って！
+KO  스퀴시, Sloppy~♡ ——다섯 가지 색이야, 말해 봐!  ->  Sloppy~♡ ——말해 봐!  ->  말해!
+ZH  啪叽，Sloppy~♡ ——五种颜色，说出来！  ->  Sloppy~♡ ——说出来！  ->  说！
+
+EN  Jump, heart, bow — you blinked. Again.  ->  Jump, heart, bow.  ->  Jump!
+JA  ジャンプ、ハート、お辞儀——瞬きしたね。もう一回。  ->  ジャンプ、ハート、お辞儀。  ->  ジャンプ！
+KO  점프, 하트, 인사——눈 깜빡였네. 다시.  ->  점프, 하트, 인사.  ->  점프!
+ZH  跳、爱心、鞠躬——你眨眼了。再来。  ->  跳、爱心、鞠躬。  ->  跳！
+
+EN  Squish, Sloppy~♡ — I didn't say stop!  ->  Sloppy~♡ — don't stop!  ->  Don't stop!
+JA  スクイッシュ、Sloppy~♡ ——止めなんて言ってない！  ->  Sloppy~♡ ——止めないで！  ->  止めないで！
+KO  스퀴시, Sloppy~♡ ——그만이라고 안 했어!  ->  Sloppy~♡ ——멈추지 마!  ->  멈추지 마!
+ZH  啪叽，Sloppy~♡ ——我没说停！  ->  Sloppy~♡ ——别停！  ->  别停！
+
+EN  You're welcome.  ->  You're welcome.  ->  Welcome.
+JA  どういたしまして。  ->  どういたしまして。  ->  どうぞ。
+KO  천만에.  ->  천만에.  ->  별말씀.
+ZH  不客气。  ->  不客气。  ->  不客气。
+
+EN  Now. My mint ice cream.  ->  Mint ice cream.  ->  Ice cream.
+JA  さあ。私のミントアイス。  ->  ミントアイス。  ->  アイス。
+KO  자. 내 민트 아이스크림.  ->  민트 아이스.  ->  아이스.
+ZH  现在。我的薄荷冰淇淋。  ->  薄荷冰淇淋。  ->  冰淇淋。

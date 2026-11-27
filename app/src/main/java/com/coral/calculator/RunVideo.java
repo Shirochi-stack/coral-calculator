@@ -61,6 +61,8 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
     private final boolean film;
     private final java.util.List<RunFilms.Line> lines;
     private TextView caption;
+    /** How large what is written under it is when it fits (the size is taken down for a line that would be more than three lines, so that none runs off the screen). */
+    private float captionSize;
     private MediaPlayer voice;
     private boolean pictureReady, voiceReady, voiceGone;
     /** How many times it has looked at itself; how long its sound takes to go on after being set to a moment, as far as that has been seen; and whether it was set at the last look. */
@@ -114,7 +116,7 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
             caption = new TextView(context);
             caption.setTextColor(Color.WHITE);
             caption.setGravity(Gravity.CENTER);
-            caption.setMaxLines(2);
+            caption.setMaxLines(3);
             caption.setShadowLayer(5, 0, 1, Color.BLACK);
             int pad = Math.round(10 * context.getResources().getDisplayMetrics().density);
             caption.setPadding(pad, pad / 3, pad, pad / 3);
@@ -277,7 +279,10 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
                 if (words == null) {
                     caption.setVisibility(INVISIBLE);
                 } else {
-                    if (!words.contentEquals(caption.getText())) caption.setText(words);
+                    if (!words.contentEquals(caption.getText())) {
+                        fitCaption(words);
+                        caption.setText(words);
+                    }
                     caption.setVisibility(VISIBLE);
                 }
             }
@@ -349,11 +354,27 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
      * lines; if not, on the picture, as low as the picture's own writing allows, and never in the strip at the foot of the screen
      * that belongs to the phone.
      */
+    /** The size of what is written, taken down by steps (to six tenths of itself) until it is no more than three lines wide as it is wrapped, by word or by character. */
+    private void fitCaption(String words) {
+        if (captionSize <= 0 || caption.getMaxWidth() <= 0 || caption.getMaxWidth() == Integer.MAX_VALUE) return;
+        int room = caption.getMaxWidth() - caption.getPaddingLeft() - caption.getPaddingRight();
+        float size = captionSize;
+        android.text.TextPaint paint = new android.text.TextPaint(caption.getPaint());
+        while (true) {
+            paint.setTextSize(size);
+            int count = android.text.StaticLayout.Builder.obtain(words, 0, words.length(), paint, Math.max(1, room)).build().getLineCount();
+            if (count <= 3 || size <= captionSize * .6f) break;
+            size *= .93f;
+        }
+        caption.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
+    }
+
     private void place(float scale, int width, int height) {
         float density = getResources().getDisplayMetrics().density, scaled = getResources().getDisplayMetrics().scaledDensity;
         float shownWide = wide * scale, shownTall = tall * scale, top = (height - shownTall) / 2, bottom = top + shownTall;
         boolean tallPicture = tall > wide;
         float size = RunFilms.size(Math.min(shownWide, width), tallPicture, 14 * scaled);
+        captionSize = size;
         caption.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
         caption.setMaxWidth(Math.round(Math.min(shownWide, width) - 24 * density));
         LayoutParams where = (LayoutParams) caption.getLayoutParams();

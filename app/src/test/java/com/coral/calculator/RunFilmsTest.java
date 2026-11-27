@@ -90,9 +90,9 @@ public class RunFilmsTest {
     @Test public void theSoundIsTheOneChosenInTheLanguageChosenOrInEnglish() {
         assertArrayEquals(new String[]{"prologue_h"}, RunFilms.sounds(RunFilms.PROLOGUE, RunFilms.HALGAKOS, RunFilms.ENGLISH, true));
         assertArrayEquals(new String[]{"prologue_h_ja", "prologue_h"}, RunFilms.sounds(RunFilms.PROLOGUE, RunFilms.HALGAKOS, RunFilms.JAPANESE, true));
-        assertArrayEquals(new String[]{"idol_h_ko", "idol_h"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.HALGAKOS, RunFilms.KOREAN, false));
-        assertArrayEquals(new String[]{"idol_h_zh", "idol_h"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.HALGAKOS, RunFilms.CHINESE, true));
-        assertArrayEquals("a language there is none of is English", new String[]{"idol_h"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.HALGAKOS, 9, true));
+        assertArrayEquals(new String[]{"idol_wide_h_ko", "idol_wide_h"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.HALGAKOS, RunFilms.KOREAN, false));
+        assertArrayEquals(new String[]{"idol_tall_h_zh", "idol_tall_h"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.HALGAKOS, RunFilms.CHINESE, true));
+        assertArrayEquals("a language there is none of is English", new String[]{"idol_tall_h"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.HALGAKOS, 9, true));
         assertArrayEquals(new String[]{"prologue_o"}, RunFilms.sounds(RunFilms.PROLOGUE, RunFilms.MODEL, RunFilms.JAPANESE, true));
         assertArrayEquals("the model's sound belongs to its picture", new String[]{"idol_tall_m"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.MODEL, RunFilms.ENGLISH, true));
         assertArrayEquals(new String[]{"idol_wide_m"}, RunFilms.sounds(RunFilms.IDOL, RunFilms.MODEL, RunFilms.ENGLISH, false));
@@ -125,7 +125,7 @@ public class RunFilmsTest {
     @Test public void whatIsWrittenIsNamedForItsSoundAndLanguageAndOffIsNothing() {
         assertEquals("films/prologue_h.en.txt", RunFilms.captions("prologue_h", RunFilms.ENGLISH));
         assertEquals("films/idol_tall_m.ja.txt", RunFilms.captions("idol_tall_m", RunFilms.JAPANESE));
-        assertEquals("films/idol_h_ko.ko.txt", RunFilms.captions("idol_h_ko", RunFilms.KOREAN));
+        assertEquals("films/idol_wide_h_ko.ko.txt", RunFilms.captions("idol_wide_h_ko", RunFilms.KOREAN));
         assertEquals("films/idol_l.zh.txt", RunFilms.captions("idol_l", RunFilms.CHINESE));
         assertNull(RunFilms.captions("prologue_h", RunFilms.NO_CAPTIONS));
         assertNull(RunFilms.captions("prologue_h", -1));
@@ -266,6 +266,13 @@ public class RunFilmsTest {
             if (item.shelf == RunGallery.VIDEOS) videos++;
         }
         assertEquals("four videos in the app, the idol song's two pictures being one of them here", 3, videos);
+    }
+
+    @Test public void theJapanesePrologueHasAPictureOfItsOwn() {
+        assertEquals("prologue_ja", RunFilms.picture(RunFilms.PROLOGUE, false, RunFilms.HALGAKOS, RunFilms.JAPANESE));
+        assertEquals("prologue", RunFilms.picture(RunFilms.PROLOGUE, false, RunFilms.HALGAKOS, RunFilms.KOREAN));
+        assertEquals("the model's own sound goes with the usual picture", "prologue", RunFilms.picture(RunFilms.PROLOGUE, false, RunFilms.MODEL, RunFilms.JAPANESE));
+        assertEquals("idol_tall", RunFilms.picture(RunFilms.IDOL, true, RunFilms.HALGAKOS, RunFilms.JAPANESE));
     }
 
     @Test public void thePicturesAreRowsOfTheirTable() {
