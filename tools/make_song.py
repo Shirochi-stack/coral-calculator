@@ -38,9 +38,9 @@ spec = importlib.util.spec_from_file_location("make_cutscene", str(HERE / "make_
 tool = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tool)
 
-def planned(song, shade, short):
+def planned(song, shade, short, bare=False):
     """The song as a plan of parts with their seconds: the roll call as one part for each friend. Short: the first chorus alone, after a few seconds of intro."""
-    plan = song["plans"][shade or "cute"]
+    plan = song["plans"][shade if shade in song["plans"] else "cute"]
     local = song["plans"]["local"]
     parts = []
     for part in song["sections"]:
@@ -51,10 +51,18 @@ def planned(song, shade, short):
             for index in range(0, len(lines), 2):
                 parts.append({"section_name": f"Call-out {index // 2 + 1}", "positive_local_styles": local.get("bridge", []), "negative_local_styles": [], "duration_ms": each * 1000, "lines": lines[index:index + 2]})
         else:
-            parts.append({"section_name": part["tag"].capitalize(), "positive_local_styles": local.get(part["tag"], []), "negative_local_styles": [], "duration_ms": max(3, lasts) * 1000, "lines": lines})
+            again = sum(1 for other in parts if other["section_name"].split(" ")[0] == part["tag"].capitalize())
+            parts.append({"section_name": part["tag"].capitalize() + (f" {again + 1}" if again else ""), "positive_local_styles": local.get(part["tag"], []), "negative_local_styles": [],
+                          "duration_ms": max(3, lasts) * 1000, "lines": [line.replace("(", "").replace(")", "") for line in lines]})
     if short:
         parts = [dict(parts[0], duration_ms=3000), next(part for part in parts if part["section_name"] == "Chorus")]
-    return {"composition_plan": {"positive_global_styles": plan["positive"], "negative_global_styles": plan["negative"], "sections": parts}, "respect_sections_durations": True}
+    yes, no = list(plan["positive"]), list(plan["negative"])
+    if bare:
+        # The band alone, the same parts with the same seconds: no words, and nothing said of voices but that there are none.
+        parts = [dict(part, lines=[], positive_local_styles=[style for style in part["positive_local_styles"] if not any(word in style for word in ("sing", "shout", "speak", "girl", "crowd", "vocal"))] + ["instrumental"]) for part in parts]
+        yes = [style for style in yes if not any(word in style for word in ("sing", "vocal", "voice", "crowd", "English"))] + ["instrumental, no vocals"]
+        no = [style for style in no if "voice" not in style and "vocal" not in style] + ["vocals", "singing", "spoken words", "choir"]
+    return {"composition_plan": {"positive_global_styles": yes, "negative_global_styles": no, "sections": parts}, "respect_sections_durations": True}
 
 
 MODELS = {
@@ -132,6 +140,7 @@ def main():
     parser.add_argument("--shade", help="one of the song's other styles, by name")
     parser.add_argument("--only", help="with --hear: only the songs whose names begin so")
     parser.add_argument("--short", action="store_true", help="a test of the voice: the first chorus alone (named ...-test-N)")
+    parser.add_argument("--bare", action="store_true", help="of a model that takes a plan: the band alone, the same parts and seconds, no voices (named ...-band-N)")
     args = parser.parse_args()
     song = json.loads((tool.BOARDS / f"{args.song}.json").read_text(encoding="utf-8"))
     if args.shade:
@@ -161,7 +170,7 @@ def main():
     if args.go:
         many = int(args.go[1])
         model = MODELS[args.go[0]]
-        name = args.go[0] + (f"-{args.shade}" if args.shade else "") + ("-test" if args.short else "")
+        name = args.go[0] + (f"-{args.shade}" if args.shade else "") + ("-test" if args.short else "") + ("-band" if args.bare else "")
         price = model["costs"](song["seconds"])
         for _ in range(many):
             _, spent = tool.spending(folder)
@@ -173,7 +182,7 @@ def main():
             number = int(waiting[0].stem.split("-")[-1]) if waiting else max([int(made.stem.split("-")[-1]) for made in out.glob(f"{name}-*.json") if made.stem.split("-")[-1].isdigit()], default=0) + 1
             seed = 1000 * number + 7
             note = out / f"{name}-{number}.sent"
-            asked = planned(song, args.shade, args.short) if model["asks"] is None else model["asks"](song, words, seed)
+            asked = planned(song, args.shade, args.short, args.bare) if model["asks"] is None else model["asks"](song, words, seed)
             request, answer = fal(headers, model["id"], asked, note)
             note.unlink()
             audio = answer.get("audio") or {}

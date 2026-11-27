@@ -55,9 +55,15 @@ film is a handful of requests and not one for every shot.
     python tools/make_cutscene.py BOARD --edit --with kling                 joins the takes of one model into the film (BOARD-kling.mp4), with their own sound
     python tools/make_cutscene.py BOARD --edit --with kling --song FILE     the same picture with a song laid over in place of the takes' sound (BOARD-kling-edited.mp4)
 Beside each film a copy under 28 MB is written, the same size and sound at a lower bit rate (...-for-phone.mp4).
+Where one take ends and the next begins a page is turned across the picture (the book is the story), and a short sting is heard
+(a whoosh, a soft hit, a page's flutter) with the takes' music held down under it and brought to one level each side; under a
+song laid over, only the flutter.
 The edit takes whatever takes are in the folder under a name (A-NAME-....mp4), not only those this tool asked for: takes made
 elsewhere (--with magi, for clips made on a website) are joined the same way, whatever their size, speed or length: each is
 fitted into the film's picture, read by its own clock, and cut or held on its last frame to its thirty seconds.
+A board made in more shapes than one (its "shapes": a name for each, as "9x16": "9:16") has its takes named for the shape
+(A-9x16-....mp4) and its stills in stills-9x16; --with 9x16 makes the film of that shape (BOARD-9x16.mp4). With --song,
+--named NAME says what that film is called (BOARD-9x16-NAME.mp4), so that one picture can be kept with several songs.
 
 Of Kling (kling/v4/reference-to-video on fal) a take is asked shot by shot, each with its
 seconds and at most 512 letters, with the first shot's still as the first frame, the other
@@ -771,7 +777,7 @@ def for_phone(film, limit=28_000_000):
     return target
 
 
-def edit_takes(board, folder, which, song=None):
+def edit_takes(board, folder, which, song=None, named=None):
     """
     The film from the long takes of one model: each take as long as its shots, in order, at the takes' own size; their own sound, eased
     down and up across each join; and the names and the title drawn on. A take not made yet is its shots' stills, held, in silence.
@@ -784,9 +790,12 @@ def edit_takes(board, folder, which, song=None):
     from PIL import Image, ImageDraw, ImageFont
 
     plan = board["segments"]
-    wide, tall = SIZES[plan["resolution"]][board.get("ratio", "16:9")]
+    # A board made in more shapes than one names its takes for the shape (A-9x16-....mp4), and the film is that shape.
+    wide, tall = SIZES[plan["resolution"]][board.get("shapes", {}).get(which, board.get("ratio", "16:9"))]
+    drawn = folder / (f"stills-{which}" if (folder / f"stills-{which}").exists() else plan["stills"])
     fps, bar, rate = FRAMES_A_SECOND, board["bar"], 48000
-    scale = tall / 720
+    # Words are sized for a wide picture 1280 across; on an upright one they are half as large again as its width alone would make them, to be read on a phone.
+    scale = wide / 1280 * 1.5 if tall > wide else min(wide / 1280, tall / 720)
     picks = json.loads((folder / "picks.json").read_text(encoding="utf-8")) if (folder / "picks.json").exists() else {}
 
     def font(kind, size):
@@ -800,7 +809,7 @@ def edit_takes(board, folder, which, song=None):
         letters, signs = font(kind, size), font("signs", size)
         parts = []
         for letter in text:
-            mine = signs if letter in "\u2661\u2665\u266a\u266b" else letters
+            mine = signs if letter in "\u2661\u2665\u266a\u266b\u2606\u2605" else letters
             if parts and parts[-1][1] is mine:
                 parts[-1][0] += letter
             else:
@@ -864,7 +873,8 @@ def edit_takes(board, folder, which, song=None):
     if title:
         layer = Image.new("RGBA", (wide, tall), (0, 0, 0, 0))
         lines, size = title["text"].split("\n"), 104
-        top = tall * .1
+        # How far down the picture the title begins: a tenth, or what the board says for this shape (where the last shot has room for it).
+        top = tall * (title["top"].get(which, .1) if isinstance(title.get("top"), dict) else title.get("top", .1))
         for line in lines:
             write(layer, line, wide / 2, top, size, "heavy", (255, 255, 255, 255), (214, 51, 108, 255), 9, "middle")
             top += size * scale * 1.22
@@ -877,7 +887,7 @@ def edit_takes(board, folder, which, song=None):
         piece = numpy.asarray(layer.crop(box), dtype=numpy.float32)
         layers.append((piece[:, :, :3], piece[:, :, 3:4] / 255, box, begins, ends, fades))
 
-    name = f"{folder.name}-{which}-edited.mp4" if song else f"{folder.name}-{which}.mp4"
+    name = f"{folder.name}-{which}-{named or 'edited'}.mp4" if song else f"{folder.name}-{which}.mp4"
     out = av.open(str(folder / name), "w")
     picture = out.add_stream("libx264", rate=fps)
     picture.width, picture.height, picture.pix_fmt = wide, tall, "yuv420p"
@@ -885,16 +895,32 @@ def edit_takes(board, folder, which, song=None):
     sound = out.add_stream("aac", rate=rate)
     sound.bit_rate = 192000
     sound.layout = "stereo"
-    index, heard, used = 0, [], []
-    for part in plan["list"]:
-        shots = [next(shot for shot in board["shots"] if shot["name"] == shot_name) for shot_name in part["shots"]]
-        count = int(round(sum(shot["bars"] for shot in shots) * bar * fps))
-        clip = chosen(part)
-        used.append(clip.name if clip else "its stills")
+    index, heard, used = [0], [], []
+
+    def emit(frame):
+        """One picture of the film: the names and the title over it, up out of black at the beginning and down into it at the end."""
+        now = index[0] / fps
+        shown = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if any(begins <= now < ends for _, _, _, begins, ends, _ in layers) or now < .5 or total - now < 1:
+            shown = shown.astype(numpy.float32)
+            for colour, alpha, box, begins, ends, fades in layers:
+                if begins <= now < ends:
+                    strength = min(1.0, (now - begins) / fades, (ends - now) / fades)
+                    area = shown[box[1]:box[3], box[0]:box[2]]
+                    shown[box[1]:box[3], box[0]:box[2]] = area * (1 - alpha * strength) + colour * alpha * strength
+            shown = numpy.clip(shown * min(1.0, now / .5 + .0001, (total - now) / 1.0), 0, 255).astype(numpy.uint8)
+        image = av.VideoFrame.from_ndarray(numpy.ascontiguousarray(shown), format="rgb24")
+        image.pts = index[0]
+        image.time_base = fractions.Fraction(1, fps)
+        for packet in picture.encode(image):
+            out.mux(packet)
+        index[0] += 1
+
+    def pictures(part, shots, count, clip):
+        """A take's pictures, one for each frame of its share of the film."""
         video = cv2.VideoCapture(str(clip)) if clip else None
         speed = (video.get(cv2.CAP_PROP_FPS) or fps) if video is not None else fps
-        last = numpy.zeros((tall, wide, 3), numpy.uint8)
-        read, fitted = -1, last
+        read, fitted = -1, numpy.zeros((tall, wide, 3), numpy.uint8)
         for step in range(count):
             if video is not None:
                 # The take's own clock: the picture it shows at this moment, whatever its frames a second; past its end, its last one.
@@ -913,35 +939,68 @@ def edit_takes(board, folder, which, song=None):
                         fitted = numpy.zeros((tall, wide, 3), numpy.uint8)
                         x, y = (wide - size[0]) // 2, (tall - size[1]) // 2
                         fitted[y:y + size[1], x:x + size[0]] = cv2.resize(raw, size, interpolation=cv2.INTER_LANCZOS4)
-                frame = fitted
+                yield fitted
             else:
-                now = step / fps
-                at = 0
+                now, at = step / fps, 0
                 for shot in shots:
                     if now < at + shot["bars"] * bar or shot is shots[-1]:
-                        frame = cv2.resize(cv2.imread(str(folder / plan["stills"] / f"{shot['name']}.png")), (wide, tall), interpolation=cv2.INTER_LANCZOS4)
+                        yield cv2.resize(cv2.imread(str(drawn / f"{shot['name']}.png")), (wide, tall), interpolation=cv2.INTER_LANCZOS4)
                         break
                     at += shot["bars"] * bar
-            last = frame
-            now = index / fps
-            shown = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            if any(begins <= now < ends for _, _, _, begins, ends, _ in layers) or now < .5 or total - now < 1:
-                shown = shown.astype(numpy.float32)
-                for colour, alpha, box, begins, ends, fades in layers:
-                    if begins <= now < ends:
-                        strength = min(1.0, (now - begins) / fades, (ends - now) / fades)
-                        area = shown[box[1]:box[3], box[0]:box[2]]
-                        shown[box[1]:box[3], box[0]:box[2]] = area * (1 - alpha * strength) + colour * alpha * strength
-                shown = numpy.clip(shown * min(1.0, now / .5 + .0001, (total - now) / 1.0), 0, 255).astype(numpy.uint8)
-            image = av.VideoFrame.from_ndarray(numpy.ascontiguousarray(shown), format="rgb24")
-            image.pts = index
-            image.time_base = fractions.Fraction(1, fps)
-            for packet in picture.encode(image):
-                out.mux(packet)
-            index += 1
         if video is not None:
             video.release()
-        # The take's own sound, as long as its picture; eased up at its beginning and down at its end, which is where the takes join.
+
+    # Where one take ends and the next begins, a page is turned: the outgoing picture is the page, swept away from right to left like a
+    # leaf of the book, with the paper of its back along the turning edge and a soft shadow on what it uncovers. Fourteen frames, half
+    # from each take, so neither loses more than a third of a second.
+    TURN = 14
+    across = numpy.arange(wide, dtype=numpy.float32)[None, :]
+    down = (numpy.arange(tall, dtype=numpy.float32)[:, None] / tall - .5)
+    curl, lean, shade = .085 * wide, .12 * wide, .04 * wide
+    paper = numpy.array([214, 235, 244], numpy.float32)  # (blue, green, red: the cream of a page)
+
+    def turned(old, new, p):
+        """The old picture as a page turned so far (0 not at all, 1 gone), over the new one."""
+        p = p * p * (3 - 2 * p)
+        edge = (1 - p) * (wide + curl + shade * 3 + lean) - curl - shade * 3 - lean / 2 + lean * down
+        d = across - edge
+        was, comes = old.astype(numpy.float32), new.astype(numpy.float32)
+        # Left of the turning edge the old page still lies, a little darker toward the fold.
+        left = was * numpy.clip(.82 + .18 * (-d / shade), .82, 1)[:, :, None]
+        # The back of the page along the edge: paper, rounded, lightest in its middle.
+        u = numpy.clip(d / curl, 0, 1)
+        back = paper[None, None, :] * (.72 + .28 * numpy.sin(numpy.pi * u))[:, :, None]
+        # Beyond it, the new picture under the page's shadow, which fades away from the edge.
+        right = comes * (1 - .5 * numpy.exp(-numpy.clip(d - curl, 0, None) / shade))[:, :, None]
+        soft = lambda x: numpy.clip(x / 2 + .5, 0, 1)[:, :, None]
+        frame = left * (1 - soft(d)) + (back * (1 - soft(d - curl)) + right * soft(d - curl)) * soft(d)
+        return numpy.clip(frame, 0, 255).astype(numpy.uint8)
+
+    parts = []
+    for part in plan["list"]:
+        shots = [next(shot for shot in board["shots"] if shot["name"] == shot_name) for shot_name in part["shots"]]
+        parts.append((part, shots, int(round(sum(shot["bars"] for shot in shots) * bar * fps)), chosen(part)))
+    kept = None
+    for number, (part, shots, count, clip) in enumerate(parts):
+        used.append(clip.name if clip else "its stills")
+        frames = pictures(part, shots, count, clip)
+        if kept is not None:
+            head = [next(frames) for _ in range(TURN // 2)]
+            for k in range(TURN // 2):
+                emit(turned(kept[k], head[0], (k + 1) / (TURN + 1)))
+            for k in range(TURN // 2):
+                emit(turned(kept[-1], head[k], (TURN // 2 + k + 1) / (TURN + 1)))
+        waiting = []
+        for frame in frames:
+            waiting.append(frame)
+            if len(waiting) > TURN // 2:
+                emit(waiting.pop(0))
+        if number + 1 < len(parts):
+            kept = waiting
+        else:
+            for frame in waiting:
+                emit(frame)
+        # The take's own sound, as long as its share of the film.
         wave = numpy.zeros((int(count / fps * rate), 2), numpy.float32)
         if clip is not None:
             box = av.open(str(clip))
@@ -950,22 +1009,99 @@ def edit_takes(board, folder, which, song=None):
                 chunks = [made_.to_ndarray().reshape(-1, 2) for frame_ in box.decode(audio=0) for made_ in resampler.resample(frame_)]
                 got = numpy.concatenate(chunks)[: len(wave)] if chunks else wave[:0]
                 wave[: len(got)] = got
-        ease = int(.15 * rate)
-        wave[:ease] *= numpy.linspace(0, 1, ease)[:, None]
-        wave[-ease:] *= numpy.linspace(1, 0, ease)[:, None]
         heard.append(wave)
     for packet in picture.encode():
         out.mux(packet)
-    wave = numpy.concatenate(heard)
+
+    def noise(seconds, low, high, seed):
+        random = numpy.random.default_rng(seed)
+        size = int(seconds * rate)
+        spectrum = numpy.fft.rfft(random.standard_normal(size))
+        pitches = numpy.fft.rfftfreq(size, 1 / rate)
+        spectrum[(pitches < low) | (pitches > high)] = 0
+        made_ = numpy.fft.irfft(spectrum, size)
+        return made_ / (numpy.abs(made_).max() + 1e-9)
+
+    def flutter(seed):
+        """A page's flutter: a few short rustles of bright noise, three fifths of a second in all."""
+        random = numpy.random.default_rng(seed)
+        size = int(.6 * rate)
+        bright = noise(.6, 2500, 9000, seed)
+        made_ = numpy.zeros(size)
+        for begins in numpy.sort(random.uniform(.0, .42, 6)):
+            length = int(random.uniform(.07, .16) * rate)
+            at = int(begins * rate)
+            shape = numpy.hanning(length) * (.5 + .5 * numpy.sin(numpy.arange(length) / rate * 2 * numpy.pi * random.uniform(20, 36)))
+            made_[at:at + length] += bright[at:at + length] * shape * random.uniform(.5, 1)
+        return made_ / (numpy.abs(made_).max() + 1e-9)
+
+    def sting(seed):
+        """What is heard on a join: a whoosh rising into it, a soft hit with a page's flutter on it, and a short tail. Begins .45 s before the join."""
+        size = int(1.25 * rate)
+        time_ = numpy.arange(size) / rate - .45
+        rise = numpy.clip((time_ + .45) / .45, 0, 1)
+        swell = numpy.where(time_ < 0, rise ** 1.6, numpy.exp(-numpy.clip(time_, 0, None) / .11))
+        whoosh = (noise(1.25, 250, 1100, seed) * (1 - rise) + noise(1.25, 900, 5200, seed + 1) * rise) * swell * .55
+        after = numpy.clip(time_, 0, None)
+        hit = numpy.where(time_ >= 0, numpy.sin(2 * numpy.pi * (58 * after + 30 * (1 - numpy.exp(-after / .03)) * .03)) * numpy.exp(-after / .09), 0) * .6
+        tail = noise(1.25, 400, 3000, seed + 2) * numpy.where(time_ >= 0, numpy.exp(-after / .22), 0) * .16
+        rustle = numpy.zeros(size)
+        leaf = flutter(seed + 3)
+        begins = int(.4 * rate)
+        rustle[begins:begins + len(leaf)] = leaf[: size - begins] * .32
+        both = whoosh + hit + tail + rustle
+        # A little from left to right as it passes.
+        pan = numpy.clip((time_ + .45) / .9, 0, 1)
+        return numpy.stack([both * (1 - .35 * pan), both * (.65 + .35 * pan)], axis=1).astype(numpy.float32)
+
+    joins, at = [], 0
+    for wave in heard[:-1]:
+        at += len(wave)
+        joins.append(at)
     if song:
-        # A song laid over: the takes' own sound is left out, and the song is as long as the film, come what may.
+        # A song laid over: the takes' own sound is left out, and the song is as long as the film, come what may; on each join, only
+        # the page's flutter, low, under the song.
         box = av.open(str(song))
         resampler = av.AudioResampler(format="flt", layout="stereo", rate=rate)
-        got = numpy.concatenate([made_.to_ndarray().reshape(-1, 2) for frame_ in box.decode(audio=0) for made_ in resampler.resample(frame_)])[: len(wave)]
-        wave = numpy.zeros_like(wave)
-        wave[: len(got)] = got
+        got = numpy.concatenate([made_.to_ndarray().reshape(-1, 2) for frame_ in box.decode(audio=0) for made_ in resampler.resample(frame_)])
+        wave = numpy.zeros((sum(len(part_) for part_ in heard), 2), numpy.float32)
+        wave[: min(len(got), len(wave))] = got[: len(wave)]
         wave *= .97 / max(.97, float(numpy.abs(wave).max()))
+        level = float(numpy.sqrt((wave ** 2).mean())) or .1
+        for number, join in enumerate(joins):
+            leaf = flutter(40 + number) * level * .9
+            begins = join - int(.05 * rate)
+            wave[begins:begins + len(leaf)] += numpy.stack([leaf, leaf], axis=1)[: len(wave) - begins]
+    else:
+        # The takes' own sound. Each side of a join is brought to one level (the mean of the two, reached a second and a half before the
+        # join and left a second and a half after it), the music is held down under the sting for half a second each way, and the sting
+        # is laid on the join: no hole, and no step.
+        wave = numpy.concatenate(heard)
+        rms = lambda piece: float(numpy.sqrt((piece ** 2).mean())) + 1e-6
+        gain = numpy.ones(len(wave), numpy.float32)
+        for join in joins:
+            before, after = rms(wave[join - 3 * rate:join - rate // 2]), rms(wave[join + rate // 2:join + 3 * rate])
+            both = (before * after) ** .5
+            out_gain, in_gain = min(2.0, max(.5, both / before)), min(2.0, max(.5, both / after))
+            t = (numpy.arange(len(wave)) - join) / rate
+            gain *= numpy.where(t < 0, 1 + (out_gain - 1) * numpy.clip((t + 3) / 1.5, 0, 1), 1 + (in_gain - 1) * (1 - numpy.clip((t - 1.5) / 3.5, 0, 1))).astype(numpy.float32)
+            gain *= (1 - .45 * numpy.clip(1 - numpy.abs(t) / .5, 0, 1)).astype(numpy.float32)
+        wave = wave * gain[:, None]
+        level = rms(wave)
+        for number, join in enumerate(joins):
+            # (The takes meet over a fiftieth of a second, so that nothing clicks.)
+            blend = rate // 50
+            wave[join - blend:join] *= numpy.linspace(1, .6, blend)[:, None]
+            wave[join:join + blend] *= numpy.linspace(.6, 1, blend)[:, None]
+            heard_ = sting(20 + number * 7) * min(.6, level * 3.4)
+            begins = join - int(.45 * rate)
+            wave[begins:begins + len(heard_)] += heard_[: len(wave) - begins]
+        ease = int(.15 * rate)
+        wave[:ease] *= numpy.linspace(0, 1, ease)[:, None]
     wave[-rate:] *= numpy.linspace(1, 0, rate)[:, None]
+    # (What is louder than four fifths of full is rounded off, not cut off: a sting on loud music must not crack.)
+    over = numpy.abs(wave) > .8
+    wave[over] = numpy.sign(wave[over]) * (.8 + .17 * numpy.tanh((numpy.abs(wave[over]) - .8) / .17))
     samples = (numpy.clip(wave, -1, 1) * 32767).astype(numpy.int16)
     for start in range(0, len(samples), 1024):
         chunk = av.AudioFrame.from_ndarray(numpy.ascontiguousarray(samples[start:start + 1024].reshape(1, -1)), format="s16", layout="stereo")
@@ -977,7 +1113,7 @@ def edit_takes(board, folder, which, song=None):
     for packet in sound.encode():
         out.mux(packet)
     out.close()
-    print(f"saved {folder / name} {(folder / name).stat().st_size:,} bytes: {index / fps:.1f} s at {wide} x {tall}, made of {used}" + (f", with {pathlib.Path(song).name} laid over" if song else ""))
+    print(f"saved {folder / name} {(folder / name).stat().st_size:,} bytes: {index[0] / fps:.1f} s at {wide} x {tall}, made of {used}" + (f", with {pathlib.Path(song).name} laid over" if song else ""))
     for_phone(folder / name)
 
 
@@ -991,6 +1127,7 @@ def main():
     parser.add_argument("--segment", help="of a storyboard with long takes: the one take meant")
     parser.add_argument("--with", dest="which", help="kling or seedance: whose long takes are meant")
     parser.add_argument("--song", help="with --edit and --with: a song to lay over the film in place of the takes' own sound")
+    parser.add_argument("--named", help="with --song: what the film with that song is called after the board and the takes' name (edited, if not said)")
     args = parser.parse_args()
     folder = SHOTS / args.shot
     if (BOARDS / f"{args.shot}.json").exists():
@@ -1003,7 +1140,7 @@ def main():
             one_take(board, folder, part, args.which, args.go, args.task)
             return None
         if args.edit and args.which:
-            return edit_takes(board, folder, args.which, args.song)
+            return edit_takes(board, folder, args.which, args.song, args.named)
         if args.edit:
             return edit(board, folder)
         chosen = [shot for shot in board["shots"] if args.one in (None, shot["name"])]
