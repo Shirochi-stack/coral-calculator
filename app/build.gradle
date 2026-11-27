@@ -18,8 +18,8 @@ android {
         applicationId 'com.halgakos.calculator'
         minSdk 26
         targetSdk 36
-        versionCode 120
-        versionName '3.47.0'
+        versionCode 121
+        versionName '3.48.0'
     }
 
     // The outfits are an install-time asset pack, kept out of the base module; the debug APK carries them in the app itself.

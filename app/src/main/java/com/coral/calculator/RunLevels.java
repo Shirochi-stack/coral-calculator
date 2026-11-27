@@ -1512,6 +1512,7 @@ final class RunLevels {
         swarm(level);
         uniques(level);
         plant(level);
+        stairs(level);
         return level;
     }
 
@@ -1711,7 +1712,195 @@ final class RunLevels {
         swarm(level);
         uniques(level);
         plant(level);
+        stairs(level);
         return level;
+    }
+
+    // The dungeons
+
+    /**
+     * A floor of a dungeon as it is laid for one dive (from the dive's own number, so that every dive is new): made of what its land's
+     * chapter is made of, shorter than a land, with a flag half way and no village, nothing asked and no one waiting; its own creatures
+     * along it (twice as many on a teeming floor, few on a quiet one, with bread to mend), a chest, pluses (more on a gilded floor); and on
+     * the last floor a hall before the way out where its keeper stands. It is drawn as its land is, and as hard as its land, more deeply
+     * down, as {@link RunDungeons#deeper} says.
+     */
+    static Level dungeon(int dungeon, int floor, long dive) {
+        int number = RunDungeons.land(dungeon), chapter = chapterOf(number), sort = RunDungeons.kindOf(dungeon, floor, dive);
+        boolean last = floor >= RunDungeons.floors(dungeon) - 1;
+        Random random = new Random(dive * 50021L + dungeon * 7919L + floor * 104729L + 17);
+        float hard = number > COUNT ? 1 : (number - 1) / (float) (COUNT - 1);
+        Level draft = new Level(number, 1400, DEEP);
+        Builder builder = new Builder(draft, random, hard, chapter);
+        builder.ground(6);
+        int stretches = 12 + floor + (number > COUNT ? 6 : 0), previous = -1;
+        for (int stretch = 0; stretch < stretches; stretch++) {
+            int piece;
+            do {
+                if (number > COUNT) {
+                    int from = random.nextInt(10);
+                    int[] pool = LATER_POOLS[chapter - CHAPTERS], shapes = LATER_SHAPES[chapter - CHAPTERS];
+                    piece = from < 3 ? shapes[random.nextInt(shapes.length)] : from < 5 ? MOBS[random.nextInt(MOBS.length)] : pool[random.nextInt(pool.length)];
+                } else {
+                    int[] pool = chapter < EARLY_POOLS.length ? EARLY_POOLS[chapter] : HIGH_POOL;
+                    piece = pool[random.nextInt(pool.length)];
+                }
+            } while (piece == previous || number <= 2 && (piece == BRIDGE || piece == HIGH_ROAD));
+            previous = piece;
+            builder.stretch(piece);
+            if (stretch == stretches / 2) builder.flag();
+            builder.rest();
+        }
+        // The keeper's hall: flat, and long enough to fight in.
+        int hall = -1, hallFloor = FLOOR;
+        if (last) {
+            builder.ground(4);
+            hall = builder.at;
+            hallFloor = builder.floor;
+            builder.ground(KEEPER_HALL);
+        }
+        builder.ground(3);
+        draft.gate = builder.at;
+        int gateFloor = builder.floor;
+        builder.ground(PAST_GATE);
+        draft.main = builder.at;
+        builder.rooms();
+        boolean deep = false;
+        for (int[] room : draft.rooms) deep |= room[0] == ARENA;
+        Level level = new Level(number, builder.at, deep ? DEEP : ROWS);
+        level.main = draft.main;
+        level.quest = 0;
+        level.rooms.addAll(draft.rooms);
+        level.spawns.addAll(draft.spawns);
+        level.lofts.addAll(draft.lofts);
+        level.made.addAll(draft.made);
+        for (int row = 0; row < level.land.length; row++) System.arraycopy(draft.land[row], 0, level.land[row], 0, level.columns);
+        level.land[gateFloor - 1][draft.gate] = GATE;
+        level.land[gateFloor - 2][draft.gate] = GATE;
+        level.pluses.addAll(draft.pluses);
+        level.foes.addAll(draft.foes);
+        level.flags.addAll(draft.flags);
+        level.items.addAll(draft.items);
+        level.weapons.addAll(draft.weapons);
+        level.movers.addAll(draft.movers);
+        level.doors.addAll(draft.doors);
+        level.gate = draft.gate;
+        level.tiered = true;
+        // Something to fight with by where she comes down, and by the flag.
+        level.weapons.add(new int[]{(number + floor + dungeon) % PlusRun.GUN, 4, FLOOR - 1});
+        for (int flag : level.flags) level.weapons.add(new int[]{(number + floor + dungeon + 3) % PlusRun.GUN, flag + 1, top(level, flag + 1) - 1});
+        level.foes.addAll(draft.lodgers);
+        delve(level, dungeon, floor, sort, hall, hallFloor, random);
+        return level;
+    }
+
+    /** How long the keeper's hall is. */
+    static final int KEEPER_HALL = 26;
+
+    /** Where on a floor something of a dungeon may stand: flat ground with room over it, clear of the start, the flag, the doors and what lies about. */
+    private static List<int[]> standings(Level level, int until) {
+        List<int[]> spots = new ArrayList<>();
+        for (int column = 16; column < until; column++) {
+            boolean near = false;
+            for (int flag : level.flags) near |= Math.abs(flag - column) < 5;
+            for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
+            for (int[] item : level.items) if (item[1] < level.main) near |= Math.abs(item[1] - column) < 3;
+            for (int[] weapon : level.weapons) near |= Math.abs(weapon[1] - column) < 2;
+            if (near) continue;
+            int floor = top(level, column);
+            boolean flat = floor > 7 && floor < level.land.length && level.land[floor][column] == BLOCK && top(level, column + 1) == floor && top(level, column - 1) == floor;
+            for (int row = floor - 4; row < floor && flat; row++) flat = level.land[row][column] == AIR && level.land[row][column - 1] == AIR && level.land[row][column + 1] == AIR;
+            if (flat) spots.add(new int[]{column, floor});
+        }
+        return spots;
+    }
+
+    /** What lives on a floor of a dungeon: its own creatures, now and then one of its chapter's; a chest; and what the floor is like. */
+    private static void delve(Level level, int dungeon, int floor, int sort, int hall, int hallFloor, Random random) {
+        int until = hall >= 0 ? hall - 4 : level.gate - 6;
+        List<int[]> spots = standings(level, until);
+        int want = 5 + floor * 2 + level.number / 12;
+        if (sort == RunDungeons.TEEMING) want *= 2;
+        if (sort == RunDungeons.QUIET) want = Math.max(2, want / 3);
+        int[] kinds = RunDungeons.delvers(dungeon);
+        int chapterFirst = RunUniques.first(Math.min(11, level.chapter));
+        List<Integer> taken = new ArrayList<>();
+        for (int tries = 0; tries < 300 && want > 0 && !spots.isEmpty(); tries++) {
+            int[] spot = spots.get(random.nextInt(spots.size()));
+            boolean clear = true;
+            for (int column : taken) clear &= Math.abs(column - spot[0]) >= (sort == RunDungeons.TEEMING ? 5 : 7);
+            if (!clear) continue;
+            int kind = kinds[random.nextInt(kinds.length)];
+            // (One in five is one of its chapter's own; never its mini-boss, nor its hornets.)
+            if (random.nextInt(5) == 0) {
+                int own = chapterFirst + random.nextInt(2);
+                if (RunUniques.way(own) != RunUniques.MINIBOSS && !RunUniques.flies(own)) kind = own;
+            }
+            int way = RunUniques.way(kind);
+            // The spider hangs over the way from something high enough to hang from: room over it, five squares at least.
+            if (way == RunUniques.DROPPER && (spot[1] < 9 || level.land[spot[1] - 6][spot[0]] != AIR)) continue;
+            int row = RunUniques.floats(kind) ? spot[1] - 3 : spot[1] - 1;
+            level.foes.add(new int[]{kind, spot[0], row, 1, 0, 2});
+            taken.add(spot[0]);
+            want--;
+        }
+        // A chest, somewhere along it; on a gilded floor more pluses, in lines over the ground.
+        if (!spots.isEmpty()) {
+            int[] spot = spots.get(random.nextInt(spots.size()));
+            level.items.add(new int[]{PlusRun.CHEST, spot[0], spot[1] - 1, 0, 20 + floor * 5});
+        }
+        if (sort == RunDungeons.GILDED) {
+            for (int line = 0; line < 4 && !spots.isEmpty(); line++) {
+                int[] spot = spots.get(random.nextInt(spots.size()));
+                pluses(level, spot[0] - 2, spot[0] + 2, spot[1] - 3);
+            }
+        }
+        if (sort == RunDungeons.QUIET) {
+            for (int loaf = 0; loaf < 2 && !spots.isEmpty(); loaf++) {
+                int[] spot = spots.get(random.nextInt(spots.size()));
+                level.items.add(new int[]{PlusRun.BREAD, spot[0], spot[1] - 1, 0});
+            }
+        }
+        // The keeper, in the middle of its hall; and pluses along the hall for the fight.
+        if (hall >= 0) {
+            level.foes.add(new int[]{RunDungeons.keeper(dungeon), hall + KEEPER_HALL / 2 + 2, hallFloor - 1, 1, 0, 2});
+            pluses(level, hall + 2, hall + 5, hallFloor - 3);
+            pluses(level, hall + KEEPER_HALL - 6, hall + KEEPER_HALL - 3, hallFloor - 3);
+        }
+    }
+
+    /**
+     * The stairway down into a land's dungeon, if it has one: on flat, open ground about two fifths of the way along, clear of
+     * everything else. It is put in last, so that the land is as it was.
+     */
+    private static void stairs(Level level) {
+        if (RunDungeons.inLand(level.number) < 0) return;
+        int until = (level.arena >= 0 ? level.arena : level.gate) - 10, want = level.main * 2 / 5, best = -1;
+        // (Well clear of everything if it can be; if not, clear of what stands where it would.)
+        for (int pass = 0; pass < 2 && best < 0; pass++) {
+            int room_ = pass == 0 ? 1 : 0;
+            for (int column = 12; column < until; column++) {
+                int floor = top(level, column);
+                boolean clear = floor > 5 && top(level, column - 1) == floor && top(level, column + 1) == floor;
+                for (int row = floor - 4; row < floor && clear; row++) clear = level.land[row][column] == AIR && level.land[row][column - 1] == AIR && level.land[row][column + 1] == AIR;
+                for (int flag : level.flags) clear &= Math.abs(flag - column) > 2 + room_ * 2;
+                for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 2 + room_ * 4;
+                for (int[] room : level.rooms) clear &= Math.abs(room[1] - column) > 2 + room_ && Math.abs(room[5] - column) > 2 + room_;
+                for (int[] item : level.items) clear &= item[1] >= level.main || Math.abs(item[1] - column) > 1 + room_;
+                for (int[] weapon : level.weapons) clear &= Math.abs(weapon[1] - column) > 1 + room_;
+                for (int[] tree : level.trees) clear &= Math.abs(tree[0] - column) > 1 + room_;
+                for (int[] foe : level.foes) clear &= foe[1] >= level.main || Math.abs(foe[1] - column) > 1 + room_ * 2;
+                for (int[] way : level.ways) clear &= Math.abs(way[0] - column) > 2 + room_;
+                if (clear && (best < 0 || Math.abs(column - want) < Math.abs(best - want))) best = column;
+            }
+        }
+        if (best >= 0) level.items.add(new int[]{PlusRun.SPOT, best, top(level, best) - 1, 0, PlusRun.STAIRS});
+    }
+
+    /** The column of a land's stairway down, or -1. */
+    static int stairsOf(Level level) {
+        for (int[] item : level.items) if (item[0] == PlusRun.SPOT && item.length > 4 && item[4] == PlusRun.STAIRS) return item[1];
+        return -1;
     }
 
     /**
