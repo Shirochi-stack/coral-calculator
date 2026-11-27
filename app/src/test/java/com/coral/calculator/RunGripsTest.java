@@ -62,6 +62,20 @@ public class RunGripsTest {
         assertTrue(found > 0);
     }
 
+    @Test public void aKatanaIsSheathedAtHerHipAndDrawnOutInHerHands() {
+        int grip = RunGrips.of(RunArms.KATANA);
+        int hip = 0, hands = 0;
+        for (boolean one : RunGrips.HIP[grip]) if (one) hip++; else hands++;
+        assertTrue(hip > 0 && hands > 0);
+        Set<Integer> blades = new HashSet<>();
+        for (int theme = 0; theme < 12; theme++) blades.add(RunGrips.bladeIcon(RunLoot.code(RunLoot.WEAPON, theme, 1, RunLoot.BLUE)));
+        blades.add(RunGrips.bladeIcon(RunLoot.code(RunLoot.WEAPON, 2, 1, RunLoot.ROSE)));
+        assertEquals(13, blades.size());
+        for (int blade : blades) assertNotNull(RunGrips.axis(blade));
+        // Every found kind has a grip now.
+        for (int base = 0; base < 12; base++) assertTrue(RunGrips.of(RunArms.kindOf(RunLoot.code(RunLoot.WEAPON, 0, base, RunLoot.WHITE))) >= 0);
+    }
+
     @Test public void everyGripHasALineInEveryFrame() {
         for (int grip = 0; grip < RunGrips.KINDS.length; grip++) {
             assertEquals(RunGrips.FRAMES[grip], RunGrips.LINES[grip].length);

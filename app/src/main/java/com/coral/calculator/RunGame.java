@@ -11558,6 +11558,8 @@ final class RunGame {
         int grip = RunGrips.of(weapon), icon = heldIcon(weapon);
         if (grip < 0 || icon < 0) return false;
         float[] line = pose < RunGrips.LINES[grip].length ? RunGrips.LINES[grip][pose] : null;
+        // (A katana found, out of its sheath in her hands: its blade drawn out; at her hip, sheathed as its icon.)
+        if (weapon == PlusRun.KATANA && !RunLoot.paper(perks.item) && pose < RunGrips.HIP[grip].length && !RunGrips.HIP[grip][pose]) icon = RunGrips.bladeIcon(perks.item);
         short[] axis = RunGrips.axis(icon);
         if (line == null || axis == null) return false;
         if (gripSheets[grip] == null) {
