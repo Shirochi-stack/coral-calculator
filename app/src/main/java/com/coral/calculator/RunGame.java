@@ -2338,6 +2338,33 @@ final class RunGame {
         canvas.drawBitmap(picture, null, target, paint);
     }
 
+    /** The pet shop's pedestals, one for each pet, its cushion in that pet's colour, and its shelf. How far up a pedestal its cushion's top is, as a part of its width. */
+    private Bitmap pedestals, petShelf;
+    static final float PEDESTAL_SEAT = .62f;
+
+    /** Whether she is in a pet shop. */
+    private boolean inPetShop() {
+        if (run == null || run.room() < 0) return false;
+        int[] in = run.level().rooms.get(run.room());
+        return in[0] == RunLevels.HOUSE && in.length > 14 && in[14] == RunLevels.PET_SHOP;
+    }
+
+    /** The shelf the upper pets stand on, of the shop's honey wood, drawn once along the whole of a ledge, its plank's top where the ledge's top is. */
+    private void drawShelf(Canvas canvas, int column, int row, float y) {
+        if (petShelf == null) petShelf = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_pet_shelf);
+        int from = column, to = column;
+        while (run.at(from - 1, row) == RunLevels.LEDGE) from--;
+        while (run.at(to + 1, row) == RunLevels.LEDGE) to++;
+        float left = (from - cameraX) * tile - tile * .15f, right = (to + 1 - cameraX) * tile + tile * .15f;
+        float tall = (right - left) * petShelf.getHeight() / petShelf.getWidth();
+        paint.setAlpha(255);
+        target.set(left, y - tall * SHELF_TOP, right, y - tall * SHELF_TOP + tall);
+        canvas.drawBitmap(petShelf, null, target, paint);
+    }
+
+    /** Where the plank's top lies in the shelf's picture, as a part of its height. */
+    static final float SHELF_TOP = .04f;
+
     /** Where the three notices of the board lie on its picture, as parts of it across and down. */
     private static final float[] NOTICES = {.272f, .499f, .724f};
     private static final float NOTICE_WIDE = .177f, NOTICE_TOP = .306f, NOTICE_BOTTOM = .570f;
@@ -7114,6 +7141,8 @@ final class RunGame {
      * paler for being further off. Where each stands, and which it is, comes from its place in the
      * wood, so the same wood is there each time she comes back to the same place.
      */
+    private Bitmap meadow;
+
     private void drawPaperTrees(Canvas canvas, RunLevels.Level level) {
         if (paperTrees == null) paperTrees = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_paper_trees);
         if (paperTrees == null) return;
@@ -7125,16 +7154,41 @@ final class RunGame {
         float back = cameraX * WOOD_PACE;
         int first = (int) Math.floor(back / WOOD_EVERY) - 2, last = (int) Math.ceil((back + width / tile) / WOOD_EVERY) + 2;
         paint.setFilterBitmap(true);
+        // The wood has a ground of its own, going by as slowly as it does: a meadow of low paper hills from a little over the trees'
+        // feet down to the bottom of the screen, so that every trunk stands in grass, and where the land in front drops away or steps up,
+        // meadow is what shows under them, never sky.
+        if (meadow == null) meadow = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_meadow);
+        if (meadow != null) {
+            float wide = tile * 16, tall = wide * meadow.getHeight() / meadow.getWidth(), top = woodLine - tile * 1.05f;
+            float drift = Math.floorMod(Math.round(back * tile), Math.round(wide * 2));
+            paint.setAlpha(240);
+            for (int copy = -1; copy * wide - drift < width; copy++) {
+                float left = copy * wide - drift;
+                target.set(left - 1, top, left + wide + 1, top + tall);
+                canvas.save();
+                // (Every other copy is its mirror, so their edges always meet.)
+                if (Math.floorMod(copy, 2) != 0) canvas.scale(-1, 1, left + wide / 2, 0);
+                canvas.drawBitmap(meadow, null, target, paint);
+                canvas.restore();
+            }
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFCDD8BA);
+            paint.setAlpha(240);
+            canvas.drawRect(0, top + tall - 1, width, height, paint);
+            paint.setColor(Color.BLACK);
+        }
         for (int slot = first; slot <= last; slot++) {
             // (Its own small chance, the same every time: which tree, how far off, how large.)
             int seed = slot * 7919 + level.number * 104729;
             int which = Math.floorMod(seed >> 3, kinds);
             float offset = Math.floorMod(seed >> 7, 100) / 100f, far = Math.floorMod(seed >> 11, 3) / 2f;
-            float tall = tile * (4.2f - far * 1.4f);
+            // (Each tree stands on its roots, which go down past the line of the ground in front, under it.)
+            float tall = tile * (6.4f - far * 2f);
             float x = (slot * WOOD_EVERY + offset * WOOD_EVERY * .6f - back) * tile;
             float wide = tall * cellWide / cellTall;
             source.set(which * cellWide, 0, (which + 1) * cellWide, cellTall);
-            target.set(x - wide / 2, woodLine - tall - far * tile * .5f, x + wide / 2, woodLine - far * tile * .5f);
+            float foot = woodLine + tile * .55f - far * tile * .5f;
+            target.set(x - wide / 2, foot - tall, x + wide / 2, foot);
             paint.setAlpha(Math.round(210 - far * 60));
             canvas.drawBitmap(paperTrees, source, target, paint);
         }
@@ -7412,6 +7466,9 @@ final class RunGame {
                     canvas.scale(column % 2 == 0 ? 1 : -1, capped || row % 2 == 0 ? 1 : -1, left + tile / 2, y + tile / 2);
                     canvas.drawBitmap(art, source, target, paint);
                     canvas.restore();
+                } else if (here == RunLevels.LEDGE && inPetShop()) {
+                    // In the pet shop a ledge is its shelf, drawn once from wherever the first of it in view is.
+                    if (run.at(column - 1, row) != RunLevels.LEDGE || column == first) drawShelf(canvas, column, row, y);
                 } else if (here == RunLevels.LEDGE) {
                     art(canvas, LEDGE_ART, left + tile / 2, y + tile * artTall[LEDGE_ART] / artWide[LEDGE_ART], tile + 1, column % 2 != 0);
                     if (column % 3 == 1) lets(canvas, left + tile / 2, y + tile * .42f, row);
@@ -7586,23 +7643,26 @@ final class RunGame {
                 continue;
             }
             if (item[0] == PlusRun.SPOT) {
-                // A pet on show: sitting on a cushion; one of hers hops now and then, one she has not got has its price by it.
+                // A pet on show: sitting on a pedestal of its own, its cushion in the pet's colour; one of hers hops now and then, one she has not got has its price by it.
                 int kind = item[4];
                 float px = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
                 boolean hers = (session.tally("run_pet_own") >> kind & 1) != 0, at = run.spot() == kind;
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(0xFFE8A0B4);
-                canvas.drawOval(px - tile * .5f, feet - tile * .16f, px + tile * .5f, feet + tile * .04f, paint);
-                paint.setColor(Color.BLACK);
+                if (pedestals == null) pedestals = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_pedestals);
+                int cells = pedestals.getWidth() / pedestals.getHeight();
+                float standWide = tile * .98f, seat = standWide * PEDESTAL_SEAT;
+                paint.setAlpha(255);
+                source.set(Math.floorMod(kind, cells) * pedestals.getHeight(), 0, (Math.floorMod(kind, cells) + 1) * pedestals.getHeight(), pedestals.getHeight());
+                target.set(px - standWide / 2, feet - standWide + tile * .03f, px + standWide / 2, feet + tile * .03f);
+                canvas.drawBitmap(pedestals, source, target, paint);
                 float hop = hers && (int) (clock * 1.3f + kind) % 4 == 0 ? Math.abs((float) Math.sin(clock * 6)) * tile * .12f : 0;
-                cell(canvas, petArt(kind), hop > 0 ? 5 : 0, 6, px, feet - tile * .08f - hop, tile * .95f * 170 / 100 * (at ? 1.12f : 1), false);
+                cell(canvas, petArt(kind), hop > 0 ? 5 : 0, 6, px, feet - seat - hop, tile * .95f * 170 / 100 * (at ? 1.12f : 1), false);
                 // Its price on a little dark tag: under the ones on the floor, and over the heads of the ones on the shelf, where the shelf can never hide it.
                 String price = hers ? "hers" : "+ " + PET_COSTS[kind];
                 text.setTextAlign(Paint.Align.CENTER);
                 text.setTextSize(tile * .26f);
                 text.setTypeface(Typeface.DEFAULT_BOLD);
                 boolean shelf = item[2] < RunLevels.FLOOR - 1;
-                float tagY = shelf ? feet - tile * 1.32f - hop : feet + tile * .34f, half = text.measureText(price) / 2 + tile * .12f;
+                float tagY = shelf ? feet - seat - tile * 1.32f - hop : feet + tile * .34f, half = text.measureText(price) / 2 + tile * .12f;
                 box.set(px - half, tagY - tile * .26f, px + half, tagY + tile * .09f);
                 paint.setColor(hers ? 0xD91C4A38 : 0xD93A2414);
                 canvas.drawRoundRect(box, tile * .15f, tile * .15f, paint);
