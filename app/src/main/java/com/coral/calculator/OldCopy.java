@@ -49,7 +49,7 @@ final class OldCopy {
         }
         new AlertDialog.Builder(activity)
                 .setTitle("An older copy is still installed")
-                .setMessage("This is Halgakos Calculator " + BuildConfig.VERSION_NAME + ". An earlier release is "
+                .setMessage("This is " + activity.getString(R.string.app_title) + " " + BuildConfig.VERSION_NAME + ". An earlier release is "
                         + "installed beside it as a separate app with the same name, its own settings and its "
                         + "own Halgakos.\n\nUninstall the older one so that you are not looking at two. Copy "
                         + "anything you need from its history first: it does not carry over.")
