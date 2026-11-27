@@ -3062,7 +3062,7 @@ final class RunGame {
 
     /** Everything in the gallery: what is always there, and the pictures of the table kept with them. */
     private List<RunGallery.Item> gallery() {
-        if (gallery == null) gallery = RunGallery.all(RunShelf.text(context, "gallery/pictures.tsv"));
+        if (gallery == null) gallery = RunGallery.all(RunShelf.text(context, "gallery/pictures.tsv"), RunShelf.text(context, "clips/clips.tsv"));
         return gallery;
     }
 
@@ -3088,6 +3088,10 @@ final class RunGame {
      */
     private void showFilm(int film, android.view.View over, Runnable then) {
         if (video != null) return;
+        if (film >= RunClips.BASE) {
+            showClip(film - RunClips.BASE, over, then);
+            return;
+        }
         audio.hush();
         captionLeft = 0;
         RunVideo.Ends ends = played -> {
@@ -3126,6 +3130,67 @@ final class RunGame {
         video = RunVideo.film(over, picture, audio.on() ? voice : 0, lines, ends);
     }
 
+    private java.util.List<RunClips.Clip> clips;
+
+    /** The next short clip of a land, at a moment, that has not been seen and whose files are there; or RunClips.NONE. */
+    private int clipDue(int land, boolean before) {
+        if (clips == null) clips = RunClips.parse(RunShelf.text(context, "clips/clips.tsv"));
+        java.util.List<RunClips.Clip> there = new java.util.ArrayList<>();
+        for (RunClips.Clip clip : clips) {
+            if (RunShelf.raw(context, RunClips.picture(clip.number)) != 0) there.add(clip);
+        }
+        return RunClips.due(there, land, before, session);
+    }
+
+    /** The clips that come before a land, one after another, each once; and then what follows them. Nothing is shown over another film. */
+    private void beforeClips(int land, Runnable next) {
+        int clip = video == null ? clipDue(land, true) : RunClips.NONE;
+        if (clip == RunClips.NONE) next.run();
+        else showClip(clip, stage, () -> beforeClips(land, next));
+    }
+
+    /** The same for the clips that come after a land is won. */
+    private void afterClips(int land, Runnable next) {
+        int clip = video == null ? clipDue(land, false) : RunClips.NONE;
+        if (clip == RunClips.NONE) next.run();
+        else showClip(clip, stage, () -> afterClips(land, next));
+    }
+
+    /**
+     * A short clip is played once, over the game or the gallery, and then something is done. Its sound is in the language chosen
+     * for Halgakos if that has been recorded, and in English if not; what is written under it is in the language chosen for that. It
+     * is kept as seen however it ends (a touch or Back ends it at once), so that it is never shown twice and never loops.
+     */
+    private void showClip(int number, android.view.View over, Runnable then) {
+        if (video != null) return;
+        audio.hush();
+        captionLeft = 0;
+        RunVideo.Ends ends = played -> {
+            video = null;
+            session.keep(RunClips.SEEN + number, 1);
+            if (played) news();
+            if (shelf != null && !shelf.closed()) shelf.fill();
+            if (then != null) then.run();
+        };
+        int picture = RunShelf.raw(context, RunClips.picture(number)), voice = 0;
+        if (picture == 0) {
+            ends.ended(false);
+            return;
+        }
+        String sound = null;
+        for (String name : RunClips.sounds(number, session.tally(RunFilms.TONGUE))) {
+            if (voice == 0 && RunShelf.raw(context, "run_" + name) != 0) {
+                sound = name;
+                voice = RunShelf.raw(context, "run_" + name);
+            }
+        }
+        int script = session.tally(RunFilms.CAPTIONS);
+        String written = sound == null ? null : RunFilms.captions(sound, script);
+        java.util.List<RunFilms.Line> lines = written == null ? null : RunFilms.lines(RunShelf.text(context, written));
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "clip " + number + ": sound " + (audio.on() ? sound : "off (" + sound + ")") + ", written " + (lines == null || lines.isEmpty() ? "nothing" : written));
+        video = RunVideo.film(over, picture, audio.on() ? voice : 0, lines, ends);
+    }
+
     /** Whether more of the gallery is open than when she last said so: if it is, she will say so, once, when she next can. */
     private void news() {
         int open = RunGallery.open(gallery(), session);
@@ -3158,6 +3223,12 @@ final class RunGame {
             int film = session.tally("run_film") - 1;
             session.keep("run_film", 0);
             if (film <= RunFilms.CLIP) showFilm(film, stage, null);
+        }
+        // (And a clip asked for, by its number, in the same way: for looking at it.)
+        if (BuildConfig.DEBUG && screen == MAP && video == null && session.tally("run_clip") > 0) {
+            int clip = session.tally("run_clip");
+            session.keep("run_clip", 0);
+            showClip(clip, stage, null);
         }
         if (!galleryNews && !petNews || video != null || shelf != null && !shelf.closed()) return;
         boolean free = screen == MAP || screen == PLAY && finale == NO_FINALE && !talking && captionLeft <= 0 && personLeft <= 0;
@@ -3260,6 +3331,10 @@ final class RunGame {
     // A land
 
     private void play(int land) {
+        beforeClips(land, () -> playLand(land));
+    }
+
+    private void playLand(int land) {
         number = land;
         blackRung = 0;
         String[][] intro = RunStory.intro(land);
@@ -3789,7 +3864,10 @@ final class RunGame {
         // And after that, where a film belongs to the story, it is shown, the first time: the prologue after the first of them, the
         // idol song after the true ending.
         int film = screen == RESULT && blackRung == 0 ? RunFilms.due(number, won, session.tally("run_ending"), session.tally(RunFilms.SEEN)) : RunFilms.NONE;
-        Runnable then = film == RunFilms.NONE ? () -> carryOut(action) : () -> showFilm(film, stage, () -> carryOut(action));
+        Runnable afterFilm = film == RunFilms.NONE ? () -> carryOut(action) : () -> showFilm(film, stage, () -> carryOut(action));
+        // (The short clips that belong to the land just won come first, each once.)
+        int landWon = number;
+        Runnable then = screen == RESULT && won && blackRung == 0 ? () -> afterClips(landWon, afterFilm) : afterFilm;
         if (outro != null && untold("run_outro2", number)) tell(outro, RunLevels.chapterOf(number), then);
         else then.run();
     }

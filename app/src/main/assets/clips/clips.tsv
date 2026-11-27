@@ -1,0 +1,2 @@
+# The short clips of the story, a row each, with tabs between: number, title, the word shown in the gallery while it is locked, the land it belongs to, and whether it is shown before that land or after it (see RunClips).
+# The files of clip NN are res/raw/run_clip_NN.mp4, run_clip_NN_h.m4a (and _h_ja, _h_ko, _h_zh), assets/films/clip_NN_h[_xx].yy.txt, and assets/gallery/video_clipNN.webp and board_clipNN.webp.
