@@ -806,6 +806,8 @@ final class PlusRun {
          * how many times as long nothing hurts her again after a hurt.
          */
         int defence, stomp;
+        /** Her level: how much harder her blows land comes from it. */
+        int level = 1;
         float mercy = 1;
     }
 
@@ -1068,6 +1070,8 @@ final class PlusRun {
         float enter, flourish, fromX, toX;
         /** Not come yet; there but not to be seen or touched; and made by one of those who wait. */
         boolean away, unseen, spawned;
+        /** Whether what it drops has dropped. */
+        boolean dropped;
 
         Foe(int kind) {
             this.kind = kind;
@@ -1076,6 +1080,146 @@ final class PlusRun {
 
         float wide() { return FOE_WIDE[kind] * size; }
         float tall() { return FOE_TALL[kind] * size; }
+    }
+
+    /**
+     * What has fallen from creatures as they fell, as it lies about: pluses, like coins, and things to keep. Each flies out, falls, bounces and
+     * comes to rest; a plus comes to her from close by, as if drawn, and a thing to keep is picked up by walking into it; each blinks a while
+     * before it is gone. Its place, how it moves, how long it has been about, and what it is (0 a plus, otherwise a thing to keep, as {@link RunLoot} numbers it).
+     */
+    static final class Drop {
+        float x, y, across, down, age;
+        final int code;
+        boolean resting;
+
+        Drop(float x, float y, float across, float down, int code) {
+            this.x = x;
+            this.y = y;
+            this.across = across;
+            this.down = down;
+            this.code = code;
+        }
+
+        Drop(Drop other) {
+            this(other.x, other.y, other.across, other.down, other.code);
+            age = other.age;
+            resting = other.resting;
+        }
+
+        /** How long a plus lies about before it is gone, and a thing to keep; and for how much of the end of that it blinks. */
+        float life() { return code == 0 ? 11 : 40; }
+
+        float blink() { return code == 0 ? 3 : 6; }
+    }
+
+    private final List<Drop> scattered = new ArrayList<>();
+    /** What she has picked up of what fell: pluses, and the things to keep, in order; and how much experience the falls gave her. */
+    private int dropPluses, xp;
+    private final List<Integer> found = new ArrayList<>();
+    /** The chance, made the same way every time for the same land, of what drops. */
+    private long lootDice;
+    /** What is gathered of the parts of a blow more her level gives, until it makes a whole one. */
+    private float surplus;
+
+    List<Drop> scattered() { return scattered; }
+
+    /** One of each rarity of thing to keep, and a handful of pluses, thrown out round a place: for looking at them. */
+    void scatterAll(float atX, float atY) {
+        for (int rarity = RunLoot.WHITE; rarity <= RunLoot.ROSE; rarity++) {
+            scattered.add(new Drop(atX + 1.4f * rarity + 1, atY, 0, -5, RunLoot.code(rarity % 3, Math.min(11, level.chapter), rarity * 3, rarity)));
+        }
+        for (int coin = 0; coin < 8; coin++) scattered.add(new Drop(atX + 3 + coin * .3f, atY - 1, (coin - 4) * .8f, -7, 0));
+    }
+
+    /** What she keeps that has to do with this land: her level among it, which grows while she plays. */
+    Perks perks() { return perks; }
+
+    int dropPluses() { return dropPluses; }
+
+    List<Integer> found() { return found; }
+
+    int xp() { return xp; }
+
+    /** A roll of the land's own chance, from 0 to below a number. */
+    private int lootRoll(int bound) {
+        lootDice = lootDice * 6364136223846793005L + 1442695040888963407L;
+        return (int) ((lootDice >>> 33) % bound);
+    }
+
+    /**
+     * A creature has fallen: its pluses fly out of it, and now and then something to keep (always from one who waits), of its land's
+     * chapter, its rarity by its chances; and it gives her the experience it is worth to her.
+     */
+    private void fall(Foe foe) {
+        if (foe.kind == RunLevels.TARGET) return;
+        boolean boss = RunLevels.boss(foe.kind) && !foe.spawned, hard = level.chapter >= RunLevels.CHAPTERS * 2;
+        int landLevel = RunLevels.levelOf(level.number);
+        xp += RunLoot.xpFor(boss, tough, level.number, perks.level);
+        float middle = foe.x + foe.wide() / 2, top = foe.y + foe.tall() * .4f;
+        int coins = RunLoot.plusesFor(boss, tough);
+        for (int coin = 0; coin < coins; coin++) {
+            float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
+            scattered.add(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
+        }
+        if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel)) {
+            int rarity = RunLoot.rarityOf(boss ? RunLoot.BOSS : hard ? RunLoot.HARD : RunLoot.CREATURE, lootRoll(10000));
+            int code = RunLoot.dropped(Math.min(RunLoot.THEMES.length - 1, level.chapter), rarity, lootRoll(10000), lootRoll(10000));
+            scattered.add(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, code));
+        }
+    }
+
+    /** What lies about falls, bounces and comes to rest; pluses near her come to her; things to keep are picked up; what has lain long enough is gone. */
+    private void scatter(float seconds) {
+        float reach = Math.max(1.4f, Math.max(perks.reach, magnet > 0 ? MAGNET_REACH : 0)), herX = x + WIDE / 2, herY = y + TALL / 2;
+        for (int index = scattered.size() - 1; index >= 0; index--) {
+            Drop drop = scattered.get(index);
+            drop.age += seconds;
+            if (drop.age > drop.life()) {
+                scattered.remove(index);
+                continue;
+            }
+            float far = (float) Math.hypot(drop.x - herX, drop.y - .3f - herY);
+            if (drop.code == 0 && drop.age > .35f && far < reach) {
+                // Drawn to her, faster the nearer it is.
+                float pull = 14 * seconds / Math.max(.3f, far);
+                drop.x += (herX - drop.x) * Math.min(1, pull);
+                drop.y += (herY - drop.y) * Math.min(1, pull);
+                drop.resting = false;
+                if (far < .55f) {
+                    scattered.remove(index);
+                    dropPluses++;
+                    bonus++;
+                }
+                continue;
+            }
+            if (drop.code != 0 && drop.age > .5f && far < .8f) {
+                scattered.remove(index);
+                found.add(drop.code);
+                continue;
+            }
+            if (drop.resting) continue;
+            drop.down = Math.min(16, drop.down + GRAVITY * .85f * seconds);
+            float nextX = drop.x + drop.across * seconds;
+            if (PlusRun.solid(at((int) Math.floor(nextX), (int) Math.floor(drop.y - .1f)))) drop.across = -drop.across * .5f;
+            else drop.x = nextX;
+            float nextY = drop.y + drop.down * seconds;
+            int row = (int) Math.floor(nextY), column = (int) Math.floor(drop.x);
+            char under = at(column, row);
+            boolean lands = drop.down > 0 && (PlusRun.solid(under) || under == RunLevels.THIN || under == RunLevels.LEDGE) && drop.y <= row + .05f;
+            if (lands) {
+                drop.y = row;
+                drop.down = -drop.down * .42f;
+                drop.across *= .55f;
+                if (Math.abs(drop.down) < 1.6f) {
+                    drop.down = 0;
+                    drop.resting = true;
+                }
+            } else {
+                drop.y = nextY;
+                // (Below the land, it is gone.)
+                if (drop.y > level.land.length + 2) scattered.remove(index);
+            }
+        }
     }
 
     private final RunLevels.Level level;
@@ -1229,12 +1373,19 @@ final class PlusRun {
         y = startY;
         firmX = x;
         firmY = y;
+        lootDice = level.number * 977L + 12345;
     }
 
     private PlusRun(PlusRun other) {
         level = other.level;
         perks = other.perks;
         items.addAll(other.items);
+        lootDice = other.lootDice;
+        surplus = other.surplus;
+        xp = other.xp;
+        dropPluses = other.dropPluses;
+        found.addAll(other.found);
+        for (Drop drop : other.scattered) scattered.add(new Drop(drop));
         rush = other.rush;
         magnet = other.magnet;
         notes = other.notes;
@@ -1357,6 +1508,7 @@ final class PlusRun {
             foe.mode = from.mode;
             foe.size = from.size;
             foe.unlocked = from.unlocked;
+            foe.dropped = from.dropped;
             foe.most = from.most;
             foe.step = from.step;
             foe.turn = from.turn;
@@ -2643,6 +2795,13 @@ final class PlusRun {
     }
 
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
+        for (Foe foe : foes) {
+            if (foe.flat && !foe.dropped) {
+                foe.dropped = true;
+                fall(foe);
+            }
+        }
+        scatter(seconds);
         // The moment of the black ribbon: nothing else moves.
         if (moment > 0) {
             momentous(seconds);
@@ -3581,7 +3740,14 @@ final class PlusRun {
             doubled++;
         }
         // Against a creature a blow counts for as many as the smith has made what dealt it count for; against those who wait, for one.
-        if ((foe.left -= waits ? 1 : power()) <= 0) {
+        // (And her level makes a part of a blow more, gathered up into whole ones.)
+        int levelled = 0;
+        if (!waits) {
+            surplus += RunLoot.power(perks.level) - 1;
+            levelled = (int) surplus;
+            surplus -= levelled;
+        }
+        if ((foe.left -= waits ? 1 : power() + levelled) <= 0) {
             foe.left = 0;
             foe.flat = true;
             foe.y = foe.ground;

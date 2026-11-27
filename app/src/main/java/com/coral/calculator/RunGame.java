@@ -707,6 +707,22 @@ final class RunGame {
     }
 
     /** What she takes into a land of what she has bought. */
+    /**
+     * Her experience in all, kept; and from it her level. Kept from before there were levels, it is given what the lands she has won would
+     * have given her, once, so that she comes to them at the level they are for.
+     */
+    private long herXp() {
+        if (session.tally("run_xp_given") == 0) {
+            session.keep("run_xp_given", 1);
+            long given = 0;
+            for (int land = 1; land <= RunLevels.TOTAL; land++) if (starsOf(land) > 0 && land < RunLevels.TOTAL) given = RunLoot.need(RunLoot.recommended(land + 1));
+            if (given > session.tally("run_xp")) session.keep("run_xp", (int) Math.min(Integer.MAX_VALUE, given));
+        }
+        return session.tally("run_xp") & 0xFFFFFFFFL;
+    }
+
+    private int herLevel() { return RunLoot.levelAt(herXp()); }
+
     private PlusRun.Perks kept() {
         PlusRun.Perks kept = new PlusRun.Perks();
         kept.hearts = PlusRun.HEARTS + bought(0);
@@ -764,10 +780,13 @@ final class RunGame {
         // piece, and a heart more for all four of one set.
         for (int kind = 0; kind < RunArms.COUNT; kind++) kept.levels[kind] = forged(kind);
         int on = gearOn();
-        kept.defence = RunGear.defence(on);
+        kept.defence = RunGear.defence(on) + RunLoot.guard(herLevel());
         kept.mercy = RunGear.mercy(on);
         kept.stomp = RunGear.stomp(on);
         if (RunGear.whole(on)) kept.hearts++;
+        // Her level: her blows land harder for it, a hurt costs less, and now and then it is a heart more.
+        kept.level = herLevel();
+        kept.hearts += RunLoot.hearts(kept.level);
         // And how much harder she has chosen to have it, at the black market.
         kept.harder = hard();
         // The white that is truly hers, once it has been won in the last land: hers to call on in any land.
@@ -2321,6 +2340,47 @@ final class RunGame {
         text.setTextAlign(Paint.Align.LEFT);
     }
 
+    /** What fell from creatures, as it lies about. */
+    private void drawScattered(Canvas canvas) {
+        for (PlusRun.Drop drop : run.scattered()) {
+            float left = drop.life() - drop.age;
+            if (left < drop.blink() && (int) (drop.age * 8) % 2 == 0) continue;
+            float x = (drop.x - cameraX) * tile, y = (drop.y - cameraY) * tile;
+            if (x < -tile * 2 || x > width + tile * 2) continue;
+            if (drop.code == 0) {
+                float turned = Math.max(.2f, Math.abs((float) Math.cos(clock * 5 + drop.x * 3)));
+                paint.setAlpha(255);
+                art(canvas, PLUS_ART, x, y, tile * .5f * turned, false);
+                continue;
+            }
+            int rarity = RunLoot.rarity(drop.code), colour = rarity == RunLoot.ROSE ? RunLoot.rose(clock) : RunLoot.COLOURS[rarity];
+            // Its beam: taller and brighter the rarer it is.
+            float tall = tile * (2 + rarity * .9f), beat = .6f + .4f * (float) Math.sin(clock * 4 + drop.x);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setShader(new android.graphics.LinearGradient(x, y, x, y - tall, colour & 0x00FFFFFF | 0xB0000000, colour & 0x00FFFFFF, android.graphics.Shader.TileMode.CLAMP));
+            paint.setAlpha(Math.round(255 * beat));
+            canvas.drawRect(x - tile * (.12f + rarity * .03f), y - tall, x + tile * (.12f + rarity * .03f), y, paint);
+            paint.setShader(null);
+            glowAt(canvas, x, y - tile * .3f, tile * (.5f + rarity * .12f), colour, Math.round(200 * beat));
+            paint.setAlpha(255);
+            paint.setColor(Color.BLACK);
+            float bob = drop.resting ? (float) Math.sin(clock * 3 + drop.x) * tile * .06f : 0;
+            lootIcon(canvas, drop.code, x, y - tile * .38f + bob, tile * .62f, colour);
+        }
+        paint.setAlpha(255);
+    }
+
+    /** What a thing to keep looks like, small: for a weapon, the thing to fight with nearest it; armour and accessories by their icons, in its colour. */
+    private void lootIcon(Canvas canvas, int code, float x, float y, float size, int colour) {
+        int type = RunLoot.type(code), base = RunLoot.base(code);
+        if (type == RunLoot.WEAPON) {
+            int[] like = {PlusRun.SWORD, PlusRun.KATANA, PlusRun.SWORD, PlusRun.BOOK, PlusRun.BOOK, PlusRun.SWORD, PlusRun.PEN, PlusRun.SWORD, PlusRun.SWORD, PlusRun.PEN, PlusRun.GUN, PlusRun.SWORD};
+            thing(canvas, like[base % like.length], x, y, size, 35, false, false);
+        } else {
+            gearIcon(canvas, type == RunLoot.ARMOUR ? RunGear.HELM : RunGear.CHARM, x, y, size * .8f, colour);
+        }
+    }
+
     /** In homes: a loose floorboard, a little askew, glinting now and then; and a diary page, glowing softly where it lies. */
     private Bitmap floorboard, diaryPage;
 
@@ -2346,10 +2406,35 @@ final class RunGame {
     }
 
     /** A diary page found: what is written on it, on a card of its own for a while; and which of them have been found, kept. */
+    private int seenXp, seenFound;
+    private float levelAge = 9;
     private String diaryText;
     private int diaryNumber, seenDiaries, seenLifted;
     private float diaryAge = 99;
     static final float DIARY_SHOWN = 9;
+
+    /** Her level and how far she is to the next, under the plate at the top left; at a new level it swells and shines. */
+    private void drawLevel(Canvas canvas, float left, float top) {
+        int level = herLevel();
+        long xp = herXp(), from = RunLoot.need(level), to = RunLoot.need(level + 1);
+        float part = to > from ? Math.min(1, (xp - from) / (float) (to - from)) : 0, wide = dp(120), high = dp(22), swell = levelAge < .8f ? 1 + .25f * (1 - levelAge / .8f) : 1;
+        canvas.save();
+        canvas.scale(swell, swell, left, top + high / 2);
+        box.set(left, top, left + wide, top + high);
+        plate(canvas, box, high / 2, 235);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        text.setColor(levelAge < 1.5f ? 0xFFE0A21A : ink);
+        fitted(canvas, "Lv " + level, left + dp(9), top + high * .7f, dp(12.5f), dp(46));
+        text.setTypeface(Typeface.DEFAULT);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+        canvas.drawRoundRect(left + dp(52), top + high / 2 - dp(3), left + wide - dp(9), top + high / 2 + dp(3), dp(3), dp(3), paint);
+        paint.setColor(0xFFE0A21A);
+        if (part > 0) canvas.drawRoundRect(left + dp(52), top + high / 2 - dp(3), left + dp(52) + (wide - dp(61)) * part, top + high / 2 + dp(3), dp(3), dp(3), paint);
+        paint.setColor(Color.BLACK);
+        canvas.restore();
+    }
 
     private void drawDiary(Canvas canvas) {
         if (diaryText == null || diaryAge >= DIARY_SHOWN) return;
@@ -3250,7 +3335,7 @@ final class RunGame {
         int tougher = run.tough() * 10 + run.bite();
         if (tougher > session.tally("run_tough_told")) {
             session.keep("run_tough_told", tougher);
-            toast("A level " + RunLevels.levelOf(land) + " land", "Creatures take " + (1 + run.tough()) + (run.tough() == 0 ? " blow" : " blows") + "  ·  a hurt costs "
+            toast("A land for level " + RunLoot.recommended(land), "Creatures take " + (1 + run.tough()) + (run.tough() == 0 ? " blow" : " blows") + "  ·  a hurt costs "
                     + hearts(2 + run.bite()), 0);
         }
         // A rung of the black arena: she begins at the door of the place where whoever waits is, and a card says who, and what winning gives.
@@ -3283,6 +3368,8 @@ final class RunGame {
         // And a pet, for looking at one.
         if (BuildConfig.DEBUG && session.tally("run_pet") > 0) run.adopt(session.tally("run_pet") - 1);
         if (BuildConfig.DEBUG && session.tally("run_arm") > 0) run.arm(session.tally("run_arm") - 1);
+        // And what drops, of each rarity, for looking at it.
+        if (BuildConfig.DEBUG && session.tally("run_drops") > 0) run.scatterAll(run.x() + 1, run.y());
         idle();
         seenJumps = seenLandings = seenCollected = seenFlattened = seenHurts = seenSprings = seenFlags = seenBlows = 0;
         seenStrikes = seenPicked = seenThrown = seenTurned = seenTaken = seenSpared = seenCharms = seenFlaps = seenSwings = seenBonus = 0;
@@ -3304,6 +3391,7 @@ final class RunGame {
         saidRumour = false;
         seenLives = seenCasts = seenBraces = seenPaid = seenReminders = seenChests = 0;
         seenDiaries = seenLifted = 0;
+        seenXp = seenFound = 0;
         diaryAge = 99;
         villageSaid = false;
         roomCardAge = roomResultAge = -1;
@@ -5162,6 +5250,7 @@ final class RunGame {
         if (screen == PLAY && video == null) {
             clearedAge += seconds;
             diaryAge += seconds;
+            levelAge += seconds;
             crossAge += seconds;
             warpAge += seconds;
             arriveAge += seconds;
@@ -6137,6 +6226,35 @@ final class RunGame {
         // doing of the stash, and is told with that.
         // (In a build made for testing it can be slowed, to be looked at: run_slow is the hundredths of its pace.)
         chestAge += seconds * (BuildConfig.DEBUG && session.tally("run_slow") > 0 ? session.tally("run_slow") / 100f : 1);
+        // Experience from what fell: kept as it comes; a new level is a burst about her and a word from her, and her blows land harder from now.
+        if (run.xp() != seenXp) {
+            int before = herLevel();
+            long gathered = Math.min(0xFFFFFFFFL, herXp() + run.xp() - seenXp);
+            seenXp = run.xp();
+            session.keep("run_xp", (int) gathered);
+            int after = herLevel();
+            if (after > before) {
+                levelAge = 0;
+                run.perks().level = after;
+                audio.play("star", 1);
+                buzz(true);
+                speak(RunStory.LEVEL[random.nextInt(RunStory.LEVEL.length)], true);
+                for (int spark = 0; spark < 18; spark++) {
+                    double way = random.nextFloat() * Math.PI * 2;
+                    bits.add(new float[]{herX, herY - 1, (float) Math.cos(way) * 4, (float) Math.sin(way) * 4 - 2, .9f, 0});
+                }
+            }
+        }
+        // Things to keep, picked up: into her bag, and named in a card in the colour of what they are.
+        while (seenFound < run.found().size()) {
+            int code = run.found().get(seenFound++);
+            session.keepNote("run_bag", RunLoot.note(RunLoot.add(RunLoot.bag(session.note("run_bag")), code)));
+            int rarity = RunLoot.rarity(code);
+            toast(RunLoot.RARITIES[rarity] + ": " + RunLoot.name(code), "In her bag  ·  " + RunLoot.TYPES[RunLoot.type(code)], 0);
+            toastRarity = rarity >= RunLoot.GOLD ? 2 : rarity >= RunLoot.BLUE ? 1 : 0;
+            audio.play(rarity >= RunLoot.GOLD ? "unlock" : "tap", 1);
+            if (rarity == RunLoot.ROSE) speak(RunStory.LEVEL[0], true);
+        }
         // A diary page found is read: on a card, for a while, and kept as found.
         if (run.diaries() != seenDiaries) {
             seenDiaries = run.diaries();
@@ -8178,6 +8296,7 @@ final class RunGame {
             float turned = Math.max(.18f, Math.abs((float) Math.cos(clock * 3 + plus[0] * .7f)));
             art(canvas, PLUS_ART, x, y, tile * .78f * turned, false);
         }
+        drawScattered(canvas);
         // Whoever holds something out, where she waits: her friends, and those met in the villages, each beside what she has.
         for (int[] item : level.items) {
             if (item[3] == 0 || item[1] < first - 3 || item[1] > last + 3) continue;
@@ -10746,6 +10865,8 @@ final class RunGame {
         canvas.drawRoundRect(pauseButton.centerX() + dp(2.5f), pauseButton.centerY() - dp(8), pauseButton.centerX() + dp(7), pauseButton.centerY() + dp(8), dp(1.5f), dp(1.5f), paint);
         paint.setColor(Color.BLACK);
         float under = safe.top + margin + tall + dp(8), round = dp(36), x = safe.left + margin;
+        drawLevel(canvas, x, under);
+        under += dp(30);
         if (run.pet() >= 0) {
             float face = dp(run.herd().size() > 2 ? 30 : 42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
             for (PlusRun.Pet it : run.herd()) {
@@ -11984,7 +12105,7 @@ final class RunGame {
         int all = lastOf(volumes() - 1);
         for (int land = 1; land <= all; land++) earned += starsOf(land);
         int guild = RunHunts.rank(session.tally("run_hunts"));
-        heading(canvas, "Plus run", RunStory.TITLE + "  ·  " + earned + " of " + all * 3 + " stars" + (guild > 0 ? "  ·  " + RunHunts.RANK_NAMES[guild - 1] + " badge" : "")
+        heading(canvas, "Plus run", RunStory.TITLE + "  ·  Lv " + herLevel() + "  ·  " + earned + " of " + all * 3 + " stars" + (guild > 0 ? "  ·  " + RunHunts.RANK_NAMES[guild - 1] + " badge" : "")
                 + (session.tally("run_sash") != 0 ? "  ·  black sash" : ""));
         if (guild > 0) {
             // The badge of her rank in the guild, kept: by the name, where there is room for it.
@@ -12043,7 +12164,8 @@ final class RunGame {
                 canvas.drawText(RunStory.CHAPTERS[RunLevels.chapterOf(land)], where.left, where.top - dp(8), text);
                 // The levels of its lands: how tough they are.
                 float named = text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]);
-                int low = RunLevels.levelOf(land), high = RunLevels.levelOf(Math.min(RunLevels.TOTAL, land + each - 1));
+                // (The levels she would be in them, having played her way there: what her level is measured against.)
+                int low = RunLoot.recommended(land), high = RunLoot.recommended(Math.min(RunLevels.TOTAL, land + each - 1));
                 text.setColor(soft);
                 text.setTextSize(dp(11.5f));
                 canvas.drawText(low == high ? "level " + low : "levels " + low + " to " + high, where.left + named + dp(26), where.top - dp(8), text);

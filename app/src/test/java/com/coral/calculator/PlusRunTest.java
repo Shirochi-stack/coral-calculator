@@ -7386,7 +7386,8 @@ public class PlusRunTest {
         assertTrue("hit " + hit, hit >= PlusRun.ENOUGH);
         assertEquals(0, run.hurts());
         assertFalse(run.sealed());
-        assertEquals(bonus + hit * 2 + 10, run.bonus());
+        // (And whatever fell from any creature her ink caught on the way, picked up.)
+        assertEquals(bonus + hit * 2 + 10 + run.dropPluses(), run.bonus());
         // What she carried is in her hands again, and the targets are gone.
         assertEquals(PlusRun.SWORD, run.weapon());
         for (PlusRun.Foe foe : run.foes()) assertTrue(foe.kind != RunLevels.TARGET || foe.flat);
@@ -7454,7 +7455,8 @@ public class PlusRunTest {
         assertEquals(0, run.wave());
         assertFalse(run.sealed());
         assertTrue(run.ranked() >= 0);
-        assertEquals(bonus + PlusRun.RANK_PAYS[run.ranked()] + 20, run.bonus());
+        // (And the pluses that fell from the Old Book, those she was close enough to draw in.)
+        assertEquals(bonus + PlusRun.RANK_PAYS[run.ranked()] + 20 + run.dropPluses(), run.bonus());
         assertEquals(PlusRun.PLAYING, run.state());
     }
 
@@ -7597,7 +7599,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.

@@ -553,6 +553,13 @@ final class RunStory {
             "If you are reading this, translator: the first word is not angry. She is only lonely. Read her aloud. That is all she ever wanted.",
     };
 
+    /** A new level: she says so, glowing. */
+    static final String[][] LEVEL = {
+            {"lvl1", "Level up! Feel that? That's me getting stronger Sloppy~♡", "H", PLAYER + "She has just gone up a level in a game and glows with new power. Thrilled, smug, flexing."},
+            {"lvl2", "Another level. My blows hit harder now. Watch Sloppy~♡", "H", PLAYER + "She levels up and notices her attacks are stronger. Confident, eager to show off."},
+            {"lvl3", "Higher and higher. There's no top to this, is there Sloppy~♡", "H", PLAYER + "She levels up again and realises her level has no limit. Delighted, a little greedy."},
+    };
+
     /** At the counter where her pluses buy what she keeps. */
     static final String[][] SHOP = {
             {"shop1", "The guild counter. Spend my pluses wisely Sloppy~♡", "H", PLAYER + "She opens the upgrade shop. Businesslike, possessive of her coins, teasing."},
@@ -1176,6 +1183,7 @@ final class RunStory {
         groups.add(GALLERY);
         groups.add(NEW_PET);
         groups.add(WARP);
+        groups.add(LEVEL);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {

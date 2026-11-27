@@ -18,8 +18,8 @@ android {
         applicationId 'com.halgakos.calculator'
         minSdk 26
         targetSdk 36
-        versionCode 99
-        versionName '3.28.0'
+        versionCode 100
+        versionName '3.29.0'
     }
 
     buildFeatures {
