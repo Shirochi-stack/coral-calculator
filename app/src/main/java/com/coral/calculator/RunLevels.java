@@ -157,6 +157,42 @@ final class RunLevels {
     static int toughOf(int number) { return number > SECOND ? 4 : (levelOf(number) - 1) / 5; }
     static int biteOf(int number) { return number > SECOND + IN_LATER_CHAPTER ? 4 : number > SECOND ? 3 : (levelOf(number) - 1) / 6; }
 
+    /**
+     * The villages: one in each chapter, in its first land, and nowhere else. Each has its own name and its own landmark, and
+     * every building there is by then: the guild hall, the pet shop, the smithy, a home, and from their lands on the ribbon
+     * gacha and the black market. Where the other lands had villages there is a homestead: one house, with whoever lives in it
+     * at her door, the stall, and a well or a paper tree.
+     */
+    static final String[] VILLAGES = {"Contents Village", "Hushwick", "Rosemarrow", "Cairn Index", "Endleaf", "Gildcrest", "Inkwell Row", "Margin Ford", "Goopvale",
+            "Footnote Hollow", "Dog-Ear Bay", "Colophon"};
+
+    /** The first land of a chapter. */
+    static int firstOf(int chapter) { return chapter < CHAPTERS ? chapter * IN_CHAPTER + 1 : COUNT + (chapter - CHAPTERS) * IN_LATER_CHAPTER + 1; }
+
+    /** Whether a land has its chapter's village. */
+    static boolean villageLand(int number) { return number == firstOf(chapterOf(number)); }
+
+    /** The sorts of the buildings of a chapter's village, in the order they stand along it. */
+    static int[] townOf(int number) {
+        List<Integer> sorts = new ArrayList<>(java.util.Arrays.asList(GUILD_HALL, PET_SHOP, SMITHY, HOME));
+        if (number >= GACHA_FROM) sorts.add(GACHA);
+        if (number >= MARKET_FROM) sorts.add(MARKET);
+        int[] out = new int[sorts.size()];
+        for (int index = 0; index < out.length; index++) out[index] = sorts.get(index);
+        return out;
+    }
+
+    /** How long a village is, with so many buildings in it. */
+    static int townWide(int buildings) { return 12 + buildings * TOWN_GAP + 8; }
+
+    static final int TOWN_GAP = 9;
+
+    /** The insides of homes: six of them, after the buildings' own; which one a home has goes by the land and which room it is. */
+    static final int HOME_LOOKS = 6, HOME_LOOK = 14;
+
+    /** The diary pages there are to find, one at a time, in the homes; and what a home's secret is, if it has one: 0 a hidden room, 1 a loose floorboard, 2 a diary page out on its table, -1 none. */
+    static int homeSecret(int number, int room) { return Math.floorMod(number * 5 + room * 3, 4) - 1; }
+
     /** The sorts of the two buildings of a village that can be gone into. */
     static int[] buildingsOf(int number, int village) {
         int first = (number + village) % 4, second = (first + 1 + (number / 4 + village) % 3) % 4;
@@ -610,7 +646,8 @@ final class RunLevels {
     static int flockTry = -1;
     static {
         // (Found again with the creatures of the later lands as tough as their levels make them.)
-        for (int land : new int[]{40, 57, 61, 63}) FLOCKS[land - 1] = 1;
+        // (And again for the first land of a chapter, its village now the chapter's whole village.)
+        for (int land : new int[]{40, 51, 57, 63}) FLOCKS[land - 1] = 1;
         for (int land : new int[]{46, 67, 68, 71, 72, 78, 79}) FLOCKS[land - 1] = 2;
     }
 
@@ -875,6 +912,8 @@ final class RunLevels {
         int gate;
         /** Whether the gate stays shut until Zero has been dealt with. */
         boolean guarded;
+        /** Where its chapter's village begins, if it has it; or -1. */
+        int town = -1;
         /** Where it has a lower layer: for each column of the land, whether there is a cave under it (a fall there lands in it); null if it has none. */
         boolean[] under;
         /** The hatches in its ground that drop into a cave, the vines up from one, and its high ledges' ways up: the column and row of each, and what it is (0 hatch, 1 vine foot, 2 hidden). */
@@ -899,6 +938,9 @@ final class RunLevels {
     /** How many rows a land's lower layer has, under the rows of the land itself; the row its caves' floor is at its lowest. */
     static final int LOWER = 16, CAVE_FLOOR = ROWS + LOWER - 3;
 
+    /** How many diary pages there are. */
+    static final int DIARY_PAGES = 18;
+
     /**
      * A land as it is for one play: the land itself, as the number kept for it makes it, always the same and always fair; and laid over it
      * afresh for each play, from the play's own number, its other layers. Under it, a cave or more, each dropped into by a hatch in the
@@ -918,6 +960,7 @@ final class RunLevels {
         level.arena = base.arena;
         level.gate = base.gate;
         level.guarded = base.guarded;
+        level.town = base.town;
         level.pluses.addAll(base.pluses);
         level.foes.addAll(base.foes);
         level.weapons.addAll(base.weapons);
@@ -1195,6 +1238,7 @@ final class RunLevels {
         level.gate = draft.gate;
         level.arena = draft.arena;
         level.guarded = draft.guarded;
+        level.town = draft.town;
         armLater(level, new Random(seed * 104729 + number * 31L));
         level.foes.addAll(draft.lodgers);
         rove(level);
@@ -1365,6 +1409,7 @@ final class RunLevels {
         level.gate = draft.gate;
         level.arena = draft.arena;
         level.guarded = draft.guarded;
+        level.town = draft.town;
         arm(level, new Random(seed * 104729 + number * 31L));
         // The signs that walk in the places off the land join the rest only now, so that what the land is given is what it was given without them.
         level.foes.addAll(draft.lodgers);
@@ -1607,7 +1652,7 @@ final class RunLevels {
             int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL;
             wall(2);
             int from = at;
-            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL || sort == MARKET ? 16 : sort == SMITHY ? 18 : 14);
+            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL || sort == MARKET ? 16 : sort == SMITHY ? 18 : sort == HOME ? 19 : 14);
             int to = at - 1;
             wall(2);
             level.land[FLOOR - 1][from + 1] = ENTRY;
@@ -1636,15 +1681,37 @@ final class RunLevels {
                 }
             } else {
                 // (Not whoever has something to ask of her in this land: she is out in the village. Nor whoever keeps the building next door.)
-                int who = SOMI + (number * 3 + level.rooms.size()) % (ALTTEUL - SOMI), next = built.get(built.indexOf(want) ^ 1)[6];
-                int keeper = next == PET_SHOP ? NABI : next == GUILD_HALL ? INJU : next == SMITHY ? MORU : -1;
-                if (who == keeper) who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
-                if (level.quest != 0 && who == giverOf(level.quest)) who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
-                if (who == keeper) who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
+                int who = SOMI + (number * 3 + level.rooms.size()) % (ALTTEUL - SOMI);
+                for (int turn = 0; turn < ALTTEUL - SOMI; turn++) {
+                    boolean keeps = false;
+                    for (int[] other : built) {
+                        int sort2 = other[6];
+                        keeps |= who == (sort2 == PET_SHOP ? NABI : sort2 == GUILD_HALL ? INJU : sort2 == SMITHY ? MORU : -1);
+                    }
+                    boolean asks = level.quest != 0 && who == giverOf(level.quest);
+                    boolean outside = false;
+                    for (int[] item : level.items) outside |= item[3] == who && item[0] != PlusRun.STALL && item[1] < at;
+                    if (!keeps && !asks && !outside) break;
+                    who = SOMI + (who - SOMI + 1) % (ALTTEUL - SOMI);
+                }
                 level.items.add(new int[]{GIVES[who - SOMI], from + 8, FLOOR - 1, who});
                 pluses(from + 3, from + 6, FLOOR - 1);
+                // And its secret, if it has one: a false wall at its far end with a little room behind it, a chest and a diary page in it; a loose
+                // floorboard with a chest under it; or a diary page left out.
+                int secret = homeSecret(number, level.rooms.size()), page = Math.floorMod(number * 31 + level.rooms.size() * 17 + number / 7, DIARY_PAGES);
+                if (secret == 0) {
+                    for (int row = FLOOR - 3; row < FLOOR; row++) level.land[row][to - 3] = FAKE;
+                    for (int column = to - 2; column <= to; column++) for (int row = FLOOR - 3; row < FLOOR; row++) level.land[row][column] = AIR;
+                    level.items.add(new int[]{PlusRun.CHEST, to - 1, FLOOR - 1, 0, 45});
+                    level.items.add(new int[]{PlusRun.DIARY, to, FLOOR - 1, 0, page});
+                } else if (secret == 1) {
+                    level.items.add(new int[]{PlusRun.LOOSE, from + 13, FLOOR - 1, 0, 30});
+                } else if (secret == 2) {
+                    level.items.add(new int[]{PlusRun.DIARY, from + 12, FLOOR - 1, 0, page});
+                }
             }
-            level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, LOOKS + sort, sort});
+            int look = sort == HOME ? HOME_LOOK + Math.floorMod(number * 3 + level.rooms.size(), HOME_LOOKS) : LOOKS + sort;
+            level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, look, sort});
         }
 
         /** Some columns of a place off the land: floor under them, ceiling over them, and nothing between. */
@@ -2166,41 +2233,62 @@ final class RunLevels {
                     break;
                 }
                 case VILLAGE: {
-                    // A village: houses, a lantern and a sign to look at, someone to meet, and a stall.
-                    ground(23);
+                    // Someone to meet; and in a land's first such place, whoever has something to ask of her. (What is drawn from the numbers
+                    // the land is made from is drawn as it always was, so that the rest of the land is the same land.)
                     int who = SOMI + (level.number + level.items.size()) % (ALTTEUL - SOMI);
                     if (level.chapter == CHAPTERS && random.nextBoolean()) who = NURI;
-                    // In its first village stands whoever has something to ask of her.
                     if (!inVillage && level.quest != 0) who = giverOf(level.quest);
-                    level.decor.add(new int[]{random.nextInt(3), from + 2, floor - 1});
-                    level.decor.add(new int[]{3 + random.nextInt(2), from + 6, floor - 1});
-                    level.decor.add(new int[]{random.nextInt(3), from + 12, floor - 1});
-                    level.decor.add(new int[]{5, from + 17, floor - 1});
-                    level.decor.add(new int[]{6 + random.nextInt(2), from + 21, floor - 1});
-                    level.items.add(new int[]{who == NURI ? PlusRun.NOTES : GIVES[who - SOMI], from + 7, floor - 1, who});
-                    level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});
-                    // Two of what stands in it are buildings she can go into, of sorts that go by the land and by which village of it this
-                    // is: where a house stood, the pet shop or the guild hall, in a look of its own, or a home as it was. (Nothing here is
-                    // drawn from the numbers the land is made from: the land is the same land.)
-                    int[] sorts = buildingsOf(level.number, villages++);
-                    for (int which = 0; which < 2; which++) {
-                        int column = from + (which == 0 ? 2 : 12), sort = sorts[which];
-                        int[] stands = level.decor.get(level.decor.size() - (which == 0 ? 5 : 3));
-                        if (sort == PET_SHOP) stands[0] = 300 + level.number % 2;
-                        else if (sort == GUILD_HALL) stands[0] = 302 + level.number % 2;
-                        else if (sort == SMITHY) stands[0] = 304;
-                        else if (sort == MARKET) stands[0] = 305;
-                        else if (sort == GACHA) stands[0] = 306;
-                        // (Its door is not marked in the land itself, as other doors are: what is laid about a land afterwards is laid as it was.)
-                        built.add(new int[]{HOUSE, column, floor, 0, column, floor, sort});
+                    int house = random.nextInt(3), lamp = 3 + random.nextInt(2), other = random.nextInt(3), yard = 6 + random.nextInt(2);
+                    int gives = who == NURI ? PlusRun.NOTES : GIVES[who - SOMI];
+                    if (!inVillage && villageLand(level.number)) {
+                        // The chapter's village: its arch with its name, whoever has something for her, its buildings one after another with
+                        // its landmark among them, lanterns between, the stall at its far end, and a well or a paper tree.
+                        int[] sorts = townOf(level.number);
+                        ground(townWide(sorts.length));
+                        level.town = from;
+                        level.decor.add(new int[]{400, from + 1, floor - 1});
+                        level.items.add(new int[]{gives, from + 4, floor - 1, who});
+                        int column = from + 7;
+                        for (int which = 0; which < sorts.length; which++) {
+                            if (which == 2) {
+                                level.decor.add(new int[]{410 + level.chapter, column + 1, floor - 1});
+                                column += TOWN_GAP;
+                            }
+                            int sort = sorts[which];
+                            level.decor.add(new int[]{sort == PET_SHOP ? 300 + level.number % 2 : sort == GUILD_HALL ? 302 + level.number % 2 : sort == SMITHY ? 304
+                                    : sort == MARKET ? 305 : sort == GACHA ? 306 : (house + which) % 3, column, floor - 1});
+                            built.add(new int[]{HOUSE, column, floor, 0, column, floor, sort});
+                            if (which % 2 == 1) level.decor.add(new int[]{lamp, column + 5, floor - 1});
+                            column += TOWN_GAP;
+                        }
+                        level.decor.add(new int[]{5, column + 1, floor - 1});
+                        level.items.add(new int[]{PlusRun.STALL, column + 1, floor - 1, ALTTEUL});
+                        level.decor.add(new int[]{yard, column + 5, floor - 1});
+                        inVillage = true;
+                        if (level.number >= PLACES_FROM) {
+                            door(level.number % 2 == 0 ? STASH : level.number % 6 == 1 ? GAME : level.number % 6 == 3 ? RANGE : TRAMPLE, column - 4, false);
+                        }
+                        break;
                     }
+                    // A homestead: one house she can go into, whoever lives there at her door, a lantern, the stall, and a well or a paper tree.
+                    ground(23);
+                    level.decor.add(new int[]{house, from + 2, floor - 1});
+                    level.decor.add(new int[]{lamp, from + 6, floor - 1});
+                    level.decor.add(new int[]{yard, from + 11, floor - 1});
+                    level.decor.add(new int[]{5, from + 17, floor - 1});
+                    level.decor.add(new int[]{4, from + 21, floor - 1});
+                    level.items.add(new int[]{gives, from + 7, floor - 1, who});
+                    level.items.add(new int[]{PlusRun.STALL, from + 17, floor - 1, ALTTEUL});
+                    built.add(new int[]{HOUSE, from + 2, floor, 0, from + 2, floor, HOME});
+                    villages++;
                     if (!inVillage) {
                         inVillage = true;
                         // A stash in the even lands; in the odd ones a game: the room where pluses fall, the range, and the room where signs keep coming, by turns.
                         if (level.number >= PLACES_FROM) {
                             door(level.number % 2 == 0 ? STASH : level.number % 6 == 1 ? GAME : level.number % 6 == 3 ? RANGE : TRAMPLE, from + 14, false);
                         }
-                    }                    break;
+                    }
+                    break;
                 }
                 case PACK: {
                     // Three to five walking together between two blocks, and a ledge over them.

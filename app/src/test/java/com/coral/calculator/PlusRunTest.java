@@ -1380,7 +1380,8 @@ public class PlusRunTest {
     @Test public void theLandsHaveMoreCreaturesTheHigherTheirLevel() {
         // What each chapter had when every land had five times what it was laid with, and twice as many again in the air.
         // (The two chapters of the third volume are new: there is nothing they had.)
-        int[] had = {41, 190, 418, 657, 856, 1530, 1655, 1761, 1815, 2195, 0, 0}, has = new int[RunLevels.ALL_CHAPTERS];
+        // (The third chapter one fewer: one of its villages is a homestead now, and the land after it lies a little differently.)
+        int[] had = {41, 190, 417, 657, 856, 1530, 1655, 1761, 1815, 2195, 0, 0}, has = new int[RunLevels.ALL_CHAPTERS];
         int ground = 0, air = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
@@ -4200,7 +4201,8 @@ public class PlusRunTest {
                     assertFalse(PlusRun.solid(level.land[FLOOR - 1][column]));
                 }
                 // Each has a look of its own kind: one of the eight.
-                if (one[0] == RunLevels.HOUSE) assertEquals("land " + number, RunLevels.LOOKS + one[14], one[13]);
+                if (one[0] == RunLevels.HOUSE && one[14] == RunLevels.HOME) assertTrue("land " + number, one[13] >= RunLevels.HOME_LOOK && one[13] < RunLevels.HOME_LOOK + RunLevels.HOME_LOOKS);
+                else if (one[0] == RunLevels.HOUSE) assertEquals("land " + number, RunLevels.LOOKS + one[14], one[13]);
                 else assertTrue("land " + number, one[13] >= 0 && one[13] < RunLevels.LOOKS);
                 // A passage comes out on the ground further on, at a door of its own.
                 if (one[0] == RunLevels.PASSAGE) {
@@ -4222,7 +4224,9 @@ public class PlusRunTest {
                     chests++;
                     if (one[0] == RunLevels.STASH) assertTrue("land " + number, item[2] <= FLOOR - 6);
                 }
-                assertEquals("land " + number, one[0] == RunLevels.STASH || one[0] == RunLevels.PASSAGE || one[0] == RunLevels.ARENA ? 1 : 0, chests);
+                // (A home may have one behind a false wall of its own.)
+                if (one[0] == RunLevels.HOUSE && one[14] == RunLevels.HOME) assertTrue("land " + number, chests <= 1);
+                else assertEquals("land " + number, one[0] == RunLevels.STASH || one[0] == RunLevels.PASSAGE || one[0] == RunLevels.ARENA ? 1 : 0, chests);
             }
             // No sign of the land is in them but those that walk in its passages, and nothing of the land's to fight with.
             for (int[] foe : level.foes) {
@@ -4574,7 +4578,9 @@ public class PlusRunTest {
                 int sort = one[14];
                 assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.GACHA);
                 sorts[sort] = true;
-                assertEquals(RunLevels.LOOKS + sort, one[13]);
+                // (A home has one of the six insides of homes; every other building its own.)
+                if (sort == RunLevels.HOME) assertTrue(one[13] >= RunLevels.HOME_LOOK && one[13] < RunLevels.HOME_LOOK + RunLevels.HOME_LOOKS);
+                else assertEquals(RunLevels.LOOKS + sort, one[13]);
                 // Its door is on the ground of the land, where a building stands to be looked at; the land's own squares there are as they were.
                 assertEquals("land " + number, one[2], RunLevels.top(level, one[1]));
                 assertEquals("land " + number, RunLevels.AIR, level.land[one[2] - 1][one[1]]);
@@ -4674,29 +4680,46 @@ public class PlusRunTest {
                     assertEquals("land " + number, 1, givers);
                 }
             }
-            assertEquals("land " + number, villages * 2, houses);
-            // The two of a village are of different sorts, by the land and by which village it is.
+            // A chapter's first land has its village, with every building of its time, in order, and its own name and landmark; every
+            // other place where a village was is a homestead, with one home.
             java.util.Collections.sort(built, (one, other) -> one[1] - other[1]);
-            for (int village = 0; village < villages; village++) {
-                int[] wanted = RunLevels.buildingsOf(number, village);
-                assertTrue(wanted[0] != wanted[1]);
-                assertEquals("land " + number, wanted[0], built.get(village * 2)[14]);
-                assertEquals("land " + number, wanted[1], built.get(village * 2 + 1)[14]);
-                // (Whoever is in a home is not whoever keeps the building next door.)
-                for (int which = 0; which < 2; which++) {
-                    int[] home = built.get(village * 2 + which);
-                    int next = built.get(village * 2 + 1 - which)[14];
-                    if (home[14] != RunLevels.HOME) continue;
-                    for (int[] item : level.items) {
-                        if (item[1] < home[3] || item[1] > home[4] || item[3] < RunLevels.SOMI) continue;
-                        assertTrue("land " + number, item[3] != (next == RunLevels.PET_SHOP ? RunLevels.NABI : next == RunLevels.GUILD_HALL ? RunLevels.INJU : next == RunLevels.SMITHY ? RunLevels.MORU : -1));
+            int[] town = RunLevels.villageLand(number) ? RunLevels.townOf(number) : new int[0];
+            assertEquals("land " + number, villages - (town.length > 0 ? 1 : 0) + town.length, houses);
+            for (int index = 0; index < town.length; index++) assertEquals("land " + number, town[index], built.get(index)[14]);
+            for (int index = town.length; index < built.size(); index++) assertEquals("land " + number, RunLevels.HOME, built.get(index)[14]);
+            if (town.length > 0) {
+                assertTrue("land " + number, level.town >= 0);
+                boolean landmark = false, arch = false;
+                for (int[] decor : level.decor) {
+                    landmark |= decor[0] == 410 + level.chapter;
+                    arch |= decor[0] == 400 && decor[1] == level.town + 1;
+                }
+                assertTrue("land " + number, landmark && arch);
+            } else {
+                assertEquals("land " + number, -1, level.town);
+            }
+            // (Whoever is at home is not whoever keeps a building of the same land, nor whoever has something to ask of her, who is out at her door.)
+            for (int[] home : built) {
+                if (home[14] != RunLevels.HOME) continue;
+                for (int[] item : level.items) {
+                    if (item[1] < home[3] || item[1] > home[4] || item[3] < RunLevels.SOMI) continue;
+                    for (int[] other : built) {
+                        int sort2 = other[14];
+                        assertTrue("land " + number, item[3] != (sort2 == RunLevels.PET_SHOP ? RunLevels.NABI : sort2 == RunLevels.GUILD_HALL ? RunLevels.INJU : sort2 == RunLevels.SMITHY ? RunLevels.MORU : -1));
                     }
+                    if (level.quest != 0) assertTrue("land " + number, item[3] != RunLevels.giverOf(level.quest));
                 }
             }
         }
         assertTrue(sorts[RunLevels.PET_SHOP] && sorts[RunLevels.GUILD_HALL] && sorts[RunLevels.HOME] && sorts[RunLevels.SMITHY] && sorts[RunLevels.MARKET]);
-        assertTrue("shops " + shops + " halls " + halls + " homes " + homes + " smithies " + smithies + " markets " + markets,
-                shops >= 40 && halls >= 40 && homes >= 40 && smithies >= 40 && markets >= 20 && markets <= 40 && gachas >= 15 && gachas <= 34);
+        // Twelve villages, one in each chapter, each with its own name; and many homes.
+        assertEquals(RunLevels.ALL_CHAPTERS, shops);
+        assertEquals(RunLevels.ALL_CHAPTERS, halls);
+        assertEquals(RunLevels.ALL_CHAPTERS, smithies);
+        assertEquals(RunLevels.ALL_CHAPTERS - 1, gachas);
+        assertEquals(RunLevels.ALL_CHAPTERS - 2, markets);
+        assertTrue("homes " + homes, homes >= 150);
+        assertEquals(RunLevels.ALL_CHAPTERS, new java.util.HashSet<>(java.util.Arrays.asList(RunLevels.VILLAGES)).size());
         assertTrue(sorts[RunLevels.GACHA]);
 
         // Gone into, a pet shop: each pet is walked up to, and Nabi's desk is stood at anywhere along it; nothing hurts her; and out again.
@@ -7574,7 +7597,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.

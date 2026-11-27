@@ -422,6 +422,137 @@ final class RunStory {
             {"warp2", "Where to? The lit ones have gates I already found Sloppy~♡", "H", PLAYER + "Standing in the light of a teleporter, she explains to the player that the lit places on the map are gates she has already found. Brisk, helpful, smug."},
     };
 
+    /**
+     * Talking to whoever she meets: tapped, each says something of her own about how the story stands, and Halgakos answers. Four
+     * times in the story: the first lands (to the fifteenth), the rest of the first volume, the second volume, and the third. For
+     * each of them, in the order of {@link RunLevels#SOMI} on (Somi, Inju, Boksun, Ttosun, Galpi, Yeseo, Nabi, Moru, Altteul) and
+     * Nuri-yeowang last, her line and Halgakos's answer.
+     */
+    static final String[][][] TALK = {
+            {
+                    {"tks0", "Halgakos-nim! A whole book fell out of the sky, and now the plus signs walk! Isn't it the best?", "S", "A genki little girl of the Footnote Party gushes to the hero about the book that fell from the sky and made the maths signs come alive. Bouncing, starry-eyed."},
+                    {"tku0", "Form 1-A: incidents involving a falling book. There have been three hundred. Please stop causing them.", "U", "A tired, precise guild clerk tells the hero how much paperwork the fallen book has made. Dry, deadpan, faintly accusing."},
+                    {"tkb0", "Aigoo, a book from the sky. In my day things fell gently. Like rain. And rice.", "B", "A sweet old grandmother remembers when only rain and rice fell from the sky. Warm, rambling, fond."},
+                    {"tko0", "Zero stands at a gate and won't let anyone by. I raced her once. She didn't move. I lost anyway!", "O", "An energetic ice-cream seller who loves racing complains about Zero, who blocks a gate and never moves. Indignant, laughing at herself."},
+                    {"tkp0", "The book is missing pages. The wind took them. The wind always takes the best ones.", "P", "A quiet, mysterious girl who knows the wind tells the hero the fallen book has missing pages. Low, wistful, cryptic."},
+                    {"tke0", "Footnote one: the book is a translation. Footnote two: someone does not want it finished.", "E", "A bookish girl who talks in footnotes tells the hero the fallen book is a translation that someone wants left unfinished. Measured, serious."},
+                    {"tka0", "Nya! The new signs are fun to chase! The minus ones taste like nothing, nya.", "A", "A playful cat girl who keeps a pet shop talks about chasing the walking maths signs. Mischievous, purring."},
+                    {"tkw0", "Hammer's been busy since the book came down. Signs make bad steel. I make it work.", "W", "A gruff dwarf blacksmith says she has been busy since the book fell, working with bad material. Terse, proud."},
+                    {"tkl0", "Dear customer! Since the book fell, pluses grow on every land. Business has never been sweeter!", "L", "A cheerful merchant with an abacus is delighted that the fallen book made coins appear everywhere. Brisk, beaming."},
+                    {"tkn0", "Translator-nim. The book that fell is Ours. Every page of it was spoken in Our court.", "N", "A cold, regal queen tells the translator that the fallen book belongs to her court. Stately, possessive, quiet."},
+            },
+            {
+                    {"tks1", "The Footnote Party voted! You're our honorary president. It was unanimous. It was just me.", "S", "The genki girl announces the hero is her club's honorary president, then admits she was the only voter. Proud, then sheepish."},
+                    {"tku1", "Illya filed a complaint about you. Tsubakieh filed one about Illya. I filed them both under 'no'.", "U", "The guild clerk reports rival complaints between two girls the hero fought, and how she dismissed them. Bone-dry, satisfied."},
+                    {"tkb1", "That bat girl came by for soup. Tsubakieh. She said you broke her bat. Then she had seconds.", "B", "The grandmother says a girl whose bat the hero broke came by for soup and stayed for seconds. Amused, motherly."},
+                    {"tko1", "They say the Mawang wants to come home. Even demon kings get homesick, huh? I'd race her home!", "O", "The ice-cream girl muses that even the demon king gets homesick, and offers to race her home. Upbeat, sympathetic."},
+                    {"tkp1", "The last page of this volume is near. The wind is quieter there. Listen, when you reach it.", "P", "The mysterious girl tells the hero the last page of the first volume is close, and the wind is quiet there. Hushed, foreboding."},
+                    {"tke1", "Footnote three: a demon king who wants to go home is still a king. Be kind, but be quick.", "E", "The footnote girl advises the hero about the homesick demon king. Earnest, gentle."},
+                    {"tka1", "Mini pets! The guild counter has little ones of the girls you beat. I want the bat one, nya!", "A", "The cat girl gushes about tiny pet versions of defeated rivals sold at the guild counter. Excited, greedy."},
+                    {"tkw1", "Two sisters of mine. Pulmu does armour. Sutdol trades. Don't haggle with Sutdol.", "W", "The gruff blacksmith mentions her two sisters and warns the hero never to haggle with one of them. Short, fond, a little afraid."},
+                    {"tkl1", "The black market moved in down the road. Competition! I lowered nothing. My prices are perfect.", "L", "The merchant complains that a black market opened nearby, but refuses to lower her prices. Huffy, proud."},
+                    {"tkn1", "When the last page is sealed, We shall need you again. Cast: everyone. Remember the word.", "N", "The queen warns the translator she will be needed again after the first volume ends. Solemn, cryptic."},
+            },
+            {
+                    {"tks2", "The Gazette printed that you're a villain! I bought every copy and used them to wrap ice cream!", "S", "The genki girl says a newspaper called the hero a villain, so she bought every copy and used them as wrapping. Fierce, triumphant."},
+                    {"tku2", "The Great Translation Killer stops every series at a name. The guild has a form for it. It's blank.", "U", "The clerk talks about a villain who stops translated series at a name, and admits the guild has no idea what to do. Grim, deadpan."},
+                    {"tkb2", "Nuri-yeowang came to my kitchen, dear. A queen, eating kimchi with her hands. Don't tell anyone.", "B", "The grandmother whispers that the regal queen secretly ate at her kitchen table. Delighted, conspiratorial."},
+                    {"tko2", "The Brake Pads stop anything that goes fast. So of course they hate me. And you. Race them!", "O", "The ice-cream girl warns about enemies called the Brake Pads that stop anything fast, and urges the hero to race them. Fired up."},
+                    {"tkp2", "Between the lines there is a whole land. Most readers never see it. You will.", "P", "The mysterious girl tells the hero there is a hidden land between the lines of text, which the hero will see. Soft, prophetic."},
+                    {"tke2", "Footnote forty: Gokhae's fan blows the words right off the page. Hold on to yours.", "E", "The footnote girl warns that a rival named Gokhae blows words off pages with her fan. Wry, cautioning."},
+                    {"tka2", "A slime king lives in the margins. He's squishy and he smells like jam, nya. I want him as a pet.", "A", "The cat girl describes a slime king who smells like jam and says she wants him as a pet. Dreamy, silly."},
+                    {"tkw2", "Weapons get better if you hit them enough. So do people. Come back when you've been hit.", "W", "The gruff smith offers blunt wisdom about weapons and people getting stronger from being hit. Deadpan, kind underneath."},
+                    {"tkl2", "Jupan charges a toll on the bridge. A toll! On a bridge I sell snacks on! Unthinkable!", "L", "The merchant is outraged that a rival charges a toll on the bridge where she sells snacks. Scandalised, theatrical."},
+                    {"tkn2", "Our words are being rewritten in Our own palace. We do not ask, Translator-nim. We are asking.", "N", "The proud queen, whose words are being rewritten, swallows her pride and asks the translator for help. Strained, dignified."},
+            },
+            {
+                    {"tks3", "A dragon library! With a dragon in it! Halgakos-nim, if you see her, ask if she's a member of anything!", "S", "The genki girl is thrilled that a library has a real dragon in it and wants to recruit the dragon to her club. Breathless."},
+                    {"tku3", "Lucy has been issued forty-one warnings for breathing fire in a library. She has not read one.", "U", "The clerk reports that a dragon named Lucy keeps breathing fire in a library and ignores every warning. Exasperated, deadpan."},
+                    {"tkb3", "That dragon girl is only lonely, dear. Everyone is fierce when no one feeds them.", "B", "The grandmother says the dragon girl Lucy is only fierce because she is lonely and hungry. Tender, wise."},
+                    {"tko3", "They say the Mother Tongue was the first word ever said. I bet I could still outrun her!", "O", "The ice-cream girl boasts she could outrun the Mother Tongue, said to be the first word ever spoken. Cocky, a little scared."},
+                    {"tkp3", "Every book keeps one hidden page. The last book keeps a hidden room. Look behind what doesn't fit.", "P", "The mysterious girl hints that the final book hides a secret room behind something out of place. Whispered, knowing."},
+                    {"tke3", "Final footnote: the Mother Tongue does not want to be translated. She wants to be understood.", "E", "The footnote girl explains the final villain only wants to be understood, not translated. Quiet, moved."},
+                    {"tka3", "Moru's sisters smelled like soot and cinnamon, nya. Moru won't say where they went. Ask her nicely.", "A", "The cat girl remembers the smith's missing sisters and urges the hero to ask the smith about them gently. Sad, hushed."},
+                    {"tkw3", "My sisters went into the library before you. Didn't come out. If you find their hammers... bring them.", "W", "The gruff smith admits her sisters vanished into the dragon library and asks the hero to bring back their hammers. Voice cracking, trying to stay gruff."},
+                    {"tkl3", "Last stall before the dragon! Everything's full price. Heroes always pay full price at the end!", "L", "The merchant cheerfully refuses discounts at the last shop before the final dragon. Shameless, sunny."},
+                    {"tkn3", "The first word is waking, Translator-nim. When you read her, read her aloud. As We did.", "N", "The queen tells the translator the first word of all is waking and must be read aloud. Grave, trusting."},
+            },
+    };
+
+    /** And Halgakos's answers, in the same order. */
+    static final String[][][] ANSWERS = {
+            {
+                    {"tah0s", "The best? They bite. But fine, it's a little bit the best Sloppy~♡", "H", PLAYER + "She answers an excited little girl who loves that the maths signs came alive. Grudging, amused."},
+                    {"tah0u", "Three hundred? I caused maybe two hundred of those Sloppy~♡", "H", PLAYER + "She answers a tired guild clerk complaining about incident forms. Smug, unrepentant."},
+                    {"tah0b", "Rice from the sky sounds better than signs from the sky Sloppy~♡", "H", PLAYER + "She answers a kind grandmother reminiscing about gentle rain and rice. Wistful, hungry."},
+                    {"tah0o", "Zero doesn't move because she's a zero. I'll move her Sloppy~♡", "H", PLAYER + "She answers a girl complaining about Zero blocking a gate. Cocky, determined."},
+                    {"tah0p", "Then I'll catch the wind. Somebody has to Sloppy~♡", "H", PLAYER + "She answers a mysterious girl who says the wind took the book's missing pages. Breezy, brave."},
+                    {"tah0e", "Someone doesn't want it finished? Then I'm finishing it out of spite Sloppy~♡", "H", PLAYER + "She answers a bookish girl who says someone wants the translation left unfinished. Defiant, grinning."},
+                    {"tah0a", "Don't lick the minus signs, Nabi. Even I have standards Sloppy~♡", "H", PLAYER + "She answers a cat girl who has been chasing and tasting the walking signs. Disgusted, fond."},
+                    {"tah0w", "Bad steel, good hammer. I respect that Sloppy~♡", "H", PLAYER + "She answers a gruff blacksmith who makes bad material work. Approving, brief."},
+                    {"tah0l", "Sweeter for you. I'm the one picking them up Sloppy~♡", "H", PLAYER + "She answers a merchant who is getting rich from all the coins. Wry, a bit exploited."},
+                    {"tah0n", "Yours or not, I'm translating it. You can read it after Sloppy~♡", "H", PLAYER + "She answers a regal queen who claims the fallen book. Bold, respectful under the cheek."},
+            },
+            {
+                    {"tah1s", "President of a club of one. I accept. Obviously Sloppy~♡", "H", PLAYER + "She accepts an honorary title from a one-member fan club. Delighted, regal."},
+                    {"tah1u", "Filed under no. My favourite drawer Sloppy~♡", "H", PLAYER + "She answers a clerk who dismissed two complaints against each other. Pleased."},
+                    {"tah1b", "She had seconds? Then she forgives me Sloppy~♡", "H", PLAYER + "She hears that a rival she beat came for soup and had seconds. Relieved, amused."},
+                    {"tah1o", "Homesick demon king. Fine. I'll walk her to the door Sloppy~♡", "H", PLAYER + "She answers a girl saying the demon king wants to go home. Softening, kind."},
+                    {"tah1p", "Quiet wind, last page. Got it. I'll bring a scarf Sloppy~♡", "H", PLAYER + "She answers a cryptic warning about the last page. Light, hiding nerves."},
+                    {"tah1e", "Kind and quick. My two settings Sloppy~♡", "H", PLAYER + "She answers advice to be kind but quick with the demon king. Confident."},
+                    {"tah1a", "A tiny Tsubakieh with a tiny bat. Okay, that's adorable Sloppy~♡", "H", PLAYER + "She imagines a mini pet version of a rival with a little bat. Charmed despite herself."},
+                    {"tah1w", "Noted. I will never, ever haggle with Sutdol Sloppy~♡", "H", PLAYER + "She solemnly promises never to haggle with the smith's scary sister. Mock-serious."},
+                    {"tah1l", "Perfect prices, she says. With a straight face Sloppy~♡", "H", PLAYER + "She marvels at a merchant who claims her prices are perfect. Teasing."},
+                    {"tah1n", "Cast: everyone. I'll remember. Queens are dramatic Sloppy~♡", "H", PLAYER + "She answers the queen's solemn warning. Respectful, then cheeky aside."},
+            },
+            {
+                    {"tah2s", "Villain ice cream wrappers. You're a genius, Somi Sloppy~♡", "H", PLAYER + "She praises a little girl who used newspapers calling her a villain as ice cream wrappers. Touched, laughing."},
+                    {"tah2u", "A blank form. Fine. I'll fill it in myself Sloppy~♡", "H", PLAYER + "She answers a clerk whose form about a series-killing villain is blank. Grim, resolved."},
+                    {"tah2b", "A queen with kimchi fingers. My lips are sealed Sloppy~♡", "H", PLAYER + "She promises to keep the queen's secret kitchen visit quiet. Gleeful, sworn to secrecy."},
+                    {"tah2o", "They stop anything fast? Then they've never met me Sloppy~♡", "H", PLAYER + "She answers a warning about enemies who stop fast things. Cocky, fired up."},
+                    {"tah2p", "A land between the lines. I always read those anyway Sloppy~♡", "H", PLAYER + "She answers a hint about a hidden land between the lines. Intrigued, clever."},
+                    {"tah2e", "Hold on to my words. I'm a translator. They're all I have Sloppy~♡", "H", PLAYER + "She answers a warning about a fan that blows words away. Sincere for a moment."},
+                    {"tah2a", "A jam-scented slime king is not a pet, Nabi. ...Is he? Sloppy~♡", "H", PLAYER + "She answers a cat girl wanting a slime king as a pet. Exasperated, then tempted."},
+                    {"tah2w", "Come back when I've been hit. That's the plan anyway Sloppy~♡", "H", PLAYER + "She answers blunt wisdom from the smith. Wry, fond."},
+                    {"tah2l", "A toll on your snack bridge. The villainy has no limit Sloppy~♡", "H", PLAYER + "She mock-sympathises with a merchant outraged by a bridge toll. Theatrical."},
+                    {"tah2n", "You're asking. I heard. Your words stay yours, Majesty Sloppy~♡", "H", PLAYER + "She answers a proud queen who has finally asked for help. Gentle, steady."},
+            },
+            {
+                    {"tah3s", "I'll ask the dragon about your club. Right after she stops burning me Sloppy~♡", "H", PLAYER + "She promises a little girl to recruit the dragon to her club. Amused, a bit singed."},
+                    {"tah3u", "Forty-one warnings, zero read. A girl after my own heart Sloppy~♡", "H", PLAYER + "She hears a dragon ignored forty-one warnings. Admiring, mischievous."},
+                    {"tah3b", "Lonely and hungry. Then I'll bring her your soup Sloppy~♡", "H", PLAYER + "She answers the grandmother's wisdom about the lonely dragon. Warm, decided."},
+                    {"tah3o", "Outrun the first word? Let's both try, and not die Sloppy~♡", "H", PLAYER + "She answers a boast about outrunning the final villain. Laughing, nervous."},
+                    {"tah3p", "Behind what doesn't fit. Like me, in a library Sloppy~♡", "H", PLAYER + "She answers a hint about a hidden room behind something out of place. Self-deprecating, sharp."},
+                    {"tah3e", "Understood, not translated. ...I can do that too Sloppy~♡", "H", PLAYER + "She answers that the final villain wants to be understood. Quiet, earnest."},
+                    {"tah3a", "Soot and cinnamon. I'll ask Moru gently. Gently, Nabi Sloppy~♡", "H", PLAYER + "She promises the cat girl to ask about the smith's lost sisters kindly. Soft, serious."},
+                    {"tah3w", "I'll find them, Moru. Hammers and all Sloppy~♡", "H", PLAYER + "She promises the grieving blacksmith to find her lost sisters. Firm, tender."},
+                    {"tah3l", "Full price at the end. You really are the final boss Sloppy~♡", "H", PLAYER + "She teases the merchant who refuses discounts before the final battle. Laughing."},
+                    {"tah3n", "Aloud. As you did. I won't forget, Majesty Sloppy~♡", "H", PLAYER + "She answers the queen's last instruction to read the first word aloud. Solemn, brave."},
+            },
+    };
+
+    /** The diary pages found in homes: a little of the story on each, in the words of whoever wrote it. They are read, not said. */
+    static final String[] DIARY = {
+            "Day one of the book. It came down over the square with a sound like a sigh. By evening the plus signs were walking. Mother says not to feed them.",
+            "Somi has started a party. Its members are Somi. Its rules are that everyone must be happy. I joined. Now there are two of us.",
+            "The guild clerk stamped my dog. He was not a form. She says everything is a form if you are brave enough.",
+            "Grandmother left rice cakes on the sill for the walking signs. In the morning there were none, and a minus sign was asleep in the flowerpot.",
+            "Zero stood at the gate all day and would not move. I told her a joke. She did not laugh. Nothing adds up with her.",
+            "A girl with a bat came through town and broke three signs and one window. She paid for the window in candy. Fair.",
+            "They say the book is a translation, and someone hates it being finished. Who could hate a story being finished? Only someone who wants the last word.",
+            "Nabi's shop has a cat that is a jar. Or a jar that is a cat. I bought it. It purrs when I put my pencils in.",
+            "Moru had three hammers on her wall. Now there is one. She will not talk about the other two. She hits the anvil harder these days.",
+            "The palace bells rang backwards tonight. The queen's words came out in the wrong order in the paper. Someone is rewriting her.",
+            "The Gazette says the hero is a villain. My aunt cut it into paper boats. They sailed better than the news.",
+            "I went between the lines today. There is a whole country there, quiet and blue, where the words go to rest between readings.",
+            "Slimes in the margins again. They smell of jam. I am not eating jam anymore. I am not eating anything green.",
+            "Found an old footnote in the attic: \"See appendix.\" I went to the appendix. It said \"See footnote.\" I have been going round for a week.",
+            "The tide brought in a boat folded out of a letter. Inside was one line: we are still reading. I do not know who \"we\" is.",
+            "There is a dragon in the library. She reads faster than she burns. Nobody has ever finished a book before her.",
+            "Moru's sisters went into the library to fix a broken word. That was last spring. Their hammers sing at night, Moru says. Far away.",
+            "If you are reading this, translator: the first word is not angry. She is only lonely. Read her aloud. That is all she ever wanted.",
+    };
+
     /** At the counter where her pluses buy what she keeps. */
     static final String[][] SHOP = {
             {"shop1", "The guild counter. Spend my pluses wisely Sloppy~♡", "H", PLAYER + "She opens the upgrade shop. Businesslike, possessive of her coins, teasing."},
@@ -1045,6 +1176,8 @@ final class RunStory {
         groups.add(GALLERY);
         groups.add(NEW_PET);
         groups.add(WARP);
+        for (String[][] stage : TALK) groups.add(stage);
+        for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
             if (intro(land) != null) groups.add(intro(land));
             if (outro(land) != null) groups.add(outro(land));
