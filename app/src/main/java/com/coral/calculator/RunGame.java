@@ -2530,6 +2530,18 @@ final class RunGame {
         canvas.restore();
     }
 
+    /** A layer of hearts' colour over the red of the heart: none for the first; gold, purple, orange, blue, green after. */
+    private final android.graphics.ColorFilter[] heartFilters = new android.graphics.ColorFilter[RunSkills.LAYER_COLOURS.length];
+
+    private android.graphics.ColorFilter heartFilter(int layer) {
+        if (layer <= 0 || layer >= heartFilters.length) return null;
+        if (heartFilters[layer] == null) {
+            int colour = RunSkills.LAYER_COLOURS[layer];
+            heartFilters[layer] = new android.graphics.LightingColorFilter(0xFF000000 | colour & 0xFFFFFF, 0x00202020);
+        }
+        return heartFilters[layer];
+    }
+
     /** A piece of her shield bar: a small shield, blue as far as it is filled. */
     private void drawWard(Canvas canvas, float x, float y, float size, float full) {
         path.reset();
@@ -11965,7 +11977,8 @@ final class RunGame {
         }
         // Her hearts, her lives and her pluses, in a plate at the top. The hearts are hearts, and empty by halves; the lives are her own
         // face and a count beside it, so that the two are never taken for each other.
-        int hearts = run.maxHearts(), halves = run.halves(), wards = run.wardMost();
+        int most = run.maxHp(), hp = run.hp(), allHearts = Math.max(1, (most + RunSkills.HEART - 1) / RunSkills.HEART), hearts = Math.min(RunSkills.ROW, allHearts),
+                halves = run.halves(), wards = run.wardMost();
         float tall = dp(wards > 0 ? 58 : 44), margin = dp(10), heart = hearts > 5 ? dp(15) : hearts > 3 ? dp(18) : dp(22);
         text.setTextSize(dp(15));
         text.setTextAlign(Paint.Align.LEFT);
@@ -11991,20 +12004,36 @@ final class RunGame {
         }
         for (int index = 0; index < hearts; index++) {
             float middle = plateLeft + dp(14) + heart * (index + .5f), bottom = plateMiddle + heart * .42f;
-            int has = Math.max(0, Math.min(2, halves - index * 2));
+            // The layer showing at this place, and how full its heart is; under it, the layer below, full, if there is one.
+            float[] shown = RunSkills.heart(index, hp, most);
+            int layer = (int) shown[0];
+            float fill = shown[1];
             // Down to the last of them, they beat.
-            float size = heart * .92f * (halves <= 2 && has > 0 ? 1 + .1f * (float) Math.sin(clock * 9) : 1);
-            if (has < 2) {
+            float size = heart * .92f * (hp <= RunSkills.HEART && fill > 0 ? 1 + .1f * (float) Math.sin(clock * 9) : 1);
+            if (layer > 0) {
+                paint.setAlpha(255);
+                paint.setColorFilter(heartFilter(layer - 1));
+                art(canvas, HEART_ART, middle, bottom, size, false);
+            } else if (fill < 1) {
+                paint.setColorFilter(null);
                 paint.setAlpha(60);
                 art(canvas, HEART_ART, middle, bottom, size, false);
             }
-            if (has > 0) {
+            if (fill > 0) {
                 paint.setAlpha(255);
+                paint.setColorFilter(heartFilter(layer));
                 canvas.save();
-                if (has == 1) canvas.clipRect(middle - heart, bottom - heart * 1.2f, middle, bottom + heart * .2f);
+                if (fill < 1) canvas.clipRect(middle - heart, bottom - heart * 1.2f, middle - heart * .46f + heart * .92f * fill, bottom + heart * .2f);
                 art(canvas, HEART_ART, middle, bottom, size, false);
                 canvas.restore();
             }
+            paint.setColorFilter(null);
+        }
+        // Past three hearts, her HP, small, under them.
+        if (allHearts > 3) {
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(soft);
+            fitted(canvas, hp + " / " + most + " HP", plateLeft + dp(14), plateMiddle + heart * .42f + dp(10), dp(9.5f), heart * hearts);
         }
         paint.setAlpha(255);
         // What she wears, under her hearts: a small picture of each piece, in the colour of its set.
