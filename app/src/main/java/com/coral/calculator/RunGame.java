@@ -3407,19 +3407,40 @@ final class RunGame {
         audio.play("flap", .9f);
     }
 
+    private int seenRideMet, seenRideBursts;
+    private static final float[][] RIDE_WAYS = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+    private boolean seenRideDesperate;
+
     private void rideTick(float seconds) {
         // (In a build made for testing it can be ridden by itself, to be looked at: at her, with both buttons held.)
         if (BuildConfig.DEBUG && session.tally("run_sweep") == 1) {
-            // (To the way through whatever arrives soonest, or clear of it; and otherwise at her.)
-            float toX = ride.herX(), toY = ride.herY(), soonest = 1.6f;
+            // (As the tests ride it: when something is about to land where they are, the way that keeps them clearest of all of it; otherwise
+            // at her, with the breath always and the beam when she is open or nearly.)
+            float x = ride.x(), y = ride.y(), pace = RunRide.SPEED * (ride.beam() > 0 ? RunRide.SLOWED : 1);
+            boolean threatened = false;
             for (RunRide.Thing thing : ride.things()) {
-                float until = thing.far / thing.speed;
-                if (thing.gone || thing.kind == RunRide.NAME || until > soonest) continue;
-                soonest = until;
-                toX = thing.kind == RunRide.BLOCKS ? thing.x : thing.kind == RunRide.PASS ? (thing.x < 0 ? .3f : -.3f) : ride.x();
-                toY = thing.kind == RunRide.PRESS ? thing.y : ride.y();
+                threatened |= !thing.gone && thing.far / thing.speed < (thing.kind == RunRide.NAME ? .5f : 1.7f) && RunRide.clear(thing, x, y) < .08f;
             }
-            ride.step(seconds, toX < ride.x() - .05f, toX > ride.x() + .05f, toY < ride.y() - .05f, toY > ride.y() + .05f, soonest >= 1.6f, true);
+            if (threatened) {
+                int chosen = 0;
+                float best = -9;
+                for (int way = 0; way < RIDE_WAYS.length; way++) {
+                    float least = 9;
+                    for (RunRide.Thing thing : ride.things()) {
+                        float until = thing.far / thing.speed;
+                        if (thing.gone || until > (thing.kind == RunRide.NAME ? .6f : 1.9f)) continue;
+                        float thereX = Math.max(-1, Math.min(1, x + RIDE_WAYS[way][0] * pace * until)), thereY = Math.max(-RunRide.HIGH, Math.min(RunRide.HIGH, y + RIDE_WAYS[way][1] * pace * until));
+                        least = Math.min(least, Math.min(.2f, RunRide.clear(thing, thereX, thereY)));
+                    }
+                    if (least > best + .001f) {
+                        best = least;
+                        chosen = way;
+                    }
+                }
+                ride.step(seconds, RIDE_WAYS[chosen][0] < 0, RIDE_WAYS[chosen][0] > 0, RIDE_WAYS[chosen][1] < 0, RIDE_WAYS[chosen][1] > 0, false, true);
+            } else {
+                ride.step(seconds, ride.herX() < x - .06f, ride.herX() > x + .06f, ride.herY() < y - .06f, ride.herY() > y + .06f, ride.open() > 0 || ride.shield() <= 1, true);
+            }
         } else {
             ride.step(seconds, goLeft, goRight, goJump, goDown, goStrike, goBreath);
         }
@@ -3454,6 +3475,27 @@ final class RunGame {
             audio.play("hurt");
             buzz(true);
             shake = .25f;
+        }
+        if (ride.met() != seenRideMet) {
+            // A blast of Lucy's has met the beam on her: the sky shakes with it.
+            seenRideMet = ride.met();
+            audio.play("star", .9f);
+            audio.play("fire", .7f);
+            flash = Math.max(flash, .22f);
+            shake = Math.max(shake, .35f);
+            buzz(true);
+        }
+        if (ride.bursts() != seenRideBursts) {
+            seenRideBursts = ride.bursts();
+            audio.play("pop", .8f);
+            shake = Math.max(shake, .15f);
+        }
+        if (ride.desperate() && !seenRideDesperate) {
+            seenRideDesperate = true;
+            audio.play("quake", 1);
+            flash = Math.max(flash, .4f);
+            shake = Math.max(shake, .6f);
+            buzz(true);
         }
         if (ride.stages() != seenRideStages) {
             seenRideStages = ride.stages();
@@ -3491,10 +3533,83 @@ final class RunGame {
      * follows, and her own pass down one side; Lucy's breath crossing the sky; and Halgakos on Lucy's back, from behind, with the
      * beam going away from them. Before it, the Mother rising; and after it, the Mother made small, and listening.
      */
+    /** The ride's effects, drawn: Lucy's ink fire, its blast, its flare at her jaws; light bursting with paper; glowing pages and letters; a ring of runes; a column of light; a band of golden script. */
+    private Bitmap fxFire, fxBlast, fxMuzzle, fxLight, fxPages, fxRing, fxColumn, fxScript, fxSeal, fxSigil, fxImpact;
+
+    /** Soft round glows, one picture for each colour, made once and drawn at any size: far cheaper than a gradient made every frame. And the red about the sky's edges. */
+    private final java.util.Map<Integer, Bitmap> glows = new java.util.HashMap<>();
+    private Bitmap vignette;
+
+    private void glowAt(Canvas canvas, float x, float y, float radius, int colour, int alpha) {
+        if (BuildConfig.DEBUG && (session.tally("run_fxoff") & 4) != 0) return;
+        Bitmap glow = glows.get(colour);
+        if (glow == null) {
+            glow = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
+            Paint soft = new Paint(Paint.ANTI_ALIAS_FLAG);
+            soft.setShader(new android.graphics.RadialGradient(64, 64, 64, new int[]{colour | 0xFF000000, (colour & 0xFFFFFF) | 0x8C000000, colour & 0xFFFFFF}, new float[]{0, .4f, 1},
+                    android.graphics.Shader.TileMode.CLAMP));
+            new Canvas(glow).drawCircle(64, 64, 64, soft);
+            glows.put(colour, glow);
+        }
+        paint.setAlpha(Math.max(0, Math.min(255, alpha)));
+        target.set(x - radius, y - radius, x + radius, y + radius);
+        canvas.drawBitmap(glow, null, target, paint);
+    }
+
+    /** A picture laid in a box side by side, each copy as tall as the box and as wide as that makes it. */
+    private void tiles(Canvas canvas, Bitmap picture, RectF in) {
+        if (picture == null || in.width() <= 0 || in.height() <= 0) return;
+        float each = in.height() * picture.getWidth() / picture.getHeight();
+        canvas.save();
+        canvas.clipRect(in);
+        for (float along = in.left; along < in.right; along += each) {
+            target.set(along, in.top, along + each + 1, in.bottom);
+            canvas.drawBitmap(picture, null, target, paint);
+        }
+        canvas.restore();
+    }
+
+    private Bitmap fxOf(int resource) { return BitmapFactory.decodeResource(context.getResources(), resource); }
+
+    /** A frame of an effect's strip, its middle at a place, so wide and tall, turned by so many degrees. */
+    private void fx(Canvas canvas, Bitmap sheet, int count, int index, float x, float y, float wide, float tall, float turn) {
+        if (sheet == null) return;
+        int side = sheet.getWidth() / count;
+        source.set(Math.floorMod(index, count) * side, 0, Math.floorMod(index, count) * side + side, sheet.getHeight());
+        target.set(x - wide / 2, y - tall / 2, x + wide / 2, y + tall / 2);
+        canvas.save();
+        if (turn != 0) canvas.rotate(turn, x, y);
+        canvas.drawBitmap(sheet, source, target, paint);
+        canvas.restore();
+    }
+
+    /** Glowing words: a gold light behind the letters. */
+    private void glow(boolean on, float size) {
+        if (on) text.setShadowLayer(size * .45f, 0, 0, 0xFFFFD36A);
+        else text.clearShadowLayer();
+    }
+
+    /** The words on her wide ones: a sweep of her script, and the rain of it. */
+    private static final String[] SWEEP_WORDS = {"Grammar", "Correct", "Proper", "Standard", "Approved", "Official"};
+    private static final String[] RAIN_WORDS = {"no", "wrong", "fix", "redo", "sic", "x"};
+
     private void drawRide(Canvas canvas) {
         if (pagesSky == null) pagesSky = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_sky13);
         if (rideArt == null) rideArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ride_back);
         if (motherArt == null) motherArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_mother);
+        if (fxFire == null) {
+            fxFire = fxOf(R.drawable.run_fx_inkfire);
+            fxBlast = fxOf(R.drawable.run_fx_inkblast);
+            fxMuzzle = fxOf(R.drawable.run_fx_muzzle);
+            fxLight = fxOf(R.drawable.run_fx_lightburst);
+            fxPages = fxOf(R.drawable.run_fx_pages);
+            fxRing = fxOf(R.drawable.run_fx_runering);
+            fxColumn = fxOf(R.drawable.run_fx_lightcolumn);
+            fxScript = fxOf(R.drawable.run_fx_goldscript);
+            fxSeal = fxOf(R.drawable.run_fx_sealwall);
+            fxSigil = fxOf(R.drawable.run_fx_sigil);
+            fxImpact = fxOf(R.drawable.run_fx_impact);
+        }
         float fit = Math.max(width / (float) pagesSky.getWidth(), height / (float) pagesSky.getHeight()) * 1.04f;
         target.set(width / 2f - pagesSky.getWidth() * fit / 2 + (float) Math.sin(clock * .23f) * dp(8), height / 2f - pagesSky.getHeight() * fit / 2 + (float) Math.cos(clock * .19f) * dp(8),
                 width / 2f + pagesSky.getWidth() * fit / 2 + (float) Math.sin(clock * .23f) * dp(8), height / 2f + pagesSky.getHeight() * fit / 2 + (float) Math.cos(clock * .19f) * dp(8));
@@ -3522,6 +3637,11 @@ final class RunGame {
             boolean after = finale == RIDDEN;
             float age = finaleAge, come = Math.min(1, age / 2.2f), ease = come * come * (3 - 2 * come), bob = (float) Math.sin(clock * 2) * tile * .1f;
             if (after) {
+                if (age < .9f) {
+                    paint.setAlpha(255);
+                    fx(canvas, fxLight, 6, (int) (age / .9f * 6), cx, farY + grand * .1f, tile * 11, tile * 11, 0);
+                    fx(canvas, fxBlast, 6, (int) (age / .9f * 6), cx, farY + grand * .1f, tile * 8, tile * 8, 0);
+                }
                 float small = Math.max(0, 1 - age / 1.4f);
                 if (small > 0) {
                     paint.setAlpha(Math.round(255 * small));
@@ -3576,8 +3696,11 @@ final class RunGame {
         }
         // What is on its way.
         text.setTextAlign(Paint.Align.CENTER);
-        for (RunRide.Thing thing : ride.things()) {
-            if (thing.gone) continue;
+        // (Her wide ones first, under the rest: a sweep, a ring, the rain and her beam.)
+        java.util.List<RunRide.Thing> order = new java.util.ArrayList<>(ride.things());
+        order.sort((one, two) -> Boolean.compare(one.kind < RunRide.SWEEP || one.kind > RunRide.RAY, two.kind < RunRide.SWEEP || two.kind > RunRide.RAY));
+        for (RunRide.Thing thing : order) {
+            if (thing.gone || BuildConfig.DEBUG && (session.tally("run_fxoff") & 2) != 0) continue;
             float near = 1 - Math.max(0, thing.far), scale = far + (1 - far) * near, level = farY + (cy - farY) * near;
             int warn = Math.round((50 + 130 * near) * (.75f + .25f * (float) Math.sin(clock * 16)));
             paint.setStyle(Paint.Style.FILL);
@@ -3590,19 +3713,24 @@ final class RunGame {
                     paint.setColor(0xFFE0362F);
                     paint.setAlpha(warn / 2);
                     canvas.drawRect(cx + from, cy - tall, cx + to, cy + tall, paint);
-                    paint.setColor(0xFFF4EBD2);
-                    paint.setAlpha(Math.round(120 + 135 * near));
                     box.set(cx + from * scale, level - tall * scale, cx + to * scale, level + tall * scale);
-                    canvas.drawRoundRect(box, tile * .12f, tile * .12f, paint);
-                    stroke.setColor(0xFF8A6A3A);
-                    stroke.setAlpha(Math.round(120 + 135 * near));
+                    // A wall of golden rune light, with a bloom of gold about it.
+                    paint.setColor(0xFFFFD36A);
+                    for (int bloom = 3; bloom >= 1; bloom--) {
+                        paint.setAlpha(Math.round((20 + 18 * near) * (4 - bloom) / 3f));
+                        canvas.drawRoundRect(box.left - bloom * tile * .16f, box.top - bloom * tile * .16f, box.right + bloom * tile * .16f, box.bottom + bloom * tile * .16f, tile * .3f, tile * .3f, paint);
+                    }
+                    paint.setAlpha(Math.round(170 + 85 * near));
+                    tiles(canvas, fxSeal, box);
+                    stroke.setColor(0xFFFFF4C8);
+                    stroke.setAlpha(Math.round(150 + 105 * near));
+                    stroke.setStrokeWidth(tile * .06f);
+                    canvas.drawRect(box, stroke);
+                    // (Where it lands, over it.)
+                    stroke.setColor(0xFFFF3B30);
+                    stroke.setAlpha(Math.round(warn * 1.2f));
                     stroke.setStrokeWidth(tile * .05f);
-                    canvas.drawRoundRect(box, tile * .12f, tile * .12f, stroke);
-                    text.setColor(0xFF5A4A3A);
-                    text.setAlpha(Math.round(120 + 135 * near));
-                    text.setTypeface(Typeface.DEFAULT_BOLD);
-                    fitted(canvas, BLOCK_WORDS[(thing.word + (side < 0 ? 0 : 1)) % BLOCK_WORDS.length], box.centerX(), level + tile * .2f * scale, tile * .9f * scale, box.width() * .8f);
-                    text.setTypeface(Typeface.DEFAULT);
+                    canvas.drawRect(cx + from, cy - tall, cx + to, cy + tall, stroke);
                 }
                 stroke.setAlpha(255);
                 text.setAlpha(255);
@@ -3613,19 +3741,176 @@ final class RunGame {
                 paint.setAlpha(warn / 2);
                 canvas.drawRect(0, cy - high * 1.15f, width, cy + at - slit, paint);
                 canvas.drawRect(0, cy + at + slit, width, cy + high * 1.15f, paint);
-                paint.setColor(0xFFF4EBD2);
-                paint.setAlpha(Math.round(110 + 130 * near));
                 float reach = safe.width() * (.3f + .35f * near);
-                canvas.drawRoundRect(cx - reach, level - high * 1.15f * scale, cx + reach, level + (at - slit) * scale, tile * .1f, tile * .1f, paint);
-                canvas.drawRoundRect(cx - reach, level + (at + slit) * scale, cx + reach, level + high * 1.15f * scale, tile * .1f, tile * .1f, paint);
-                stroke.setColor(0xFF8A6A3A);
-                stroke.setAlpha(Math.round(110 + 130 * near));
-                stroke.setStrokeWidth(tile * .04f);
-                for (int line = 1; line <= 3; line++) {
-                    canvas.drawLine(cx - reach * .85f, level + (at - slit) * scale - line * tile * .16f * scale, cx + reach * .85f, level + (at - slit) * scale - line * tile * .16f * scale, stroke);
-                    canvas.drawLine(cx - reach * .85f, level + (at + slit) * scale + line * tile * .16f * scale, cx + reach * .85f, level + (at + slit) * scale + line * tile * .16f * scale, stroke);
+                // Two plates of golden rune light closing on one height.
+                paint.setAlpha(Math.round(160 + 95 * near));
+                box.set(cx - reach, level - high * 1.15f * scale, cx + reach, level + (at - slit) * scale);
+                tiles(canvas, fxSeal, box);
+                box.set(cx - reach, level + (at + slit) * scale, cx + reach, level + high * 1.15f * scale);
+                tiles(canvas, fxSeal, box);
+                // Its closing edges blaze.
+                for (int edge = 0; edge < 2; edge++) {
+                    float ey = level + (edge == 0 ? at - slit : at + slit) * scale;
+                    stroke.setColor(0xFFFFD36A);
+                    stroke.setAlpha(Math.round(120 * near));
+                    stroke.setStrokeWidth(tile * .35f);
+                    canvas.drawLine(cx - reach, ey, cx + reach, ey, stroke);
+                    stroke.setColor(Color.WHITE);
+                    stroke.setAlpha(Math.round(230 * near));
+                    stroke.setStrokeWidth(tile * .08f);
+                    canvas.drawLine(cx - reach, ey, cx + reach, ey, stroke);
                 }
+                // (Where it lands, over it.)
+                stroke.setColor(0xFFFF3B30);
+                stroke.setAlpha(Math.round(warn * 1.2f));
+                stroke.setStrokeWidth(tile * .05f);
+                canvas.drawLine(0, cy + at - slit, width, cy + at - slit, stroke);
+                canvas.drawLine(0, cy + at + slit, width, cy + at + slit, stroke);
                 stroke.setAlpha(255);
+            } else if (thing.kind == RunRide.SWEEP) {
+                // A sweep: a band of her script across the whole sky at one height, coming from far off; where it will be is marked from edge to edge.
+                float band = RunRide.BAND * high, at = cy + thing.y * high;
+                paint.setColor(0xFFE0362F);
+                paint.setAlpha(warn / 2);
+                canvas.drawRect(0, at - band, width, at + band, paint);
+                float y = level + thing.y * high * scale, half = band * scale, reach = width * (.35f + .65f * near);
+                // A wave of radiant golden calligraphy, drifting along, with her words glowing on it.
+                paint.setAlpha(Math.round(160 + 95 * near));
+                if (fxScript != null) {
+                    float tallBand = half * 3.2f, wideOne = tallBand * fxScript.getWidth() / fxScript.getHeight();
+                    canvas.save();
+                    canvas.clipRect(cx - reach, y - tallBand, cx + reach, y + tallBand);
+                    for (float along = cx - reach - (clock * tile * 2.5f) % wideOne; along < cx + reach; along += wideOne) {
+                        target.set(along, y - tallBand / 2, along + wideOne + 1, y + tallBand / 2);
+                        canvas.drawBitmap(fxScript, null, target, paint);
+                    }
+                    canvas.restore();
+                }
+                for (int spark = 0; spark < 10; spark++) {
+                    float sx = cx - reach + ((spark * .137f + clock * .4f) % 1) * reach * 2, sy = y + (float) Math.sin(clock * 5 + spark) * half * 1.3f;
+                    paint.setColor(spark % 2 == 0 ? 0xFFFFF4C0 : 0xFFFFD36A);
+                    paint.setAlpha(Math.round(200 * near));
+                    canvas.drawCircle(sx, sy, tile * .08f * (1 + (spark % 3)), paint);
+                }
+                text.setAlpha(255);
+                // (Where it lands, drawn over it, so it stays clear.)
+                stroke.setColor(0xFFFF3B30);
+                stroke.setAlpha(Math.round(warn * 1.2f));
+                stroke.setStrokeWidth(tile * .05f);
+                canvas.drawLine(0, at - band, width, at - band, stroke);
+                canvas.drawLine(0, at + band, width, at + band, stroke);
+                text.setAlpha(255);
+                stroke.setAlpha(255);
+            } else if (thing.kind == RunRide.RING) {
+                // A ring growing out from her, arriving at one width: its band is marked where it will be; inside it or outside it is clear.
+                float rx = thing.size * wide, ry = thing.size * high, bx = RunRide.RING_WIDE * wide, by = RunRide.RING_WIDE * high;
+                float mx = cx + thing.x * wide, my = cy + thing.y * high;
+                stroke.setColor(0xFFE0362F);
+                stroke.setAlpha(warn / 2);
+                stroke.setStrokeWidth((bx + by));
+                canvas.drawOval(mx - rx, my - ry, mx + rx, my + ry, stroke);
+                float grow = near, sx = herX + (mx - herX) * near, sy = herY + (my - herY) * near;
+                // A shining shockwave of runes, turning as it grows.
+                paint.setAlpha(Math.round(255 * Math.min(1, .25f + near)));
+                if (fxRing != null) {
+                    canvas.save();
+                    canvas.rotate(clock * 40, sx, sy);
+                    target.set(sx - (rx + bx) * grow * 1.08f, sy - (ry + by) * grow * 1.08f, sx + (rx + bx) * grow * 1.08f, sy + (ry + by) * grow * 1.08f);
+                    canvas.drawBitmap(fxRing, null, target, paint);
+                    canvas.restore();
+                }
+                stroke.setColor(0xFFFFF4D6);
+                stroke.setAlpha(Math.round(200 * near));
+                stroke.setStrokeWidth((bx + by) * .25f);
+                canvas.drawOval(sx - rx * grow, sy - ry * grow, sx + rx * grow, sy + ry * grow, stroke);
+                // (Where it lands, over it.)
+                stroke.setColor(0xFFFF3B30);
+                stroke.setAlpha(Math.round(warn * 1.2f));
+                stroke.setStrokeWidth(tile * .05f);
+                canvas.drawOval(mx - rx - bx, my - ry - by, mx + rx + bx, my + ry + by, stroke);
+                canvas.drawOval(mx - rx + bx, my - ry + by, mx + rx - bx, my + ry - by, stroke);
+                stroke.setAlpha(255);
+            } else if (thing.kind == RunRide.RAIN) {
+                // A rain of her words over the whole sky, with two gaps in it: everything but the gaps is marked.
+                float g = RunRide.RAIN_GAP * wide, a = cx + thing.x * wide, b = cx + thing.other * wide, low = Math.min(a, b), highGap = Math.max(a, b);
+                paint.setColor(0xFFE0362F);
+                paint.setAlpha(warn / 2);
+                canvas.drawRect(0, safe.top, low - g, cy + high * 1.2f, paint);
+                canvas.drawRect(low + g, safe.top, highGap - g, cy + high * 1.2f, paint);
+                canvas.drawRect(highGap + g, safe.top, width, cy + high * 1.2f, paint);
+                // Luminous pages and letters falling, with trails of light; the gaps are left clear.
+                int drops = Math.max(14, Math.round(width / (tile * .9f)));
+                for (int drop = 0; drop < drops; drop++) {
+                    float x = (drop + .5f) * width / drops;
+                    if (Math.abs(x - a) < g || Math.abs(x - b) < g) continue;
+                    float y = safe.top + (near + (drop * .37f) % .3f - .3f) * (cy + high * 1.2f - safe.top) * 1.2f;
+                    if (y < safe.top) continue;
+                    paint.setAlpha(Math.round(150 + 105 * near));
+                    float size = tile * (1.0f + (drop % 3) * .2f);
+                    fx(canvas, fxPages, 8, drop * 3, x, y, size, size, (float) Math.sin(clock * 3 + drop) * 12);
+                }
+                // (Where it lands, over it: the edges of the two gaps.)
+                stroke.setColor(0xFFFF3B30);
+                stroke.setAlpha(Math.round(warn * 1.2f));
+                stroke.setStrokeWidth(tile * .05f);
+                for (float edge : new float[]{low - g, low + g, highGap - g, highGap + g}) canvas.drawLine(edge, safe.top, edge, cy + high * 1.2f, stroke);
+                stroke.setAlpha(255);
+            } else if (thing.kind == RunRide.RAY) {
+                // A beam of hers that swings into a slant across the sky: the slant is marked; it sweeps into place as it arrives.
+                float angle = thing.size, nx = -(float) Math.sin(angle) * RunRide.RAY_WIDE, ny = (float) Math.cos(angle) * RunRide.RAY_WIDE;
+                float dx = (float) Math.cos(angle) * 3, dy = (float) Math.sin(angle) * 3;
+                path.reset();
+                path.moveTo(cx + (thing.x - dx + nx) * wide, cy + (thing.y - dy + ny) * high);
+                path.lineTo(cx + (thing.x + dx + nx) * wide, cy + (thing.y + dy + ny) * high);
+                path.lineTo(cx + (thing.x + dx - nx) * wide, cy + (thing.y + dy - ny) * high);
+                path.lineTo(cx + (thing.x - dx - nx) * wide, cy + (thing.y - dy - ny) * high);
+                path.close();
+                paint.setColor(0xFFE0362F);
+                paint.setAlpha(warn / 2);
+                canvas.drawPath(path, paint);
+                // Her mouth, where it comes from: a light gathering there, and then a blazing column from it, swinging into its slant.
+                float mouthX = herX, mouthY = herY - grand * .25f;
+                glowAt(canvas, mouthX, mouthY, tile * (.6f + 1.4f * near), 0xFFFFE08A, 255);
+                glowAt(canvas, mouthX, mouthY, tile * (.3f + .6f * near), 0xFFFFFFFF, 255);
+                if (near > .45f) {
+                    float swing = Math.min(1, (near - .45f) / .55f);
+                    float px = cx + thing.x * wide, py = cy + thing.y * high;
+                    float aim = (float) Math.atan2(py - mouthY, px - mouthX) + (1 - swing) * (px < mouthX ? -.9f : .9f);
+                    float length = Math.max(width, height) * 1.5f, thick = RunRide.RAY_WIDE * Math.min(wide, high) * 4.2f * (1 + .06f * (float) Math.sin(clock * 30));
+                    paint.setAlpha(Math.round(255 * Math.min(1, swing * 1.5f)));
+                    if (fxColumn != null) {
+                        canvas.save();
+                        canvas.rotate((float) Math.toDegrees(aim) - 90, mouthX, mouthY);
+                        target.set(mouthX - thick / 2, mouthY, mouthX + thick / 2, mouthY + length);
+                        canvas.drawBitmap(fxColumn, null, target, paint);
+                        canvas.restore();
+                    }
+                }
+                // (Where it lands, over it.)
+                stroke.setColor(0xFFFF3B30);
+                stroke.setAlpha(Math.round(warn * 1.2f));
+                stroke.setStrokeWidth(tile * .05f);
+                canvas.drawPath(path, stroke);
+                stroke.setAlpha(255);
+            } else if (thing.kind == RunRide.BURST || thing.kind == RunRide.SHARD) {
+                // A word that will burst where it arrives, and the pieces of one that has: a ring where each will land, and the word itself, glowing.
+                boolean piece = thing.kind == RunRide.SHARD;
+                float r = (piece ? RunRide.SHARD_NEAR : RunRide.NEAR), mx = cx + thing.x * wide, my = cy + thing.y * high;
+                stroke.setColor(0xFFE0362F);
+                stroke.setAlpha(warn);
+                stroke.setStrokeWidth(tile * .06f);
+                canvas.drawOval(mx - r * wide, my - r * high, mx + r * wide, my + r * high, stroke);
+                stroke.setAlpha(255);
+                float x = piece ? mx : cx + thing.x * wide * scale, y = piece ? my - (1 - near) * tile * 2 : level + thing.y * high * scale, size = tile * (piece ? .9f : .9f + 1.4f * near);
+                // A shining sigil of ink, turning, that will burst.
+                paint.setAlpha(255);
+                if (fxSigil != null) {
+                    canvas.save();
+                    canvas.rotate(clock * (piece ? 220 : 120) + thing.word * 37, x, y);
+                    target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+                    canvas.drawBitmap(fxSigil, null, target, paint);
+                    canvas.restore();
+                }
             } else if (thing.kind == RunRide.PASS) {
                 // Her pass: its side of the sky is marked, and she comes down it, vast, as it arrives.
                 paint.setColor(0xFFE0362F);
@@ -3643,17 +3928,16 @@ final class RunGame {
                 canvas.drawOval(cx + thing.x * wide - wide * RunRide.NEAR, cy + thing.y * high - high * RunRide.NEAR, cx + thing.x * wide + wide * RunRide.NEAR, cy + thing.y * high + high * RunRide.NEAR,
                         stroke);
                 stroke.setAlpha(255);
-                String name = NAME_WORDS[thing.word % NAME_WORDS.length];
-                text.setTextSize(size);
-                float half = text.measureText(name) / 2 + size * .4f, y = level + thing.y * high * scale;
-                paint.setColor(0xFFFDF6EE);
-                paint.setAlpha(240);
-                canvas.drawRoundRect(x - half, y - size * .8f, x + half, y + size * .5f, size * .4f, size * .4f, paint);
-                stroke.setColor(0xFFC0392B);
-                stroke.setStrokeWidth(tile * .05f);
-                canvas.drawRoundRect(x - half, y - size * .8f, x + half, y + size * .5f, size * .4f, size * .4f, stroke);
-                text.setColor(0xFFC0392B);
-                canvas.drawText(name, x, y + size * .15f, text);
+                // A seal of her ink that follows them, turning.
+                float y = level + thing.y * high * scale, seal = size * 2.4f;
+                paint.setAlpha(255);
+                if (fxSigil != null) {
+                    canvas.save();
+                    canvas.rotate(-clock * 160 + thing.word * 53, x, y);
+                    target.set(x - seal / 2, y - seal / 2, x + seal / 2, y + seal / 2);
+                    canvas.drawBitmap(fxSigil, null, target, paint);
+                    canvas.restore();
+                }
             }
         }
         paint.setColor(Color.BLACK);
@@ -3666,39 +3950,133 @@ final class RunGame {
         stroke.setStrokeWidth(tile * (before ? .08f : .05f));
         canvas.drawCircle(aimX, aimY, tile * (before ? .5f + .06f * (float) Math.sin(clock * 14) : .4f), stroke);
         stroke.setAlpha(255);
-        // Lucy's breath, crossing: a cloud of her mist, smaller as it goes.
+        // The two of them, from behind: Lucy's wings going; and Halgakos up on her back with the book out while the beam is gathered or out.
+        paint.setAlpha(ride.safe() && (int) (clock * 14) % 2 == 0 ? 90 : 255);
+        cell(canvas, rideArt, ride.charge() > 0 || ride.beam() > 0 ? 5 : (int) (clock * 7) % 4, 6, atX, atY + riders * .5f, riders, false);
+        paint.setAlpha(255);
+        // Where her fire comes from, Lucy's jaws, at her head; and where the beam comes from, the book Halgakos holds up.
+        float mouthX = atX, mouthY = atY - riders * .27f, bookX = atX, bookY = atY - riders * .25f;
+        // Lucy's breath: fire the colour of ink pouring from her jaws, joined to them all the way to its blazing head, smaller as it goes.
         paint.setStyle(Paint.Style.FILL);
+        int seed = 0;
+        boolean pouring = false;
         for (RunRide.Breath puff : ride.breaths()) {
-            float gone = Math.min(1, puff.gone), scale = 1 - (1 - far) * gone, x = cx + puff.x * wide * scale, y = cy + (farY - cy) * gone + puff.y * high * scale - riders * .3f * (1 - gone);
-            for (int part = 0; part < 4; part++) {
-                double turn = clock * 6 + part * 1.57;
-                paint.setColor(part == 0 ? 0xFFBFF3EA : 0xFF8FE0D2);
-                paint.setAlpha(190);
-                canvas.drawCircle(x + (float) Math.cos(turn) * tile * .2f * scale, y + (float) Math.sin(turn) * tile * .16f * scale, tile * (.44f - part * .05f) * scale, paint);
+            if (BuildConfig.DEBUG && (session.tally("run_fxoff") & 1) != 0) break;
+            seed++;
+            float gone = Math.min(1, puff.gone);
+            float toX = cx + puff.x * wide * far, toY = farY + puff.y * high * far;
+            float headX = mouthX + (toX - mouthX) * gone, headY = mouthY + (toY - mouthY) * gone;
+            float turn = (float) Math.toDegrees(Math.atan2(toX - mouthX, -(toY - mouthY)));
+            float scale = 1 - (1 - far) * gone;
+            // The stream, from her jaws to its head.
+            int parts = 5;
+            for (int part = 0; part <= parts; part++) {
+                float along = gone * part / parts, size = tile * (1.3f + 2.2f * (part / (float) parts)) * (1 - (1 - far) * along);
+                paint.setAlpha(Math.round(120 + 135 * part / (float) parts));
+                fx(canvas, fxFire, 8, (int) (clock * 16) + seed * 3 + part * 2, mouthX + (toX - mouthX) * along, mouthY + (toY - mouthY) * along, size, size, turn);
             }
+            paint.setAlpha(255);
+            fx(canvas, fxFire, 8, (int) (clock * 14) + seed * 3, headX, headY, tile * 3.6f * scale, tile * 3.6f * scale, turn);
+            pouring |= gone < .5f;
+        }
+        if (pouring || ride.puffs() > 0 && ride.wind() < .32f) {
+            // The flame leaving her jaws: a flare of ink fire bursting up from her head.
+            float flare = riders * .7f;
+            paint.setAlpha(255);
+            fx(canvas, fxMuzzle, 4, ride.wind() < .32f ? (int) (ride.wind() / .32f * 4) : 2, mouthX, mouthY - flare * .32f, flare, flare, 0);
         }
         if (ride.beam() > 0) {
             float life = ride.beam() / RunRide.LASTS, swell = (float) Math.sin(Math.min(1, (1 - life) * 6) * Math.PI / 2) * Math.min(1, life * 5);
+            // It ends on her, where it strikes her, while she is before it; and otherwise far off, where it goes on into the sky.
+            boolean striking = ride.onHer();
+            float endX = striking ? herX : aimX, endY = striking ? herY : aimY;
             for (int layer = 0; layer < 3; layer++) {
                 float nearHalf = tile * .6f * swell * (1.25f - layer * .42f) * (1 + .08f * (float) Math.sin(clock * 40 + layer)), farHalf = nearHalf * .34f;
                 path.reset();
-                path.moveTo(atX - nearHalf, atY - riders * .3f);
-                path.lineTo(atX + nearHalf, atY - riders * .3f);
-                path.lineTo(aimX + farHalf, aimY);
-                path.lineTo(aimX - farHalf, aimY);
+                path.moveTo(bookX - nearHalf * .5f, bookY);
+                path.lineTo(bookX + nearHalf * .5f, bookY);
+                path.lineTo(endX + farHalf, endY);
+                path.lineTo(endX - farHalf, endY);
                 path.close();
                 paint.setColor(layer == 0 ? 0xFFFFE9A8 : layer == 1 ? 0xFFFFF7DE : Color.WHITE);
-                paint.setAlpha(layer == 0 ? 110 : layer == 1 ? 190 : 255);
+                paint.setAlpha(Math.round((layer == 0 ? 110 : layer == 1 ? 190 : 255) * (striking ? 1 : .8f)));
                 canvas.drawPath(path, paint);
-                canvas.drawCircle(aimX, aimY, farHalf, paint);
             }
-            if (ride.reads()) {
-                paint.setColor(Color.WHITE);
-                paint.setAlpha(Math.round(110 + 80 * (float) Math.sin(clock * 30)));
-                canvas.drawCircle(herX, herY, tile * 1.6f, paint);
-            }
+            // Its light at the book.
+            glowAt(canvas, bookX, bookY, tile * 1.5f * swell + 1, 0xFFFFE9A8, 255);
+            glowAt(canvas, bookX, bookY, tile * .7f * swell + 1, 0xFFFFFFFF, 255);
+            // And where it strikes her: a splash of light on her body.
+            paint.setAlpha(255);
+            if (striking) fx(canvas, fxImpact, 6, (int) (clock * 18), endX, endY, tile * (ride.reads() ? 4.2f : 3f), tile * (ride.reads() ? 4.2f : 3f), clock * 40);
         }
         paint.setColor(Color.BLACK);
+        // Where the last of Lucy's blasts landed, far off: an explosion of ink fire.
+        if (ride.sinceBlast() < .45f) {
+            float bx = cx + ride.blastX() * wide * far, by = farY + ride.blastY() * high * far;
+            paint.setAlpha(255);
+            fx(canvas, fxBlast, 6, (int) (ride.sinceBlast() / .45f * 6), bx, by, tile * 4.6f, tile * 4.6f, 0);
+        }
+        // Where a word burst: light and paper.
+        if (ride.sinceBurst() < .45f) {
+            float bx = cx + ride.burstX() * wide, by = cy + ride.burstY() * high;
+            paint.setAlpha(255);
+            fx(canvas, fxLight, 6, (int) (ride.sinceBurst() / .45f * 6), bx, by, tile * 4f, tile * 4f, 0);
+        }
+        // Where Lucy's fire and the beam meet on her: light bursts out of her, and rings of violet and gold and white, and rays.
+        if (ride.met() > 0 && ride.sinceMet() < .5f) {
+            paint.setAlpha(255);
+            fx(canvas, fxLight, 6, (int) (ride.sinceMet() / .5f * 6), herX, herY, tile * 6.5f, tile * 6.5f, 0);
+            fx(canvas, fxBlast, 6, (int) (ride.sinceMet() / .5f * 6), herX, herY, tile * 5f, tile * 5f, 0);
+        }
+        if (ride.met() > 0 && ride.sinceMet() < .9f) {
+            float age = ride.sinceMet() / .9f, out = (float) Math.sqrt(age) * tile * 4.2f, fade = 1 - age;
+            for (int ray = 0; ray < 12; ray++) {
+                double turn = ray * Math.PI / 6 + clock * 1.5;
+                stroke.setColor(ray % 2 == 0 ? 0xFFFFE9A8 : 0xFFB98CFF);
+                stroke.setAlpha(Math.round(230 * fade));
+                stroke.setStrokeWidth(tile * .12f * fade + 1);
+                canvas.drawLine(herX + (float) Math.cos(turn) * out * .25f, herY + (float) Math.sin(turn) * out * .25f, herX + (float) Math.cos(turn) * out * 1.2f, herY + (float) Math.sin(turn) * out * 1.2f, stroke);
+            }
+            for (int ring = 0; ring < 3; ring++) {
+                stroke.setColor(ring == 0 ? 0xFF6A3BD6 : ring == 1 ? 0xFFFFC94A : Color.WHITE);
+                stroke.setAlpha(Math.round(240 * fade));
+                stroke.setStrokeWidth(tile * (.4f - ring * .12f) * fade + 1);
+                canvas.drawCircle(herX, herY, out * (1 - ring * .22f), stroke);
+            }
+            paint.setColor(Color.WHITE);
+            paint.setAlpha(Math.round(200 * fade * fade));
+            canvas.drawCircle(herX, herY, tile * 1.4f * (1 + age), paint);
+            stroke.setAlpha(255);
+            paint.setColor(Color.BLACK);
+        }
+        if (ride.desperate()) {
+            // Her desperation: the sky about the edges pulses red, and she says what she is doing.
+            float pulse = .5f + .5f * (float) Math.sin(clock * 6);
+            if (vignette == null || vignette.getWidth() != Math.max(1, width / 4) || vignette.getHeight() != Math.max(1, height / 4)) {
+                vignette = Bitmap.createBitmap(Math.max(1, width / 4), Math.max(1, height / 4), Bitmap.Config.ARGB_8888);
+                Paint soft = new Paint();
+                soft.setShader(new android.graphics.RadialGradient(vignette.getWidth() / 2f, vignette.getHeight() / 2f, Math.max(vignette.getWidth(), vignette.getHeight()) * .75f,
+                        new int[]{0x00C81428, 0x00C81428, 0xFFC81428}, new float[]{0, .6f, 1}, android.graphics.Shader.TileMode.CLAMP));
+                new Canvas(vignette).drawPaint(soft);
+            }
+            paint.setAlpha(Math.round(70 + 50 * pulse));
+            target.set(0, 0, width, height);
+            canvas.drawBitmap(vignette, null, target, paint);
+            // The whole sky lit from her: a gold glow about her, and rays of light out across it, turning.
+            glowAt(canvas, herX, herY, tile * 7, 0xFFFFECAA, Math.round(150 + 60 * pulse));
+            for (int ray = 0; ray < 10; ray++) {
+                double turnRay = ray * Math.PI / 5 + clock * .5;
+                stroke.setColor(0xFFFFE9A8);
+                stroke.setAlpha(Math.round(60 + 40 * pulse));
+                stroke.setStrokeWidth(tile * .5f);
+                canvas.drawLine(herX, herY, herX + (float) Math.cos(turnRay) * width * 1.2f, herY + (float) Math.sin(turnRay) * width * 1.2f, stroke);
+            }
+            stroke.setAlpha(255);
+            if (ride.sinceDesperate() < 3) {
+                float in = Math.min(1, ride.sinceDesperate() / .3f), gone = Math.max(0, (ride.sinceDesperate() - 2.4f) / .6f);
+                word(canvas, "She throws everything at once!", cx, cy + high * 1.25f, Math.min(dp(17), safe.width() / 19f), 0xFFE0362F, in * (1 - gone));
+            }
+        }
         // One of her friends, taking a piece off the Mother's shield: her face, going up the sky to her.
         if (ride.sinceHelp() < .9f && ride.helps() > 0) {
             float gone = ride.sinceHelp() / .9f;
@@ -3707,10 +4085,6 @@ final class RunGame {
                     atY + (herY - atY) * gone, tile * (.5f - .2f * gone));
             canvas.restore();
         }
-        // The two of them, from behind: Lucy's wings going; her head forward as she breathes; and Halgakos up on her back with the book out while the beam is gathered or out.
-        paint.setAlpha(ride.safe() && (int) (clock * 14) % 2 == 0 ? 90 : 255);
-        cell(canvas, rideArt, ride.charge() > 0 || ride.beam() > 0 ? 5 : ride.wind() < .3f ? 4 : (int) (clock * 7) % 4, 6, atX, atY + riders * .5f, riders, false);
-        paint.setAlpha(255);
         if (cheerAge < 2.6f && ride.stages() > 0) {
             float in = Math.min(1, cheerAge / .35f), out = Math.max(0, (cheerAge - 2.1f) / .5f);
             word(canvas, ride.stage() == 1 ? "She is cracking: keep reading" : "The last of her: all together", cx, cy + high * 1.25f, Math.min(dp(16), safe.width() / 20f), 0xFFB9862C, in * (1 - out));

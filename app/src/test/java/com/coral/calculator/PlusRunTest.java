@@ -5499,10 +5499,7 @@ public class PlusRunTest {
     // The ride: Halgakos on Lucy's back, and the Mother Tongue
 
     /** How far clear of something the Mother has sent a place is: nothing or less, and it lands there. */
-    private static float clearOf(RunRide.Thing thing, float x, float y) {
-        return thing.kind == RunRide.BLOCKS ? RunRide.GAP - Math.abs(x - thing.x) : thing.kind == RunRide.PRESS ? RunRide.SLIT - Math.abs(y - thing.y)
-                : thing.kind == RunRide.PASS ? Math.abs(x - thing.x) - RunRide.PASS_WIDE : (float) Math.hypot(x - thing.x, y - thing.y) - RunRide.NEAR;
-    }
+    private static float clearOf(RunRide.Thing thing, float x, float y) { return RunRide.clear(thing, x, y); }
 
     /**
      * The ride ridden by someone who has understood it: to the way through what is coming, in time; otherwise to where the Mother is,
@@ -5539,6 +5536,61 @@ public class PlusRunTest {
                         beams && (ride.open() > 0 || ride.shield() <= 1), breathes);
             }
         }
+    }
+
+    @Test public void theMotherTongueSendsHerWideOnesEachMarkedAndFairAndIsDesperateAtTheLast() {
+        // Each of the wide ones lands where it says and nowhere else.
+        RunRide.Thing sweep = new RunRide.Thing(), ring = new RunRide.Thing(), rain = new RunRide.Thing(), ray = new RunRide.Thing(), shard = new RunRide.Thing();
+        sweep.kind = RunRide.SWEEP;
+        sweep.y = .3f;
+        assertTrue(RunRide.lands(sweep, -.9f, .35f));
+        assertTrue(RunRide.lands(sweep, .9f, .2f));
+        assertFalse(RunRide.lands(sweep, 0, -.1f));
+        assertFalse(RunRide.lands(sweep, 0, .6f));
+        ring.kind = RunRide.RING;
+        ring.size = .6f;
+        assertTrue(RunRide.lands(ring, .6f, 0));
+        assertTrue(RunRide.lands(ring, 0, -.55f));
+        assertFalse("inside it", RunRide.lands(ring, .1f, .1f));
+        assertFalse("outside it", RunRide.lands(ring, .95f, .6f));
+        rain.kind = RunRide.RAIN;
+        rain.x = -.5f;
+        rain.other = .4f;
+        assertFalse(RunRide.lands(rain, -.5f, .7f));
+        assertFalse(RunRide.lands(rain, .45f, -.7f));
+        assertTrue(RunRide.lands(rain, 0, 0));
+        assertTrue(RunRide.lands(rain, .9f, 0));
+        ray.kind = RunRide.RAY;
+        ray.size = (float) (Math.PI / 4);
+        assertTrue(RunRide.lands(ray, .3f, .3f));
+        assertTrue(RunRide.lands(ray, -.5f, -.5f));
+        assertFalse(RunRide.lands(ray, .5f, -.4f));
+        assertFalse(RunRide.lands(ray, -.6f, .5f));
+        shard.kind = RunRide.SHARD;
+        shard.x = .2f;
+        assertTrue(RunRide.lands(shard, .25f, .05f));
+        assertFalse(RunRide.lands(shard, .5f, 0));
+        // Ridden well: she sends every kind she has, words burst into pieces, the beam and the blasts meet on her, and at the last she is desperate;
+        // and it is still won, with hurts to spare.
+        int[] kinds = new int[10];
+        int bursts = 0, met = 0, hurts = 0;
+        for (long seed = 1; seed <= 16; seed++) {
+            RunRide ride = new RunRide(20, 3, seed);
+            ride(ride, 400, true, true);
+            assertEquals("seed " + seed, RunRide.WON, ride.state());
+            assertTrue("seed " + seed, ride.desperate());
+            for (int kind = 0; kind < 10; kind++) kinds[kind] += ride.sentOf(kind);
+            bursts += ride.bursts();
+            met += ride.met();
+            hurts += ride.hurts();
+        }
+        for (int kind : new int[]{RunRide.BLOCKS, RunRide.PRESS, RunRide.NAME, RunRide.PASS, RunRide.SWEEP, RunRide.RING, RunRide.RAIN, RunRide.RAY, RunRide.BURST}) {
+            assertTrue("kind " + kind, kinds[kind] > 0);
+        }
+        assertEquals("pieces are not sent: they come of a burst", 0, kinds[RunRide.SHARD]);
+        assertTrue(bursts > 0);
+        assertTrue("met " + met, met >= 16);
+        assertTrue("hurts " + hurts, hurts < 48);
     }
 
     @Test public void theMotherTongueIsReadOnlyWhileHerShieldIsBrokenAndTheLastOfItTakesTheBeamAndTheBreathTogether() {

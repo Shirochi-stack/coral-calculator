@@ -12,7 +12,8 @@ import java.util.Random;
  *
  * Two things are theirs to send. Halgakos's beam, as in the flight: the strike button, held,
  * gathers it; it lasts a while and then rests; it goes straight ahead. And Lucy's breath: a
- * puff of mist that takes a moment to cross the sky, as often as she has the wind for it.
+ * blast of ink-coloured fire that takes a moment to cross the sky, as often as she has the
+ * wind for it. When a blast reaches the Mother while the beam is on her, the two meet on her.
  * The Mother keeps a shield of gilt about her, in pieces. Breath that reaches her takes a
  * piece off it; so, every so often, does one of the friends who pledged. With the last
  * piece gone she is open for a while, and only then does the beam read her; then her
@@ -28,17 +29,25 @@ import java.util.Random;
  * pass, down one side of the sky, in which nothing touches her. Blocks, the press and her
  * pass are not cut by anything: they are flown round.
  *
+ * And the wider ones, each marked where it will land before it does. A sweep: a band of her
+ * script across the whole sky at one height, to be out of. A ring that grows from her and
+ * arrives at one width, to be inside or outside of. A rain of words over the whole sky, with
+ * two gaps in it. A beam of hers that swings into a slant across the sky, to be clear of. And
+ * a word that bursts where it arrives, into four pieces that land a moment later around it;
+ * the beam and the breath cut it out of the air before it bursts, as they cut a name. When
+ * only the last of her is left to read, she sends everything at once, faster: her desperation.
+ *
  * A hurt costs hearts, in halves; when they are gone they have fallen, and whoever keeps
  * the lives decides whether it begins again. There is nothing here but numbers.
  */
 final class RunRide {
     static final int FLYING = 0, WON = 1, FELL = 2;
-    static final int BLOCKS = 0, PRESS = 1, NAME = 2, PASS = 3;
+    static final int BLOCKS = 0, PRESS = 1, NAME = 2, PASS = 3, SWEEP = 4, RING = 5, RAIN = 6, RAY = 7, BURST = 8, SHARD = 9;
     static final float SPEED = 1.6f, SLOWED = .6f, HIGH = .8f;
     /** The beam, as in the flight; she is larger than Lucy, and so easier to keep it on. */
     static final float CHARGE = .45f, LASTS = 1.3f, WAIT = 1.5f, TICK = .12f, TRUE = .36f, CUTS = .27f;
     /** Lucy's breath: how often, how long it takes to cross, and how near the Mother it must arrive. */
-    static final float BREATH_EVERY = 1, BREATH_FLIES = .55f, BREATH_TRUE = .38f;
+    static final float BREATH_EVERY = 1, BREATH_FLIES = .55f, BREATH_TRUE = .44f;
     /** How many pieces her shield has in each stage, how long she is open once it is gone, how long it takes to form, and how often a friend takes a piece. */
     static final int[] SHIELD = {5, 6, 7};
     static final float OPEN = 4.5f, FORMS = 1.2f, HELP_EVERY = 9;
@@ -49,14 +58,24 @@ final class RunRide {
     static final float GAP = .3f, SLIT = .25f, NEAR = .26f, PASS_WIDE = .42f;
     /** How fast a name follows, and how near it is when it no longer does. */
     static final float FOLLOWS = .5f, LOCKS = .3f;
+    /** How tall a sweep is from its middle; how wide a ring's band is, and how wide it grows; how wide a gap in the rain; how wide a beam's band; and how near a burst or one of its pieces must land. */
+    static final float BAND = .2f, RING_WIDE = .13f, RING_TO = .62f, RAIN_GAP = .2f, RAY_WIDE = .16f, SHARD_NEAR = .19f;
+    /** Where she is seen, in the same measure as they are: so much nearer the middle than her own place, and so far above them. */
+    static final float FAR = .5f, ABOVE = -1.41f;
+    /** From how little of her is left she is desperate. */
+    static final int DESPERATE = 8;
     private static final float[] EVERY = {2.1f, 1.75f, 1.5f}, HER_SPEED = {.28f, .38f, .48f}, TURNS = {2.8f, 2.3f, 1.9f};
-    private static final int[][] SENDS = {{BLOCKS, NAME, PRESS, NAME}, {BLOCKS, NAME, PRESS, PASS, NAME, BLOCKS}, {PRESS, NAME, BLOCKS, PASS, NAME, PRESS, BLOCKS, NAME}};
+    private static final int[][] SENDS = {{BLOCKS, NAME, PRESS, SWEEP, NAME, RING}, {BLOCKS, RAIN, NAME, PRESS, PASS, RING, BURST, SWEEP},
+            {RAIN, BURST, RING, PASS, RAY, PRESS, BURST, BLOCKS, SWEEP, NAME}};
+    private static final int[] LAST = {RING, RAIN, BURST, RAY, SWEEP, RING, BURST, RAIN};
     private static final float[] LANES = {-.62f, 0, .62f};
 
     /** Something on its way: what it is; where it will arrive (for blocks, the way through; for a press, its slit; for her pass, its middle); how far off it is, from one to nothing; how fast; and which word is on it. */
     static final class Thing {
         int kind, word;
         float x, y, far = 1, speed;
+        /** A ring's width when it arrives; a beam's slant; and the rain's second gap. */
+        float size, other;
         boolean gone;
     }
 
@@ -73,7 +92,12 @@ final class RunRide {
     private int beams, hits, hurts, cut, sent, stages, puffs, chips, opens, helps, names;
     private float x, y = .3f, herX, herY = -.1f, goalX, goalY, sinceGoal = 9;
     private float safe, held, beam, wait, tick, wind, reel = 2.5f, next = 1.5f, open, forming, passing, help = HELP_EVERY, time;
-    private float sinceSent = 9, sinceRead = 9, sinceHurt = 9, sinceChip = 9, sinceHelp = 9;
+    private float sinceSent = 9, sinceRead = 9, sinceHurt = 9, sinceChip = 9, sinceHelp = 9, sinceMet = 9, sinceDesperate = 9;
+    private boolean desperate;
+    private int bursts, met;
+    /** Where the last of Lucy's blasts arrived, far off, and how long ago; and where the last word burst, and how long ago. */
+    private float blastX, blastY, sinceBlast = 9, burstX, burstY, sinceBurst = 9;
+    private final int[] sentOf = new int[10];
 
     RunRide(int halves, int costs, long seed) {
         this.halves = Math.max(1, halves);
@@ -116,6 +140,20 @@ final class RunRide {
     float sinceHurt() { return sinceHurt; }
     float sinceChip() { return sinceChip; }
     float sinceHelp() { return sinceHelp; }
+    /** How long since a blast of Lucy's met the beam on her; how many times it has; whether she is desperate, and since when; and how many words have burst. */
+    float sinceMet() { return sinceMet; }
+    int met() { return met; }
+    boolean desperate() { return desperate; }
+    float sinceDesperate() { return sinceDesperate; }
+    int bursts() { return bursts; }
+    float blastX() { return blastX; }
+    float blastY() { return blastY; }
+    float sinceBlast() { return sinceBlast; }
+    float burstX() { return burstX; }
+    float burstY() { return burstY; }
+    float sinceBurst() { return sinceBurst; }
+    /** How many of a kind she has sent. */
+    int sentOf(int kind) { return sentOf[kind]; }
     float time() { return time; }
     /** Counts that only go up: beams, times the beam has read her, hurts, names cut out of the air, things sent, stages ended, breaths, pieces off her shield, times it has been broken, and pieces a friend took. */
     int beams() { return beams; }
@@ -146,6 +184,10 @@ final class RunRide {
         sinceHurt += seconds;
         sinceChip += seconds;
         sinceHelp += seconds;
+        sinceMet += seconds;
+        sinceDesperate += seconds;
+        sinceBlast += seconds;
+        sinceBurst += seconds;
         if (safe > 0) safe -= seconds;
         shine(seconds, strike);
         if (state != FLYING) return;
@@ -167,7 +209,7 @@ final class RunRide {
             puff.gone += seconds / BREATH_FLIES;
             // What it passes on its way, of the names she sends, is gone.
             for (Thing thing : things) {
-                if (thing.gone || thing.kind != NAME || Math.abs(thing.far - puff.gone) > .12f) continue;
+                if (thing.gone || thing.kind != NAME && thing.kind != BURST || Math.abs(thing.far - puff.gone) > .12f) continue;
                 if (Math.abs(thing.x - puff.x) < CUTS && Math.abs(thing.y - puff.y) < CUTS) {
                     thing.gone = true;
                     cut++;
@@ -175,7 +217,15 @@ final class RunRide {
             }
             if (puff.gone < 1) continue;
             breaths.remove(index);
+            blastX = puff.x;
+            blastY = puff.y;
+            sinceBlast = 0;
             if (reel > 0 || passing > 0 || Math.abs(puff.x - herX) > BREATH_TRUE || Math.abs(puff.y - herY) > BREATH_TRUE) continue;
+            // (A blast that reaches her while the beam is on her: the two meet on her.)
+            if (onHer()) {
+                met++;
+                sinceMet = 0;
+            }
             if (shield > 0 && forming <= 0) {
                 chip();
             } else if (finishing() && onHer()) {
@@ -212,8 +262,14 @@ final class RunRide {
                 herX += across / length * go;
                 herY += down / length * go;
             }
+            // With only the last of her left to read, she is desperate: everything at once, and faster.
+            if (!desperate && stage == 2 && left <= DESPERATE) {
+                desperate = true;
+                sinceDesperate = 0;
+                next = Math.min(next, .8f);
+            }
             if ((next -= seconds) <= 0) {
-                next = EVERY[stage];
+                next = desperate ? EVERY[2] * .82f : EVERY[stage];
                 send();
             }
         }
@@ -234,15 +290,46 @@ final class RunRide {
             }
             if ((thing.far -= thing.speed * seconds) > 0) continue;
             things.remove(index);
+            if (thing.kind == BURST) shatter(thing);
             if (lands(thing, x, y)) hurt();
             if (state != FLYING) return;
         }
     }
 
     /** Whether something, arriving, would land on whoever is at a place. */
-    static boolean lands(Thing thing, float atX, float atY) {
-        return thing.kind == BLOCKS ? Math.abs(atX - thing.x) >= GAP : thing.kind == PRESS ? Math.abs(atY - thing.y) >= SLIT
-                : thing.kind == PASS ? Math.abs(atX - thing.x) < PASS_WIDE : Math.hypot(atX - thing.x, atY - thing.y) < NEAR;
+    static boolean lands(Thing thing, float atX, float atY) { return clear(thing, atX, atY) <= 0; }
+
+    /** How far clear of where something will land a place is: nothing or less, and it lands there. */
+    static float clear(Thing thing, float atX, float atY) {
+        switch (thing.kind) {
+            case BLOCKS: return GAP - Math.abs(atX - thing.x);
+            case PRESS: return SLIT - Math.abs(atY - thing.y);
+            case PASS: return Math.abs(atX - thing.x) - PASS_WIDE;
+            case SWEEP: return Math.abs(atY - thing.y) - BAND;
+            case RING: return Math.abs((float) Math.hypot(atX - thing.x, atY - thing.y) - thing.size) - RING_WIDE;
+            case RAIN: return RAIN_GAP - Math.min(Math.abs(atX - thing.x), Math.abs(atX - thing.other));
+            case RAY: return Math.abs((atX - thing.x) * (float) Math.sin(thing.size) - (atY - thing.y) * (float) Math.cos(thing.size)) - RAY_WIDE;
+            case SHARD: return (float) Math.hypot(atX - thing.x, atY - thing.y) - SHARD_NEAR;
+            default: return (float) Math.hypot(atX - thing.x, atY - thing.y) - NEAR;
+        }
+    }
+
+    /** A word that has burst: four pieces of it, which land a moment later on four sides of where it did. */
+    private void shatter(Thing burst) {
+        bursts++;
+        burstX = burst.x;
+        burstY = burst.y;
+        sinceBurst = 0;
+        for (int piece = 0; piece < 4; piece++) {
+            Thing shard = new Thing();
+            shard.kind = SHARD;
+            shard.word = burst.word;
+            shard.x = Math.max(-1, Math.min(1, burst.x + (piece % 2 == 0 ? -.42f : .42f)));
+            shard.y = Math.max(-HIGH, Math.min(HIGH, burst.y + (piece < 2 ? -.34f : .34f)));
+            shard.far = .5f;
+            shard.speed = .85f;
+            things.add(shard);
+        }
     }
 
     private void chip() {
@@ -260,7 +347,7 @@ final class RunRide {
         if (beam > 0) {
             beam -= seconds;
             for (Thing thing : things) {
-                if (thing.gone || thing.kind != NAME || Math.abs(thing.x - x) >= CUTS || Math.abs(thing.y - y) >= CUTS) continue;
+                if (thing.gone || thing.kind != NAME && thing.kind != BURST || Math.abs(thing.x - x) >= CUTS || Math.abs(thing.y - y) >= CUTS) continue;
                 thing.gone = true;
                 cut++;
             }
@@ -303,7 +390,7 @@ final class RunRide {
 
     /** The Mother sends the next of what she sends in this stage. */
     private void send() {
-        int[] sends = SENDS[stage];
+        int[] sends = desperate ? LAST : SENDS[stage];
         int kind = sends[turn++ % sends.length];
         // (Open, she does not make her pass: she is where she is, to be read.)
         if (kind == PASS && open > 0) kind = NAME;
@@ -323,6 +410,30 @@ final class RunRide {
             thing.x = x < 0 ? -.58f : .58f;
             thing.speed = .4f;
             passing = 1 / thing.speed + .4f;
+        } else if (kind == SWEEP) {
+            // (Never at the height they are at already, when there is room to be elsewhere.)
+            thing.y = (random.nextFloat() * 2 - 1) * (HIGH - BAND);
+            thing.speed = .45f;
+        } else if (kind == RING) {
+            // From where she is, growing to its width as it arrives: inside it or outside it is clear.
+            thing.x = herX * .5f;
+            thing.y = herY * .5f;
+            thing.size = RING_TO * (.75f + random.nextFloat() * .4f);
+            thing.speed = .42f;
+        } else if (kind == RAIN) {
+            thing.x = (random.nextFloat() * 2 - 1) * .8f;
+            thing.other = thing.x + (thing.x < 0 ? 1 : -1) * (.6f + random.nextFloat() * .4f);
+            thing.speed = .4f;
+        } else if (kind == RAY) {
+            // From her mouth, through where they are and on: clear of it is either side.
+            thing.x = x;
+            thing.y = y;
+            thing.size = (float) Math.atan2(y - (ABOVE + herY * FAR), x - herX * FAR);
+            thing.speed = .44f;
+        } else if (kind == BURST) {
+            thing.x = x;
+            thing.y = y;
+            thing.speed = .5f;
         } else {
             thing.x = herX;
             thing.y = herY;
@@ -330,6 +441,7 @@ final class RunRide {
         }
         things.add(thing);
         sent++;
+        sentOf[kind]++;
     }
 
     private void hurt() {
