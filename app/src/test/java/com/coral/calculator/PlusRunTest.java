@@ -4710,17 +4710,17 @@ public class PlusRunTest {
         assertEquals(1 << index, run.roomsDone());
         int from = shop[3];
         for (int pet = 0; pet < 5; pet++) {
-            run.place(from + 4 + pet * 2 + .2f, GROUND);
+            run.place(from + 7 + pet * 2 + .2f, GROUND);
             run.step(STEP, false, false, false);
             assertEquals(pet, run.spot());
-            run.place(from + 4 + pet * 2 + .2f, GROUND - 2);
+            run.place(from + 7 + pet * 2 + .2f, GROUND - 2);
             hold(run, .2f, false, false, false);
             assertEquals(5 + pet, run.spot());
         }
-        run.place(from + 3 + .2f, GROUND);
+        run.place(from + 5.2f, GROUND);
         run.step(STEP, false, false, false);
         assertEquals(-1, run.spot());
-        run.place(from + 16, GROUND);
+        run.place(from + 3, GROUND);
         run.step(STEP, false, false, false);
         assertEquals(104, run.spot());
         hold(run, 3, true, false, false);
