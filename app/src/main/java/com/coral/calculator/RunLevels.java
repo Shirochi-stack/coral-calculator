@@ -1374,7 +1374,7 @@ final class RunLevels {
             level.land[FLOOR - 1][from + 1] = ENTRY;
             if (sort == PET_SHOP) {
                 ledge(from + 4, FLOOR - 2, 10);
-                for (int pet = 0; pet < PlusRun.PETS; pet++) level.items.add(new int[]{PlusRun.SPOT, from + 4 + pet % 5 * 2, pet < 5 ? FLOOR - 1 : FLOOR - 3, 0, pet});
+                for (int pet = 0; pet < RunPets.FOUND; pet++) level.items.add(new int[]{PlusRun.SPOT, from + 4 + pet % 5 * 2, pet < 5 ? FLOOR - 1 : FLOOR - 3, 0, pet});
                 level.items.add(new int[]{PlusRun.SPOT, from + 15, FLOOR - 1, NABI, 100 + 4});
             } else if (sort == GUILD_HALL) {
                 level.items.add(new int[]{PlusRun.SPOT, from + 11, FLOOR - 1, INJU, 100});
@@ -1589,7 +1589,7 @@ final class RunLevels {
                     level.items.add(new int[]{PlusRun.CHEST, end + 9, FLOOR - 6, 0});
                 }
                 holds = number < 4 ? HOLDS_TREAT : dice.nextInt(3);
-                if (holds == HOLDS_PET) level.items.add(new int[]{PlusRun.PET + dice.nextInt(PlusRun.PETS), end + 7, FLOOR - 1, 0});
+                if (holds == HOLDS_PET) level.items.add(new int[]{PlusRun.PET + dice.nextInt(RunPets.FOUND), end + 7, FLOOR - 1, 0});
                 else if (holds == HOLDS_SHRINE) level.items.add(new int[]{PlusRun.SHRINE, end + 7, FLOOR - 1, 0, ribbonsOf(number)[0]});
                 else level.items.add(new int[]{treat, end + 7, FLOOR - 1, 0});
                 // (Black hangs in its far corner, where only a jump takes it.)

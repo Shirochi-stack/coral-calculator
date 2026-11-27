@@ -277,14 +277,23 @@ final class PlusRun {
      * long way on a slow beat, and every so often has a ring of light ready that turns
      * aside one thing thrown at Halgakos. And one with no wings runs and copies her: when
      * she uses what she holds, it uses a small one of the same, and it does nothing else.
+     *
+     * And four more, small stuffed copies of those she has beaten, to be had only once she has
+     * (see {@link RunPets}). A mini Tsubakieh runs up to the nearest and swings her bat: all
+     * within the swing are hit, and what stands after it stands knocked silly. A mini Illya
+     * runs, and throws a fan of three sparkles from her quill. A mini Mawang flies, and breathes
+     * a short dark flame, three tongues of it, at what is close. A mini Lucy runs, and squirts
+     * a quick, weak jet of water from further off than the rest.
      */
     static final int PET = 30, JAR = 0, CAT = 1, DOG = 2, DUCK = 3, MONKEY = 4;
-    static final int MINI_CHIKUWA = 5, MINI_RUNE = 6, IMP = 7, CHERUB = 8, TWIN = 9, PETS = 10;
+    static final int MINI_CHIKUWA = 5, MINI_RUNE = 6, IMP = 7, CHERUB = 8, TWIN = 9;
+    static final int MINI_TSUBAKIEH = 10, MINI_ILLYA = 11, MINI_MAWANG = 12, MINI_LUCY = 13, PETS = 14;
     /** What a pet throws: a blot of ink, a nut, a bread roll, and a ray of light. */
     static final int BLOT_SHOT = 23, NUT = 24, ROLL = 25, RAY = 26;
     /** How often a mini Chikuwa has a roll for her, how long a puddle of ink lies, how much it slows, and how often the ring of light is ready. */
     static final float GIFT_EVERY = 18, PUDDLE_LASTS = 5, PUDDLE_SLOWS = .45f, WARD_EVERY = 9;
-    private static final float[] PET_EVERY = {1.6f, 1, 2.2f, 1.5f, 1.8f, 1.7f, 1.3f, .7f, 2.4f, .35f}, PET_NEAR = {7, 3.2f, 6, 7, 6, 6.5f, 3.5f, 3.6f, 9, 0};
+    private static final float[] PET_EVERY = {1.6f, 1, 2.2f, 1.5f, 1.8f, 1.7f, 1.3f, .7f, 2.4f, .35f, 2, 2.2f, 2.6f, 1.2f},
+            PET_NEAR = {7, 3.2f, 6, 7, 6, 6.5f, 3.5f, 3.6f, 9, 0, 4, 7, 4, 7.5f};
     /** How long after one pet begins on something before another may. */
     private static final float PET_TURN = .22f;
 
@@ -385,7 +394,7 @@ final class PlusRun {
     int petKills() { return petKills; }
     int petJoined() { return petJoined; }
     int petStrikes() { return petStrikes; }
-    static boolean floats(int pet) { return pet == JAR || pet == DUCK || pet == IMP || pet == CHERUB; }
+    static boolean floats(int pet) { return pet == JAR || pet == DUCK || pet == IMP || pet == CHERUB || pet == MINI_MAWANG; }
 
     /** A pet is hers, there and then: for looking at one, and for the tests. */
     void adopt(int kind) {
@@ -536,6 +545,16 @@ final class PlusRun {
                 }
             }
             if (it.busy <= 0) {
+                if (kind == MINI_TSUBAKIEH) {
+                    // Her swing: all within it are hit, and what stands after it stands knocked silly.
+                    for (int index = 0; index < foes.size(); index++) {
+                        Foe foe = foes.get(index);
+                        if (foe == it.at || RunLevels.boss(foe.kind) || Math.abs(foe.x + foe.wide() / 2 - it.x) > 1.5f || Math.abs(foe.y + foe.tall() - it.y) > 1.4f) continue;
+                        if (petted(foe) && !foe.flat) foe.dazed = Math.max(foe.dazed, 1.5f);
+                    }
+                    if (it.at != null && petted(it.at) && !it.at.flat && !RunLevels.boss(it.at.kind)) it.at.dazed = Math.max(it.at.dazed, 1.5f);
+                    it.at = null;
+                }
                 if (it.at != null && kind != DOG) petted(it.at);
                 if (it.at != null && kind == DOG && RunLevels.boss(it.at.kind)) petted(it.at);
                 if (kind == DUCK && ++it.drops % 3 == 0) {
@@ -646,6 +665,21 @@ final class PlusRun {
         sincePetAct = 0;
         petStrikes++;
         it.left = best.x + best.wide() / 2 < it.x;
+        if (kind == MINI_ILLYA || kind == MINI_MAWANG || kind == MINI_LUCY) {
+            // A fan of three sparkles; three short tongues of dark flame; one quick jet of water. Each from where it is, at what it chose.
+            float toX = best.x + best.wide() / 2, toY = best.y + best.tall() / 2;
+            float length = Math.max(.5f, (float) Math.hypot(toX - it.x, toY - it.y + .5f));
+            float speed = kind == MINI_LUCY ? 16 : kind == MINI_MAWANG ? 10 : 13, aim = (float) Math.atan2(toY - it.y + .5f, toX - it.x);
+            int many = kind == MINI_LUCY ? 1 : 3;
+            for (int one = 0; one < many; one++) {
+                float turn = aim + (one - (many - 1) / 2f) * (kind == MINI_MAWANG ? .22f : .3f);
+                Shot shot = shoot(kind == MINI_ILLYA ? RAY : kind == MINI_MAWANG ? FIRE : WATER, true, it.x, it.y - .5f, (float) Math.cos(turn) * speed, (float) Math.sin(turn) * speed,
+                        kind == MINI_MAWANG ? .42f : kind == MINI_LUCY ? .5f : .55f);
+                shot.pets = true;
+            }
+            if (length < 0) return;
+            return;
+        }
         if (kind == JAR || kind == MONKEY || kind == MINI_CHIKUWA || kind == MINI_RUNE || kind == CHERUB) {
             // From where it is: a blot or a flick of ink, straight; a nut or a roll, lobbed; a ray, straight and fast.
             float toX = best.x + best.wide() / 2, toY = best.y + best.tall() / 2;
@@ -1687,7 +1721,7 @@ final class PlusRun {
             if (wave == 1 && which == 0 && herd.isEmpty()) {
                 boolean waits = false;
                 for (int[] item : items) waits |= item[0] >= PET && item[0] < PET + PETS && item[1] >= one[3] && item[1] <= one[4];
-                if (!waits) items.add(new int[]{PET + (level.number + 2) % PETS, where[2] + 2, where[3] - 1, 0});
+                if (!waits) items.add(new int[]{PET + (level.number + 2) % RunPets.FOUND, where[2] + 2, where[3] - 1, 0});
             }
             boolean book = wave == WAVES && which == 1;
             // (The book of the last wave takes the place of whatever lies where it is to lie.)

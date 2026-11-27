@@ -409,6 +409,13 @@ final class RunStory {
             {"gal5", "Another one unlocked. It's in the gallery. Cringe, they call it Sloppy~♡", "H", PLAYER + "She notes that another picture has been unlocked in the gallery, whose name, Cringe, she finds beneath her. Deadpan, unimpressed, faintly offended."},
     };
 
+    /** A pet of one she has beaten can be had now, at the guild counter: she says so, once, the next moment she can. */
+    static final String[][] NEW_PET = {
+            {"npet1", "Someone small wants to come with us. The counter has her. Pets Sloppy~♡", "H", PLAYER + "She tells the player that a new pet, a little stuffed copy of someone she has just beaten, can now be had at the guild counter's pets tab. Smug, amused, secretly charmed."},
+            {"npet2", "A new pet at the counter. She looks like someone I beat. Cute Sloppy~♡", "H", PLAYER + "She mentions that a new pet that looks like an enemy she defeated is now at the guild counter. Teasing, pleased with herself."},
+            {"npet3", "The guild counter has a new pet. Go look. I'm not jealous Sloppy~♡", "H", PLAYER + "She tells the player a new pet is at the guild counter, and insists she is not jealous of it. Huffy, obviously a little jealous."},
+    };
+
     /** At the counter where her pluses buy what she keeps. */
     static final String[][] SHOP = {
             {"shop1", "The guild counter. Spend my pluses wisely Sloppy~♡", "H", PLAYER + "She opens the upgrade shop. Businesslike, possessive of her coins, teasing."},
@@ -1030,6 +1037,7 @@ final class RunStory {
         java.util.List<String[][]> groups = new java.util.ArrayList<>();
         groups.add(PROLOGUE);
         groups.add(GALLERY);
+        groups.add(NEW_PET);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
             if (intro(land) != null) groups.add(intro(land));
             if (outro(land) != null) groups.add(outro(land));

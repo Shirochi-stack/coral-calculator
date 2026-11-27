@@ -2090,7 +2090,8 @@ public class PlusRunTest {
             }
             assertEquals("land " + number, number < 3 ? 0 : 1, waiting);
         }
-        assertEquals(PlusRun.PETS, kinds.size());
+        // (Every kind that is had from the first: those of the ones she has beaten wait in no land.)
+        assertEquals(RunPets.FOUND, kinds.size());
 
         // Touched, it goes with her: one that runs keeps on the ground behind her; one that floats, in the air at her shoulder.
         for (int kind = 0; kind < PlusRun.PETS; kind++) {
@@ -2333,8 +2334,62 @@ public class PlusRunTest {
         assertEquals(2, guard.left);
     }
 
+    @Test public void theFourOfThoseSheHasBeatenEachHelpInTheirOwnWay() {
+        // Each deals with a sign near her, by what it throws or by its swing; and what it throws is its own.
+        int[] kinds = {PlusRun.MINI_TSUBAKIEH, PlusRun.MINI_ILLYA, PlusRun.MINI_MAWANG, PlusRun.MINI_LUCY};
+        int[] throwsOf = {-1, PlusRun.RAY, PlusRun.FIRE, PlusRun.WATER};
+        for (int index = 0; index < kinds.length; index++) {
+            RunLevels.Level level = flat(80);
+            level.foes.add(new int[]{RunLevels.TIMES, 25, FLOOR - 1});
+            PlusRun run = new PlusRun(level);
+            for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+            run.place(22, GROUND);
+            run.adopt(kinds[index]);
+            int most = 0;
+            boolean own = throwsOf[index] < 0;
+            for (int step = 0; step < 60 * 5 && run.flattened() == 0; step++) {
+                run.step(STEP, false, false, false);
+                int now = 0;
+                for (PlusRun.Shot shot : run.shots()) {
+                    if (!shot.pets) continue;
+                    own |= shot.kind == throwsOf[index];
+                    now++;
+                }
+                most = Math.max(most, now);
+            }
+            assertTrue("kind " + kinds[index], own);
+            assertEquals("kind " + kinds[index], 1, run.petKills());
+            // A fan of three sparkles; three tongues of flame; one jet of water; a swing throws nothing.
+            assertEquals("kind " + kinds[index], new int[]{0, 3, 3, 1}[index], most);
+        }
+        // A swing of mini Tsubakieh's: all within it are dealt with, and the one she went at; what is further off is not.
+        RunLevels.Level level = flat(80);
+        level.foes.add(new int[]{RunLevels.MINUS, 25, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.MINUS, 26, FLOOR - 1});
+        level.foes.add(new int[]{RunLevels.MINUS, 34, FLOOR - 1});
+        PlusRun run = new PlusRun(level);
+        for (PlusRun.Foe foe : run.foes()) foe.dazed = 99;
+        run.place(22, GROUND);
+        run.adopt(PlusRun.MINI_TSUBAKIEH);
+        for (int step = 0; step < 60 * 2 && run.flattened() < 2; step++) run.step(STEP, false, false, false);
+        assertEquals(2, run.flattened());
+        assertFalse(run.foes().get(2).flat);
+        // Against one of those who wait, each only helps, as every pet does: it never lands the last blow.
+        for (int kind : kinds) {
+            level = flat(80);
+            level.foes.add(new int[]{RunLevels.GUARD, 26, FLOOR - 1});
+            run = new PlusRun(level);
+            run.place(22, GROUND);
+            run.adopt(kind);
+            PlusRun.Foe boss = run.foes().get(0);
+            hold(run, 30, false, false, false);
+            assertFalse("kind " + kind, boss.flat);
+        }
+    }
+
     @Test public void theFiveSmallCopiesOfPeopleSheKnowsEachHelpInTheirOwnWay() {
-        assertEquals(10, PlusRun.PETS);
+        assertEquals(14, PlusRun.PETS);
+        assertEquals("the first ten are had from the first", 10, RunPets.FOUND);
         assertTrue(PlusRun.floats(PlusRun.IMP) && PlusRun.floats(PlusRun.CHERUB));
         assertFalse(PlusRun.floats(PlusRun.MINI_CHIKUWA) || PlusRun.floats(PlusRun.MINI_RUNE) || PlusRun.floats(PlusRun.TWIN));
         // A mini Chikuwa: a roll, lobbed, at the nearest; and while she is short of a heart, half of one back every so often, and never more than she can have.
@@ -4561,7 +4616,8 @@ public class PlusRunTest {
                             assertEquals(RunLevels.LEDGE, level.land[FLOOR - 2][spot[1]]);
                         }
                     }
-                    assertEquals((1 << PlusRun.PETS) - 1, seen);
+                    // (Every pet that is had from the first sits in a pet shop; those of the ones she has beaten in none.)
+        assertEquals((1 << RunPets.FOUND) - 1, seen);
                     assertEquals(5, low);
                     assertEquals(5, high);
                     if (inShop == null) {
@@ -7465,7 +7521,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.
