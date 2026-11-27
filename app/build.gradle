@@ -22,6 +22,14 @@ android {
         versionName '3.33.0'
     }
 
+    // The outfits are an install-time asset pack, kept out of the base module; the debug APK carries them in the app itself.
+    assetPacks = [':vanity']
+    sourceSets {
+        debug {
+            assets.srcDirs += ['../vanity/src/main/assets']
+        }
+    }
+
     buildFeatures {
         buildConfig true
     }
