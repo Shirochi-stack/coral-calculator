@@ -3272,7 +3272,7 @@ final class RunGame {
         if (now - vanityAt > 250 || now < vanityAt) {
             vanityAt = now;
             RunVanity.Keep kept = RunVanity.on(session);
-            vanityStyle = RunVanity.styleFor(RunVanity.mode(kept), RunVanity.outfit(kept), RunVanity.mode(kept) == RunVanity.GEAR ? wornNow() : null);
+            vanityStyle = RunVanity.styleFor(RunVanity.mode(kept), RunVanity.outfit(kept), RunVanity.mode(kept) == RunVanity.GEAR ? wornNow() : null, RunVanity.ears(kept), RunVanity.horns(kept));
         }
         return vanityStyle;
     }
@@ -13696,11 +13696,14 @@ final class RunGame {
 
     private RunVanity.Keep vanityKeep() { return RunVanity.on(session); }
 
-    private final RectF boutiqueAct = new RectF();
+    private final RectF boutiqueAct = new RectF(), picturesAct = new RectF();
+    private final RectF[] vanityParts = {new RectF(), new RectF()};
     private RunBoutique boutique;
 
     /** The boutique is laid over the game, with the game's voice and sounds lent to it. */
-    private void openBoutique() {
+    private void openBoutique() { openBoutique(0); }
+
+    private void openBoutique(int page) {
         if (boutique != null && !boutique.closed()) return;
         audio.hush();
         int[] edges = {Math.round(safe.left), Math.round(safe.top), Math.round(width - safe.right), Math.round(height - safe.bottom)};
@@ -13715,9 +13718,29 @@ final class RunGame {
 
             @Override public void closed() { vanityAt = -1000; }
         });
+        if (boutique != null) boutique.page(page);
     }
 
     private void vanityTouch(float x, float y) {
+        for (int part = 0; part < 2; part++) {
+            if (vanityParts[part].isEmpty() || !vanityParts[part].contains(x, y)) continue;
+            boolean ears = part == 0;
+            int now = ears ? RunVanity.ears(vanityKeep()) : RunVanity.horns(vanityKeep()), count = ears ? RunVanity.EARS.length : RunVanity.HORNS.length;
+            // The next she has, round to her own.
+            for (int step = 1; step <= count; step++) {
+                int next = (now + step) % count;
+                if (RunVanity.wearPart(vanityKeep(), ears, next)) break;
+            }
+            if (RunVanity.mode(vanityKeep()) != RunVanity.VANITY) RunVanity.setMode(vanityKeep(), RunVanity.VANITY);
+            vanityAt = -1000;
+            audio.play("star", .6f);
+            return;
+        }
+        if (!picturesAct.isEmpty() && picturesAct.contains(x, y)) {
+            audio.play("tap", .5f);
+            openBoutique(2);
+            return;
+        }
         if (!boutiqueAct.isEmpty() && boutiqueAct.contains(x, y)) {
             audio.play("tap", .5f);
             openBoutique();
@@ -13771,6 +13794,43 @@ final class RunGame {
         text.setColor(soft);
         fitted(canvas, RunVanity.MODE_DOES[mode] + "  \u00B7  it never changes what she can do", left + dp(6), top + dp(52), dp(12), across - dp(12));
         float y = top + dp(62);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        for (int part = 0; part < 2; part++) {
+            boolean ears = part == 0;
+            int now = ears ? RunVanity.ears(vanityKeep()) : RunVanity.horns(vanityKeep());
+            vanityParts[part].set(left, y, left + across, y + dp(40));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(dark ? 0xFF2F3336 : 0xFFF1F3F4);
+            canvas.drawRoundRect(vanityParts[part], dp(20), dp(20), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(soft);
+            fitted(canvas, ears ? "Ears" : "Horns", left + dp(16), vanityParts[part].centerY() + dp(5), dp(13), dp(60));
+            text.setColor(ink);
+            fitted(canvas, (ears ? RunVanity.EARS[now] : RunVanity.HORNS[now]) + "  \u203A", left + dp(76), vanityParts[part].centerY() + dp(5), dp(14.5f), across - dp(92));
+            y += dp(46);
+        }
+        float split = across * .62f;
+        boutiqueAct.set(left, y, left + split, y + dp(36));
+        picturesAct.set(left + split + dp(6), y, left + across, y + dp(36));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(CalculatorLayout.CORAL);
+        canvas.drawRoundRect(boutiqueAct, dp(18), dp(18), paint);
+        canvas.drawRoundRect(picturesAct, dp(18), dp(18), paint);
+        paint.setColor(Color.BLACK);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(Color.WHITE);
+        fitted(canvas, "Tulle & Thread, the boutique  \u203A", boutiqueAct.centerX(), boutiqueAct.centerY() + dp(5), dp(13.5f), boutiqueAct.width() - dp(20));
+        fitted(canvas, "Pictures  \u203A", picturesAct.centerX(), picturesAct.centerY() + dp(5), dp(13.5f), picturesAct.width() - dp(16));
+        y += dp(44);
+        text.setTextAlign(Paint.Align.LEFT);
+        // How she looks in it now: in the air, hurt, and with the sword in hand.
+        float tall = dp(96), feet = y + tall;
+        frame(canvas, herJump(), 1, JUMP_FRAMES, left + across * .2f, feet, tall, false);
+        frame(canvas, herLose(0), HIT, LOSE_FRAMES, left + across * .5f, feet, tall, false);
+        frame(canvas, herArmed(PlusRun.SWORD), 7, ARMED_FRAMES, left + across * .8f, feet, tall, false);
+        y = feet + dp(8);
         for (int outfit = 0; outfit < vanityRows.length; outfit++) {
             if (vanityRows[outfit] == null) vanityRows[outfit] = new RectF();
             RectF at = vanityRows[outfit];
@@ -13778,8 +13838,12 @@ final class RunGame {
                 at.setEmpty();
                 continue;
             }
-            at.set(left, y, left + across, y + dp(62));
-            y += dp(68);
+            if (y + dp(56) > safe.bottom - dp(6)) {
+                at.setEmpty();
+                continue;
+            }
+            at.set(left, y, left + across, y + dp(50));
+            y += dp(56);
             boolean hers = RunVanity.owns(vanityKeep(), outfit), on = chosen == outfit, quest = RunVanity.QUEST[outfit] >= 0, can = !hers && !quest && bank >= RunVanity.PRICES[outfit];
             plate(canvas, at, dp(16), 245);
             RunVanity.Style style = RunVanity.STYLES[outfit];
@@ -13787,16 +13851,16 @@ final class RunGame {
             paint.setStyle(Paint.Style.FILL);
             for (int dot = 0; dot < 4 && style.art == null; dot++) {
                 paint.setColor(swatch[dot]);
-                canvas.drawCircle(at.left + dp(22), at.top + dp(15) + dot * dp(10.5f) - (dot > 1 ? 0 : 0), dp(4.6f), paint);
+                canvas.drawCircle(at.left + dp(22), at.top + dp(10) + dot * dp(9.5f), dp(4f), paint);
             }
             paint.setColor(Color.BLACK);
             float words = at.left + dp(42), price = dp(86), room = at.right - words - price - dp(18);
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(ink);
-            fitted(canvas, RunVanity.NAMES[outfit], words, at.top + dp(25), dp(15.5f), room);
+            fitted(canvas, RunVanity.NAMES[outfit], words, at.top + dp(21), dp(14.5f), room);
             text.setColor(soft);
-            fitted(canvas, RunVanity.DOES[outfit], words, at.top + dp(45), dp(11.5f), room);
-            box.set(at.right - dp(12) - price, at.centerY() - dp(18), at.right - dp(12), at.centerY() + dp(18));
+            fitted(canvas, RunVanity.DOES[outfit], words, at.top + dp(39), dp(10.5f), room);
+            box.set(at.right - dp(12) - price, at.centerY() - dp(16), at.right - dp(12), at.centerY() + dp(16));
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(on ? CalculatorLayout.CORAL : hers ? (dark ? 0xFF2F3336 : 0xFFEDEEEE) : can ? CalculatorLayout.CORAL : dark ? 0xFF44292E : 0xFFFCE9EB);
             canvas.drawRoundRect(box, dp(18), dp(18), paint);
@@ -13805,23 +13869,6 @@ final class RunGame {
             text.setColor(on || can ? Color.WHITE : hers ? soft : CalculatorLayout.CORAL);
             fitted(canvas, on ? "Wearing" : hers ? "Wear" : quest ? "Quest" : "+ " + RunVanity.PRICES[outfit], box.centerX(), box.centerY() + dp(5.5f), dp(14), price - dp(14));
         }
-        text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(soft);
-        boutiqueAct.set(left, y, left + across, y + dp(36));
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(CalculatorLayout.CORAL);
-        canvas.drawRoundRect(boutiqueAct, dp(18), dp(18), paint);
-        paint.setColor(Color.BLACK);
-        text.setTextAlign(Paint.Align.CENTER);
-        text.setColor(Color.WHITE);
-        fitted(canvas, "Visit Tulle & Thread, the boutique  \u203A", boutiqueAct.centerX(), boutiqueAct.centerY() + dp(5), dp(14), boutiqueAct.width() - dp(24));
-        y += dp(44);
-        text.setTextAlign(Paint.Align.LEFT);
-        // How she looks in it now: in the air, hurt, and with the sword in hand.
-        float tall = dp(120), feet = y + dp(30) + tall;
-        frame(canvas, herJump(), 1, JUMP_FRAMES, left + across * .2f, feet, tall, false);
-        frame(canvas, herLose(0), HIT, LOSE_FRAMES, left + across * .5f, feet, tall, false);
-        frame(canvas, herArmed(PlusRun.SWORD), 7, ARMED_FRAMES, left + across * .8f, feet, tall, false);
     }
 
     /**

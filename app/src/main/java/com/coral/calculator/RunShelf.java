@@ -88,6 +88,8 @@ final class RunShelf extends FrameLayout {
         // (A picture being looked at lies over its edges too.)
         setClipToPadding(false);
         items = RunGallery.all(text(context, "gallery/pictures.tsv"), text(context, "clips/clips.tsv"));
+        // (The vanity pictures, which are in the vanity asset pack, have a shelf of their own.)
+        items.addAll(VanityPictures.items());
         try {
             String[] names = context.getAssets().list("films");
             if (names != null) java.util.Collections.addAll(written, names);
@@ -221,7 +223,7 @@ final class RunShelf extends FrameLayout {
             if (item.shelf == RunGallery.VIDEOS) shelves.addView(video(item), spaced(8));
         }
         // What was drawn for them, and then the pictures: tiles, a few to a row.
-        for (int shelf = RunGallery.BOARDS; shelf <= RunGallery.PICTURES; shelf++) {
+        for (int shelf = RunGallery.BOARDS; shelf <= RunGallery.VANITY; shelf++) {
             List<RunGallery.Item> here = new ArrayList<>();
             for (RunGallery.Item item : items) if (item.shelf == shelf) here.add(item);
             int open = 0;
@@ -458,7 +460,7 @@ final class RunShelf extends FrameLayout {
 
     /** A picture of the gallery's, with its longer side no more than about so many dots (0: as it is). */
     static Bitmap picture(Context context, String name, int longest) {
-        String path = "gallery/" + name + ".webp";
+        String path = name.startsWith("vanity/") ? name + ".webp" : "gallery/" + name + ".webp";
         try {
             BitmapFactory.Options options = new BitmapFactory.Options();
             if (longest > 0) {
