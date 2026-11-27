@@ -5,36 +5,264 @@
  "band": "prologue/songs/eleven-band-1.mp3",
  "seconds": 90,
  "beat": 0.5,
- "mix": {"voice": 0.9, "crowd": 0.5, "band": 1.0, "under": -3.7, "down": 0.1, "up": 0.2, "presence": 0.0, "dip": 0.0},
+ "mix": {
+  "voice": 0.9,
+  "crowd": 0.5,
+  "band": 1.0,
+  "under": -3.7,
+  "down": 0.1,
+  "up": 0.2,
+  "presence": 0.0,
+  "dip": 0.0
+ },
  "mix_about": "The user heard the first mix of this track (her at .9, the band held down by a third under her) and found it fine: these settings are that mix. The file in use, dist/cutscenes/opening/prologue-halgakos.wav, is the very one the user heard.",
  "scene": "She talks over the opening theme of her own show, bouncy anime pop at 120 beats a minute, straight to the viewer who followed her on her day off. She does not sing: she talks on the beat in short dry phrases, smug, bratty and teasing, looking down her nose, unhurried and pleased with herself. Full stops are clipped: no long pauses. 'zah-ko' is her taunt (Japanese 'zako', small fry), said with a drawl. 'nim' and 'sshi' are Korean honorifics.",
  "brisk": "She talks over the fast opening theme of her own show, straight to the viewer. She does not sing: she snaps the line out right on the beat, quick, crisp and dry, smug and teasing. As brisk as she can say it clearly, with no pauses between the phrases. 'zah-ko' is her taunt (Japanese 'zako', small fry). 'nim' and 'sshi' are Korean honorifics.",
  "shout": "She calls one word out over the opening theme of her own show, as loud and bright and short as she can.",
- "says": {"zaako": "zah-ko", "-nim": "nim", "-ssi": "sshi"},
+ "says": {
+  "zaako": "zah-ko",
+  "-nim": "nim",
+  "-ssi": "sshi"
+ },
  "lines": [
-  [1.5, 2.5, "Sloppy~♡", "solo"],
-  [6.25, 3.4, "One day off. One cone. You followed me anyway.", "solo"],
-  [10.0, 3.9, "Book fell. Look at the mess. Your fault? Doesn't matter.", "solo"],
-  [14.25, 3.5, "Sums grew legs. Words ran wild.", "solo"],
-  [18.0, 3.7, "Who cleans it? Me. You just stand there, zaako.", "solo"],
-  [22.0, 3.4, "Carry the one. Footnote. Focus.", "solo"],
-  [25.75, 4.0, "Thumbs out. Don't slow me down, Sloppy~♡", "solo"],
-
-  [30.25, 3.4, "Calculation! Translation! And Sloppy~♡", "solo"],
-  [33.7, 4.0, "Two plus two is four. Clap for yourself. Slowly.", "solo"],
-  [37.75, 2.6, "Every word as written. Every sum just right.", "solo"],
-  [40.4, 3.7, "Squish, Sloppy~♡ Flat as a page. Chin up.", "solo"],
-  [44.5, 3.5, "Chikuwa! Not always bread, genius.", "solo"],
-  [48.25, 3.9, "Rune! Stop crying in the ink. It's sad to watch.", "solo"],
-  [52.5, 3.4, "Illya! One heroine is plenty. Sit.", "solo"],
-  [56.25, 3.6, "Tsubakieh! Put the bat down. Normally!", "solo"],
-
-  [60.25, 3.6, "Calculation! Translation! And Sloppy~♡", "solo"],
-  [65.75, 2.9, "-nim and -ssi. I keep both. You drop them.", "solo"],
-  [68.75, 2.7, "Miss one honorific and you're Sloppy~♡", "solo"],
-  [71.75, 3.9, "Not bad. For you. Sloppy~♡", "solo"],
-  [76.0, 3.8, "Calculation! Translation! And Sloppy~♡", "solo"],
-  [80.0, 3.6, "Sloppy, sloppy, sloppy. Louder. Sloppy~♡", "solo"],
-  [84.0, 5.5, "Now where is my ice cream. I was promised. Sloppy~♡", "solo"]
- ]
+  [
+   1.5,
+   2.5,
+   "Sloppy~♡",
+   "solo"
+  ],
+  [
+   6.25,
+   3.4,
+   "One day off. One cone. You followed me anyway.",
+   "solo"
+  ],
+  [
+   10.0,
+   3.9,
+   "Book fell. Look at the mess. Your fault? Doesn't matter.",
+   "solo"
+  ],
+  [
+   14.25,
+   3.5,
+   "Sums grew legs. Words ran wild.",
+   "solo"
+  ],
+  [
+   18.0,
+   3.7,
+   "Who cleans it? Me. You just stand there, zaako.",
+   "solo"
+  ],
+  [
+   22.0,
+   3.4,
+   "Carry the one. Footnote. Focus.",
+   "solo"
+  ],
+  [
+   25.75,
+   4.0,
+   "Thumbs out. Don't slow me down, Sloppy~♡",
+   "solo"
+  ],
+  [
+   30.25,
+   3.4,
+   "Calculation! Translation! And Sloppy~♡",
+   "solo"
+  ],
+  [
+   33.7,
+   4.0,
+   "Two plus two is four. Clap for yourself. Slowly.",
+   "solo"
+  ],
+  [
+   37.75,
+   2.6,
+   "Every word as written. Every sum just right.",
+   "solo"
+  ],
+  [
+   40.4,
+   3.7,
+   "Squish, Sloppy~♡ Flat as a page. Chin up.",
+   "solo"
+  ],
+  [
+   44.5,
+   3.5,
+   "Chikuwa! Not always bread, genius.",
+   "solo"
+  ],
+  [
+   48.25,
+   3.9,
+   "Rune! Stop crying in the ink. It's sad to watch.",
+   "solo"
+  ],
+  [
+   52.5,
+   3.4,
+   "Illya! One heroine is plenty. Sit.",
+   "solo"
+  ],
+  [
+   56.25,
+   3.6,
+   "Tsubakieh! Put the bat down. Normally!",
+   "solo"
+  ],
+  [
+   60.25,
+   3.6,
+   "Calculation! Translation! And Sloppy~♡",
+   "solo"
+  ],
+  [
+   65.75,
+   2.9,
+   "-nim and -ssi. I keep both. You drop them.",
+   "solo"
+  ],
+  [
+   68.75,
+   2.7,
+   "Miss one honorific and you're Sloppy~♡",
+   "solo"
+  ],
+  [
+   71.75,
+   3.9,
+   "Not bad. For you. Sloppy~♡",
+   "solo"
+  ],
+  [
+   76.0,
+   3.8,
+   "Calculation! Translation! And Sloppy~♡",
+   "solo"
+  ],
+  [
+   80.0,
+   3.6,
+   "Sloppy, sloppy, sloppy. Louder. Sloppy~♡",
+   "solo"
+  ],
+  [
+   84.0,
+   5.5,
+   "Now where is my ice cream. I was promised. Sloppy~♡",
+   "solo"
+  ]
+ ],
+ "tongues": {
+  "ja": {
+   "lines": [
+    "Sloppy~♡",
+    "お休みはひとつ。コーンもひとつ。なのに、ついてきちゃったね。",
+    "本が落ちた。見てよ、この有様。あなたのせい？ まあ、いいけど。",
+    "足の生えた計算。暴れ出した言葉。",
+    "誰が片付けるの？ 私。あなたはそこで突っ立ってるだけ、ざぁこ。",
+    "繰り上げて、注釈、集中。",
+    "親指出して。足を引っ張らないでね、Sloppy~♡",
+    "計算！ 翻訳！ そして Sloppy~♡",
+    "二たす二は四。自分に拍手。ゆっくりね。",
+    "言葉は書いてある通りに。計算はぴったりに。",
+    "ぺちゃん、Sloppy~♡ ページみたいにぺったんこ。顎を上げて。",
+    "ちくわ！ いつもパンとは限らないでしょ、天才。",
+    "ルーン！ インクの中で泣かないの。見てて悲しくなる。",
+    "イリヤ！ ヒロインはひとりで十分。座って。",
+    "ツバキエ！ バットを下ろして。普通に！",
+    "計算！ 翻訳！ そして Sloppy~♡",
+    "「さん」も「ニム」も、私は両方つける。あなたは落とす。",
+    "敬称をひとつ忘れたら、あなたは Sloppy~♡",
+    "悪くない。あなたにしては。Sloppy~♡",
+    "計算！ 翻訳！ そして Sloppy~♡",
+    "Sloppy、Sloppy、Sloppy。もっと大きく。Sloppy~♡",
+    "さあ、私のアイスはどこ。約束したでしょ。Sloppy~♡"
+   ],
+   "says": {
+    "Sloppy": "スロッピー",
+    "Squish": "スクイッシュ",
+    "Chikuwa": "ちくわ",
+    "Rune": "ルーン",
+    "Illya": "イリヤ",
+    "Tsubakieh": "ツバキエ",
+    "Halgakos": "ハルガコス"
+   }
+  },
+  "ko": {
+   "lines": [
+    "Sloppy~♡",
+    "쉬는 날 하루. 콘 하나. 그런데 날 따라왔네.",
+    "책이 떨어졌어. 이 난장판 좀 봐. 네 탓이냐고? 상관없어.",
+    "숫자에 다리가 생겼어. 말들이 날뛰어.",
+    "누가 치우냐고? 나야. 넌 거기 멍하니 서 있기만 해, 허접.",
+    "올림 하나. 각주. 집중.",
+    "엄지 내놔. 날 방해하지 마, Sloppy~♡",
+    "계산! 번역! 그리고 Sloppy~♡",
+    "이 더하기 이는 사. 스스로 박수 쳐. 천천히.",
+    "모든 말은 쓰인 그대로. 모든 계산은 딱 맞게.",
+    "꾹, Sloppy~♡ 종이처럼 납작. 턱 들어.",
+    "치쿠와! 맨날 빵은 아니거든, 천재야.",
+    "루네! 잉크 속에서 그만 울어. 보기 슬프잖아.",
+    "일리야! 주인공은 한 명이면 충분해. 앉아.",
+    "츠바키에! 배트 내려놔. 평범하게!",
+    "계산! 번역! 그리고 Sloppy~♡",
+    "님도 씨도, 난 둘 다 붙여. 넌 빼먹지.",
+    "호칭 하나만 빼먹어도 넌 Sloppy~♡",
+    "나쁘지 않아. 너치곤. Sloppy~♡",
+    "계산! 번역! 그리고 Sloppy~♡",
+    "Sloppy, Sloppy, Sloppy. 더 크게. Sloppy~♡",
+    "자, 내 아이스크림은 어디 있지. 약속했잖아. Sloppy~♡"
+   ],
+   "says": {
+    "Sloppy": "슬로피",
+    "Squish": "스퀴시",
+    "Chikuwa": "치쿠와",
+    "Rune": "루네",
+    "Illya": "일리야",
+    "Tsubakieh": "츠바키에",
+    "Halgakos": "할가코스"
+   }
+  },
+  "zh": {
+   "lines": [
+    "Sloppy~♡",
+    "难得休息一天。就一个甜筒。你还是跟来了。",
+    "书掉下来了。看看这一团糟。你的错？无所谓。",
+    "算式长出了腿。词语到处乱跑。",
+    "谁来收拾？我。你只会站在那儿，杂鱼。",
+    "进一位。脚注。专心。",
+    "拇指伸出来。别拖我后腿，Sloppy~♡",
+    "计算！翻译！还有 Sloppy~♡",
+    "二加二等于四。给自己鼓掌。慢一点。",
+    "每个词都照原样。每道算式都刚刚好。",
+    "啪叽，Sloppy~♡ 扁得像一页纸。抬起下巴。",
+    "竹轮！不是什么时候都是面包，天才。",
+    "露恩！别在墨水里哭了。看着真难受。",
+    "伊莉雅！一个女主角就够了。坐下。",
+    "椿！把球棒放下。正常点！",
+    "计算！翻译！还有 Sloppy~♡",
+    "“大人”和“先生”，我两个都用。你却丢掉。",
+    "漏掉一个敬称，你就是 Sloppy~♡",
+    "还不错。对你来说。Sloppy~♡",
+    "计算！翻译！还有 Sloppy~♡",
+    "Sloppy，Sloppy，Sloppy。再大声点。Sloppy~♡",
+    "现在，我的冰淇淋在哪。你答应过的。Sloppy~♡"
+   ],
+   "says": {
+    "Sloppy": "斯洛皮",
+    "Squish": "啪叽",
+    "Chikuwa": "竹轮",
+    "Rune": "露恩",
+    "Illya": "伊莉雅",
+    "Tsubakieh": "椿",
+    "Halgakos": "哈尔加科斯"
+   }
+  }
+ }
 }

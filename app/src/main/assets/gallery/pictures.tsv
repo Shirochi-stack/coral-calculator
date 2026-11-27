@@ -1,2 +1,102 @@
 # The pictures of the gallery that open as the story goes on: a row each, with tabs between: name, title, the word shown while it is locked, and its rule (see RunGallery).
 # The picture itself is gallery/NAME.webp. More pictures are more rows here and nothing else.
+pre_01_ice_cream	One day off	At the very start	open:1
+pre_02_book_lands	The book lands	At the very start	open:1
+pre_03_lettera	Welcome to Lettera	At the very start	open:1
+pre_04_walking_signs	Signs with legs	At the very start	open:1
+pre_05_pluses	Her output burst	At the very start	open:1
+l1_01_contents_village	Contents Village	Reach land 1	open:1
+l1_02_first_squish	Squish	Win land 1	land:1
+l1_03_first_flag	The first flag	Win land 1	land:1
+l3_01_brick_bread	Bread turned brick	Reach land 3	open:3
+l3_02_names_stay_names	Names stay names	Win land 3	land:3
+l3_03_fresh_bread	Fresh bread by the flag	Win land 3	land:3
+l6_01_guild_exam	The guild exam	Win land 6	land:6
+l7_01_silent_archive	The Silent Archive	Reach land 7	open:7
+l7_02_quiet_library	A quiet library	Reach land 7	open:7
+l9_01_first_letter	A letter read	Reach land 9	open:9
+l9_02_friends_forever	Friends. Forever.	Win land 9	land:9
+l9_03_ink_shield	Ink wall	Win land 9	land:9
+l12_01_pen_butler	The fountain-pen butler	Win land 12	land:12
+l13_01_heart_plaza	Heart-Flutter Plaza	Reach land 13	open:13
+l13_02_arrows_turned	Her hearts turn arrows	Reach land 13	open:13
+l18_01_compliment	Nine thousand compliments	Reach land 18	open:18
+l18_02_nobody_said_no	Nobody said no	Win land 18	land:18
+l18_03_a_little_sad	A little sad	Win land 18	land:18
+l19_01_index_mountains	The Index Mountains	Reach land 19	open:19
+l19_02_another_us	Another of us	Reach land 19	open:19
+l24_01_cut_bridge	The cut bridge	Reach land 24	open:24
+l24_02_bat_duel	Batting practice	Reach land 24	open:24
+l24_03_bat_broken	Normal No. 2 breaks	Win land 24	land:24
+l24_04_bread_again	Friends can be baked again	Win land 24	land:24
+l25_01_burden	A burden shared	Reach land 25	open:25
+l25_02_ink_sea	The sea of ink	Reach land 25	open:25
+l30_01_last_page	The Last Page	Reach land 30	open:30
+l30_02_zero	The Zero	Reach land 30	open:30
+l30_03_sixty_years	Sixty years of notes	Reach land 30	open:30
+l30_04_zero_shatters	The Zero shatters	Win land 30	land:30
+l30_05_cast_everyone	Cast: everyone	Win land 30	land:30
+l30_06_loved	You're complimenting me?	Win land 30	land:30
+l30_07_rune_watching	Still watching	Win land 30	land:30
+l30_08_bread_for_all	Everyone gets bread	Win land 30	land:30
+v2_01_volume_two_falls	Volume Two falls	Reach land 31	open:31
+v2_02_home_run	Home run	Reach land 31	open:31
+v2_03_inside_again	Inside a book again	Reach land 31	open:31
+v2_04_the_queen	The queen speaks	Reach land 31	open:31
+l40_01_gokhae	How very literal of her	Reach land 40	open:40
+l40_02_our_words	Our words are Our own	Reach land 40	open:40
+l40_03_fan_down	Fan lowered	Reach land 40	open:40
+l40_04_mistranslation	A mistranslation...	Win land 40	land:40
+l40_05_we_can_be_heard	We can be heard	Win land 40	land:40
+l41_01_gazette	The Gazette Press	Reach land 41	open:41
+l50_01_spoiler	Spoiler alert	Reach land 50	open:50
+l50_02_black_bar	Cover the page	Reach land 50	open:50
+l51_01_between_lines	Between the lines	Reach land 51	open:51
+l51_02_sleeping_sword	A swordswoman asleep	Reach land 51	open:51
+l60_01_woken	A guard who is woken	Reach land 60	open:60
+l60_02_cut_and_nap	Cut and nap	Reach land 60	open:60
+l60_03_company_returns	The company returns	Win land 60	land:60
+l61_01_slime_margins	The Slime Margins	Reach land 61	open:61
+l70_01_king_slime	King Slime	Reach land 70	open:70
+l70_02_three_cuts	Three cuts	Reach land 70	open:70
+l70_03_bread_cannon	Bread cannon	Win land 70	land:70
+l70_04_i_drew_them	I drew them all	Win land 70	land:70
+l71_01_audition	The audition	Reach land 71	open:71
+l71_02_crossed_out	A name crossed out	Reach land 71	open:71
+l80_01_demon_king	A demon king needs no one	Reach land 80	open:80
+l80_02_not_her_line	That's her line	Reach land 80	open:80
+l80_03_cheering	The bread is here	Reach land 80	open:80
+l80_04_what_took_so_long	What took you so long	Win land 80	land:80
+l80_05_we_seal_it	Cast: everyone	Win land 80	land:80
+l80_06_share_a_page	Heroine: everyone	Win land 80	land:80
+l80_07_proofreading	A thousand and one pages	Win land 80	land:80
+l80_08_ice_cream_wish	Now, my ice cream	Win land 80	land:80
+v3_01_volume_three	Volume Three	Reach land 81	open:81
+v3_02_walk_with_you	This time I walk with you	Reach land 81	open:81
+v3_04_unwriting_wave	The unwriting wave	Reach land 81	open:81
+v3_05_back_to_back	Back to back	Win land 81	land:81
+l90_01_pledge	The pledge	Reach land 90	open:90
+l90_02_ice_cream_revenge	Ice cream revenge	Reach land 90	open:90
+l91_01_dragon_library	The Dragon's Library	Reach land 91	open:91
+l91_02_someone_small	Someone small lives here	Reach land 91	open:91
+l100_01_last_land	The last land	Reach land 100	open:100
+l100_02_everyone_together	Everyone, together	Reach land 100	open:100
+l100_03_dawn	Dawn on the page	Win land 100	land:100
+mt_01_rises	The Mother Tongue rises	An ending	ending:4
+mt_02_page_storm	Page storm	An ending	ending:4
+mt_03_ink_fire	Ink fire	An ending	ending:4
+mt_04_wings_torn	Wings of pages	An ending	ending:4
+bad_01_white	Everything unwritten	An ending	ending:1
+bad_02_empty_friends	Where are they?	An ending	ending:1
+bad_03_mawang_far	Far away, watching	An ending	ending:1
+bad_04_book_shut	The book shuts	An ending	ending:1
+bad_05_last_sum	The last sum	An ending	ending:1
+bad_06_unwritten_plaza	An unwritten plaza	An ending	ending:1
+true_01_everyone	Everyone, on the last page	An ending	ending:2
+true_02_ice_cream	My mint ice cream	An ending	ending:2
+true_03_going_home	Going home	An ending	ending:2
+true_04_volume_three_not_due	Not due yet	An ending	ending:2
+true_05_heroine_everyone	Heroine: everyone	An ending	ending:2
+true_06_friends_picnic	A picnic of friends	An ending	ending:2
+true_07_bat_mended	A mended bat	An ending	ending:2
+true_08_read_to_the_end	Read to the end	An ending	ending:2

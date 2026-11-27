@@ -299,7 +299,9 @@ public final class CalculatorLayout extends ViewGroup {
             }
         }
         for (int i = 0; i < tools.length; i++) ((IconButton) tools[i]).setColor(i < 2 ? (enabled ? 0xFFE5E7E7 : INK) : (enabled ? 0xFF9CA2A6 : MUTED));
-        games.setColor(enabled ? 0xFFE5E7E7 : INK);
+        // The way into the games stands out from the line icons: white on her coral.
+        games.setBackground(pill(CalculatorLayout.CORAL));
+        games.setColor(Color.WHITE);
     }
 
     /** Fully rounded ends: a circle when square, a pill when a key is wider than it is tall. */
