@@ -73,7 +73,9 @@ final class VanityArt {
         Bitmap out = from.copy(Bitmap.Config.ARGB_8888, true);
         String[] names = {RunVanity.HORNS_ART[style.horns], RunVanity.EARS_ART[style.ears]};
         int[] pixels = null, patch = null, mask = null;
-        for (String name : names) {
+        for (int which = 0; which < names.length; which++) {
+            String name = names[which];
+            boolean hornPart = which == 0;
             if (name == null) continue;
             Bitmap picture = load("vanity/heads/" + name + "/" + sheet + ".webp"), where = load("vanity/heads/" + name + "/" + sheet + "_m.webp");
             if (picture == null || where == null || picture.getWidth() != out.getWidth() || picture.getHeight() != out.getHeight()
@@ -90,14 +92,20 @@ final class VanityArt {
             for (int i = 0; i < n; i++) {
                 int m = mask[i] >>> 24;
                 if (m == 0) continue;
-                int p = patch[i], o = pixels[i], pa = p >>> 24, oa = o >>> 24;
-                int alpha = oa + (pa - oa) * m / 255;
-                int rgb = o & 0xFFFFFF;
-                if (pa > 0) {
-                    int r = (o >> 16 & 255) + ((p >> 16 & 255) - (o >> 16 & 255)) * m / 255, g = (o >> 8 & 255) + ((p >> 8 & 255) - (o >> 8 & 255)) * m / 255,
-                            b = (o & 255) + ((p & 255) - (o & 255)) * m / 255;
-                    rgb = oa == 0 ? p & 0xFFFFFF : r << 16 | g << 8 | b;
+                int p = patch[i], o = pixels[i];
+                // The loose edge of a horn's place (a mask of 90): only what is left of the old horn goes, and nothing is put there.
+                if (m < 200) {
+                    if (hornPart && hornEdge(o)) pixels[i] = 0;
+                    continue;
                 }
+                int pa = p >>> 24, oa = o >>> 24;
+                // Where a part leaves nothing, a horn's last pixels (an outfit's frame has them a pixel off) go, and her hair's edge stays.
+                if (hornPart && pa < 20) {
+                    if (hornEdge(o)) pixels[i] = 0;
+                    continue;
+                }
+                int alpha = pa;
+                int rgb = pa > 0 ? p & 0xFFFFFF : o & 0xFFFFFF;
                 pixels[i] = alpha << 24 | rgb;
             }
             picture.recycle();
@@ -106,6 +114,21 @@ final class VanityArt {
         if (pixels == null) return from;
         out.setPixels(pixels, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
         return out;
+    }
+
+    /** Whether a pixel is anywhere on a horn, its soft edge included (a little pinker and lighter than the horn itself). */
+    private static boolean hornEdge(int pixel) {
+        if (pixel >>> 24 == 0) return false;
+        // (A faint pixel is the soft edge of a line: in the ring round a horn's place it is what is left of the horn's outline.)
+        if (pixel >>> 24 < 200) return true;
+        int r = pixel >> 16 & 255, g = pixel >> 8 & 255, b = pixel & 255;
+        return r < 190 && g < 130 && b < 180 && r - g < 110 && b + 12 >= g;
+    }
+
+    /** Whether a pixel is the dark purple of her horns (and not the pink of her hair). */
+    private static boolean horny(int pixel) {
+        int r = pixel >> 16 & 255, g = pixel >> 8 & 255, b = pixel & 255;
+        return r < 140 && g < 100 && b < 150 && b + 6 >= g;
     }
 
     private Bitmap load(String path) {

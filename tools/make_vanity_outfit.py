@@ -229,7 +229,9 @@ def pack(outfit, threshold=0.80):
             if best[1] is None:
                 bad.append({"job": name, "sheet": sheet, "index": idx, "iou": 0})
                 continue
-            frame = best[1].convert("RGBa").resize((cw, ch), Image.LANCZOS).convert("RGBA")
+            # (the frame's own place in the cell: the cell is bigger than the frame it holds, and not of its shape)
+            ax, ay = fr["at"][0] - x, fr["at"][1] - y
+            frame = best[1].crop((ax, ay, ax + big.size[0], ay + big.size[1])).convert("RGBa").resize((cw, ch), Image.LANCZOS).convert("RGBA")
             # her own pixels' shape is the shape: anything the fit left outside her silhouette's neighbourhood is cut
             keep = cv2.dilate((np.array(orig.getchannel("A")) > 20).astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
             a = np.array(frame)

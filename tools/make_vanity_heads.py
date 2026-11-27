@@ -152,16 +152,43 @@ def pack(variant):
             # Back to the frame's own pixels, in the crop box: the cell is cut down to the enlarged crop, then to the crop's size.
             region = best[1].crop((fr["at"][0] - x, fr["at"][1] - y, fr["at"][0] - x + big.size[0], fr["at"][1] - y + big.size[1]))
             var = region.convert("RGBa").resize((bw, bh), Image.LANCZOS).convert("RGBA")
+            # (the faint haze at the edges of a redraw is not part of anything: only what is plainly drawn is a patch)
+            va = np.array(var)
+            va[..., 3] = np.where(va[..., 3] < 120, 0, va[..., 3])
+            # (and the model leaves ghosts, thin broken lines where a removed part was: pieces smaller than a part are dropped)
+            # (her school collar is navy and white: a part is never that, and an outfit has a collar of its own)
+            navy = (va[..., 2].astype(int) > va[..., 0].astype(int) + 12) & (va[..., 2] > 70)
+            va[..., 3] = np.where(navy, 0, va[..., 3])
+            solid_va = va[..., 3] > 0
+            va[..., 3] = np.where(components(solid_va, 24), va[..., 3], 0)
+            var = Image.fromarray(va)
             o = np.array(ref).astype(np.int32)
             v = np.array(var).astype(np.int32)
             alpha_diff = np.abs(o[..., 3] - v[..., 3]) > 90
             both = (o[..., 3] > 128) & (v[..., 3] > 128)
             colour_diff = both & (np.abs(o[..., :3] - v[..., :3]).sum(axis=2) > 110)
-            diff = alpha_diff | colour_diff
-            diff = cv2.morphologyEx(diff.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
-            diff = components(diff, 30)
-            # (widened by a good margin: the same part on an outfit's frame sits a pixel or two off, and what is left of it must be inside the patch)
-            diff = cv2.dilate(diff.astype(np.uint8), np.ones((17, 17), np.uint8)) > 0
+            ys_ = np.nonzero((o[..., 3] > 128).any(axis=1))[0]
+            if variant in ("nohorns", "elf"):
+                # Only the horns' own place: every pixel that is a horn in her frame, and (for elf ears) what the redraw adds there. The rest of the head
+                # is drawn again by the model a little differently, and that drift is not a change.
+                r_, g_, b_ = o[..., 0], o[..., 1], o[..., 2]
+                horn = (o[..., 3] > 100) & (r_ < 140) & (g_ < 100) & (b_ < 150) & (b_ + 6 >= g_) & (r_ >= g_ + 8)
+                near = cv2.dilate(horn.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0
+                added = components(alpha_diff & near, 8)
+                diff = horn | added
+            else:
+                # Ears: the top of the head; what the part changed in colour or in outline, from the strongest differences only.
+                diff = alpha_diff | (both & (np.abs(o[..., :3] - v[..., :3]).sum(axis=2) > 170))
+                diff = cv2.morphologyEx(diff.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
+                diff = components(diff, 30)
+                if len(ys_):
+                    diff[ys_[0] + int((ys_[-1] - ys_[0]) * 0.34):] = False
+            # Two regions: the tight one, where the part's own pixels go (a little wider than the part), and, for horns, a loose one round it,
+            # where only the last dark pixels of the old horns are taken off (an outfit's frame has them a pixel or two off).
+            tight = cv2.dilate(diff.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
+            loose = (cv2.dilate(diff.astype(np.uint8), np.ones((31, 31), np.uint8)) > 0) & ~tight if variant in ("nohorns", "elf") else np.zeros_like(tight)
+            diff = tight | loose
+            code = np.where(tight, 255, np.where(loose, 90, 0)).astype(np.uint8)
             if not diff.any():
                 continue
             if sheet not in patch:
@@ -176,11 +203,11 @@ def pack(variant):
                 for_x0, for_x1 = max(0, bx), min(cw, bx + bw)
                 if for_x0 >= for_x1:
                     continue
-                row = diff[yy, for_x0 - bx:for_x1 - bx]
+                row = tight[yy, for_x0 - bx:for_x1 - bx]
                 patch[sheet][py + fy, px + for_x0:px + for_x1][row] = np.array(var)[yy, for_x0 - bx:for_x1 - bx][row].astype(np.uint8)
-                mask[sheet][py + fy, px + for_x0:px + for_x1][row] = 255
+                mask[sheet][py + fy, px + for_x0:px + for_x1] = np.maximum(mask[sheet][py + fy, px + for_x0:px + for_x1], code[yy, for_x0 - bx:for_x1 - bx])
     for sheet in patch:
-        m = cv2.GaussianBlur(mask[sheet], (0, 0), 0.7)
+        m = mask[sheet]
         pr = patch[sheet].copy()
         Image.fromarray(pr, "RGBA").save(out / (sheet + ".webp"), quality=88, alpha_quality=95, method=6)
         mk = np.zeros(m.shape + (4,), np.uint8)
@@ -230,9 +257,50 @@ def register_part(cell, ref_mask):
     return Image.fromarray(fitted, "RGBa").convert("RGBA"), v
 
 
+def offsets(outfit_name):
+    """
+    Where an outfit's head sits against her own: for every frame, the shift (dx, dy, up to 4 pixels) that makes its face line up with the
+    face of the frame it redraws, so that a part drawn on her own frame can be laid on the outfit's. One table per outfit:
+    vanity/src/main/assets/vanity/heads/offsets_OUTFIT.txt, a line "sheet frame dx dy" for each frame.
+    """
+    lines = []
+    for name, (cols, rows, cw, ch) in SHEETS.items():
+        base = outfit.sheet_image(name)
+        new = Image.open(ROOT / "vanity/src/main/assets/vanity" / outfit_name / (name + ".webp")).convert("RGBA")
+        for idx in range(cols * rows):
+            box = ((idx % cols) * cw, (idx // cols) * ch, (idx % cols) * cw + cw, (idx // cols) * ch + ch)
+            a = np.array(base.crop(box)).astype(np.int32)
+            b = np.array(new.crop(box)).astype(np.int32)
+            al = a[..., 3] > 128
+            if al.sum() < 400:
+                continue
+            ys = np.nonzero(al.any(axis=1))[0]
+            top, bottom = ys[0], ys[0] + int((ys[-1] - ys[0]) * 0.42)
+            # the face and hair, below the ears and horns, above the chin
+            y0 = top + int((bottom - top) * 0.45)
+            best = (1e18, 0, 0)
+            for dy in range(-4, 5):
+                for dx in range(-4, 5):
+                    shifted = np.roll(np.roll(b, dy, axis=0), dx, axis=1)
+                    region = (slice(y0, bottom), slice(None))
+                    ra, rb = a[region], shifted[region]
+                    both = (ra[..., 3] > 128) & (rb[..., 3] > 128)
+                    if both.sum() < 50:
+                        continue
+                    # (the cost: the difference where both are drawn, and a heavy cost for where only one is)
+                    diff = np.abs(ra[..., :3] - rb[..., :3]).sum(axis=2)[both].mean() + 60.0 * ((ra[..., 3] > 128) ^ (rb[..., 3] > 128)).mean() * 255
+                    if diff < best[0]:
+                        best = (diff, dx, dy)
+            # the shift to put the uniform's patch on the outfit: the other way
+            lines.append("%s %d %d %d" % (name, idx, -best[1], -best[2]))
+    HEADS.mkdir(parents=True, exist_ok=True)
+    (HEADS.parent / "heads" / ("offsets_%s.txt" % outfit_name)).write_text("\n".join(lines) + "\n")
+    print(outfit_name, len(lines), "frames; shifts:", sorted({tuple(l.split()[2:]) for l in lines})[:12])
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["jobs", "pack"])
-    ap.add_argument("variant", choices=list(WHAT))
+    ap.add_argument("what", choices=["jobs", "pack", "offsets"])
+    ap.add_argument("variant")
     a = ap.parse_args()
-    {"jobs": lambda: make_jobs(a.variant), "pack": lambda: pack(a.variant)}[a.what]()
+    {"jobs": lambda: make_jobs(a.variant), "pack": lambda: pack(a.variant), "offsets": lambda: offsets(a.variant)}[a.what]()
