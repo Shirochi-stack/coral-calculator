@@ -885,7 +885,7 @@ public class FightTest {
     // On the floor
 
     @Test public void lyingOnTheFloorHerBodyRestsOnTheGroundAndDoesNotFloat() {
-        assertEquals(6, FightFrames.FLOOR.length);
+        assertEquals(8, FightFrames.FLOOR.length);
         for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
             for (int index = 0; index < FightFrames.FLOOR.length; index++) {
                 short[] at = FightFrames.FRAMES[kind][FightFrames.FLOOR[index]];

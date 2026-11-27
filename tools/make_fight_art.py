@@ -304,8 +304,9 @@ def faced(parts, want):
     return out, scales
 
 
-# The frames in which she is on the floor: lying, knocked out, and getting up as far as one knee.
-FLOOR = "LYING KO SIT_UP KNEEL_UP PROP HALF_UP".split()
+# The frames in which she is on the floor: lying, knocked out, getting up as far as one knee, and on her knees or
+# sitting when she has lost a round on time.
+FLOOR = "LYING KO SIT_UP KNEEL_UP PROP HALF_UP LOSE1 LOSE2".split()
 
 
 def resting(picture):
@@ -314,7 +315,16 @@ def resting(picture):
     part of her. Her feet are not what touches the ground then, and something that hangs lower than she lies (a ring
     of keys, a strap) must not be taken for it, or she would float above the floor by as much as it hangs.
     """
-    across = (numpy.asarray(picture.getchannel("A")) > 128).sum(axis=1)
+    # Only the largest piece of the picture is her: what lies apart from her (Chikuwa's baguette and brick bread on the
+    # floor in front of her, Halgakos's book fallen open) is drawn lower, nearer the one who looks, and is not what she
+    # rests on.
+    solid = numpy.asarray(picture.getchannel("A")) > 128
+    labels, count = scipy.ndimage.label(solid, structure=numpy.ones((3, 3)))
+    if count > 1:
+        sizes = numpy.bincount(labels.ravel())
+        sizes[0] = 0
+        solid = labels == sizes.argmax()
+    across = solid.sum(axis=1)
     return int(numpy.where(across >= max(8, across.max() * .25))[0].max()) + 1
 
 
