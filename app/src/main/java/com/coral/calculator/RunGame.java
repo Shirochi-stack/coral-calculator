@@ -563,6 +563,8 @@ final class RunGame {
     private int seenHeals, seenWinds, seenHidden;
     /** Foreground pieces, drawn in front of her for depth. */
     private Bitmap foreground;
+    /** Her swimming: four pictures (two strokes, a dive, an ink bolt). */
+    private Bitmap swim;
     private float healAge = 9;
     private int seenClangs, seenBroken;
     private float clangAge = 9, shatterAge = 9;
@@ -5961,6 +5963,15 @@ final class RunGame {
             }
             seenHidden = run.hiddenBeaten();
         }
+        // Deep water, the first time: in blue she can swim in it; without it she cannot breathe.
+        if (run != null && screen == PLAY && run.inWater() && captionLeft <= 0 && !audio.speaking()) {
+            boolean blue = run.has(PlusRun.BLUE);
+            String said = blue ? "run_wat1" : "run_wat2";
+            if (session.tally(said) == 0) {
+                session.keep(said, 1);
+                speak(RunStory.WATER[blue ? 0 : 1], true);
+            }
+        }
         // Her second wind: she says so.
         if (run != null && run.secondWinds() != seenWinds) {
             if (run.secondWinds() > seenWinds && screen == PLAY) {
@@ -10995,12 +11006,14 @@ final class RunGame {
             int kind = one[0];
             boolean holds = roomHolds() && roomCardAge < 2.4f;
             String title = kind == RunLevels.ARENA ? "Cellar: three waves" : kind == RunLevels.GAME ? "Mini game: catch the pluses" : kind == RunLevels.RANGE
-                    ? "Mini game: the range" : kind == RunLevels.TRAMPLE ? "Mini game: flatten them" : kind == RunLevels.STASH ? LOOK_NAMES[Math.max(0, one[13])] + ": a stash"
+                    ? "Mini game: the range" : kind == RunLevels.TRAMPLE ? "Mini game: flatten them" : kind == RunLevels.LAGOON ? "A lagoon: deep water"
+                    : kind == RunLevels.HIDEOUT ? "A hideout: someone hidden" : kind == RunLevels.STASH ? LOOK_NAMES[Math.max(0, one[13])] + ": a stash"
                     : LOOK_NAMES[Math.max(0, one[13])] + ": a way through";
             String words = kind == RunLevels.ARENA ? (one[10] != 0 ? "An arena. Each wave is different; something sleeps under the last." : "An arena. Each wave is different; lose a life and the wave starts again.")
                     : kind == RunLevels.GAME ? "10 seconds. Catch " + PlusRun.ENOUGH + " for the prize." : kind == RunLevels.RANGE
                     ? "12 seconds, and an ink gun that never empties. Hit " + PlusRun.ENOUGH + "." : kind == RunLevels.TRAMPLE
-                    ? "15 seconds. They keep coming: flatten " + PlusRun.ENOUGH + "." : kind == RunLevels.STASH ? (one[14] == RunLevels.HOLDS_PET ? "A pet waits in it, by its chest." : one[14] == RunLevels.HOLDS_SHRINE ? "A shrine stands by its chest." : "Find the way through to its chest.")
+                    ? "15 seconds. They keep coming: flatten " + PlusRun.ENOUGH + "." : kind == RunLevels.LAGOON ? "Take the blue ribbon to swim; a chest lies on the bottom."
+                    : kind == RunLevels.HIDEOUT ? "Its hidden boss waits at the far end. What it guards is rare." : kind == RunLevels.STASH ? (one[14] == RunLevels.HOLDS_PET ? "A pet waits in it, by its chest." : one[14] == RunLevels.HOLDS_SHRINE ? "A shrine stands by its chest." : "Find the way through to its chest.")
                     : "Spikes, signs, and a chest by the far door.";
             float show = Math.min(1, roomCardAge / .25f) * (holds ? 1 : Math.max(0, Math.min(1, (3.4f - roomCardAge) / .4f)));
             if (holds) canvas.drawColor(Color.argb(Math.round(90 * show), 20, 16, 30));
@@ -12066,6 +12079,16 @@ final class RunGame {
         }
         if (beaming) weapon = PlusRun.TABLET;
         if (RunLoot.ultimate(perks.item) && weapon == RunArms.kindOf(perks.item)) quillAura(canvas, feetX, feetY, tall, leftward);
+        // Swimming: two strokes by turns, a dive, and an ink bolt as it goes; bubbles rising off her.
+        if (run.swimming()) {
+            if (swim == null) swim = BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_swim);
+            int stroke = sinceUse < .25f ? 3 : run.speedDown() > 1.8f ? 2 : (int) (clock * 4) % 2;
+            frame(canvas, dressed("swim", formed(swim, swims)), stroke, 4, feetX, feetY + tall * .1f, tall, leftward);
+            bubbles(canvas, feetX + (leftward ? -1 : 1) * tall * .3f, feetY - tall * .7f, tall);
+            paint.setAlpha(255);
+            return;
+        }
+        if (run.inWater()) bubbles(canvas, feetX, feetY - tall * .85f, tall);
         // In the middle of one of her moves, it is drawn, whatever she holds.
         int move = run.moveShown();
         if (move != PlusRun.NO_MOVE) {
@@ -12102,6 +12125,41 @@ final class RunGame {
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
         }
         paint.setAlpha(255);
+    }
+
+    // Water
+
+    /** Bubbles rising from about her head, three at a time. */
+    private void bubbles(Canvas canvas, float x, float y, float tall) {
+        stroke.setColor(0xFFE8F6FF);
+        stroke.setStrokeWidth(Math.max(1, tall * .015f));
+        for (int one = 0; one < 3; one++) {
+            float age = (clock * .9f + one * .33f) % 1;
+            stroke.setAlpha(Math.round(220 * (1 - age)));
+            canvas.drawCircle(x + (float) Math.sin(age * 9 + one) * tall * .06f, y - age * tall * .9f, tall * (.025f + one * .012f), stroke);
+        }
+        stroke.setAlpha(255);
+    }
+
+    /** Her breath, under her level, while she is in deep water without the blue ribbon: a bubble for each second of it left. */
+    private void drawBreath(Canvas canvas, float left, float top) {
+        if (!run.inWater() || run.has(PlusRun.BLUE)) return;
+        int bubbles = (int) Math.ceil(Math.max(0, run.breath()));
+        float size = dp(9);
+        box.set(left, top, left + size * 2.2f * 8 + dp(16), top + dp(22));
+        plate(canvas, box, dp(11), 235);
+        for (int one = 0; one < 8; one++) {
+            float x = left + dp(12) + one * size * 2.2f, y = top + dp(11);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(one < bubbles ? 0xFF6FB8FF : dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+            canvas.drawCircle(x, y, size * .8f, paint);
+        }
+        if (run.breath() <= 0 && (int) (clock * 6) % 2 == 0) {
+            stroke.setColor(0xFFE0362F);
+            stroke.setStrokeWidth(dp(2));
+            canvas.drawRoundRect(box, dp(11), dp(11), stroke);
+        }
+        paint.setColor(Color.BLACK);
     }
 
     // Hideouts
@@ -12398,7 +12456,22 @@ final class RunGame {
 
     private Bitmap movesSheet() {
         if (moves == null) moves = BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_moves);
-        return dressed("moves", moves);
+        return dressed("moves", formed(moves, movesDyed));
+    }
+
+    /** Her swimming and her moves in the colour of each form she has been drawn in, kept as they are made. */
+    private final android.util.SparseArray<Bitmap> swims = new android.util.SparseArray<>(), movesDyed = new android.util.SparseArray<>();
+
+    /** A sheet of her in the colour she is drawn in now: as it is in her own colour, or dyed once and kept. */
+    private Bitmap formed(Bitmap from, android.util.SparseArray<Bitmap> kept) {
+        int form = drawn();
+        if (form == 0) return from;
+        Bitmap dyed = kept.get(form);
+        if (dyed == null) {
+            dyed = dyed(from, form);
+            kept.put(form, dyed);
+        }
+        return dyed;
     }
 
     /**
@@ -13094,6 +13167,7 @@ final class RunGame {
         if (RunArms.heavy(run.weapon()) || anySlot || run.energy() < PlusRun.ENERGY_MOST - .5f) drawEnergy(canvas, x + dp(128), under);
         if (run.dpMaking() > 0 || run.dp() > 0 || run.divineLeft() > 0) drawDivine(canvas, x + dp(232), under);
         if (anySlot) drawSlots(canvas);
+        drawBreath(canvas, x, under + dp(26));
         under += dp(30);
         if (run.pet() >= 0) {
             float face = dp(run.herd().size() > 2 ? 30 : 42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);

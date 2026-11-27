@@ -128,6 +128,15 @@ final class RunLevels {
     static final int STASH = 0, PASSAGE = 1, ARENA = 2, GAME = 3;
     /** And a hideout, where a hidden boss waits: behind a crack that only a strong blow breaks, or up on a ledge out of reach of a jump. */
     static final int HIDEOUT = 8;
+    /** And a lagoon: a hall full of deep water, swum in with the blue ribbon (one lies by its door), with creatures that swim and a chest at the bottom. */
+    static final int LAGOON = 9;
+    /** The first land that may have a lagoon; and which do: one land in four, and every land of the Unread Shore. */
+    static final int LAGOONS_FROM = 10;
+
+    static boolean lagoonIn(int number) {
+        if (number < LAGOONS_FROM || number >= OPEN_TO) return false;
+        return chapterOf(number) == 10 || number % 4 == 1;
+    }
     /** The first land that may have a hideout. */
     static final int HIDEOUTS_FROM = 8;
 
@@ -1441,6 +1450,7 @@ final class RunLevels {
             builder.rest();
             // Its hideout, in the lands that have one.
             if (stretch == stretches * 3 / 8 && hideoutIn(number)) builder.hideoutDoor(builder.at - 3);
+            if (stretch == stretches - 2 && lagoonIn(number)) builder.door(LAGOON, builder.at - 3, false);
             // After the first flag a book or a brush and what it is good against; after the second an ink gun and a crowd; and in half the lands another after the third.
             if (stretch == stretches / 4 || stretch == stretches / 2 || stretch == stretches * 3 / 4 && number % 2 == 1) {
                 boolean gallery = stretch != stretches / 4;
@@ -1643,10 +1653,11 @@ final class RunLevels {
                 builder.rest();
                 builder.after();
             }
-            // Its hideout, half way along, in the lands that have one.
+            // Its hideout, half way along, in the lands that have one; and its lagoon, near the end.
             if (stretch == stretches / 2 && hideoutIn(number)) {
                 builder.hideoutDoor(builder.at - 3);
             }
+            if (stretch == stretches - 2 && lagoonIn(number)) builder.door(LAGOON, builder.at - 3, false);
             // Its village, a little way in.
             if (shaped && stretch == 1) {
                 builder.stretch(VILLAGE);
@@ -1893,7 +1904,7 @@ final class RunLevels {
                     continue;
                 }
                 // (A hideout is laid after the rest, so that the places a land had before there were hideouts keep their numbers.)
-                if (kind == HIDEOUT) continue;
+                if (kind == HIDEOUT || kind == LAGOON) continue;
                 wall(2);
                 int from = at, to = from + wide - 1, far = -1, middle = (from + to) / 2;
                 for (int column = from; column <= to; column++) {
@@ -1919,6 +1930,7 @@ final class RunLevels {
                 level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], 0, FLOOR, ceiling, lookOf(number, level.rooms.size()), 0});
             }
             for (int[] want : wanted) if (want[0] == HIDEOUT) hideout(want);
+            for (int[] want : wanted) if (want[0] == LAGOON) lagoon(want);
             for (int[] want : built) house(want);
         }
 
@@ -1939,6 +1951,40 @@ final class RunLevels {
             level.foes.add(new int[]{RunUniques.hiddenOf(chapterOf(number)), to - 5, FLOOR - 1, 1, 0, 2});
             pluses(from + 3, from + 6, FLOOR - 1);
             level.rooms.add(new int[]{HIDEOUT, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], 0, FLOOR, ceiling, -1, 0});
+        }
+
+        /**
+         * A lagoon: a dry landing by the door, with the blue ribbon on it; then deep water to the far wall, ten rows of it, with pillars of
+         * coral standing up and hanging down, pluses all through it, a chest on the bottom at the far end, and creatures that swim.
+         */
+        void lagoon(int[] want) {
+            int number = level.number, ceiling = FLOOR - ROOM_TALL;
+            wall(2);
+            int from = at;
+            open(40);
+            int to = at - 1;
+            wall(2);
+            level.land[FLOOR - 1][from + 1] = ENTRY;
+            for (int column = from + 6; column <= to; column++) for (int row = ceiling + 3; row < FLOOR; row++) level.land[row][column] = WATER;
+            // Coral: standing up from the bottom, and hanging from the top.
+            for (int row = FLOOR - 4; row < FLOOR; row++) level.land[row][from + 14] = BLOCK;
+            for (int row = ceiling + 3; row < ceiling + 7; row++) level.land[row][from + 22] = BLOCK;
+            for (int row = FLOOR - 5; row < FLOOR; row++) level.land[row][from + 30] = BLOCK;
+            level.items.add(new int[]{PlusRun.FORM + PlusRun.BLUE, from + 3, FLOOR - 1, 0});
+            pluses(from + 8, from + 12, FLOOR - 6);
+            pluses(from + 16, from + 20, FLOOR - 2);
+            pluses(from + 24, from + 28, ceiling + 8);
+            pluses(from + 32, from + 36, FLOOR - 7);
+            level.items.add(new int[]{PlusRun.CHEST, to - 2, FLOOR - 1, 0, 60});
+            // Its creatures, of the four that swim, more of them further on.
+            int many = 3 + Math.min(4, number / 25);
+            for (int one = 0; one < many; one++) {
+                int kind = RunUniques.WATER_FIRST + (number + one) % RunUniques.WATER_COUNT;
+                int column = from + 10 + one * (to - from - 14) / many, row = ceiling + 5 + (one * 3 + number) % 6;
+                while (level.land[row][column] != WATER && column < to - 1) column++;
+                level.foes.add(new int[]{kind, column, row, 1, 0, 2});
+            }
+            level.rooms.add(new int[]{LAGOON, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], 0, FLOOR, ceiling, -1, 0});
         }
 
         /** Its door: up on a high ledge, out of reach of any jump but the third or a dash; or behind a strong crack in the ground's wall. */

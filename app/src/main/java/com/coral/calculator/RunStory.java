@@ -585,6 +585,12 @@ final class RunStory {
             {"hid2", "A boss nobody was meant to find. Mine now Sloppy~♡", "H", PLAYER + "She has just beaten a hidden boss in a secret hideout and claims its treasure. Breathless, triumphant, smug."},
     };
 
+    /** Water: the first time she is in deep water, in blue and without it. */
+    static final String[][] WATER = {
+            {"wat1", "Blue ribbon, deep water. I can swim in this Sloppy~♡", "H", PLAYER + "She dives into deep water wearing the blue ribbon and finds she can swim and breathe. Delighted, surprised, bubbly."},
+            {"wat2", "Can't breathe down here! The blue ribbon, quick Sloppy~♡", "H", PLAYER + "She has fallen into deep water without the blue ribbon and is holding her breath. Urgent, flustered, a little panicked."},
+    };
+
     /** A new level: she says so, glowing. */
     static final String[][] LEVEL = {
             {"lvl1", "Level up! Feel that? That's me getting stronger Sloppy~♡", "H", PLAYER + "She has just gone up a level in a game and glows with new power. Thrilled, smug, flexing."},
@@ -1221,6 +1227,7 @@ final class RunStory {
         groups.add(SKILLS);
         groups.add(MOVES);
         groups.add(SECRETS);
+        groups.add(WATER);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
