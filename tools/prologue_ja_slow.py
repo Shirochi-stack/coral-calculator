@@ -21,11 +21,62 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 D = pathlib.Path(r"C:\Users\ADMIN\Documents\ChatGPT\Calculator APP\dist\cutscenes")
 RATE = 48000
-A, B = 5.0, 30.0
+A, B = 5.0, 23.0
+ADD = 8.0  # seconds added: four bars of the music at 120 to the minute, so that the music can be extended by repeating them without changing its tempo
 
 
 def mapped(t, f):
     return t if t <= A else A + (t - A) * f if t <= B else t + (B - A) * (f - 1)
+
+
+def factor():
+    """The slowing of the picture between 5 and 23 s: the seconds added, over the seconds there are."""
+    return (B - A + ADD) / (B - A)
+
+
+def beat_phase(band):
+    """Where, in the first half second, the beats of the music fall (seconds), from the steps of its energy."""
+    import scipy.signal
+
+    x = numpy.abs(band[: RATE * 30])
+    hop = RATE // 200
+    env = numpy.sqrt((x[: len(x) // hop * hop].reshape(-1, hop) ** 2).mean(axis=1))
+    env = numpy.maximum(0, numpy.diff(env))
+    score = [env[k::100].sum() for k in range(100)]
+    return int(numpy.argmax(score)) / 200
+
+
+def loop_join(band):
+    """
+    Where to insert four bars (8 s) of the music that came before, inside 5 to 23 s: at a beat, and where the music just before the join is most
+    like the music just before the same bars one time earlier, so that the repeat is a musical loop. Gives the second at which the copy begins.
+    """
+    import scipy.signal
+
+    phase = beat_phase(band)
+
+    def spectrum(a, b):
+        seg = band[int(a * RATE):int(b * RATE)]
+        f, _, z = scipy.signal.stft(seg, RATE, nperseg=4096)
+        s = numpy.log(numpy.abs(z).mean(axis=1) + 1e-6)[(f > 60) & (f < 5000)]
+        return (s - s.mean()) / (s.std() + 1e-9)
+
+    best, at = -9, None
+    k = 0
+    while True:
+        t = phase + k * .5
+        k += 1
+        if t < A + ADD:
+            continue
+        if t > B:
+            break
+        score = float((spectrum(t - 1, t) * spectrum(t - 1 - ADD, t - ADD)).mean())
+        # (a bar line is better than a beat: the score is raised a little where the second is a whole bar from the music's start)
+        if abs(((t - phase) / 2) - round((t - phase) / 2)) < 1e-6:
+            score += .05
+        if score > best:
+            best, at = score, t
+    return at, best, phase
 
 
 def spec(f):
@@ -39,22 +90,23 @@ def spec(f):
     for line in base["lines"]:
         at, room = line[0], line[1]
         new_at = mapped(at, f)
-        new_room = room * f if A < at < B and at + room <= B + .5 else room
+        new_room = mapped(at + room, f) - new_at
         lines.append([round(new_at, 2), round(new_room, 2)] + line[2:])
     base["lines"] = lines
     base["seconds"] = seconds
     base["out"] = "opening/prologue-halgakos-slow"
-    # the band, stretched over 5 to 30 s (pitch kept) and the rest moved
+    # the band: at its own speed and pitch, with four bars repeated inside 5 to 23 s (crossfaded 40 ms on the beat)
     band = cf.read_audio(D / base["band"])
-    cut = lambda a, b: band[int(a * RATE):int(b * RATE)]
-    middle = cf.stretch(cut(A, B), 1 / f, RATE)
+    at, score, phase = loop_join(band)
     fade = int(.04 * RATE)
-    parts = [cut(0, A), middle, cut(B, 90)]
-    out = parts[0]
-    for part in parts[1:]:
+    first, copy, rest = band[: int(at * RATE)], band[int((at - ADD) * RATE):int(at * RATE)], band[int(at * RATE):]
+    out = first
+    for part in (copy, rest):
         ramp = numpy.linspace(0, 1, fade)
         out = numpy.concatenate([out[:-fade], out[-fade:] * (1 - ramp) + part[:fade] * ramp, part[fade:]])
     soundfile.write(str(D / "opening" / "band-slow.wav"), out[: seconds * RATE], RATE)
+    print(f"music: the {ADD:g} s from {at - ADD:.2f} to {at:.2f} s are said again after {at:.2f} s (beats fall at {phase:.2f} s + n x 0.5; the likeness of the two joins {score:.2f})")
+    (D / "opening" / "band-slow.txt").write_text(f"repeated: {at - ADD:.2f}-{at:.2f} s, inserted at {at:.2f} s, length {ADD} s\n", encoding="utf-8")
     base["band"] = "opening/band-slow.wav"
     (ROOT / "tools" / "cutscenes" / "prologue-slow-mc.json").write_text(json.dumps(base, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print("seconds", seconds, "added", round(extra, 2), "s; band", round(len(out) / RATE, 2), "s")

@@ -137,8 +137,8 @@ def tracks():
     print("\n".join(notes))
 
 
-F = 1.45
-A, B = 5.0, 30.0
+F = 26 / 18
+A, B = 5.0, 23.0
 
 
 def slow_track():

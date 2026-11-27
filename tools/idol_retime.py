@@ -1,4 +1,4 @@
-﻿"""
+"""
 Re-times Halgakos's lines of the idol song into the windows where the mouths of the film move, without touching a frame.
 
     python tools/idol_retime.py SHAPE LANG [--review]      SHAPE 9x16 or 16x9; LANG en, ja, ko or zh
@@ -98,6 +98,61 @@ def assign(lengths, phrases, starts):
     return placed
 
 
+def shortest_fit(group_lengths, window, cap=1.15):
+    """Which form of each line of a group, so that the group fits a mouth at a natural pace: (levels, total seconds, whether it fits). group_lengths: for each line, its lengths from the longest form to the shortest."""
+    level = [0] * len(group_lengths)
+    total = lambda: sum(g[l] for g, l in zip(group_lengths, level)) + .08 * (len(level) - 1)
+    while total() > cap * window:
+        options = [i for i, g in enumerate(group_lengths) if level[i] + 1 < len(g)]
+        if not options:
+            break
+        level[max(options, key=lambda i: group_lengths[i][level[i]])] += 1
+    return level, total(), total() <= cap * window
+
+
+def assign_forms(lengths, phrases, starts, drop=7.0):
+    """The same as assign, with the forms each line can be said in: a group of lines that cannot be made to fit a mouth costs a great deal, a line left out much less."""
+    n, m = len(lengths), len(phrases)
+    inf = 1e9
+    dp = numpy.full((n + 1, m + 1), inf)
+    back = {}
+    dp[0][0] = 0
+    for i in range(n + 1):
+        for j in range(m + 1):
+            here = dp[i][j]
+            if here >= inf:
+                continue
+            if j < m:
+                cost = here + .9 * (phrases[j][1] - phrases[j][0])
+                if cost < dp[i][j + 1]:
+                    dp[i][j + 1], back[(i, j + 1)] = cost, (i, j, 0)
+                for k in range(1, 4):
+                    if i + k > n or abs(phrases[j][0] - starts[i + k - 1]) > 4.0:
+                        break
+                    window = phrases[j][1] - phrases[j][0]
+                    levels, total, fits = shortest_fit(lengths[i:i + k], window)
+                    if not fits and (k > 1 or window >= .78):
+                        cost = here + 40 + 20 * (total - 1.15 * window)
+                    elif not fits:
+                        cost = here + 40
+                    else:
+                        cost = here + .5 * sum(levels) + 1.5 * abs(phrases[j][0] - starts[i]) + 2 * abs(numpy.log(max(.3, total / window)))
+                    if cost < dp[i + k][j + 1]:
+                        dp[i + k][j + 1], back[(i + k, j + 1)] = cost, (i, j, k)
+            if i < n:
+                cost = here + drop
+                if cost < dp[i + 1][j]:
+                    dp[i + 1][j], back[(i + 1, j)] = cost, (i, j, -1)
+    placed, i, j = [None] * n, n, m
+    while (i, j) != (0, 0):
+        pi, pj, k = back[(i, j)]
+        if k > 0:
+            for u in range(pi, i):
+                placed[u] = pj
+        i, j = pi, pj
+    return placed
+
+
 def stretch_to(sound, seconds):
     factor = (len(sound) / RATE) / max(.2, seconds)
     return cf.stretch(sound, factor, RATE), factor
@@ -107,11 +162,11 @@ def main():
     global INTRO
     shape, lang = sys.argv[1], sys.argv[2]
     film = "prologue" if shape == "prologue" else "idol"
-    spec = json.loads((ROOT / "tools" / "cutscenes" / f"{film}-mc.json").read_text(encoding="utf-8"))
+    spec = json.loads((ROOT / "tools" / "cutscenes" / ("idol-variants-mc.json" if film == "idol" else f"{film}-mc.json")).read_text(encoding="utf-8"))
     songs = D / "idol" / "songs" if film == "idol" else D / "opening"
     out_dir = D / ("idol" if film == "idol" else "opening") / "retimed"
     out_dir.mkdir(exist_ok=True)
-    stem = "idol-halgakos" if film == "idol" else "prologue-halgakos"
+    stem = "idol-variants" if film == "idol" else "prologue-halgakos"
     vocals_path = D / "idol" / f"idol-{shape}-vocals.wav" if film == "idol" else D / "opening" / "opening-seedance-vocals.wav"
     bed_path = D / "idol" / f"idol-{shape}-bed.wav" if film == "idol" else D / "opening" / "opening-seedance-bed.wav"
     if film == "prologue":
@@ -121,7 +176,11 @@ def main():
     voice = voice.mean(axis=1) if voice.ndim > 1 else voice
     voice = scipy.signal.resample_poly(voice, RATE, rate).astype("float32")
     times = json.loads(pathlib.Path(str(base) + ".times.json").read_text(encoding="utf-8"))
-    units = units_of(spec)
+    SONG = 45  # the lines of the song itself; the rest of the spec are its shorter forms
+    units = units_of({"lines": spec["lines"][:SONG]}) if film == "idol" else units_of(spec)
+    import idol_variants as iv
+    order = sorted(iv.V)
+    forms_of = {i: [45 + 2 * order.index(i), 45 + 2 * order.index(i) + 1] for i in order} if film == "idol" else {}
     cut = []
     for unit in units:
         a = min(times[i][0] for i in unit)
@@ -136,33 +195,22 @@ def main():
     else:
         lengths_en = lengths
     movable = [k for k, u in enumerate(units) if times[u[0]][0] >= INTRO - .3]
-    # The short calls (Squish! Sloppy~ Louder) are put first, each on the nearest mouth that begins within 1.8 s of where it was said: a call and its answer go one to a mouth, so that no mouth is left silent between them.
     starts_of = {k: times[units[k][0]][0] for k in movable}
-    taken, pinned = set(), {}
-    for k in movable:
-        if lengths_en[k] <= 1.7:
-            best = None
-            for j, (a, b) in enumerate(phrases):
-                if j in taken or b - a < .45 or abs(a - starts_of[k]) > 1.8:
-                    continue
-                if best is None or abs(a - starts_of[k]) < abs(phrases[best][0] - starts_of[k]):
-                    best = j
-            if best is not None:
-                taken.add(best)
-                pinned[k] = best
-    rest = [k for k in movable if k not in pinned]
-    free = [j for j in range(len(phrases)) if j not in taken]
-    got = assign([lengths_en[k] for k in rest], [phrases[j] for j in free], [starts_of[k] for k in rest])
-    pick_of = dict(pinned)
-    for k, g in zip(rest, got):
-        pick_of[k] = free[g] if g is not None else None
+    def lengths_of(k):
+        i = units[k][0]
+        base_len = times[i][1] - times[i][0] + (.12 if spec["lines"][i][3] != "crowd" else .35)
+        out = [base_len] + [times[j][1] - times[j][0] + .12 for j in forms_of.get(i, [])]
+        return out
+
+    got = assign_forms([lengths_of(k) for k in movable], phrases, [starts_of[k] for k in movable])
+    pick_of = {k: g for k, g in zip(movable, got)}
     pick = [pick_of[k] for k in movable]
     track = numpy.zeros(90 * RATE, dtype=numpy.float32)
     rows, notes = [], []  # rows: (begins, ends, number of the unit)
     W = {"en": [l[2] for l in spec["lines"]], **{k: spec["tongues"][k]["lines"] for k in ("ja", "ko", "zh")}}
 
     def words(language, u):
-        return " ".join(W[language][i] for i in units[u])
+        return W[language][u] if film == "idol" and u >= 0 else " ".join(W[language][i] for i in units[u])
 
     # the intro stays where it was said
     for k, (a, b, piece) in enumerate(cut):
@@ -171,53 +219,84 @@ def main():
             track[s:s + len(piece)] += piece[: len(track) - s]
             rows.append((a, b, k))
             notes.append(f"{a:5.1f} s intro, left where it was said: nobody's mouth moves ({words(lang, k)})")
+    # Each line has its own length and, where there are shorter forms of it, theirs: forms[k] = [(index of the line in the spec, its piece)].
+    def piece_of(i):
+        a0 = times[i][0]
+        b0 = times[i][1] + (.12 if spec["lines"][i][3] != "crowd" else .35)
+        return voice[int(a0 * RATE):int(b0 * RATE)]
+
+    forms = {k: [(units[k][0], cut[k][2])] + [(i2, piece_of(i2)) for i2 in forms_of.get(units[k][0], [])] for k in range(len(units))}
+    cap = 1.15  # the most a line may be stretched: it is said at a natural pace
     byphrase = {}
     for u, ph in zip(movable, pick):
         if ph is None:
             a0 = cut[u][0]
+            if film == "idol":
+                # (No voice over a closed mouth: a line with no mouth to say it in is left out.)
+                notes.append(f"{a0:5.1f} s no mouth window for it within 4 s: LEFT OUT ({W[lang][units[u][0]]})")
+                continue
             s0 = int(a0 * RATE)
             track[s0:s0 + len(cut[u][2])] += cut[u][2][: len(track) - s0]
-            rows.append((a0, a0 + len(cut[u][2]) / RATE, u))
-            notes.append(f"{a0:5.1f} s no mouth window within 3 s: left where it was said ({words('en', u)})")
+            rows.append((a0, a0 + len(cut[u][2]) / RATE, units[u][0]))
+            notes.append(f"{a0:5.1f} s no mouth window within 4 s: left where it was said ({W[lang][units[u][0]]})")
         else:
             byphrase.setdefault(ph, []).append(u)
     free = 0.0
+    over_count, shortened = 0, []
     for ph, us in sorted(byphrase.items()):
         a, b = phrases[ph]
-        total = sum(lengths[u] for u in us) + .1 * (len(us) - 1)
-        scale = (b - a) / total
+        level = {u: 0 for u in us}
+        size = lambda u: len(forms[u][level[u]][1]) / RATE
+        total = lambda: sum(size(u) for u in us) + .08 * (len(us) - 1)
+        while total() > cap * (b - a):
+            candidates = [u for u in us if level[u] + 1 < len(forms[u])]
+            if not candidates:
+                break
+            level[max(candidates, key=size)] += 1
+        for u in list(us):
+            if total() > cap * (b - a) and size(u) > b - a and len(us) == 1 and b - a < .78:
+                # a mouth shorter than any word she has: left silent
+                notes.append(f"{a:5.1f}-{b:5.1f} s mouth too short for a word ({W[lang][units[u][0]]}): left silent")
+                us.remove(u)
+                over_count += 0
+        if not us:
+            continue
+        stretch_all = max(.85, min(cap, total() / (b - a)))
         at = a
         for u in us:
-            # (Squeezed or slowed by LIMITS at most: a line that will not fit runs past its window and is said so, never crammed.)
-            share = min(max(lengths[u] * scale, lengths[u] / LIMITS[1]), lengths[u] / LIMITS[0])
-            piece, factor = stretch_to(cut[u][2], share)
-            over = at + share - b
+            i2, piece0 = forms[u][level[u]]
+            share = len(piece0) / RATE / stretch_all
+            piece, factor = stretch_to(piece0, share)
             at = max(at, free)
             s = int(at * RATE)
             track[s:s + len(piece)] += piece[: len(track) - s]
-            rows.append((at, at + len(piece) / RATE, u))
-            flag = f" <-- does not fit: runs {over:.1f} s past its window, needs trimming" if over > .25 else ""
-            if at + share > 90:
-                flag += " <-- runs past the end of the film"
-            notes.append(f"{at:5.1f}-{at + share:5.1f} s phrase {a:.1f}-{b:.1f}: x{factor:.2f}  {words(lang, u)}{flag}")
+            rows.append((at, at + len(piece) / RATE, i2))
+            over = at + share - b
+            bad = over > .12
+            over_count += 1 if bad else 0
+            if level[u]:
+                shortened.append(f"{W['en'][units[u][0]]} -> {W[lang][i2]}")
+            flag = f" <-- RUNS {over:.1f} s PAST ITS MOUTH even in its shortest form" if bad else ""
+            notes.append(f"{at:5.1f}-{at + share:5.1f} s phrase {a:.1f}-{b:.1f}: x{factor:.2f}  form {level[u]}  {W[lang][i2]}{flag}")
             free = at + share + .08
             at += share + .08
-    # A mouth that is left with no line (0.6 s or more) is given a call she already has: "Squish!" for a short one, "Louder, zaako." for a longer, said again, not a new lyric.
+    # A mouth that is left with no line (0.6 s or more) is given a call she already has, said again: "Squish!" for a short one, "Louder" for a longer.
     short_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Squish!") and spec["lines"][u[0]][3] == "call" and times[u[0]][0] >= INTRO)
     long_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Louder"))
     filled = []
     for j, (a, b) in enumerate(phrases):
-        if j in byphrase or b - a < .6:
+        if j in byphrase or b - a < .78:
             continue
-        k = long_unit if b - a >= 1.2 else short_unit
-        piece, factor = stretch_to(cut[k][2], min(max(b - a, lengths[k] / LIMITS[1]), lengths[k] / LIMITS[0]))
+        k = long_unit if b - a >= 1.5 else short_unit
+        piece, factor = stretch_to(cut[k][2], min(max(b - a, len(cut[k][2]) / RATE / cap), len(cut[k][2]) / RATE / .85))
         s = int(a * RATE)
         track[s:s + len(piece)] += piece[: len(track) - s]
-        rows.append((a, a + len(piece) / RATE, k))
+        rows.append((a, a + len(piece) / RATE, units[k][0]))
         filled.append(f"{a:.1f}-{b:.1f}")
-        notes.append(f"{a:5.1f}-{b:5.1f} s mouth with no line: filled with her call again, x{factor:.2f}  {words(lang, k)}")
+        notes.append(f"{a:5.1f}-{b:5.1f} s mouth with no line: filled with her call again, x{factor:.2f}  {W[lang][units[k][0]]}")
     bare = [f"{a:.1f}-{b:.1f}" for j, (a, b) in enumerate(phrases) if j not in byphrase and f"{a:.1f}-{b:.1f}" not in filled]
-    notes.append("mouths still with no voice (shorter than 0.6 s): " + (", ".join(bare) if bare else "none"))
+    notes.append("mouths still with no voice (shorter than any word she has): " + (", ".join(bare) if bare else "none"))
+    notes.append(f"RESULT {shape} {lang}: lines over their mouth: {over_count}")
     peak = numpy.abs(track).max()
     track *= .9 / peak if peak > .9 else 1
     soundfile.write(out_dir / f"{film}-{shape}-{lang}-voice.wav", track, RATE)
