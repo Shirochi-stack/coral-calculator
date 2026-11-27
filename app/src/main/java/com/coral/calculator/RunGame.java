@@ -534,6 +534,14 @@ final class RunGame {
      * chapter's look; the twelve rose weapons; the thirty armours; the thirty accessories; and the smiths' twelve pieces.
      */
     private Bitmap lootIcons;
+    /** Her skill tree's screen: open over everything, from where; the facts it shows, read again when they change; the button on the map and
+     * on the pause; her active slots on the HUD; and how many times divine power has come in this land, as last seen. */
+    private RunTree tree;
+    private boolean treeOpen;
+    private int treeFrom, seenDivines;
+    private final RunTree.Facts treeFacts = new RunTree.Facts();
+    private final RectF skillButton = new RectF(), skillPause = new RectF();
+    private final RectF[] slotButtons = {new RectF(), new RectF(), new RectF()}, slotPlaces = {new RectF(), new RectF(), new RectF()};
     private static final int LOOT_ICON = 128, LOOT_COLUMNS = 16, ROSE_ICONS = 144, ARMOUR_ICONS = 156, ACCESSORY_ICONS = 186, SMITH_ICONS = 216, ADDITION_ICON = 228;
     /** Her bag, open over the screen: from where; which tab, which page; the thing looked at (its place in the bag) or a worn slot; and its parts. */
     private boolean bagOpen;
@@ -812,6 +820,11 @@ final class RunGame {
         // Her level: her blows land harder for it, a hurt costs less, and now and then it is a heart more.
         kept.level = herLevel();
         kept.hearts += RunLoot.hearts(kept.level);
+        // What her skill tree gives, and the actives in her slots. (Kept from before there was a tree, she has the points her level gives,
+        // all to spend.)
+        java.util.BitSet taken = skillsTaken();
+        kept.skills = RunSkills.built(taken);
+        kept.slotted = RunSkills.slotted(taken, skillSlots());
         // What she wears of what she has found.
         kept.worn = RunLoot.worn(session.note("run_worn"));
         // The weapon found that she has taken in hand: in her backpack as its kind, and what she begins every land with.
@@ -3360,19 +3373,26 @@ final class RunGame {
                 lands[from + index].set(x, down, x + side, down + side);
             }
         }
-        // (The tabs leave room at the end of their row for the button that opens her backpack.)
-        float tab = Math.min(dp(132), (safe.width() - dp(44) - dp(84)) / 2);
+        // (The tabs leave room at the end of their row for the buttons that open her skill tree and her backpack.)
+        float tab = Math.min(dp(132), (safe.width() - dp(44) - dp(84) - dp(52)) / 2);
         tabs[0].set(safe.left + dp(18), safe.top + dp(80), safe.left + dp(18) + tab, safe.top + dp(114));
         tabs[1].set(tabs[0].right + dp(8), tabs[0].top, tabs[0].right + dp(8) + tab, tabs[0].bottom);
         gearButton.set(safe.right - dp(18) - dp(76), tabs[0].top, safe.right - dp(18), tabs[0].bottom);
+        skillButton.set(gearButton.left - dp(8) - dp(44), tabs[0].top, gearButton.left - dp(8), tabs[0].bottom);
         // (With the third volume there are three of them, narrower.)
-        float third = Math.min(dp(96), (safe.width() - dp(36) - dp(84) - dp(12)) / 3);
+        float third = Math.min(dp(96), (safe.width() - dp(36) - dp(84) - dp(52) - dp(12)) / 3);
         for (int volume = 0; volume < 3; volume++) {
             tabs3[volume].set(safe.left + dp(18) + volume * (third + dp(6)), tabs[0].top, safe.left + dp(18) + volume * (third + dp(6)) + third, tabs[0].bottom);
         }
         // The button that changes what she holds: over the one that uses it, a little smaller.
         float swaps = Math.max(dp(44), size * .66f);
         swapButton.set(strikeButton.centerX() - swaps / 2, strikeButton.top - dp(12) - swaps, strikeButton.centerX() + swaps / 2, strikeButton.top - dp(12));
+        // Her active slots, in a row to the left of it, the first leftmost.
+        float slotSide = Math.max(dp(40), size * .6f), slotGap = dp(6), slotsFrom = swapButton.left - between - 3 * slotSide - 2 * slotGap;
+        for (int slot = 0; slot < 3; slot++) {
+            float slotLeft = slotsFrom + slot * (slotSide + slotGap);
+            slotPlaces[slot].set(slotLeft, swapButton.centerY() - slotSide / 2, slotLeft + slotSide, swapButton.centerY() + slotSide / 2);
+        }
         turnTo(page);
         // The button that lets her down through a thin ledge: over the arrows and between them, where the thumb that holds them reaches it,
         // and clear of where she walks. It keeps its place whether it can do anything or not.
@@ -3451,7 +3471,12 @@ final class RunGame {
             audio.play("tap", .3f);
             return true;
         }
-        // Whatever sheet is open over the screen is what Back closes: her backpack, or the colours opened out.
+        // Whatever sheet is open over the screen is what Back closes: her skill tree, her backpack, or the colours opened out.
+        if (treeOpen) {
+            treeOpen = false;
+            audio.play("tap", .3f);
+            return true;
+        }
         if (packOpen) {
             packOpen = false;
             audio.play("tap", .3f);
@@ -4088,7 +4113,7 @@ final class RunGame {
             float screenX = (atX - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
             if (x < screenX - tile * .75f || x > screenX + tile * .75f || y < feet - tile * 1.6f || y > feet + tile * .1f) continue;
             // (Not where a button lies over them.)
-            if (stallButton.contains(x, y) || downButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y)) return false;
+            if (stallButton.contains(x, y) || downButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y) || slotAt(x, y) >= 0) return false;
             int stage = talkStage();
             session.keep("run_talk_" + stage, session.tally("run_talk_" + stage) | 1 << index);
             audio.play("tap", .5f);
@@ -5810,6 +5835,17 @@ final class RunGame {
             session.keep("run_title_said", 1);
             speak(RunStory.TITLE_LINE[0], false);
         }
+        // The first time the map is open with points waiting in her skill tree: she says so.
+        if (screen == MAP && video == null && !treeOpen && captionLeft <= 0 && personLeft <= 0 && session.tally("run_title_said") != 0 && session.tally("run_skills_said") == 0
+                && clock > 4 && !audio.speaking() && skillsLeft() > 0) {
+            session.keep("run_skills_said", 1);
+            speak(RunStory.SKILLS[0], false);
+        }
+        // Divine power, the first time it comes in a land.
+        if (run != null && run.divines() != seenDivines) {
+            if (seenDivines == 0 && run.divines() == 1 && screen == PLAY) speak(RunStory.SKILLS[1], true);
+            seenDivines = run.divines();
+        }
         if (screen == PLAY && video == null) {
             clearedAge += seconds;
             diaryAge += seconds;
@@ -7267,6 +7303,10 @@ final class RunGame {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) keyed = false;
         float x = event.getX(), y = event.getY();
+        if (treeOpen) {
+            treeTouch(event);
+            return;
+        }
         if (packOpen) {
             if (action == MotionEvent.ACTION_DOWN) packTouch(x, y);
             return;
@@ -7360,6 +7400,15 @@ final class RunGame {
                 buzz(true);
                 return;
             }
+            // Her active slots: a touch calls one on.
+            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+                int slot = slotAt(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()));
+                if (slot >= 0) {
+                    callSlot(slot);
+                    held(event);
+                    return;
+                }
+            }
             // The button that changes what she holds: a tap gives her the other of the last two; held, it opens her backpack.
             {
                 int index = event.getActionIndex(), finger = event.getPointerId(index);
@@ -7445,6 +7494,9 @@ final class RunGame {
                 audio.play("tap", .5f);
                 buzz(false);
                 openPack(MAP);
+            } else if (skillButton.contains(x, y)) {
+                buzz(false);
+                openTree(MAP);
             } else if (goButton.contains(x, y)) {
                 // On with the furthest land she has reached.
                 audio.play("tap", .5f);
@@ -7528,6 +7580,10 @@ final class RunGame {
             if (screen == PAUSED && packButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 openPack(PAUSED);
+                return;
+            }
+            if (screen == PAUSED && skillPause.contains(x, y)) {
+                openTree(PAUSED);
                 return;
             }
             for (int index = 0; index < pillCount; index++) {
@@ -7805,6 +7861,7 @@ final class RunGame {
                 if (perks.colours != 0 && (colourButton.contains(x, y) || nextButton.contains(x, y))) continue;
                 if (run != null && (run.atStall() || run.door() >= 0 || run.petOffer() >= 0 || run.spot() >= 0) && stallButton.contains(x, y)) continue;
                 if (run != null && run.nextUp() != PlusRun.UNARMED && swapButton.contains(x, y)) continue;
+                if (slotAt(x, y) >= 0) continue;
                 // (On Lucy's back, the button over the jump is her breath.)
                 if (finale == RIDE && x > stallButton.left - dp(10) && x < stallButton.right + dp(10) && y > stallButton.top - dp(10) && y < stallButton.bottom + dp(6)) {
                     breath = true;
@@ -7852,7 +7909,7 @@ final class RunGame {
         if (does == 0 || does == RunKeys.BACK) return false;
         int fresh = keys.press(keyCode, down);
         if (down) keyed = true;
-        boolean sheet = packOpen || bagOpen || huntsOpen || smithOpen || marketOpen || fanOpen;
+        boolean sheet = packOpen || bagOpen || huntsOpen || smithOpen || marketOpen || fanOpen || treeOpen;
         if (screen == PLAY && run != null && !sheet) {
             // (Once the story being told as the land begins is over: said over it, it would not be heard.)
             if (fresh != 0 && number == 1 && session.tally("run_keys_said") == 0) keysHintDue = true;
@@ -7861,6 +7918,7 @@ final class RunGame {
                 buzz(false);
             }
             if ((fresh & RunKeys.EXTRA) != 0) overJump();
+            for (int slot = 0; slot < PlusRun.SLOTS; slot++) if ((fresh & RunKeys.SKILL_1 << slot) != 0) callSlot(slot);
             if ((fresh & RunKeys.DOWN) != 0 && !run.atStall() && run.door() >= 0) {
                 idle();
                 run.enter();
@@ -7926,6 +7984,10 @@ final class RunGame {
 
     /** The mouse wheel: in her bag, the next page or the one before. */
     boolean wheel(float turned) {
+        if (treeOpen && turned != 0) {
+            tree().wheel(turned, width / 2f, height / 2f);
+            return true;
+        }
         if (!bagOpen || turned == 0) return false;
         bagPage = Math.max(0, bagPage + (turned < 0 ? 1 : -1));
         audio.play("page", .4f);
@@ -8096,7 +8158,19 @@ final class RunGame {
                     // (With her backpack to look into.)
                     float inside = card(canvas, "Paused", (blackRung > 0 ? "The black arena, rung " + blackRung : RunStory.CHAPTERS[RunLevels.chapterOf(number)] + ", land " + number + "  ·  level " + RunLevels.levelOf(number))
                             + (hard() > 0 ? "  ·  harder by " + hard() : ""), dp(52));
-                    packButton.set(box.left + dp(20), inside, box.right - dp(20), inside + dp(42));
+                    packButton.set(box.left + dp(20), inside, box.right - dp(20) - dp(104), inside + dp(42));
+                    skillPause.set(packButton.right + dp(8), inside, box.right - dp(20), inside + dp(42));
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(dark ? 0xFF33373B : 0xFFF1F3F4);
+                    canvas.drawRoundRect(skillPause, dp(21), dp(21), paint);
+                    tree().icon(canvas, RunSkills.PATHS + 11, skillPause.left + dp(22), skillPause.centerY(), dp(32), 255);
+                    text.setColor(ink);
+                    text.setTextAlign(Paint.Align.LEFT);
+                    fitted(canvas, "Skills  \u203A", skillPause.left + dp(40), skillPause.centerY() + dp(5.5f), dp(15.5f), skillPause.width() - dp(46));
+                    if (skillsLeft() > 0) {
+                        paint.setColor(CalculatorLayout.CORAL);
+                        canvas.drawCircle(skillPause.right - dp(8), skillPause.top + dp(7), dp(5), paint);
+                    }
                     paint.setStyle(Paint.Style.FILL);
                     paint.setColor(dark ? 0xFF33373B : 0xFFF1F3F4);
                     canvas.drawRoundRect(packButton, dp(21), dp(21), paint);
@@ -8116,6 +8190,195 @@ final class RunGame {
         if (huntsOpen) drawHunts(canvas);
         if (smithOpen) drawSmithy(canvas);
         if (marketOpen) drawMarket(canvas);
+        if (treeOpen) drawTree(canvas);
+    }
+
+    // Her skill tree
+
+    private RunTree tree() {
+        if (tree == null) tree = new RunTree(context.getResources(), dp(1));
+        return tree;
+    }
+
+    /** What is taken, as it is kept: anything no longer joined to the centre let go. */
+    private java.util.BitSet skillsTaken() { return RunSkills.whole(RunSkills.taken(session.note("run_skills"))); }
+
+    private int[] skillSlots() { return RunSkills.slots(session.note("run_skill_slots")); }
+
+    private int skillPoints() { return RunSkills.pointsFor(herLevel()); }
+
+    private int skillsLeft() { return skillPoints() - RunSkills.spent(skillsTaken()); }
+
+    /** The first time every point is taken back, it is free. */
+    private boolean freeRespec() { return session.tally("run_respecs") == 0; }
+
+    private void openTree(int from) {
+        treeOpen = true;
+        treeFrom = from;
+        tree().open(width, height);
+        goLeft = goRight = goJump = goStrike = false;
+        jumpPressed = strikePressed = false;
+        readTree();
+        audio.play("page", .6f);
+    }
+
+    /** The facts the tree shows, read again. */
+    private void readTree() {
+        RunTree.Facts facts = treeFacts;
+        facts.taken = skillsTaken();
+        facts.slots = skillSlots();
+        facts.points = skillPoints();
+        facts.level = herLevel();
+        facts.bank = bank();
+        facts.respecCost = RunSkills.respecCost(facts.taken);
+        facts.freeRespec = freeRespec();
+        facts.built = RunSkills.built(facts.taken);
+        facts.hearts = kept().hearts;
+    }
+
+    /** What is taken has changed: felt at once in a land. */
+    private void skillsChanged() {
+        perks = kept();
+        if (run != null) run.learn(perks.skills, perks.slotted);
+        readTree();
+    }
+
+    private void treeTouch(MotionEvent event) {
+        int asked = tree().touch(event), id = tree.picked();
+        if (asked == RunTree.CLOSE) {
+            treeOpen = false;
+            audio.play("tap", .3f);
+        } else if (asked == RunTree.TAKE) {
+            java.util.BitSet taken = skillsTaken();
+            if (!RunSkills.canTake(taken, id) || skillPoints() - RunSkills.spent(taken) <= 0) {
+                audio.play("no", .5f);
+                return;
+            }
+            taken.set(id);
+            session.keepNote("run_skills", RunSkills.note(taken));
+            session.keepNote("run_skill_slots", RunSkills.slotsNote(RunSkills.slotIn(skillSlots(), taken, id)));
+            skillsChanged();
+            audio.play("unlock", .8f);
+            buzz(true);
+        } else if (asked == RunTree.SLOT) {
+            // Into the slot (moved there if it was in another, swapping with what was there); in it already, it is taken out.
+            int[] slots = skillSlots();
+            int slot = tree.pickedSlot();
+            if (slots[slot] == id) {
+                slots[slot] = 0;
+            } else {
+                for (int other = 0; other < slots.length; other++) if (slots[other] == id) slots[other] = slots[slot];
+                slots[slot] = id;
+            }
+            session.keepNote("run_skill_slots", RunSkills.slotsNote(slots));
+            skillsChanged();
+            audio.play("tap", .6f);
+            buzz(false);
+        } else if (asked == RunTree.RESPEC) {
+            java.util.BitSet taken = skillsTaken();
+            if (taken.isEmpty()) return;
+            int cost = RunSkills.respecCost(taken);
+            if (!freeRespec()) {
+                if (bank() < cost) {
+                    audio.play("no", .5f);
+                    return;
+                }
+                session.keep("run_bank", bank() - cost);
+            }
+            session.keep("run_respecs", session.tally("run_respecs") + 1);
+            session.keepNote("run_skills", "");
+            session.keepNote("run_skill_slots", "");
+            skillsChanged();
+            audio.play("unlock", .8f);
+            speak(RunStory.SKILLS[2], false);
+        }
+    }
+
+    private void drawTree(Canvas canvas) { tree().draw(canvas, safe, treeFacts); }
+
+    /** Where each filled slot is: in order, packed toward the button that changes what she holds. */
+    private void placeSlots() {
+        int filled = 0;
+        for (int slot = 0; slot < PlusRun.SLOTS; slot++) if (run != null && run.active(slot) != null) filled++;
+        int at = PlusRun.SLOTS - filled;
+        for (int slot = 0; slot < PlusRun.SLOTS; slot++) {
+            if (run != null && run.active(slot) != null) slotButtons[slot].set(slotPlaces[at++]);
+            else slotButtons[slot].setEmpty();
+        }
+    }
+
+    /** Her active slots on the HUD: each the emblem of its path; dark while it rests, ringed in gold while it is called on. */
+    private void drawSlots(Canvas canvas) {
+        placeSlots();
+        for (int slot = 0; slot < PlusRun.SLOTS; slot++) {
+            RunSkills.Notable skill = run.active(slot);
+            if (skill == null) continue;
+            RectF where = slotButtons[slot];
+            float rest = run.activeRest(slot), on = run.activeLeft(slot);
+            boolean ready = rest <= 0 && run.energy() >= PlusRun.ACTIVE_COST;
+            if (on > 0) glowAt(canvas, where.centerX(), where.centerY(), where.width() * .85f, 0xFFFFD24A, 200);
+            plate(canvas, where, where.height() / 2, 235);
+            tree().icon(canvas, skill.path, where.centerX(), where.centerY(), where.width() * .94f, ready || on > 0 ? 255 : 110);
+            if (rest > 0) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0x88000000);
+                canvas.drawArc(where, -90, 360 * rest / PlusRun.ACTIVE_REST, true, paint);
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(Color.WHITE);
+                fitted(canvas, String.valueOf((int) Math.ceil(rest)), where.centerX(), where.centerY() + dp(5), dp(14), where.width());
+            }
+            if (on > 0) {
+                stroke.setColor(0xFFFFD24A);
+                stroke.setStrokeWidth(dp(3));
+                canvas.drawArc(where.left + dp(1.5f), where.top + dp(1.5f), where.right - dp(1.5f), where.bottom - dp(1.5f), -90, 360 * on / PlusRun.ACTIVE_LASTS, false, stroke);
+            }
+            if (keyed) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFF1F2328);
+                canvas.drawCircle(where.left + dp(6), where.top + dp(6), dp(8), paint);
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(Color.WHITE);
+                fitted(canvas, String.valueOf(slot + 1), where.left + dp(6), where.top + dp(10), dp(11), dp(14));
+            }
+            paint.setColor(Color.BLACK);
+        }
+    }
+
+    /** Which active slot is at a point, or -1. */
+    private int slotAt(float x, float y) {
+        if (run == null) return -1;
+        placeSlots();
+        for (int slot = 0; slot < PlusRun.SLOTS; slot++) if (run.active(slot) != null && slotButtons[slot].contains(x, y)) return slot;
+        return -1;
+    }
+
+    /** An active slot used, by touch or by its key. */
+    private void callSlot(int slot) {
+        if (run == null || run.active(slot) == null) return;
+        if (run.callOn(slot)) {
+            audio.play("unlock", .7f);
+            buzz(true);
+        } else {
+            audio.play("no", .4f);
+        }
+    }
+
+    /** Divine power, beside her energy: a bar of gold filling as energy spent becomes it; full, it shines for as long as her blows count three times. */
+    private void drawDivine(Canvas canvas, float left, float top) {
+        float wide = dp(96), high = dp(22), part = run.divineLeft() > 0 ? run.divineLeft() / PlusRun.DIVINE_LASTS : run.dp() / PlusRun.DP_MOST;
+        box.set(left, top, left + wide, top + high);
+        if (run.divineLeft() > 0) glowAt(canvas, box.centerX(), box.centerY(), wide * .7f, 0xFFFFD24A, Math.round(150 + 80 * (float) Math.sin(clock * 10)));
+        plate(canvas, box, high / 2, 235);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(0xFFC9961A);
+        fitted(canvas, run.divineLeft() > 0 ? "×3" : "DP", left + dp(7), top + high / 2 + dp(4), dp(11), dp(18));
+        float from = left + dp(28), to = left + wide - dp(9), by = top + high / 2;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+        canvas.drawRoundRect(from, by - dp(3), to, by + dp(3), dp(3), dp(3), paint);
+        paint.setColor(0xFFFFC433);
+        if (part > 0) canvas.drawRoundRect(from, by - dp(3), from + (to - from) * Math.min(1, part), by + dp(3), dp(3), dp(3), paint);
+        paint.setColor(Color.BLACK);
     }
 
     // Her bag
@@ -12203,7 +12466,10 @@ final class RunGame {
         paint.setColor(Color.BLACK);
         float under = safe.top + margin + tall + dp(8), round = dp(36), x = safe.left + margin;
         drawLevel(canvas, x, under);
-        if (RunArms.heavy(run.weapon()) || run.energy() < PlusRun.ENERGY_MOST - .5f) drawEnergy(canvas, x + dp(128), under);
+        boolean anySlot = run.active(0) != null || run.active(1) != null || run.active(2) != null;
+        if (RunArms.heavy(run.weapon()) || anySlot || run.energy() < PlusRun.ENERGY_MOST - .5f) drawEnergy(canvas, x + dp(128), under);
+        if (run.dpMaking() > 0 || run.dp() > 0 || run.divineLeft() > 0) drawDivine(canvas, x + dp(232), under);
+        if (anySlot) drawSlots(canvas);
         under += dp(30);
         if (run.pet() >= 0) {
             float face = dp(run.herd().size() > 2 ? 30 : 42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
@@ -13527,7 +13793,7 @@ final class RunGame {
                 text.setTextAlign(Paint.Align.CENTER);
                 text.setColor(volume == page ? Color.WHITE : ink);
                 // (Three of them have room only for the short of it.)
-                fitted(canvas, volumes > 2 ? "Vol. " + (volume + 1) : volume == 0 ? "Volume One" : RunStory.SEQUEL, tab.centerX(), tab.centerY() + dp(5), dp(14), tab.width() - dp(16));
+                fitted(canvas, volumes > 2 || tab.width() < dp(100) ? "Vol. " + (volume + 1) : volume == 0 ? "Volume One" : RunStory.SEQUEL, tab.centerX(), tab.centerY() + dp(5), dp(14), tab.width() - dp(16));
             }
         }
         // Its sounds on or off.
@@ -13677,6 +13943,16 @@ final class RunGame {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(CalculatorLayout.CORAL);
             canvas.drawCircle(cringeButton.right - dp(7), cringeButton.top + dp(6), dp(5), paint);
+            paint.setColor(Color.BLACK);
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+        // Her skill tree, beside her backpack: its seed, and a dot while there are points to spend.
+        plate(canvas, skillButton, skillButton.height() / 2, 235);
+        tree().icon(canvas, RunSkills.PATHS + 11, skillButton.centerX(), skillButton.centerY(), skillButton.height() * 1.02f, 255);
+        if (skillsLeft() > 0) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(CalculatorLayout.CORAL);
+            canvas.drawCircle(skillButton.right - dp(7), skillButton.top + dp(6), dp(5), paint);
             paint.setColor(Color.BLACK);
         }
         text.setTextAlign(Paint.Align.LEFT);

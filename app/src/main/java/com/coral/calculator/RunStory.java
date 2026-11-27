@@ -567,6 +567,13 @@ final class RunStory {
             {"keys1", "Keyboard? Fancy. A and D to run, Space to jump Sloppy~♡", "H", PLAYER + "She notices the player is using a keyboard and quickly tells them the keys. Teasing, impressed despite herself, brisk."},
     };
 
+    /** Her skill tree: points waiting, the first time the map shows them; divine power coming, the first time in a land; every point taken back. */
+    static final String[][] SKILLS = {
+            {"skill1", "My skill tree woke up. Points to spend, so spend them Sloppy~♡", "H", PLAYER + "She has just found that her skill tree has points waiting and urges the player to open it and spend them. Excited, a little bossy, eager to grow stronger."},
+            {"skill2", "Divine power! Every blow lands three times Sloppy~♡", "H", PLAYER + "In the middle of a fight her divine power fills and bursts out; for a few seconds she hits three times as hard. Triumphant, radiant, a battle cry."},
+            {"skill3", "All of it back? Fine. Choose better this time Sloppy~♡", "H", PLAYER + "The player has just taken back every point of her skill tree to spend them again. Mock exasperated, teasing, but secretly glad of the fresh start."},
+    };
+
     /** A new level: she says so, glowing. */
     static final String[][] LEVEL = {
             {"lvl1", "Level up! Feel that? That's me getting stronger Sloppy~♡", "H", PLAYER + "She has just gone up a level in a game and glows with new power. Thrilled, smug, flexing."},
@@ -1200,6 +1207,7 @@ final class RunStory {
         groups.add(LEVEL);
         groups.add(TITLE_LINE);
         groups.add(KEYS);
+        groups.add(SKILLS);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {

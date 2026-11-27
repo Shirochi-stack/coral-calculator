@@ -57,6 +57,8 @@ final class RunSkills {
     static final class Notable {
         final String name;
         final int kind, effect, figure, cost, costFigure;
+        /** The path it is on, and its place along it (the twelfth, 11, the keystone at its end). */
+        int path = -1, index = -1;
 
         Notable(String name, int kind, int effect, int figure, int cost, int costFigure) {
             this.name = name;
@@ -75,6 +77,17 @@ final class RunSkills {
 
     /** The twelve notables of each path, built from the path's own leanings: two each of six themes, alternately passive and active. */
     static List<Notable> notables(int path) {
+        synchronized (MADE) {
+            if (MADE[path] == null) MADE[path] = make(path);
+            return MADE[path];
+        }
+    }
+
+    private static final List<?>[] MADE_LISTS = new List<?>[PATHS];
+    @SuppressWarnings("unchecked")
+    private static final List<Notable>[] MADE = (List<Notable>[]) MADE_LISTS;
+
+    private static List<Notable> make(int path) {
         int clazz = classOf(path), side = path % 2;
         String[] names = NOTABLE_NAMES[path];
         int[][] themes = side == 0 ? new int[][]{{E_ATK_PCT, 12}, {E_HASTE, 10}, {E_CRIT, 8}, {E_AREA, 20}, {E_COMBO, 1}, {E_REACH, 15}}
@@ -94,9 +107,12 @@ final class RunSkills {
                 cost = effect == E_DEF_PCT || effect == E_SHIELD ? E_ATK_PCT : effect == E_LEECH ? E_ENERGY : E_DEF_PCT;
                 costFigure = -Math.max(10, figure / 2);
             }
-            list.add(new Notable(names[index], active ? ACTIVE : PASSIVE, effect, figure, cost, costFigure));
+            Notable made = new Notable(names[index], active ? ACTIVE : PASSIVE, effect, figure, cost, costFigure);
+            made.path = path;
+            made.index = index;
+            list.add(made);
         }
-        return list;
+        return java.util.Collections.unmodifiableList(list);
     }
 
     private static final String[][] NOTABLE_NAMES = new String[PATHS][12];
@@ -229,13 +245,152 @@ final class RunSkills {
             if (node.type == SMALL || node.type == ROOT) built.stats[node.stat] += node.figure;
             else if (node.type == NOTABLE) {
                 Notable notable = notables(node.path).get(node.notable);
+                // (An active's effect is felt only while it is called on, from a slot.)
+                if (notable.kind == ACTIVE) {
+                    built.actives.add(notable);
+                    continue;
+                }
                 built.effects[notable.effect] += notable.figure;
                 if (notable.cost >= 0) built.effects[notable.cost] += notable.costFigure;
-                if (notable.kind == ACTIVE) built.actives.add(notable);
             }
         }
         return built;
     }
+
+    /** The notable a node is, or null. */
+    static Notable notableAt(int id) {
+        List<Node> nodes = tree();
+        if (id <= 0 || id >= nodes.size()) return null;
+        Node node = nodes.get(id);
+        return node.type == NOTABLE ? notables(node.path).get(node.notable) : null;
+    }
+
+    /** Whether a node is the keystone at the end of its path. */
+    static boolean keystone(Node node) { return node.type == NOTABLE && node.notable == 11; }
+
+    /** A node in a few words: what it is, then what it gives. */
+    static String title(Node node) {
+        if (node.type == CENTRE) return "Her seed";
+        if (node.type == NOTABLE) return notables(node.path).get(node.notable).name;
+        return "+" + node.figure + " " + STAT_NAMES[node.stat];
+    }
+
+    static String kindWords(Node node) {
+        if (node.type == CENTRE) return "Where every path begins";
+        String path = PATH_NAMES[node.path] + " · " + CLASSES[classOf(node.path)];
+        if (node.type == SMALL) return "Small node · " + path;
+        if (node.type == ROOT) return "Root · " + path;
+        Notable notable = notables(node.path).get(node.notable);
+        return (keystone(node) ? "Keystone, " : "") + (notable.kind == ACTIVE ? "active" : "passive") + " · " + path;
+    }
+
+    /** What a node does, said plainly. */
+    static String does(Node node) {
+        if (node.type == CENTRE) return "Every path begins here. Take a node next to it to start one.";
+        if (node.type == NOTABLE) {
+            Notable notable = notables(node.path).get(node.notable);
+            String said = notable.said();
+            return notable.kind == ACTIVE ? said + ", for " + (int) ACTIVE_LASTS + " seconds when called on from a slot (" + (int) ACTIVE_COST + " energy, then "
+                    + (int) ACTIVE_REST + " seconds to rest)" : said + ", always";
+        }
+        return statDoes(node.stat, node.figure);
+    }
+
+    /** What so much of a stat does. */
+    static String statDoes(int stat, int figure) {
+        switch (stat) {
+            case HP: return "+" + figure + " HP at most (a heart is " + HEART + ")";
+            case DEF: return "Each hurt costs " + figure + " HP less (never under a tenth of it)";
+            case INT: return "+" + figure + "% energy back, and +" + figure + "% blows with books, the tablet, staffs and wands";
+            default: return "+" + figure + "% to every blow";
+        }
+    }
+
+    /** How long an active lasts, what calling on it costs, and how long it rests after: the rules' own, kept here for the menu. */
+    static final float ACTIVE_LASTS = 8, ACTIVE_REST = 20, ACTIVE_COST = 30;
+
+    /** Every taken node still joined to the centre through taken nodes; any other let go (a save from before a change to the tree). */
+    static java.util.BitSet whole(java.util.BitSet taken) {
+        List<Node> nodes = tree();
+        java.util.BitSet joined = new java.util.BitSet();
+        java.util.ArrayDeque<Integer> next = new java.util.ArrayDeque<>();
+        next.add(0);
+        while (!next.isEmpty()) {
+            int id = next.poll();
+            for (int other : nodes.get(id).next) {
+                if (other > 0 && other < nodes.size() && taken.get(other) && !joined.get(other)) {
+                    joined.set(other);
+                    next.add(other);
+                }
+            }
+        }
+        return joined;
+    }
+
+    /** Points spent. */
+    static int spent(java.util.BitSet taken) { return taken.cardinality(); }
+
+    /** The three slots for actives, as the nodes in them (0 for none). */
+    static final int SLOTS = 3;
+
+    static int[] slots(String note) {
+        int[] slots = new int[SLOTS];
+        if (note == null || note.isEmpty()) return slots;
+        String[] parts = note.split(",");
+        for (int slot = 0; slot < SLOTS && slot < parts.length; slot++) {
+            try {
+                slots[slot] = Integer.parseInt(parts[slot].trim());
+            } catch (NumberFormatException ignored) {
+                slots[slot] = 0;
+            }
+        }
+        return slots;
+    }
+
+    static String slotsNote(int[] slots) {
+        StringBuilder note = new StringBuilder();
+        for (int slot = 0; slot < SLOTS; slot++) note.append(slot == 0 ? "" : ",").append(slot < slots.length ? slots[slot] : 0);
+        return note.toString();
+    }
+
+    /** The actives in the slots that are taken and are actives: in slot order, a slot empty or let go left out of its place as null. */
+    static List<Notable> slotted(java.util.BitSet taken, int[] slots) {
+        List<Notable> list = new ArrayList<>();
+        for (int slot = 0; slot < SLOTS; slot++) {
+            int id = slot < slots.length ? slots[slot] : 0;
+            Notable notable = taken.get(id) ? notableAt(id) : null;
+            list.add(notable != null && notable.kind == ACTIVE ? notable : null);
+        }
+        return list;
+    }
+
+    /** An active newly taken goes into the first empty slot, if there is one. The slots as they now are. */
+    static int[] slotIn(int[] slots, java.util.BitSet taken, int id) {
+        int[] now = java.util.Arrays.copyOf(slots, SLOTS);
+        Notable notable = notableAt(id);
+        if (notable == null || notable.kind != ACTIVE) return now;
+        List<Notable> had = slotted(taken, now);
+        for (int slot = 0; slot < SLOTS; slot++) if (now[slot] == id) return now;
+        for (int slot = 0; slot < SLOTS; slot++) {
+            if (had.get(slot) == null) {
+                now[slot] = id;
+                return now;
+            }
+        }
+        return now;
+    }
+
+    /** What her HP comes to at most: hearts of 20, the tree's HP, and its HP percent. */
+    static int mostHp(int hearts, Built built) {
+        int base = hearts * HEART + built.stats[HP];
+        return Math.max(HEART / 2, base + base * built.effects[E_HP_PCT] / 100);
+    }
+
+    /** Her defence's percent, kept between a half more hurt and three quarters less. */
+    static int defencePercent(int percent) { return Math.max(-50, Math.min(75, percent)); }
+
+    /** Intelligence, with the tree's intelligence percent. */
+    static int intelligence(Built built, int more) { return built.stats[INT] + (built.stats[INT] * (built.effects[E_INT_PCT] + more)) / 100; }
 
     static String note(java.util.BitSet taken) {
         return java.util.Base64.getEncoder().encodeToString(taken.toByteArray());
