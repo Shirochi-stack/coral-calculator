@@ -69,7 +69,7 @@ final class RunVanity {
     static final String[] NAMES = {"Pajama Set", "Gothic Dress", "Knight's Tabard", "Bunny Girl", "Maid Dress", "Sloppy\u2606Stage", "Seaside Swimsuit"};
     static final String[] DOES = {"Soft lavender with stars, for resting", "Black and violet lace, a red stone at the throat", "Blue and white, a gold edge, one pauldron",
             "The classic bunny suit: black satin, tights, a collar, cuffs and a bow tie", "A short black dress, a frilled apron, white stockings with ribbon garters", "The idol stage dress from her song: ribbons, frills and a layered skirt",
-            "A striped aqua bikini with a frill, a wrap skirt and sandals"};
+            "A striped sailor swim dress with a frilled hem, a red ribbon and sandals"};
     static final int[] PRICES = {400, 700, 0, 1500, 1200, 0, 0};
     static final int[] TREATS = {3, 5, 0, 8, 6, 0, 0};
     static final int[] QUEST = {-1, -1, 2, -1, -1, 0, 1};
@@ -79,7 +79,7 @@ final class RunVanity {
             new Style(0xFF2B3A55, 0xFF5C7CB0, 0xFFEAF0FA, 0xFFE8C65A, PLAIN, false, true, true, 0xFFE8C65A),
             new Style("bunny"), new Style("maid"), new Style("idol"), new Style("swim1")};
     /** Which outfits can be had now: those whose pictures are all there. */
-    static final boolean[] READY = {true, true, true, true, true, true, false};
+    static final boolean[] READY = {true, true, true, true, true, true, true};
     static int count() { return NAMES.length; }
     static boolean ready(int outfit) { return outfit >= 0 && outfit < count() && READY[outfit]; }
 
