@@ -7,19 +7,20 @@
 13.32	14.67	Sing.
 14.77	15.71	Loud.
 17.21	19.27	Hands up. Higher.
+19.54	20.28	Squish!
 20.22	23.63	Call my name. Slowly. Right.
-24.33	24.81	Squish!
-25.24	26.58	Sloppy~♡
-26.99	27.47	Squish!
+24.33	25.11	Sloppy~♡
+25.24	25.74	Squish!
+25.77	26.58	Sloppy~♡
+26.99	27.77	Sloppy~♡
 28.02	28.80	Sloppy~♡
 28.84	29.94	Louder, zaako.
 30.68	31.90	Eyes up!
 32.56	33.97	Five colors!
 34.15	35.81	Miss the beat —
 36.13	37.32	Up!
-38.08	38.95	Pink.
-39.05	39.81	Halgakos!
-39.88	41.20	Sloppy~♡
+38.08	40.21	Pink. Center. Obviously.
+40.31	41.17	Halgakos!
 41.51	44.43	Red. Warm. Still not bread.
 44.53	45.61	Chikuwa!
 45.71	46.94	Chikuwa!
@@ -46,3 +47,4 @@
 86.22	86.96	Squish!
 87.34	88.38	Welcome.
 88.47	89.37	Ice cream.
+89.22	89.97	Sloppy~♡
