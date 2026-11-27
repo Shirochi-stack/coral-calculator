@@ -64,6 +64,10 @@ fitted into the film's picture, read by its own clock, and cut or held on its la
 A board made in more shapes than one (its "shapes": a name for each, as "9x16": "9:16") has its takes named for the shape
 (A-9x16-....mp4) and its stills in stills-9x16; --with 9x16 makes the film of that shape (BOARD-9x16.mp4). With --song,
 --named NAME says what that film is called (BOARD-9x16-NAME.mp4), so that one picture can be kept with several songs.
+The song may be any sound file, made anywhere. It is laid from the film's first frame; --song-from SECONDS begins it that far
+into the song instead (or, below zero, that long after the film begins), and --song-speed X plays it X times as fast with its
+pitch kept (1.03: a song 92.7 s long in 90). What is left over at the end is faded out; what is missing is silence.
+tools/fit_song.py measures a song against the board's seconds and says what these two should be.
 
 Of Kling (kling/v4/reference-to-video on fal) a take is asked shot by shot, each with its
 seconds and at most 512 letters, with the first shot's still as the first frame, the other
@@ -783,7 +787,47 @@ def for_phone(film, limit=28_000_000):
     return target
 
 
-def edit_takes(board, folder, which, song=None, named=None):
+def paced(wave, rate, speed):
+    """A sound played so many times as fast, its pitch kept."""
+    import fractions
+
+    import av
+
+    graph = av.filter.Graph()
+    source = graph.add_abuffer(sample_rate=rate, format="flt", layout="stereo", time_base=fractions.Fraction(1, rate))
+    out, left = [], speed
+    last = source
+    # (The filter takes a half to twice at a time; more than that is asked of it in steps.)
+    while True:
+        step = min(2.0, max(.5, left))
+        tempo = graph.add("atempo", f"{step:.6f}")
+        last.link_to(tempo)
+        last = tempo
+        left /= step
+        if abs(left - 1) < 1e-6:
+            break
+    sink = graph.add("abuffersink")
+    last.link_to(sink)
+    graph.configure()
+
+    def drawn_off():
+        while True:
+            try:
+                out.append(graph.pull().to_ndarray().reshape(-1, 2))
+            except (av.error.BlockingIOError, av.error.EOFError):
+                return
+
+    for start in range(0, len(wave), 4096):
+        frame = av.AudioFrame.from_ndarray(numpy.ascontiguousarray(wave[start:start + 4096].reshape(1, -1)).astype(numpy.float32), format="flt", layout="stereo")
+        frame.sample_rate, frame.pts, frame.time_base = rate, start, fractions.Fraction(1, rate)
+        graph.push(frame)
+        drawn_off()
+    graph.push(None)
+    drawn_off()
+    return numpy.concatenate(out)
+
+
+def edit_takes(board, folder, which, song=None, named=None, song_from=0.0, song_speed=1.0):
     """
     The film from the long takes of one model: each take as long as its shots, in order, at the takes' own size; their own sound, eased
     down and up across each join; and the names and the title drawn on. A take not made yet is its shots' stills, held, in silence.
@@ -1070,6 +1114,10 @@ def edit_takes(board, folder, which, song=None, named=None):
         box = av.open(str(song))
         resampler = av.AudioResampler(format="flt", layout="stereo", rate=rate)
         got = numpy.concatenate([made_.to_ndarray().reshape(-1, 2) for frame_ in box.decode(audio=0) for made_ in resampler.resample(frame_)])
+        # Where in the song the film begins, and how fast the song is played (its pitch kept), if the song was not made to the film's seconds.
+        got = got[int(song_from * rate):] if song_from >= 0 else numpy.concatenate([numpy.zeros((int(-song_from * rate), 2), got.dtype), got])
+        if abs(song_speed - 1) > 1e-4:
+            got = paced(got, rate, song_speed)
         wave = numpy.zeros((sum(len(part_) for part_ in heard), 2), numpy.float32)
         wave[: min(len(got), len(wave))] = got[: len(wave)]
         wave *= .97 / max(.97, float(numpy.abs(wave).max()))
@@ -1134,6 +1182,8 @@ def main():
     parser.add_argument("--with", dest="which", help="kling or seedance: whose long takes are meant")
     parser.add_argument("--song", help="with --edit and --with: a song to lay over the film in place of the takes' own sound")
     parser.add_argument("--named", help="with --song: what the film with that song is called after the board and the takes' name (edited, if not said)")
+    parser.add_argument("--song-from", type=float, default=0.0, help="with --song: the second of the song the film begins on (below zero: the song begins that long after the film)")
+    parser.add_argument("--song-speed", type=float, default=1.0, help="with --song: how many times as fast the song is played, its pitch kept")
     args = parser.parse_args()
     folder = SHOTS / args.shot
     if (BOARDS / f"{args.shot}.json").exists():
@@ -1146,7 +1196,7 @@ def main():
             one_take(board, folder, part, args.which, args.go, args.task)
             return None
         if args.edit and args.which:
-            return edit_takes(board, folder, args.which, args.song, args.named)
+            return edit_takes(board, folder, args.which, args.song, args.named, args.song_from, args.song_speed)
         if args.edit:
             return edit(board, folder)
         chosen = [shot for shot in board["shots"] if args.one in (None, shot["name"])]
