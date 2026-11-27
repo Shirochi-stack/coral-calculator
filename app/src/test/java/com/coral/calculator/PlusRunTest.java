@@ -7471,7 +7471,7 @@ public class PlusRunTest {
         assertEquals("rev7", RunStory.REVEAL[RunStory.CUT_AT][0]);
         assertEquals("H", RunStory.REVEAL[RunStory.CUT_AT][2]);
         assertTrue(RunStory.REVEAL[RunStory.CUT_AT][1].contains("great evil"));
-        assertTrue(RunStory.CUT_SAYS.endsWith(" " + Chatter.SLOPPY));
+        assertEquals("So you're the great evil. The Mother Tongue " + Chatter.SLOPPY, RunStory.CUT_SAYS);
         assertTrue(RunStory.CUT_AT > 0 && RunStory.CUT_AT + 1 < RunStory.REVEAL.length);
         assertEquals(4, RunStory.READ.length);
         assertEquals("f", RunStory.READ[0][2]);

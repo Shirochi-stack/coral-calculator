@@ -822,7 +822,7 @@ final class RunStory {
      * played, the line itself is told as it always was.
      */
     static final int CUT_AT = 10;
-    static final String CUT_SAYS = "The great evil. Not translation. You Sloppy~♡";
+    static final String CUT_SAYS = "So you're the great evil. The Mother Tongue Sloppy~♡";
     /** And what is said when the Mother Tongue has been read: she is small, and listens; and Lucy has the last word but one. */
     static final String[][] READ = {
             {"read1", "...So that is what he called her.", "f",
