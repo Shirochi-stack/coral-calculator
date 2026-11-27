@@ -1,0 +1,52 @@
+{
+ "about": "The idol film's track in Halgakos's own voice, on the words the user wrote (2026-11-27), word for word: for tools/make_mc.py. Each line: the second it begins on, the seconds it has, its words, and how it is said (solo: talked; call: shouted; crowd: her own shout many times over, the words in brackets in the lyrics); a fifth thing, where there is one, is what the voice is sent for that line when only its marks differ (the chorus's 'Sloppy' without the '~' that would draw it out). The parts and their seconds are the picture's (tools/cutscenes/idol-song.json), with two liberties: the verse and the pre-chorus (8 to 24 s) are six lines laid one after another across both, since four of these lines do not go into the verse's eight seconds at any pace she can speak them clearly; and the call and the first chorus begin half a second before their parts (24.0 and 29.5 s) and the chorus ends a quarter of a second after its own, for the same reason. A long dash is a pause of a beat where the line's seconds allow.",
+ "out": "idol/songs/idol-halgakos",
+ "kept": "idol/mc",
+ "band": "idol/songs/eleven-idol-band-1.mp3",
+ "seconds": 90,
+ "beat": 0.5,
+ "scene": "She is the centre of an idol group on stage before a cheering hall, the group's MC over bouncy idol pop at 120 beats a minute. She does not sing: she talks on the beat in short dry phrases, smug, bratty and teasing, looking down her nose at the crowd, unhurried and pleased with herself, loud enough for a hall. Full stops are clipped: no long pauses. 'zah-ko' is her taunt (Japanese 'zako', small fry), said with a drawl.",
+ "brisk": "She is the centre of an idol group on stage before a cheering hall, the group's MC over fast idol pop. She does not sing: she snaps the line out right on the beat, quick, crisp and dry, smug and teasing, loud enough for a hall. As brisk as she can say it clearly, with no pauses between the phrases. 'zah-ko' is her taunt (Japanese 'zako', small fry).",
+ "shout": "She is on stage and shouts one word to a cheering hall, as loud and bright and short as she can, like a concert call.",
+ "says": {"zaako": "zah-ko"},
+ "lines": [
+  [1.0, 0.9, "Squish!", "call"], [2.0, 1.4, "Sloppy~♡", "call"],
+  [5.0, 0.9, "Squish!", "call"], [6.0, 1.4, "Sloppy~♡", "call"],
+
+  [8.0, 2.5, "Lights up. You're staring. How cute.", "solo"],
+  [10.5, 2.5, "Five of us. Try to keep count.", "solo"],
+  [13.0, 2.5, "Book's open. Story's mine. Sing.", "solo"],
+  [15.5, 2.0, "Loud. I'll tell you if it's right.", "solo"],
+  [17.5, 3.0, "Hands up. Higher. Don't get shy.", "solo"],
+  [20.5, 3.0, "Call my name. Slowly. Right.", "solo"],
+
+  [24.0, 0.9, "Squish!", "call"], [25.0, 1.0, "Sloppy~♡", "crowd"],
+  [26.0, 0.9, "Squish!", "call"], [27.0, 1.0, "Sloppy~♡", "crowd"],
+  [28.0, 1.4, "Louder, zaako.", "solo"],
+
+  [29.5, 2.2, "Squish, Sloppy~♡ — eyes up, zaako!", "solo", "Squish, Sloppy! — eyes up, zaako!"],
+  [31.7, 2.5, "Squish, Sloppy~♡ — five colors, don't choke!", "solo", "Squish, Sloppy! — five colors, don't choke!"],
+  [34.2, 2.0, "Miss the beat and I restart you —", "solo"],
+  [36.2, 2.0, "Squish, Sloppy~♡ — up on your feet!", "solo", "Squish, Sloppy! — up on your feet!"],
+
+  [38.25, 2.2, "Pink. Center. Obviously.", "solo"], [40.5, 0.8, "Halgakos!", "call"], [41.3, 0.7, "Sloppy~♡", "crowd"],
+  [42.0, 2.4, "Red. Warm. Still not bread.", "solo"], [44.45, 0.9, "Chikuwa!", "call"], [45.35, 0.65, "Chikuwa!", "crowd"],
+  [46.0, 2.4, "Blue. Crying. We can all see.", "solo"], [48.45, 0.9, "Rune!", "call"], [49.35, 0.65, "Rune!", "crowd"],
+  [50.0, 2.4, "Gold. Lead. You can watch.", "solo"], [52.45, 0.9, "Illya!", "call"], [53.35, 0.65, "Illya!", "crowd"],
+  [54.0, 3.4, "Purple. Calm. Then I swing. Don't flinch.", "solo"], [57.5, 1.1, "Tsubakieh!", "call"], [58.7, 1.2, "Tsubakieh!", "crowd"],
+
+  [60.0, 3.0, "Down the runway. Don't let go.", "solo"],
+  [63.0, 3.0, "You're holding on like it's a favor.", "solo"],
+  [66.0, 3.0, "Not bad. For you. You kept the beat.", "solo"],
+  [69.0, 2.9, "Once more. Up. That was easy.", "solo"],
+
+  [72.0, 3.0, "Squish, Sloppy~♡ — you want the encore.", "solo", "Squish, Sloppy! — you want the encore."],
+  [75.0, 3.0, "Squish, Sloppy~♡ — five colors, say it!", "solo", "Squish, Sloppy! — five colors, say it!"],
+  [78.0, 3.0, "Jump, heart, bow — you blinked. Again.", "solo"],
+  [81.0, 3.0, "Squish, Sloppy~♡ — I didn't say stop!", "solo", "Squish, Sloppy! — I didn't say stop!"],
+
+  [84.5, 1.4, "You're welcome.", "solo"],
+  [86.0, 2.1, "Now. My mint ice cream.", "solo"],
+  [88.2, 1.7, "Sloppy~♡", "solo"]
+ ]
+}

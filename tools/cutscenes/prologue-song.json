@@ -1,0 +1,37 @@
+{
+ "about": "The prologue (the first opening's picture, as Seedance 2.5 made it) with the words the user wrote on 2026-11-27, word for word. Halgakos talks them over a band (tools/cutscenes/prologue-mc.json); this file is the band's plan for a model that takes parts with their seconds (ElevenLabs Music, asked with --bare: no voices), and where the words fall on the picture. The parts are the picture's: 120 beats a minute, a bar is two seconds, three takes of thirty seconds.",
+ "title": "Calculation, Translation, and Sloppy~♡",
+ "seconds": 90,
+ "style": "A bright, bouncy anime-opening pop instrumental, 120 BPM in 4/4: sparkling synths, chiptune blips, handclaps, a four-on-the-floor kick, slap bass. Playful, cheeky, pastel and sunny. About ninety seconds, with a clean ending.",
+ "shades": {},
+ "tags": "anime opening, j-pop, bright, bouncy, 120 bpm, sparkling synths, chiptune, handclaps, instrumental",
+ "plans": {
+  "cute": {
+   "positive": ["bright, bouncy anime-opening pop", "playful, cheeky, sunny, pastel", "sparkling synths, chiptune blips, handclaps", "four-on-the-floor kick, slap bass", "a steady groove that leaves room for someone talking over it", "120 BPM"],
+   "negative": ["slow tempo", "sad", "dark", "heavy metal", "rock guitars", "long silences"]
+  },
+  "local": {
+   "intro": ["a falling sparkle sweep and a short punchy build"],
+   "verse": ["a light, bouncy groove: bass, claps and blips, the melody kept low"],
+   "pre-chorus": ["a rising build with faster claps and a drum fill into the chorus"],
+   "chorus": ["the full band, a big bright catchy hook"],
+   "member": ["the band hits on the first beat and drops to drums and bass, with one bright stab at the end"],
+   "break": ["the band drops out to a soft pad and finger snaps, then a drum fill back in"],
+   "outro": ["the music falls to a soft sparkle and ends on one last chime"]
+  }
+ },
+ "sections": [
+  {"tag": "intro", "from": 0, "to": 6, "picture": "the book falls out of the sky", "lines": ["Sloppy~♡"]},
+  {"tag": "verse", "from": 6, "to": 22, "picture": "her day off goes wrong: the stroll, the book on her head, the sums loose, the empty cone", "lines": ["One day off. One cone. You followed me anyway.", "Book fell. Look at the mess. Your fault? Doesn't matter.", "Sums grew legs. Words ran wild.", "Who cleans it? Me. You just stand there, zaako."]},
+  {"tag": "pre-chorus", "from": 22, "to": 30, "picture": "thumbs on the keys, the take-off", "lines": ["Carry the one. Footnote. Focus.", "Thumbs out. Don't slow me down, Sloppy~♡"]},
+  {"tag": "chorus", "from": 30, "to": 44, "picture": "the hero pose, the classroom, the desk, the squish, chin up", "lines": ["Calculation! Translation! And Sloppy~♡", "Two plus two is four. Clap for yourself. Slowly.", "Every word as written. Every sum just right.", "Squish, Sloppy~♡ Flat as a page. Chin up."]},
+  {"tag": "member", "from": 44, "to": 48, "picture": "Chikuwa at her bakery stall", "lines": ["Chikuwa! Not always bread, genius."]},
+  {"tag": "member", "from": 48, "to": 52, "picture": "Rune in the archive", "lines": ["Rune! Stop crying in the ink. It's sad to watch."]},
+  {"tag": "member", "from": 52, "to": 56, "picture": "Illya on her stage", "lines": ["Illya! One heroine is plenty. Sit."]},
+  {"tag": "member", "from": 56, "to": 60, "picture": "Tsubakieh and her bat", "lines": ["Tsubakieh! Put the bat down. Normally!"]},
+  {"tag": "verse", "from": 60, "to": 72, "picture": "all five running, the honorific ribbons", "lines": ["Calculation! Translation! And Sloppy~♡", "-nim and -ssi. I keep both. You drop them.", "Miss one honorific and you're Sloppy~♡"]},
+  {"tag": "break", "from": 72, "to": 76, "picture": "the smug look over the calculator", "lines": ["Not bad. For you. Sloppy~♡"]},
+  {"tag": "chorus", "from": 76, "to": 84, "picture": "the strike, the leap, the book snaps shut", "lines": ["Calculation! Translation! And Sloppy~♡", "Sloppy, sloppy, sloppy. Louder. Sloppy~♡"]},
+  {"tag": "outro", "from": 84, "to": 90, "picture": "the mint ice cream at last", "lines": ["Now where is my ice cream. I was promised. Sloppy~♡"]}
+ ]
+}
