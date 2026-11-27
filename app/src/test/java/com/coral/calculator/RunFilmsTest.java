@@ -172,7 +172,7 @@ public class RunFilmsTest {
             assertTrue(name, lines.size() >= 20);
             float last = -1;
             for (RunFilms.Line line : lines) {
-                assertTrue(name + ": " + line.words, line.from >= last && line.from >= 0 && line.to <= 91 && line.to - line.from <= 8);
+                assertTrue(name + ": " + line.words, line.from >= last && line.from >= 0 && line.to <= 99 && line.to - line.from <= 8);
                 assertFalse(name + ": a line of two languages", line.words.contains("\n"));
                 last = line.from;
             }

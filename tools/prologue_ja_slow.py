@@ -16,6 +16,7 @@ import pathlib
 import sys
 
 import numpy
+from PIL import Image
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
@@ -124,6 +125,12 @@ def picture(f):
     frames = [fr.to_ndarray(format="rgb24") for fr in box.decode(video)]
     box.close()
     n = len(frames)
+    # How different each frame is from the one before it: a big jump is a cut of the film (never interpolated across), a middling one is fast motion
+    # (blended, not warped), a small one is calm (warped along its motion).
+    small = [cv2.resize(cv2.cvtColor(fr, cv2.COLOR_RGB2GRAY), (160, 90)).astype("float32") for fr in frames]
+    jump = [0.0] + [float(numpy.abs(small[k] - small[k - 1]).mean()) for k in range(1, n)]
+    cuts = [k for k in range(1, n) if jump[k] > 35]
+    print("cuts of the film (seconds):", [round(k / fps, 2) for k in cuts if k / fps < 40], flush=True)
     extra = (B - A) * (f - 1)
     total = int(round((n / fps + extra) * fps))
     dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
@@ -162,7 +169,13 @@ def picture(f):
         i = int(s)
         u = s - i
         if t > A and t <= B + extra and u > .02:
-            frame = warp(i, i + 1, u)
+            step = jump[i + 1]
+            if step > 35:
+                frame = frames[i]                      # a cut: the shot before it goes on until the cut, which is one frame, clean
+            elif step > 12:
+                frame = cv2.addWeighted(frames[i], 1 - u, frames[i + 1], u, 0)   # fast motion: a plain blend of two frames of the same shot
+            else:
+                frame = warp(i, i + 1, u)
         else:
             frame = frames[i]
         for packet in stream.encode(av.VideoFrame.from_ndarray(frame, format="rgb24")):
@@ -173,6 +186,119 @@ def picture(f):
     print("picture", total, "frames,", round(total / fps, 2), "s")
 
 
+def picture_master(f):
+    """
+    The slowed picture made from the untouched 1080p master (dist/cutscenes/opening/opening-seedance.mp4), in one pass, with two outputs from the same frames:
+    the picture for the app, 1280 x 720 at 1.3 Mb/s (a little better than the 1.16 Mb/s picture the app ships), and a 1080p review copy with the Japanese
+    captions and the track, at about 2.0 Mb/s. Nothing is encoded twice. Cuts are found first (a jump of over 35 on a small copy of the frame), and
+    never interpolated across: the shot before a cut is held until it, fast motion is blended within its shot, calm motion is warped along its flow
+    (computed at half size, applied at full size).
+    """
+    import av
+    import cv2
+    import soundfile
+    import clips_fit as cf
+
+    master = D / "opening" / "opening-seedance.mp4"
+    box = av.open(str(master))
+    video = box.streams.video[0]
+    fps = float(video.average_rate)
+    small = []
+    for fr in box.decode(video):
+        small.append(cv2.resize(cv2.cvtColor(fr.to_ndarray(format="rgb24"), cv2.COLOR_RGB2GRAY), (160, 90)).astype("float32"))
+    box.close()
+    n = len(small)
+    jump = [0.0] + [float(numpy.abs(small[k] - small[k - 1]).mean()) for k in range(1, n)]
+    print("cuts (s):", [round(k / fps, 2) for k in range(1, n) if jump[k] > 35 and k / fps < 40], flush=True)
+    extra = (B - A) * (f - 1)
+    total = int(round((n / fps + extra) * fps))
+
+    # the track and the captions of the review copy
+    spec = json.loads((ROOT / "tools" / "cutscenes" / "prologue-mc.json").read_text(encoding="utf-8"))
+    times = json.loads((D / "opening" / "prologue-halgakos-slow-ja.times.json").read_text(encoding="utf-8"))
+    rows = [(a, b, w.replace("\u2661", "")) for (a, b), w in zip(times, spec["tongues"]["ja"]["lines"])]
+    audio = cf.read_audio(D / "opening" / "fx" / "run_film_prologue_h_ja_slow.m4a")[: int(total / fps * RATE)]
+
+    app = av.open(str(D / "opening" / "prologue-ja-slow-app.mp4"), "w", options={"movflags": "+faststart"})
+    sa = app.add_stream("libx264", rate=round(fps))
+    sa.width, sa.height, sa.pix_fmt, sa.bit_rate = 1280, 720, "yuv420p", 1_300_000
+    sa.options = {"profile": "main", "preset": "slower", "g": str(int(fps * 2)), "keyint_min": str(int(fps)), "maxrate": str(int(1_300_000 * 1.6)), "bufsize": "2600000"}
+    rev = av.open(str(D / "films-review" / "prologue-ja-effects.mp4"), "w", options={"movflags": "+faststart"})
+    sr = rev.add_stream("libx264", rate=round(fps))
+    sr.width, sr.height, sr.pix_fmt = 1920, 1080, "yuv420p"
+    sr.options = {"preset": "slower", "crf": "21", "maxrate": "2000000", "bufsize": "4000000"}
+    ar = rev.add_stream("aac", rate=RATE, layout="mono")
+    ar.bit_rate = 160000
+
+    dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+    decoder = av.open(str(master))
+    gen = (fr.to_ndarray(format="rgb24") for fr in decoder.decode(decoder.streams.video[0]))
+    held, last = {}, -1
+
+    def get(i):
+        nonlocal last
+        while last < i:
+            last += 1
+            held[last] = next(gen)
+            for old in [k for k in held if k < last - 2]:
+                del held[old]
+        return held[i]
+
+    gx, gy = numpy.meshgrid(numpy.arange(1920, dtype="float32"), numpy.arange(1080, dtype="float32"))
+
+    def warp(i, j, u):
+        a, b = get(i), get(j)
+        ga = cv2.cvtColor(cv2.resize(a, (960, 540), interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2GRAY)
+        gb = cv2.cvtColor(cv2.resize(b, (960, 540), interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2GRAY)
+        fwd = cv2.resize(dis.calc(ga, gb, None), (1920, 1080)) * 2
+        back = cv2.resize(dis.calc(gb, ga, None), (1920, 1080)) * 2
+        wa = cv2.remap(a, gx - fwd[..., 0] * u, gy - fwd[..., 1] * u, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        wb = cv2.remap(b, gx - back[..., 0] * (1 - u), gy - back[..., 1] * (1 - u), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        return cv2.addWeighted(wa, 1 - u, wb, u, 0)
+
+    for k in range(total):
+        t = k / fps
+        s = t if t <= A else A + (t - A) / f if t <= B + extra else t - extra
+        s = min(s * fps, n - 1.001)
+        i = int(s)
+        u = s - i
+        if t > A and t <= B + extra and u > .02:
+            step = jump[i + 1]
+            if step > 35:
+                frame = get(i)
+            elif step > 12:
+                frame = cv2.addWeighted(get(i), 1 - u, get(i + 1), u, 0)
+            else:
+                frame = warp(i, i + 1, u)
+        else:
+            frame = get(i)
+        for packet in sa.encode(av.VideoFrame.from_ndarray(cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA), format="rgb24")):
+            app.mux(packet)
+        shown = Image.fromarray(frame)
+        for a0, b0, words in rows:
+            if a0 <= t <= b0 + .3:
+                shown = cf.captioned(shown, words, None, None, "ja")
+                break
+        for packet in sr.encode(av.VideoFrame.from_image(shown)):
+            rev.mux(packet)
+    for packet in sa.encode():
+        app.mux(packet)
+    for packet in sr.encode():
+        rev.mux(packet)
+    app.close()
+    pcm = numpy.clip(audio, -1, 1).astype("float32")
+    for i in range(0, len(pcm), 1024):
+        fr = av.AudioFrame.from_ndarray(pcm[i:i + 1024].reshape(1, -1), format="flt", layout="mono")
+        fr.sample_rate = RATE
+        fr.pts = i
+        for packet in ar.encode(fr):
+            rev.mux(packet)
+    for packet in ar.encode():
+        rev.mux(packet)
+    rev.close()
+    print("picture for the app, review copy:", total, "frames,", round(total / fps, 2), "s", flush=True)
+
+
 if __name__ == "__main__":
     f = float(sys.argv[2])
-    {"spec": spec, "picture": picture}[sys.argv[1]](f)
+    {"spec": spec, "picture": picture, "master": picture_master}[sys.argv[1]](f)
