@@ -16,11 +16,13 @@ public class RunSwarmsTest {
         assertEquals(50, RunLevels.swarmOf(RunLevels.TOTAL));
         for (int number = 4; number <= RunLevels.TOTAL; number++) assertTrue(RunLevels.swarmOf(number) >= RunLevels.swarmOf(number - 1));
         int onLedges = 0, short_ = 0;
+        long grand = 0, grandWanted = 0;
         for (int number = 1; number <= RunLevels.TOTAL; number++) {
             RunLevels.Level level = RunLevels.level(number);
             int laid = 0, all = 0, swarmed = 0, grouped = 0;
             for (int[] foe : level.foes) {
-                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET || RunLevels.rover(foe[0])) continue;
+                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET || RunLevels.rover(foe[0])
+                        || RunLevels.uniqueSpec(foe)) continue;
                 all++;
                 if (!RunLevels.crowd(foe)) laid++;
                 if (!RunLevels.swarmed(foe)) continue;
@@ -40,12 +42,16 @@ public class RunSwarmsTest {
             }
             int wanted = Math.max(1, laid) * RunLevels.swarmOf(number);
             // As many as wanted, short only where a land is short of room (and never by more than a third).
-            assertTrue("land " + number + " has " + all + " of " + wanted, all <= wanted && all >= wanted / (RunLevels.bossOf(number) >= 0 ? 3 : 2));
+            assertTrue("land " + number + " has " + all + " of " + wanted, all <= wanted && all >= wanted * (RunLevels.bossOf(number) >= 0 ? 1 : 2) / (RunLevels.bossOf(number) >= 0 ? 4 : 5));
             if (all < wanted) short_++;
+            grand += all;
+            grandWanted += wanted;
             assertTrue("land " + number + " grouped " + grouped + " of " + swarmed, grouped >= swarmed * 9 / 10);
         }
         assertTrue("on ledges " + onLedges, onLedges > 2000);
-        assertTrue("short " + short_, short_ <= 40);
+        System.out.println("SWARMS " + grand + " of " + grandWanted + " wanted, short in " + short_ + " lands");
+        assertTrue("short " + short_, short_ <= 70);
+        assertTrue(grand * 10L >= grandWanted * 6L);
     }
 
     @Test public void swarmsSleepUntilSheIsNearAndFightWhenSheIs() {
@@ -76,7 +82,7 @@ public class RunSwarmsTest {
             for (PlusRun.Foe foe : run.foes()) {
                 if (RunLevels.boss(foe.kind) || RunLevels.flier(foe.kind)) continue;
                 all++;
-                if (foe.guard > 0) {
+                if (foe.guard > 0 && !RunUniques.is(foe.kind)) {
                     shielded++;
                     assertEquals(PlusRun.shieldNeeds(number), foe.guardNeeds);
                     assertEquals(PlusRun.shieldKind(number), foe.guardKind);

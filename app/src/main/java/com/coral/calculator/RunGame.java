@@ -214,7 +214,7 @@ final class RunGame {
      */
     private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings: a second jump", "Glossary magnet", "Longer treats", "Bigger ink tank",
             "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons", "A place by her side", "Room for a stray", "Kennel: brisker pets",
-            "Kennel: stronger pets"};
+            "Kennel: stronger pets", "Triple jump", "Air dash", "Thorns", "Ground pound", "Dodge roll", "Wall jump", "Glide", "Second wind"};
     private static final String[][] UP_GIVES = {
             {"A fourth heart in every land", "A fifth heart in every land"},
             {"A second jump in the air: press jump again"},
@@ -229,16 +229,26 @@ final class RunGame {
             {"Two pets of her own come into every land", "Three pets of her own come into every land"},
             {"Two pets found in a land may follow her", "Three pets found in a land may follow her"},
             {"Her pets wait a fifth less between one thing and the next", "Her pets wait two fifths less"},
-            {"A pet's blow counts twice on a big one", "And a pet takes a whole piece off a shield"}};
+            {"A pet's blow counts twice on a big one", "And a pet takes a whole piece off a shield"},
+            {"A third jump in the air, a flip: press jump again"},
+            {"In the air, double-tap a way (or Shift): a dash that way", "And the dash strikes whatever it goes through"},
+            {"Whatever hurts her takes a blow of thorns", "Two blows of thorns", "Three blows of thorns"},
+            {"Hold down in the air: landing, she strikes all round her"},
+            {"On the ground, double-tap a way (or Shift): a roll nothing hurts"},
+            {"Against a wall in the air she clings: jump to kick off it"},
+            {"Hold jump as she falls: she glides down slowly"},
+            {"Once a land, what would end her leaves half a heart"}};
     private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}, {200, 350, 500, 900},
-            {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}};
+            {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}, {350}, {300, 650}, {250, 500, 900}, {280}, {260}, {320}, {300}, {600}};
+    /** The moves bought at the counter, by their places in those lists. */
+    private static final int TRIPLE = 14, AIR_DASH = 15, THORNS = 16, POUND = 17, ROLL = 18, WALL_JUMP = 19, GLIDE = 20, SECOND_WIND = 21;
     /** For her pets: more of her own beside her, more strays, brisker, stronger. */
     private static final int PET_PLACES = 10, STRAY_ROOM = 11, PET_BRISK = 12, PET_STRONG = 13;
     /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
     private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800, 950, 900, 1200, 1500};
     /** The counter's tabs, and what stands under each. */
     private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms", "Vanity"};
-    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
+    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1, 14, 15, 18, 19, 17, 20, 16, 21}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
     private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2, VANITY_TAB = 6;
     private final RectF[] counterTabs = new RectF[TAB_NAMES.length], petCells = new RectF[PlusRun.PETS];
     private final RectF petAct = new RectF(), armsAct = new RectF();
@@ -253,10 +263,14 @@ final class RunGame {
             "she comes down slowly, and water goes both ways", "what is sent back goes on through a row", "she rises much faster",
             "what she knocks over flies off burning", "whatever lands on her lands by half", "every colour's power for a while: a glow, not yet a light"};
     /** The order they stand in at the counter: lives under hearts. And the picture that stands for her own face. */
-    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13};
+    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 14, 15, 18, 19, 17, 20, 16, 21, 2, 3, 4, 5, 6, 10, 11, 12, 13};
     private static final int HER_FACE = -2;
+    /** A ware whose picture is her in one of her moves: below nothing, so that it is never taken for one of the other pictures. */
+    private static final int MOVE_ART = -100;
     private static final int[] UP_ART = {BUFF_ART + PlusRun.BREAD, -1, BUFF_ART + PlusRun.MAGNET, BUFF_ART + PlusRun.ICE, WEAPON_ART + PlusRun.GUN,
-            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART};
+            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART,
+            MOVE_ART + PlusRun.MOVE_FLIP + 1, MOVE_ART + PlusRun.MOVE_DASH, STAR_ART, MOVE_ART + PlusRun.MOVE_POUND, MOVE_ART + PlusRun.MOVE_ROLL, MOVE_ART + PlusRun.MOVE_WALL,
+            MOVE_ART + PlusRun.MOVE_GLIDE, HER_FACE};
     /** How long the ice cream, the magnet and the notes last before anything is bought, as {@link PlusRun} has them. */
     private static final float[] BUFF_LASTS = {0, 8, 0, 10, 6};
 
@@ -538,7 +552,9 @@ final class RunGame {
      * on the pause; her active slots on the HUD; and how many times divine power has come in this land, as last seen. */
     private RunTree tree;
     /** The shields creatures carry: their pictures; blows that rang off and shields broken, as last seen; and how long ago the last of each was. */
-    private Bitmap mobShields;
+    private Bitmap mobShields, uniqueSheet;
+    private int seenHeals, seenWinds;
+    private float healAge = 9;
     private int seenClangs, seenBroken;
     private float clangAge = 9, shatterAge = 9;
     private boolean treeOpen;
@@ -768,6 +784,15 @@ final class RunGame {
         kept.together = bought(PRISM) >= PRISM_NEEDS.length ? 7 : 2 + bought(PRISM);
         kept.recharge -= bought(QUICK);
         kept.wings = bought(1) > 0;
+        kept.triple = bought(TRIPLE) > 0;
+        kept.airDash = bought(AIR_DASH) > 0;
+        kept.dashStrikes = bought(AIR_DASH) > 1;
+        kept.thorns = bought(THORNS);
+        kept.pound = bought(POUND) > 0;
+        kept.roll = bought(ROLL) > 0;
+        kept.wallJump = bought(WALL_JUMP) > 0;
+        kept.glide = bought(GLIDE) > 0;
+        kept.secondWind = bought(SECOND_WIND) > 0;
         kept.reach = bought(2) == 0 ? 0 : bought(2) == 1 ? 1.6f : 2.6f;
         kept.lasting = 1 + .5f * bought(3);
         kept.shots = PlusRun.GUN_SHOTS + 8 * bought(4);
@@ -5847,6 +5872,7 @@ final class RunGame {
         wardFlash += seconds;
         gripChanged += seconds;
         clangAge += seconds;
+        healAge += seconds;
         shatterAge += seconds;
         // The keys, said once the story told as the first land begins is over (said over it, it would not be heard).
         if (keysHintDue && screen == PLAY && !(talking && !told) && captionLeft <= 0) {
@@ -5864,6 +5890,14 @@ final class RunGame {
                 && clock > 4 && !audio.speaking() && skillsLeft() > 0) {
             session.keep("run_skills_said", 1);
             speak(RunStory.SKILLS[0], false);
+        }
+        // Her second wind: she says so.
+        if (run != null && run.secondWinds() != seenWinds) {
+            if (run.secondWinds() > seenWinds && screen == PLAY) {
+                speak(RunStory.MOVES[0], true);
+                audio.play("heart", .8f);
+            }
+            seenWinds = run.secondWinds();
         }
         // Divine power, the first time it comes in a land.
         if (run != null && run.divines() != seenDivines) {
@@ -7473,6 +7507,7 @@ final class RunGame {
                 pills("Back to the land", RESUME, "Guild counter", COUNTER);
                 return;
             }
+            doubleTap(event, action);
             held(event);
             return;
         }
@@ -7594,6 +7629,7 @@ final class RunGame {
     /** What must be so before the next step of something is for sale, in a few words; or null, if it is. */
     private String locked(int which) {
         int has = bought(which);
+        if (which == TRIPLE && bought(1) == 0) return "Needs her wings first";
         if (which != PRISM || has >= PRISM_NEEDS.length) return null;
         int owned = Integer.bitCount(colours() & 127);
         return owned >= PRISM_NEEDS[has] ? null : PRISM_NEEDS[has] == 7 ? "Needs all seven colours: " + owned + " of 7 won" : "Needs " + PRISM_NEEDS[has] + " colours won: "
@@ -7839,6 +7875,26 @@ final class RunGame {
         buzz(false);
     }
 
+    /** The way last tapped (-1 left, 1 right) and when: a second tap of the same way soon after is a dash in the air, or a roll on the ground. */
+    private int tappedWay;
+    private float tappedAt = -9;
+
+    private void doubleTap(MotionEvent event, int action) {
+        if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_POINTER_DOWN || run == null) return;
+        float x = event.getX(event.getActionIndex()), y = event.getY(event.getActionIndex());
+        if (y < height * .45f) return;
+        float between = (leftButton.right + rightButton.left) / 2, arrows = Math.min(rightButton.right + dp(26), (rightButton.right + strikeButton.left) / 2);
+        int way = x < between ? -1 : x < arrows ? 1 : 0;
+        if (way == 0) return;
+        if (way == tappedWay && clock - tappedAt < .3f) {
+            tappedAt = -9;
+            if (run.dash()) audio.play("jump", .5f);
+            return;
+        }
+        tappedWay = way;
+        tappedAt = clock;
+    }
+
     /** Which buttons are held, by however many fingers are down: one may hold an arrow while another jumps. */
     private void held(MotionEvent event) {
         int action = event.getActionMasked();
@@ -7914,6 +7970,7 @@ final class RunGame {
                 buzz(false);
             }
             if ((fresh & RunKeys.EXTRA) != 0) overJump();
+            if ((fresh & RunKeys.DASH) != 0 && run.dash()) audio.play("jump", .5f);
             for (int slot = 0; slot < PlusRun.SLOTS; slot++) if ((fresh & RunKeys.SKILL_1 << slot) != 0) callSlot(slot);
             if ((fresh & RunKeys.DOWN) != 0 && !run.atStall() && run.door() >= 0) {
                 idle();
@@ -8223,7 +8280,7 @@ final class RunGame {
             float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, feet = (foe.y + foe.tall() - cameraY) * tile, tall = Math.max(tile * .62f, foe.tall() * tile * .78f);
             float shake = foe.guardMet < .2f ? (float) Math.sin(foe.guardMet * 90) * tile * .05f : 0;
             float sx = middle + (foe.leftward ? -1 : 1) * foe.wide() * tile * .42f + shake, sy = feet - foe.tall() * tile * .45f;
-            if (mobShields != null) {
+            if (mobShields != null && foe.guardKind >= 0) {
                 int cell = mobShields.getHeight();
                 source.set(foe.guardKind * cell, 0, (foe.guardKind + 1) * cell, cell);
                 target.set(sx - tall / 2, sy - tall / 2, sx + tall / 2, sy + tall / 2);
@@ -8236,7 +8293,7 @@ final class RunGame {
             paint.setColor(0xCC15171A);
             canvas.drawRoundRect(middle - wide / 2 - tile * .04f, row - pip / 2 - tile * .04f, middle + wide / 2 + tile * .04f, row + pip / 2 + tile * .04f, pip, pip, paint);
             for (int one = 0; one < foe.guardMost; one++) {
-                paint.setColor(one < foe.guard ? SHIELD_PIPS[foe.guardKind] : 0xFF4A4F54);
+                paint.setColor(one < foe.guard ? (foe.guardKind >= 0 ? SHIELD_PIPS[foe.guardKind] : 0xFFE8C77A) : 0xFF4A4F54);
                 float px = middle - wide / 2 + one * (pip + gap);
                 canvas.drawRect(px, row - pip / 2, px + pip, row + pip / 2, paint);
             }
@@ -8282,6 +8339,57 @@ final class RunGame {
             paint.setAlpha(255);
             paint.setColor(Color.BLACK);
         }
+    }
+
+    /**
+     * A unique creature: walking (two pictures by turns), winding up (lit red-gold and pulsing, so that it is seen coming), striking,
+     * hurt, and beaten (its last picture, fading). A mimic lies still as its first picture until it springs; a burrower under the
+     * ground is a mound; a wall-ghost faded is a faint shape. A healer's mending is a ring of green light about it.
+     */
+    private void drawUnique(Canvas canvas, PlusRun.Foe foe, float middle, float feet, boolean turned) {
+        if (uniqueSheet == null) uniqueSheet = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_uniques);
+        if (uniqueSheet == null) return;
+        int way = RunUniques.way(foe.kind);
+        if (foe.flat && foe.act > 1.1f) return;
+        if (run.heals() != seenHeals) {
+            if (run.heals() > seenHeals) healAge = 0;
+            seenHeals = run.heals();
+        }
+        int frame = foe.flat ? 5 : foe.mode == 1 ? 2 : foe.mode == 2 ? 3 : foe.struck < .2f ? 4
+                : way == RunUniques.MIMIC && foe.turn == 0 ? 0 : (int) (clock * 5 + foe.x) % 2;
+        float tall = Math.max(foe.tall(), foe.wide() * .9f) * tile * 1.4f;
+        if (way == RunUniques.BURROWER && foe.unseen && !foe.flat) {
+            // Under the ground: a mound of earth moving along.
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFF5A4630);
+            canvas.drawOval(middle - tile * .4f, feet - tile * .18f, middle + tile * .4f, feet + tile * .05f, paint);
+            paint.setColor(0xFF7A6240);
+            canvas.drawOval(middle - tile * .25f, feet - tile * .26f, middle + tile * .2f, feet - tile * .08f, paint);
+            paint.setColor(Color.BLACK);
+            return;
+        }
+        if (foe.mode == 1 && !foe.flat) {
+            float pulse = .5f + .5f * (float) Math.sin(clock * 22);
+            glowAt(canvas, middle, feet - tall * .4f, tall * (.7f + .15f * pulse), 0xFFFF6A3A, Math.round(140 + 100 * pulse));
+        }
+        if (way == RunUniques.HEALER && healAge < .8f && foe.mode >= 2) {
+            float through = healAge / .8f;
+            stroke.setColor(0xFF6AF09A);
+            stroke.setAlpha(Math.round(220 * (1 - through)));
+            stroke.setStrokeWidth(tile * .08f);
+            canvas.drawCircle(middle, feet - tall * .3f, tile * 4.5f * (.3f + .7f * through), stroke);
+            stroke.setAlpha(255);
+        }
+        paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
+                : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
+        int cell = uniqueSheet.getHeight() / RunUniques.COUNT, row = RunUniques.index(foe.kind);
+        source.set(frame * cell, row * cell, (frame + 1) * cell, (row + 1) * cell);
+        canvas.save();
+        if (turned) canvas.scale(-1, 1, middle, feet);
+        target.set(middle - tall / 2, feet - tall + tile * .04f, middle + tall / 2, feet + tile * .04f);
+        canvas.drawBitmap(uniqueSheet, source, target, paint);
+        canvas.restore();
+        paint.setAlpha(255);
     }
 
     /** The pips of a shield's bar, by which shield it is. */
@@ -9947,6 +10055,8 @@ final class RunGame {
                 stroke.setAlpha(255);
             } else if (RunLevels.flier(foe.kind)) {
                 drawFlier(canvas, foe, middle, feet, second, turned);
+            } else if (RunUniques.is(foe.kind)) {
+                drawUnique(canvas, foe, middle, feet, turned);
             } else if (foe.kind >= RunLevels.SLIME) {
                 // The signs of the second volume: two pictures of each about its business, and two of its going, after which it fades.
                 int which = SIGN_ART + (foe.kind - RunLevels.SLIME) * 4 + (foe.flat ? (foe.act < .22f ? 2 : 3) : second ? 1 : 0);
@@ -11882,6 +11992,13 @@ final class RunGame {
             return;
         }
         if (beaming) weapon = PlusRun.TABLET;
+        // In the middle of one of her moves, it is drawn, whatever she holds.
+        int move = run.moveShown();
+        if (move != PlusRun.NO_MOVE) {
+            drawMove(canvas, move, feetX, feetY, tall, leftward, alpha);
+            paint.setAlpha(255);
+            return;
+        }
         if (weapon == PlusRun.KATANA) {
             // The katana: the dash's cut, and standing after it; the dash gathered while the button is held; the cut downward; and a draw:
             // out, across, and back in its sheath.
@@ -11911,6 +12028,42 @@ final class RunGame {
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
         }
         paint.setAlpha(255);
+    }
+
+    // Her moves
+
+    private Bitmap moves;
+
+    private Bitmap movesSheet() {
+        if (moves == null) moves = BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_moves);
+        return dressed("moves", moves);
+    }
+
+    /**
+     * One of her moves: the three pictures of a flip, a dash with two fading copies of her behind it, the drop of a ground pound (and the
+     * ring it sends out as she lands), a roll turning over, clinging to a wall (facing it), and gliding under her book.
+     */
+    private void drawMove(Canvas canvas, int move, float feetX, float feetY, float tall, boolean leftward, int alpha) {
+        Bitmap sheet = movesSheet();
+        int count = PlusRun.MOVE_GLIDE + 1;
+        if (move == PlusRun.MOVE_DASH) {
+            float back = leftward ? 1 : -1;
+            for (int ghost = 2; ghost >= 1; ghost--) {
+                paint.setAlpha(Math.round(alpha * (ghost == 2 ? .22f : .45f)));
+                frame(canvas, sheet, move, count, feetX + back * ghost * tile * .45f, feetY, tall, leftward);
+            }
+            paint.setAlpha(alpha);
+            frame(canvas, sheet, move, count, feetX, feetY, tall, leftward);
+        } else if (move == PlusRun.MOVE_ROLL) {
+            canvas.save();
+            canvas.rotate((leftward ? -1 : 1) * 360 * run.rollThrough(), feetX, feetY - tall * .3f);
+            frame(canvas, sheet, move, count, feetX, feetY, tall, leftward);
+            canvas.restore();
+        } else if (move == PlusRun.MOVE_WALL) {
+            frame(canvas, sheet, move, count, feetX, feetY, tall, run.wallSide() < 0);
+        } else {
+            frame(canvas, sheet, move, count, feetX, feetY, tall, leftward);
+        }
     }
 
     // Her hands, for a weapon found
@@ -14165,6 +14318,8 @@ final class RunGame {
         canvas.clipRect(0, shopListTop, width, height);
         // (With her pets under them, the four that are for her pets are lower rows.)
         float squeeze = counterTab == PETS_TAB ? Math.min(wares[0].height(), dp(52)) : wares[0].height();
+        // (A long list, as her moves are, is made to fit under the tabs, down to rows that still have room for what each gives; past that, it scrolls.)
+        squeeze = Math.max(Math.min(squeeze, dp(52)), Math.min(squeeze, (safe.bottom - safe.top - dp(150)) / list.length - dp(6)));
         for (int row = 0; row < list.length; row++) {
             RectF where = wares[row];
             where.set(where.left, listed + row * (squeeze + dp(6)), where.right, listed + row * (squeeze + dp(6)) + squeeze);
@@ -14179,6 +14334,7 @@ final class RunGame {
             paint.setAlpha(255);
             if (UP_ART[index] >= 0) artIn(canvas, UP_ART[index], left + dp(14) + icon / 2, middle, icon);
             else if (UP_ART[index] == HER_FACE) round(canvas, 0, left + dp(14) + icon / 2, middle, icon * .46f);
+            else if (UP_ART[index] >= MOVE_ART && UP_ART[index] <= MOVE_ART + PlusRun.MOVE_GLIDE) frame(canvas, movesSheet(), UP_ART[index] - MOVE_ART, PlusRun.MOVE_GLIDE + 1, left + dp(14) + icon / 2, middle + icon / 2, icon * .95f, false);
             else frame(canvas, jump, TOP, JUMP_FRAMES, left + dp(14) + icon / 2, middle + icon / 2, icon * .95f, false);
             float words = left + dp(24) + icon, price = dp(86), room = right - words - price - dp(18);
             text.setTextAlign(Paint.Align.LEFT);
@@ -14237,11 +14393,6 @@ final class RunGame {
             fitted(canvas, "Open her backpack  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
         } else if (counterTab == VANITY_TAB) {
             end = drawVanityTab(canvas, left, under, across, bank);
-        } else if (counterTab == 1) {
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setColor(soft);
-            fitted(canvas, "Her wings are what there is to buy for how she moves, so far.", left + dp(6), under + dp(14), dp(12.5f), across - dp(12));
-            end = under + dp(20);
         }
         canvas.restore();
         // How far it can scroll: as far as its end coming up to the bottom of the screen; and a thin bar at the side to show there is more.
