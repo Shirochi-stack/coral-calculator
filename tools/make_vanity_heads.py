@@ -53,12 +53,16 @@ def head_crop(img):
     return int(left - pad), int(y0 - int(crop_h * 0.35)), int((right - left) + pad * 2), int(crop_h + int(crop_h * 0.35))
 
 
+LATER = ["arm%d" % i for i in range(12, 18)]
+
+
 def frames_list():
-    out = []
+    """Every frame: those of the sheets she had first, then those of the sheets that came later (as grids of their own, so that the grids drawn before stay the same)."""
+    out, later = [], []
     for name in SHEETS:
         for idx, c in cells(name):
-            out.append((name, idx, c))
-    return out
+            (later if name in LATER else out).append((name, idx, c))
+    return out, later
 
 
 def make_jobs(variant):
@@ -67,11 +71,12 @@ def make_jobs(variant):
     (work / "raw").mkdir(exist_ok=True)
     manifest = {}
     jobs = []
-    allf = frames_list()
+    first, later = frames_list()
+    allf = first + later
+    groups = [first[i:i + COLS * ROWS] for i in range(0, len(first), COLS * ROWS)] + [later[i:i + COLS * ROWS] for i in range(0, len(later), COLS * ROWS)]
     cw, ch = CANVAS[0] // COLS, CANVAS[1] // ROWS
-    for gi in range(0, len(allf), COLS * ROWS):
-        group = allf[gi:gi + COLS * ROWS]
-        name = "%s_%02d" % (variant, gi // (COLS * ROWS))
+    for gnum, group in enumerate(groups):
+        name = "%s_%02d" % (variant, gnum)
         canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
         place = []
         for k, (sheet, idx, c) in enumerate(group):
@@ -178,9 +183,14 @@ def pack(variant):
                 diff = horn | added
             else:
                 # Ears: the top of the head; what the part changed in colour or in outline, from the strongest differences only.
-                diff = alpha_diff | (both & (np.abs(o[..., :3] - v[..., :3]).sum(axis=2) > 170))
+                diff = alpha_diff | (both & (np.abs(o[..., :3] - v[..., :3]).sum(axis=2) > 90))
                 diff = cv2.morphologyEx(diff.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
-                diff = components(diff, 30)
+                diff = components(diff, 20)
+                # Horns are never touched by an ear: where a horn is (in her frame or in the redraw), nothing is a patch.
+                def hornish(a_):
+                    return (a_[..., 3] > 100) & (a_[..., 0] < 140) & (a_[..., 1] < 100) & (a_[..., 2] < 150) & (a_[..., 2] + 6 >= a_[..., 1]) & (a_[..., 0] >= a_[..., 1] + 8)
+                keep_off = cv2.dilate((hornish(o) | hornish(v)).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+                diff = diff & ~keep_off
                 if len(ys_):
                     diff[ys_[0] + int((ys_[-1] - ys_[0]) * 0.34):] = False
             # Two regions: the tight one, where the part's own pixels go (a little wider than the part), and, for horns, a loose one round it,

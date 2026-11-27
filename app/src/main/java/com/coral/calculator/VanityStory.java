@@ -50,7 +50,21 @@ final class VanityStory {
             {"vsb3", "The bunny suit! Collar, cuffs and bow tie, all pressed. Hop along now.", "g", SHOP + "She hands over a bunny girl costume, playful and cheerful."},
             {"vsb4", "The maid dress! Frills pressed and ribbons tied. Is there anything else I can do for you?", "g", SHOP + "She hands over a maid dress, prim and playful."},
             null, null,
-            {"vsb7", "The gacha bunny suit! Red satin, a little tailcoat and a pom tail. Do try to look innocent.", "g", SHOP + "She hands over a flashy red and black bunny girl costume, delighted and teasing."}};
+            {"vsb7", "The gacha bunny suit! Red satin, a little tailcoat and a pom tail. Do try to look innocent.", "g", SHOP + "She hands over a flashy red and black bunny girl costume, delighted and teasing."},
+            {"vsb8", "The bunny idol dress! Puffed sleeves, a big ribbon and a little pom tail. Perfectly sweet.", "g", SHOP + "She hands over a pastel pink bunny dress, delighted and cooing."},
+            {"vsb9", "The white bunny suit! Satin and pink trim, and not a crease in it.", "g", SHOP + "She hands over a white and pink bunny costume, proud of the pressing."},
+            {"vsb10", "The pink maid dress! Frills upon frills, and every bow tied twice.", "g", SHOP + "She hands over a pink French maid dress, bubbly and fussy."},
+            {"vsb11", "The crop stage top! Frills, ribbons and sleeves that sparkle under the lights.", "g", SHOP + "She hands over a frilled idol stage outfit, excited."},
+            {"vsb12", "The frilled swimsuit! A halter bow and a wrap skirt. Do mind the tide.", "g", SHOP + "She hands over a frilled aqua swimsuit, cheerful and teasing."},
+            {"vsb13", "The sporty swim set! Quick-dry and stripe-trimmed, for racing the waves.", "g", SHOP + "She hands over a sporty swim set, upbeat and energetic."},
+            {"vsb14", "The camisole pajamas! Satin, lace and little stars. Sweet dreams.", "g", SHOP + "She hands over a lavender pajama set, soft and sleepy."},
+            {"vsb15", "The gothic mini dress! Corset, lace and a ribbon choker. Very dramatic indeed.", "g", SHOP + "She hands over a black gothic dress, thrilled and theatrical."},
+            {"vsb16", "The sky tabard! Silver pauldrons and a gold edge. Very brave, very blue.", "g", SHOP + "She hands over a sky blue knight outfit, proud."},
+            {"vsb17", "The mage robe! Gold stars on blue and a belt of pouches. Spell books not included.", "g", SHOP + "She hands over a mage robe, amused and proud."},
+            {"vsb18", "The festival yukata! Flowers on pink and a big red obi bow. Don't trip on the geta.", "g", SHOP + "She hands over a pink yukata, delighted and fussy about the bow."},
+            {"vsb19", "The winter coat! Duffle toggles, a long red scarf and warm boots. No sniffles allowed.", "g", SHOP + "She hands over a warm winter outfit, motherly and cheerful."},
+            {"vsb20", "The magical girl dress! A big ribbon and a star brooch. Transformation sequence extra.", "g", SHOP + "She hands over a frilly magical girl dress, gleeful."},
+            {"vsb21", "The school blazer! Gold buttons and a striped tie. Top marks for style.", "g", SHOP + "She hands over a tidy school blazer outfit, proud and prim."}};
     static final String[][] HAL_BOUGHT = {
             {"vshb0", "It fits perfectly! Thank you, Tulle Sloppy~♡", "H", "Halgakos thanks the seamstress happily after getting a new outfit. She is a catgirl who ends her sentences with Sloppy."},
             {"vshb1", "So cute! I am never taking it off Sloppy~♡", "H", "Halgakos squeals happily about her new outfit. She is a catgirl who ends her sentences with Sloppy."}};

@@ -141,6 +141,16 @@ final class RunBoutique extends View {
 
     private float dp(float value) { return value * density; }
 
+    /** Which of Tulle's six pictures she is in at a moment (in seconds): the same round and round, in the boutique's page and in the village's. */
+    static int frameAt(float seconds) {
+        float time = Math.max(0, seconds) % IDLE_TOTAL[0], at = 0;
+        for (float[] one : IDLE) {
+            at += one[1];
+            if (time < at) return (int) one[0];
+        }
+        return 0;
+    }
+
     private void speak(String[] line) {
         if (line == null) return;
         queue.add(line);
@@ -580,15 +590,19 @@ final class RunBoutique extends View {
         }
     }
 
-    /** Whether there is a picture of what was just got. */
-    private static boolean hasPicture(int outfit, int ears, int horns) {
-        for (VanityPictures.Picture picture : VanityPictures.ALL) {
-            if (VanityPictures.shown(picture) && (outfit >= 0 && picture.outfit == outfit || ears > 0 && picture.ears == ears || horns > 0 && picture.horns == horns)) return true;
-        }
-        return false;
+    private int picturesBefore;
+
+    private int opened() {
+        int count = 0;
+        for (VanityPictures.Picture picture : VanityPictures.ALL) if (VanityPictures.open(save, picture)) count++;
+        return count;
     }
 
+    /** Whether what was just got opened a picture (or more): its pictures, counted before and after. */
+    private boolean hasPicture(int outfit, int ears, int horns) { return opened() > picturesBefore; }
+
     private void act(String what, int number) {
+        picturesBefore = opened();
         switch (what) {
             case "mode":
                 RunVanity.setMode(save, number);

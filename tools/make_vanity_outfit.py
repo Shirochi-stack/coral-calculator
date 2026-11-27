@@ -29,6 +29,7 @@ spec.loader.exec_module(layers)
 SHEETS = layers.SHEETS
 SMALL = ["jump", "lose", "party", "white", "back"]
 ARMS = ["arm%d" % i for i in range(12)]
+LATER_ARMS = ["arm%d" % i for i in range(12, 18)]
 
 DESIGNS = {
     "bunny": ("the bunny girl suit", "a strapless glossy black satin bodysuit shaped like a ballet leotard, sheer black tights, a white detached collar with a red bow tie, white wrist cuffs and black high heels"),
@@ -37,6 +38,12 @@ DESIGNS = {
     "swim1": ("the seaside swimsuit", "a sporty one-piece swimsuit with a white sailor-style collar, aqua and white horizontal stripes, a small frilled skirt hem, short sleeves, a tiny red ribbon at the chest and white strap sandals"),
     "bunnyg": ("the gacha bunny girl suit", "a glossy red satin bodysuit with gold buckle details, a short black cropped tailcoat jacket with red lining and gold buttons worn over it, opaque black tights, a white detached collar with a black bow tie, white wrist cuffs, red high heels and a small fluffy white pom-pom tail at the back of her waist"),
 }
+try:
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from vanity_designs import DESIGNS as MORE
+    DESIGNS.update(MORE)
+except ImportError:
+    pass
 CANVAS = (1536, 1024)
 CLEAR = (" The background must be fully transparent (a PNG with an alpha channel): no backdrop colour, no checkerboard, no ground, no shadows, no text, no borders, "
          "and no glow, halo or mist around anything.")
@@ -67,6 +74,9 @@ def groups():
     out += [("g3x2", small[i:i + 6]) for i in range(0, len(small), 6)]
     arms = [(s, i) for s in ARMS for i, _ in cells(s)]
     out += [("g2x3", arms[i:i + 6]) for i in range(0, len(arms), 6)]
+    # The sheets that came later are their own grids, so that the grids drawn before are the same grids still.
+    later = [(s, i) for s in LATER_ARMS for i, _ in cells(s)]
+    out += [("g2x3", later[i:i + 6]) for i in range(0, len(later), 6)]
     return out
 
 
@@ -237,6 +247,19 @@ def pack(outfit, threshold=0.80):
             a = np.array(frame)
             a[..., 3] = np.where(keep, a[..., 3], 0)
             frame = Image.fromarray(a)
+            if best[0] < 0.85:
+                # A frame with an effect about her (a glow, a ring, sparks): the redraw leaves it out. The effects of her own frame are semi-transparent,
+                # and her body is not, so what is faint and not near the redrawn body is put back, under her.
+                orig_a = np.array(orig)
+                faint = (orig_a[..., 3] > 10) & (orig_a[..., 3] < 235)
+                near_body = cv2.dilate((np.array(frame)[..., 3] > 128).astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+                put = faint & ~near_body
+                if put.any():
+                    under = np.zeros_like(orig_a)
+                    under[put] = orig_a[put]
+                    base_img = Image.fromarray(under)
+                    base_img.alpha_composite(frame)
+                    frame = base_img
             if sheet not in sheets:
                 sheets[sheet] = Image.new("RGBA", (cols * cw, rows * ch), (0, 0, 0, 0))
             sheets[sheet].alpha_composite(frame, ((idx % cols) * cw, (idx // cols) * ch))

@@ -92,21 +92,42 @@ final class RunVanity {
      * what it costs in pluses and in treats, the quest that gives it instead of a price (or -1; a quest's outfit is not sold),
      * and how it is drawn. An outfit drawn whole is on sale once its pictures are in the app ({@link #READY}).
      */
-    static final String[] NAMES = {"Pajama Set", "Gothic Dress", "Knight's Tabard", "Bunny Girl", "Maid Dress", "Sloppy\u2606Stage", "Seaside Swimsuit", "Bunny Girl (Gacha)"};
+    static final String[] NAMES = {"Pajama Set", "Gothic Dress", "Knight's Tabard", "Bunny Girl", "Maid Dress", "Sloppy\u2606Stage", "Seaside Swimsuit", "Bunny Girl (Gacha)",
+            "Bunny Idol", "Bunny Girl, white", "Maid Dress, pink", "Sloppy\u2606Stage, crop", "Seaside Swimsuit, frilled", "Seaside Swimsuit, sporty", "Pajama Set, camisole",
+            "Gothic Dress, mini", "Knight's Tabard, sky", "Mage Robe", "Festival Yukata", "Winter Coat", "Magical Girl", "School Blazer"};
     static final String[] DOES = {"Soft lavender with stars, for resting", "Black and violet lace, a red stone at the throat", "Blue and white, a gold edge, one pauldron",
             "The classic bunny suit: black satin, tights, a collar, cuffs and a bow tie", "A short black dress, a frilled apron, white stockings with ribbon garters", "The idol stage dress from her song: ribbons, frills and a layered skirt",
             "A striped sailor swim dress with a frilled hem, a red ribbon and sandals",
-            "Red satin bodysuit, a short black tailcoat, tights, a collar and bow tie, and a pom tail"};
-    static final int[] PRICES = {400, 700, 0, 1500, 1200, 0, 0, 1500};
-    static final int[] TREATS = {3, 5, 0, 8, 6, 0, 0, 8};
-    static final int[] QUEST = {-1, -1, 2, -1, -1, 0, 1, -1};
+            "Red satin bodysuit, a short black tailcoat, tights, a collar and bow tie, and a pom tail",
+            "A pastel pink idol dress: puffed sleeves, a big ribbon, a frilled skirt, tights and a pom tail",
+            "White satin with pink trim, a pink bow tie, white tights and pink heels",
+            "A short pink French maid dress with puffed sleeves, a frilled apron and pink bows",
+            "The stage top: black and pink frills, off-shoulder sleeves, a ribbon and a frilly mini skirt",
+            "A frilled aqua and white one-piece with a halter bow and a wrap skirt",
+            "A sporty rash guard with an aqua stripe, swim shorts and sandals",
+            "A lavender satin camisole and star shorts, with fluffy slippers",
+            "A black corset mini dress, violet lace, a red ribbon choker and platform boots",
+            "A short sky-blue tabard dress with a gold edge, silver pauldrons and thigh boots",
+            "A short blue robe with gold stars, a half-cape, a belt of pouches and tall boots",
+            "A short pink yukata with flowers, a big red obi bow and geta",
+            "A cream duffle coat, a long red scarf, a plaid skirt and boots",
+            "A frilly pink and white dress with a big ribbon, a star brooch and pink boots",
+            "A navy blazer with gold buttons, a striped tie and a plaid skirt"};
+    static final int[] PRICES = {400, 700, 0, 1500, 1200, 0, 0, 1500, 1500, 1500, 1200, 1500, 1100, 1000, 450, 800, 1000, 1300, 1100, 1000, 1400, 800};
+    static final int[] TREATS = {3, 5, 0, 8, 6, 0, 0, 8, 8, 8, 6, 8, 6, 5, 3, 5, 5, 7, 6, 5, 7, 4};
+    static final int[] QUEST = {-1, -1, 2, -1, -1, 0, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
     static final Style[] STYLES = {
             new Style(0xFF5B4FA8, 0xFF9A8CE0, 0xFFF0E9FF, 0xFFFFE08A, STARS, false, false, false, 0),
             new Style(0xFF1A1020, 0xFF4A2A5E, 0xFFB89AD0, 0xFFD8C8EC, DIAMONDS, false, false, true, 0xFFE0334A),
             new Style(0xFF2B3A55, 0xFF5C7CB0, 0xFFEAF0FA, 0xFFE8C65A, PLAIN, false, true, true, 0xFFE8C65A),
-            new Style("bunny"), new Style("maid"), new Style("idol"), new Style("swim1"), new Style("bunnyg")};
+            new Style("bunny"), new Style("maid"), new Style("idol"), new Style("swim1"), new Style("bunnyg"),
+            new Style("bunnyi"), new Style("bunnyw"), new Style("maidp"), new Style("idolc"), new Style("swimf"), new Style("swims"), new Style("pajamac"),
+            new Style("gothicm"), new Style("tabardsky"), new Style("mage"), new Style("yukata"), new Style("coat"), new Style("magical"), new Style("blazer")};
     /** Which outfits can be had now: those whose pictures are all there. */
-    static final boolean[] READY = {true, true, true, true, true, true, true, true};
+    static final boolean[] READY = {true, true, true, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false};
+    /** Whether the Rosebound Armour's pictures (assets/vanity/rose) are all there. */
+    static final boolean ROSE_READY = false;
+
     static int count() { return NAMES.length; }
     static boolean ready(int outfit) { return outfit >= 0 && outfit < count() && READY[outfit]; }
 
@@ -237,6 +258,8 @@ final class RunVanity {
         if (worn.armour == 0) return new Style(0, 0, 0, 0, PLAIN, false, false, true, gem);
         int base = RunLoot.base(worn.armour), rarity = RunLoot.rarity(worn.armour), theme = RunLoot.theme(worn.armour);
         if (base == RunLoot.ARMOURS.length - 1 || rarity == RunLoot.ROSE) {
+            // The Rosebound Armour is drawn whole, on every frame, once its pictures are in the app; until then its colours are painted over her own.
+            if (ROSE_READY) return new Style("rose");
             return new Style(0xFF8E2F5E, 0xFFE0709F, 0xFFFFE3EE, 0xFFF2C65A, ROSES, true, true, true, gem != 0 ? gem : 0xFFFF6FB5);
         }
         float hue = (theme * 47 + base * 13) % 360;
