@@ -29,7 +29,7 @@ SHEETS = {
     "jump": (6, 1, 256, 208), "lose": (6, 1, 288, 224), "party": (6, 1, 173, 202),
     "white": (12, 1, 240, 212), "back": (6, 1, 204, 236),
     "arm0": (8, 1, 304, 248), "arm1": (8, 1, 304, 248), "arm2": (8, 1, 304, 248), "arm3": (8, 1, 304, 248),
-    "arm4": (8, 1, 304, 248), "arm5": (8, 1, 304, 248), "arm6": (12, 1, 336, 248), "arm7": (12, 1, 336, 248),
+    "arm4": (8, 1, 304, 248), "arm5": (8, 1, 304, 248), "arm6": (12, 1, 500, 248), "arm7": (12, 1, 336, 248),
     "arm8": (14, 1, 400, 248), "arm9": (12, 1, 380, 248), "arm10": (12, 1, 340, 248), "arm11": (12, 1, 500, 248),
 }
 
@@ -44,14 +44,18 @@ def cut(cell):
     hsv = cv2.cvtColor(rgb.astype(np.uint8), cv2.COLOR_RGB2HSV).astype(np.float32)
     H, S, V = hsv[..., 0] * 2, hsv[..., 1] / 255, hsv[..., 2] / 255
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    navy = al & (b > r + 15) & (V < 0.75) & (H > 195) & (H < 255) & (S > 0.28)
-    n, lab, st, _ = cv2.connectedComponentsWithStats(navy.astype(np.uint8), 8)
-    if n < 2:
+    # The skirt is navy; in a frame where it is in shadow it is a greyer blue, so a second, looser try is made before giving up.
+    for gap, sat, bright in ((15, 0.28, 0.75), (8, 0.15, 0.62), (4, 0.10, 0.55)):
+        navy = al & (b > r + gap) & (V < bright) & (H > 190) & (H < 262) & (S > sat)
+        n, lab, st, _ = cv2.connectedComponentsWithStats(navy.astype(np.uint8), 8)
+        if n < 2:
+            continue
+        big = 1 + int(np.argmax(st[1:, 4]))
+        if st[big, 4] >= 150:
+            navy = lab == big
+            break
+    else:
         return None, None
-    big = 1 + int(np.argmax(st[1:, 4]))
-    if st[big, 4] < 150:
-        return None, None
-    navy = lab == big
     ys, xs = np.nonzero(navy)
     x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
     sw, sh = max(1, x1 - x0), max(1, y1 - y0)

@@ -84,11 +84,13 @@ public class RunBoutiqueTest {
     }
 
     @Test public void everyLineIsSaidAndRecorded() {
-        String[][] all = new String[1 + VanityStory.GREET.length + 1 + VanityStory.QUESTS.length * 5][];
+        String[][] all = new String[1 + VanityStory.GREET.length + 1 + VanityStory.QUESTS.length * 5 + VanityStory.BOUGHT_FOR.length + VanityStory.HAL_BOUGHT.length][];
         int n = 0;
         for (String[] one : VanityStory.GREET) all[n++] = one;
         all[n++] = VanityStory.BOUGHT;
         all[n++] = VanityStory.BROKE;
+        for (String[] one : VanityStory.BOUGHT_FOR) all[n++] = one;
+        for (String[] one : VanityStory.HAL_BOUGHT) all[n++] = one;
         for (String[][] quest : VanityStory.QUESTS) {
             assertEquals(5, quest.length);
             for (String[] one : quest) all[n++] = one;
@@ -102,6 +104,8 @@ public class RunBoutiqueTest {
             if (one[2].equals("H")) assertTrue(one[1], one[1].endsWith("Sloppy~♡"));
             assertNotNull(VanityStory.line(one[0]));
         }
+        // Every outfit that is sold has a line for it.
+        for (int outfit = 0; outfit < RunVanity.count(); outfit++) assertEquals(RunVanity.QUEST[outfit] < 0, VanityStory.BOUGHT_FOR[outfit] != null);
         // Three quest lines at least.
         assertTrue(VanityQuests.count() >= 3);
         assertEquals(VanityQuests.count(), VanityStory.QUESTS.length);

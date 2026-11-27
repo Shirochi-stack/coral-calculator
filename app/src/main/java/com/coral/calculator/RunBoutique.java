@@ -425,7 +425,8 @@ final class RunBoutique extends View {
                 if (what.equals("buy") ? RunVanity.buy(save, number) : RunVanity.buyWithTreats(save, number)) {
                     RunVanity.setMode(save, RunVanity.VANITY);
                     host.play("buy");
-                    speak(VanityStory.BOUGHT);
+                    speak(VanityStory.BOUGHT_FOR[number] != null ? VanityStory.BOUGHT_FOR[number] : VanityStory.BOUGHT);
+                    speak(VanityStory.HAL_BOUGHT[random.nextInt(VanityStory.HAL_BOUGHT.length)]);
                 } else {
                     host.play("no");
                     speak(VanityStory.BROKE);

@@ -42,10 +42,24 @@ final class VanityStory {
                     {"vsq2s2", "Crystals, perfect. Hand in four hunts for the pot's fee, and the dye is as good as in the cloth.", "g", SHOP + "She stirs the dye pot happily and names the last small price."},
                     {"vsq2d", "A knight's tabard, blue as the evening! Wear it well, and mind the dragons.", "g", SHOP + "She presents a finished knight's tabard with proud theatrical flair."}}};
 
+    /** What she says as an outfit is bought, one for each of the outfits that are sold (null for those a quest gives); and Halgakos's answer, one of two. */
+    static final String[][] BOUGHT_FOR = {
+            {"vsb0", "The pajama set! Soft, warm and covered in stars. Sweet dreams, Halgakos-nim.", "g", SHOP + "She hands over a cosy pajama set, tender and proud."},
+            {"vsb1", "The gothic dress! Black lace and a little red stone. You will look wonderfully dramatic.", "g", SHOP + "She hands over a black lace dress, thrilled at how dramatic it is."},
+            null,
+            {"vsb3", "The bunny suit! Collar, cuffs and bow tie, all pressed. Hop along now.", "g", SHOP + "She hands over a bunny girl costume, playful and cheerful."},
+            {"vsb4", "The maid dress! Frills pressed and ribbons tied. Is there anything else I can do for you?", "g", SHOP + "She hands over a maid dress, prim and playful."},
+            null, null};
+    static final String[][] HAL_BOUGHT = {
+            {"vshb0", "It fits perfectly! Thank you, Tulle Sloppy~♡", "H", "Halgakos thanks the seamstress happily after getting a new outfit. She is a catgirl who ends her sentences with Sloppy."},
+            {"vshb1", "So cute! I am never taking it off Sloppy~♡", "H", "Halgakos squeals happily about her new outfit. She is a catgirl who ends her sentences with Sloppy."}};
+
     static String[] line(String name) {
         for (String[] one : GREET) if (one[0].equals(name)) return one;
         if (BOUGHT[0].equals(name)) return BOUGHT;
         if (BROKE[0].equals(name)) return BROKE;
+        for (String[] one : BOUGHT_FOR) if (one != null && one[0].equals(name)) return one;
+        for (String[] one : HAL_BOUGHT) if (one[0].equals(name)) return one;
         for (String[][] quest : QUESTS) for (String[] one : quest) if (one[0].equals(name)) return one;
         return null;
     }

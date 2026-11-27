@@ -79,7 +79,7 @@ final class RunVanity {
             new Style(0xFF2B3A55, 0xFF5C7CB0, 0xFFEAF0FA, 0xFFE8C65A, PLAIN, false, true, true, 0xFFE8C65A),
             new Style("bunny"), new Style("maid"), new Style("idol"), new Style("swim1")};
     /** Which outfits can be had now: those whose pictures are all there. */
-    static final boolean[] READY = {true, true, true, true, false, false, false};
+    static final boolean[] READY = {true, true, true, true, true, true, false};
     static int count() { return NAMES.length; }
     static boolean ready(int outfit) { return outfit >= 0 && outfit < count() && READY[outfit]; }
 
