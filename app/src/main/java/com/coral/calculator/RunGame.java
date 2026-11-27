@@ -560,7 +560,9 @@ final class RunGame {
     private int craftBase;
     private final RectF[] craftKinds = new RectF[12], craftActs = {new RectF(), new RectF(), new RectF(), new RectF()};
     private static final int CRAFT = 3;
-    private int seenHeals, seenWinds;
+    private int seenHeals, seenWinds, seenHidden;
+    /** Foreground pieces, drawn in front of her for depth. */
+    private Bitmap foreground;
     private float healAge = 9;
     private int seenClangs, seenBroken;
     private float clangAge = 9, shatterAge = 9;
@@ -5932,6 +5934,33 @@ final class RunGame {
                 seenTrees = run.treesCut();
             }
         }
+        // A hideout: found, it is marked on the map; near one not yet found, she feels it (the first time ever); its hidden boss beaten, its
+        // own Rose is hers the first time, and the land is marked so.
+        if (run != null && screen == PLAY) {
+            int in = run.room();
+            if (in >= 0 && run.level().rooms.get(in)[0] == RunLevels.HIDEOUT) session.keep("run_hideout_" + number, 1);
+            if (session.tally("run_hid_said") == 0 && captionLeft <= 0 && !audio.speaking()) {
+                for (int[] one : run.level().rooms) {
+                    if (one[0] != RunLevels.HIDEOUT || Math.abs(run.x() - one[1]) > 9) continue;
+                    session.keep("run_hid_said", 1);
+                    speak(RunStory.SECRETS[0], true);
+                    break;
+                }
+            }
+            if (run.hiddenBeaten() > seenHidden) {
+                int kind = run.hiddenKind(), boss = kind - RunUniques.HIDDEN_FIRST;
+                session.keep("run_hidden_" + number, 1);
+                if (session.tally("run_sig_" + boss) == 0) {
+                    session.keep("run_sig_" + boss, 1);
+                    int signature = RunUniques.signature(kind);
+                    intoBag(signature);
+                    toast(RunLoot.name(signature), RunUniques.name(kind) + "'s own: in her bag", 0);
+                }
+                speak(RunStory.SECRETS[1], true);
+                audio.play("win", .8f);
+            }
+            seenHidden = run.hiddenBeaten();
+        }
         // Her second wind: she says so.
         if (run != null && run.secondWinds() != seenWinds) {
             if (run.secondWinds() > seenWinds && screen == PLAY) {
@@ -9298,7 +9327,7 @@ final class RunGame {
     private float woodGround = -1, woodTarget = -1, woodCamera, woodSeconds;
     private boolean woodReset;
 
-    private static final float WOOD_PACE = .45f, WOOD_EVERY = 4.6f;
+    private static final float WOOD_PACE = .52f, WOOD_EVERY = 4.6f;
 
     /**
      * Behind a land of the Contents Village, a wood of paper trees: some way off, so it goes by at
@@ -9661,7 +9690,7 @@ final class RunGame {
         RunLevels.Level level = run.level();
         int chapter = level.chapter;
         if (run.room() >= 0) drawInside(canvas);
-        else drawSky(canvas, chapter, cameraX * tile * .2f);
+        else drawSky(canvas, chapter, cameraX * tile * .12f);
         // In the Contents Village, between the sky and the land, a wood of paper trees.
         if (run.room() < 0 && chapter == 0) drawPaperTrees(canvas, level);
         if (run.room() < 0) drawJoins(canvas, level);
@@ -10061,6 +10090,7 @@ final class RunGame {
             }
         }
         drawTrees(canvas, first, last);
+        drawHideouts(canvas, first, last);
         for (PlusRun.Foe foe : run.foes()) {
             paint.setColorFilter(null);
             if (foe.x + foe.wide() < first - 9 || foe.x > last + 9) continue;
@@ -10153,6 +10183,7 @@ final class RunGame {
         }
         paint.setColorFilter(null);
         drawShields(canvas, first, last);
+        drawForeground(canvas);
         drawHits(canvas, first, last);
         // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
         for (PlusRun.Foe foe : run.foes()) {
@@ -12069,6 +12100,75 @@ final class RunGame {
                 pose = squash > 0 ? LAND : run.running() ? RUN : STAND;
             }
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
+        }
+        paint.setAlpha(255);
+    }
+
+    // Hideouts
+
+    /** Where a hideout's way in is and not yet broken into: a glint now and then, so that a sharp eye finds it; in its hideout, its boss's name and bar. */
+    private void drawHideouts(Canvas canvas, int first, int last) {
+        RunLevels.Level level = run.level();
+        if (run.room() < 0) {
+            for (int index = 0; index < level.rooms.size(); index++) {
+                int[] one = level.rooms.get(index);
+                if (one[0] != RunLevels.HIDEOUT || (run.roomsFound() & 1 << index) != 0 || one[1] < first - 2 || one[1] > last + 2) continue;
+                float x = (one[1] + .5f - cameraX) * tile, y = (one[2] - 1 - cameraY) * tile, beat = (clock * .6f + index * .37f) % 1;
+                if (beat < .35f) {
+                    float through = beat / .35f, size = tile * (.25f + .35f * (float) Math.sin(through * Math.PI));
+                    glowAt(canvas, x, y, size * 1.8f, 0xFFFFF2B0, Math.round(200 * (float) Math.sin(through * Math.PI)));
+                    stroke.setColor(Color.WHITE);
+                    stroke.setStrokeWidth(tile * .04f);
+                    canvas.drawLine(x - size, y, x + size, y, stroke);
+                    canvas.drawLine(x, y - size, x, y + size, stroke);
+                }
+            }
+            return;
+        }
+        if (level.rooms.get(run.room())[0] != RunLevels.HIDEOUT) return;
+        for (PlusRun.Foe foe : run.foes()) {
+            if (!RunUniques.hidden(foe.kind) || foe.flat) continue;
+            float wide = Math.min(safe.width() - dp(24), dp(300)), from = safe.centerX() - wide / 2, top = safe.top + dp(118);
+            box.set(from, top, from + wide, top + dp(40));
+            plate(canvas, box, dp(18), 235);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(0xFF7A3A9A);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            fitted(canvas, RunUniques.name(foe.kind) + "  ·  hidden", from + dp(14), top + dp(16), dp(12.5f), wide - dp(28));
+            text.setTypeface(Typeface.DEFAULT);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(dark ? 0xFF3A3F45 : 0xFFE4E6E8);
+            canvas.drawRoundRect(from + dp(14), top + dp(24), from + wide - dp(14), top + dp(32), dp(4), dp(4), paint);
+            paint.setColor(0xFF9A4AC0);
+            canvas.drawRoundRect(from + dp(14), top + dp(24), from + dp(14) + (wide - dp(28)) * Math.max(0, foe.left) / Math.max(1f, foe.most), top + dp(32), dp(4), dp(4), paint);
+            paint.setColor(Color.BLACK);
+            return;
+        }
+    }
+
+    /**
+     * Pieces in front of her for depth: paper grass, a stack of books, a fern, a column, crumpled paper, along the foot of the screen, going by
+     * faster than the land does; the same ones in the same places every time.
+     */
+    private void drawForeground(Canvas canvas) {
+        if (run == null || run.room() >= 0) return;
+        if (foreground == null) foreground = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_foreground);
+        if (foreground == null) return;
+        int cell = foreground.getHeight();
+        float pace = 1.35f, view = cameraX * pace, size = tile * 1.7f;
+        int from = (int) Math.floor(view / 7) - 1, to = (int) Math.ceil((view + width / tile) / 7) + 1;
+        paint.setAlpha(225);
+        for (int slot = from; slot <= to; slot++) {
+            long dice = (slot * 2654435761L + number * 97L) & 0xFFFFFFFFL;
+            if (dice % 3 != 0) continue;
+            int piece = (int) (dice / 3 % 8);
+            // (The two that hang, from the top; the rest stand at the foot.)
+            boolean hangs = piece == 3 || piece == 7;
+            float x = (slot * 7 + (dice >> 8) % 5 - view) * tile;
+            float y = hangs ? -tile * .2f : height - size * .82f;
+            source.set(piece * cell, 0, (piece + 1) * cell, cell);
+            target.set(x - size / 2, y, x + size / 2, y + size);
+            canvas.drawBitmap(foreground, source, target, paint);
         }
         paint.setAlpha(255);
     }
@@ -14403,6 +14503,15 @@ final class RunGame {
             RectF where = lands[index];
             paint.setAlpha(255);
             pieceIn(canvas, four, SCROLL_PICTURE, where.right - where.width() * .1f, where.top + where.width() * .1f, where.width() * .42f, 0);
+        }
+        // A hideout found: a crack in the corner of its land; its hidden boss beaten: a gold star there instead.
+        for (int index = firstShown; index < lastShown; index++) {
+            if (session.tally("run_hideout_" + (index + 1)) == 0) continue;
+            RectF where = lands[index];
+            boolean beaten = session.tally("run_hidden_" + (index + 1)) != 0;
+            paint.setAlpha(255);
+            if (beaten) artIn(canvas, STAR_ART, where.left + where.width() * .12f, where.top + where.width() * .12f, where.width() * .36f);
+            else pieceIn(canvas, four, CRACK_PICTURE, where.left + where.width() * .12f, where.top + where.width() * .12f, where.width() * .34f, 0);
         }
         // Under the lands, on with the furthest land she has reached: the button a thumb finds first.
         paint.setStyle(Paint.Style.FILL);

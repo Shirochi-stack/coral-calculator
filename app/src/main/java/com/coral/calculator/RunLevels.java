@@ -126,6 +126,20 @@ final class RunLevels {
         return quest == CAKES ? BOKSUN : quest == CELLAR ? INJU : quest == LETTER ? SOMI : quest == TIME ? TTOSUN : GALPI;
     }
     static final int STASH = 0, PASSAGE = 1, ARENA = 2, GAME = 3;
+    /** And a hideout, where a hidden boss waits: behind a crack that only a strong blow breaks, or up on a ledge out of reach of a jump. */
+    static final int HIDEOUT = 8;
+    /** The first land that may have a hideout. */
+    static final int HIDEOUTS_FROM = 8;
+
+    /** Whether a land has a hideout: one in three from the eighth on, which ones by the land's own numbers; and how it is reached. */
+    static boolean hideoutIn(int number) {
+        if (number < HIDEOUTS_FROM || number >= OPEN_TO) return false;
+        long dice = number * 2654435761L + 97;
+        return (dice >>> 7) % 3 == 0;
+    }
+
+    /** A hideout up out of the way (true), or behind a strong crack (false). */
+    static boolean hideoutHigh(int number) { return (number * 7 + 3) % 2 == 0; }
     /** And a range, where paper targets hang in the air and an ink gun that does not run dry is put in her hands for twelve seconds. */
     static final int RANGE = 4;
     /** And a room where signs keep coming for a quarter of a minute, to be dealt with as fast as they come. */
@@ -666,7 +680,7 @@ final class RunLevels {
     static int swarmOf(int number) { return number <= 3 ? 20 : Math.min(50, 20 + 30 * (number - 3) / (TOTAL - 3)); }
 
     /** How many a swarm has: small in the first lands, a crowd in the last. */
-    static int swarmSize(int number, Random random) { return number <= 3 ? 4 + random.nextInt(3) : Math.min(30, 4 + number / 5 + random.nextInt(4)); }
+    static int swarmSize(int number, Random random) { return number <= 3 ? 4 + random.nextInt(3) : Math.min(22, 4 + number / 5 + random.nextInt(4)); }
 
     /**
      * Swarms: what a land is short of its count is made up of creatures gathered in a few places, not spread along it. Each swarm is
@@ -709,7 +723,8 @@ final class RunLevels {
             if (!edge && floor > 4 && floor < level.land.length && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR) {
                 spots.add(new int[]{column, floor});
             }
-            for (int row = 4; row < (floor > 0 ? floor - 2 : ROWS - 2); row++) {
+            // (Ledges, but not the highest of them: those are for what is hidden.)
+            for (int row = Math.max(4, floor - 5); row < (floor > 0 ? floor - 2 : ROWS - 2); row++) {
                 if (level.land[row][column] == LEDGE && level.land[row - 1][column] == AIR && level.land[row - 2][column] == AIR) spots.add(new int[]{column, row});
             }
         }
@@ -1214,7 +1229,8 @@ final class RunLevels {
         }
         int caves = 1 + (level.chapter >= CHAPTERS ? 1 : 0) + (dice.nextInt(3) == 0 ? 1 : 0);
         for (int tries = 0; tries < 160 && caves > 0; tries++) if (cave(level, dice)) caves--;
-        int heights = 1 + (dice.nextInt(2) == 0 ? 1 : 0) + (level.chapter >= CHAPTERS * 2 ? 1 : 0);
+        // (More heights than there were: routes over and under the way along.)
+        int heights = 2 + (dice.nextInt(2) == 0 ? 1 : 0) + (level.chapter >= CHAPTERS * 2 ? 1 : 0);
         for (int tries = 0; tries < 160 && heights > 0; tries++) if (heights(level, dice)) heights--;
         return level;
     }
@@ -1423,6 +1439,8 @@ final class RunLevels {
             builder.stretch(kind);
             if (stretch == stretches / 4 || stretch == stretches / 2 || stretch == stretches * 3 / 4) builder.flag();
             builder.rest();
+            // Its hideout, in the lands that have one.
+            if (stretch == stretches * 3 / 8 && hideoutIn(number)) builder.hideoutDoor(builder.at - 3);
             // After the first flag a book or a brush and what it is good against; after the second an ink gun and a crowd; and in half the lands another after the third.
             if (stretch == stretches / 4 || stretch == stretches / 2 || stretch == stretches * 3 / 4 && number % 2 == 1) {
                 boolean gallery = stretch != stretches / 4;
@@ -1624,6 +1642,10 @@ final class RunLevels {
                 builder.before(gallery, start + 2);
                 builder.rest();
                 builder.after();
+            }
+            // Its hideout, half way along, in the lands that have one.
+            if (stretch == stretches / 2 && hideoutIn(number)) {
+                builder.hideoutDoor(builder.at - 3);
             }
             // Its village, a little way in.
             if (shaped && stretch == 1) {
@@ -1870,6 +1892,8 @@ final class RunLevels {
                     secret(want);
                     continue;
                 }
+                // (A hideout is laid after the rest, so that the places a land had before there were hideouts keep their numbers.)
+                if (kind == HIDEOUT) continue;
                 wall(2);
                 int from = at, to = from + wide - 1, far = -1, middle = (from + to) / 2;
                 for (int column = from; column <= to; column++) {
@@ -1894,7 +1918,38 @@ final class RunLevels {
                 }
                 level.rooms.add(new int[]{kind, want[1], want[2], from, to, want[4], from + 1, want[3], far, want[5], 0, FLOOR, ceiling, lookOf(number, level.rooms.size()), 0});
             }
+            for (int[] want : wanted) if (want[0] == HIDEOUT) hideout(want);
             for (int[] want : built) house(want);
+        }
+
+        /**
+         * A hideout: a long hall with ledges at two heights, its hidden boss at the far end of it, waiting.
+         */
+        void hideout(int[] want) {
+            int number = level.number, ceiling = FLOOR - ROOM_TALL;
+            wall(2);
+            int from = at;
+            open(36);
+            int to = at - 1;
+            wall(2);
+            level.land[FLOOR - 1][from + 1] = ENTRY;
+            ledge(from + 7, FLOOR - 3, 4);
+            ledge(from + 16, FLOOR - 5, 4);
+            ledge(to - 10, FLOOR - 3, 4);
+            level.foes.add(new int[]{RunUniques.hiddenOf(chapterOf(number)), to - 5, FLOOR - 1, 1, 0, 2});
+            pluses(from + 3, from + 6, FLOOR - 1);
+            level.rooms.add(new int[]{HIDEOUT, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], 0, FLOOR, ceiling, -1, 0});
+        }
+
+        /** Its door: up on a high ledge, out of reach of any jump but the third or a dash; or behind a strong crack in the ground's wall. */
+        void hideoutDoor(int column) {
+            if (hideoutHigh(level.number)) {
+                // (Six rows up: past a double jump, within a third.)
+                ledge(column, floor - 6, 3);
+                door(HIDEOUT, column + 1, 2, floor - 6);
+            } else {
+                door(HIDEOUT, column, 1, floor);
+            }
         }
 
         /**

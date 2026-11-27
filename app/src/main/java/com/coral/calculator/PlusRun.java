@@ -885,6 +885,20 @@ final class PlusRun {
     static final int SWARM_SHARE = 25;
     private float swarmXp;
 
+    // Hideouts
+
+    /** Hidden bosses beaten in this land, and the last of them; strong cracks struck too weakly. */
+    private int hiddenBeaten, hiddenKind = -1;
+
+    int hiddenBeaten() { return hiddenBeaten; }
+    int hiddenKind() { return hiddenKind; }
+
+    /** What a blow must count for to break the crack in front of a hideout: as a land's shields ask, less a part. */
+    static int crackNeeds(int number) { return Math.round(shieldNeeds(Math.max(SHIELDS_FROM, number)) * .7f); }
+
+    /** Whether a hidden door is a hideout's strong crack. */
+    private boolean strongCrack(int[] one) { return one[0] == RunLevels.HIDEOUT && one[7] == 1; }
+
     // Paper trees
 
     /** Its paper trees: column, row, grade, and blows left (0 once down); paper cut, by grade; trees cut; and how long since one was struck, and where. */
@@ -1058,7 +1072,7 @@ final class PlusRun {
     /** How many times what a sign gives one of them gives: experience, and the chance of a drop. */
     static final int UNIQUE_XP = 3;
     /** How long each way of fighting winds up before it strikes; and how long its strike lasts. */
-    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f}, STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f};
+    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f, .8f}, STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f, .45f};
     /** Wind-ups begun, things they made (minions, shots, heals), and how many came apart. */
     private int windUps, uniqueShots, calledUp, heals, halves;
 
@@ -1097,8 +1111,9 @@ final class PlusRun {
             foe.act -= seconds;
             if (foe.act <= 0) {
                 foe.mode = 3;
-                foe.act = way == RunUniques.BURROWER ? 1.6f : way == RunUniques.MINIBOSS ? .6f - .15f * phase3(foe) : .8f;
-                foe.wait = way == RunUniques.SUMMONER ? 6 : way == RunUniques.HEALER ? 4 : way == RunUniques.SNIPER ? 2.2f : way == RunUniques.MINIBOSS ? 1.4f - .4f * phase3(foe) : 1.6f;
+                boolean big = way == RunUniques.MINIBOSS || way == RunUniques.HIDDEN;
+                foe.act = way == RunUniques.BURROWER ? 1.6f : big ? .6f - .15f * phase3(foe) : .8f;
+                foe.wait = way == RunUniques.SUMMONER ? 6 : way == RunUniques.HEALER ? 4 : way == RunUniques.SNIPER ? 2.2f : big ? 1.4f - .4f * phase3(foe) : 1.6f;
             }
             return;
         }
@@ -1229,6 +1244,7 @@ final class PlusRun {
                 }
                 break;
             }
+            case RunUniques.HIDDEN:
             case RunUniques.MINIBOSS: {
                 int phase = phase3(foe);
                 if (near && level_ < 2) {
@@ -1261,7 +1277,7 @@ final class PlusRun {
 
     private void windUp(Foe foe, int way) {
         foe.mode = 1;
-        foe.act = way == RunUniques.MINIBOSS ? WIND_UP[way] - .15f * phase3(foe) : WIND_UP[way];
+        foe.act = way == RunUniques.MINIBOSS || way == RunUniques.HIDDEN ? WIND_UP[way] - .15f * phase3(foe) : WIND_UP[way];
         windUps++;
     }
 
@@ -1312,6 +1328,16 @@ final class PlusRun {
                     heals++;
                 }
                 break;
+            case RunUniques.HIDDEN: {
+                // A hidden boss throws what is its own, more of it at each phase.
+                int many = 3 + phase3(foe) * 2;
+                for (int one = 0; one < many; one++) {
+                    float spread = (one - (many - 1) / 2f) * 1.1f;
+                    shoot(RunUniques.hiddenShot(foe.kind), false, middle, cy, (toLeft ? -1 : 1) * 6.5f, spread, 1.8f);
+                }
+                uniqueShots += many;
+                break;
+            }
             case RunUniques.MINIBOSS:
                 // From its second phase on, three knives as well, fanned.
                 if (phase3(foe) >= 1) {
@@ -1331,8 +1357,9 @@ final class PlusRun {
                 if (!walk(foe, speed * 3.4f, false)) foe.act = 0;
                 break;
             case RunUniques.SHIELDER:
+            case RunUniques.HIDDEN:
             case RunUniques.MINIBOSS:
-                walk(foe, speed * (way == RunUniques.MINIBOSS ? 4.5f + phase3(foe) : 5), false);
+                walk(foe, speed * (way == RunUniques.SHIELDER ? 5 : 4.5f + phase3(foe)), false);
                 break;
             case RunUniques.MIMIC: {
                 walk(foe, speed * 4, false);
@@ -2194,6 +2221,18 @@ final class PlusRun {
             float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
             loose(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
         }
+        if (RunUniques.hidden(foe.kind)) {
+            hiddenBeaten++;
+            hiddenKind = foe.kind;
+            int theme = Math.min(RunLoot.THEMES.length - 1, RunUniques.chapter(foe.kind) + 1);
+            for (int type = 0; type < 3; type++) {
+                int roll = lootRoll(100), rarity = roll < 10 ? RunLoot.ROSE : roll < 40 ? RunLoot.RED : RunLoot.GOLD;
+                int typeRoll = type == 0 ? 0 : type == 1 ? 6000 : 9999;
+                int code = RunLoot.dropped(RunLoot.WAITS, theme, rarity, typeRoll, lootRoll(10000));
+                loose(new Drop(middle, top, (type - 1) * 2.2f, -9, code));
+            }
+            return;
+        }
         // (Gold and black ink drop as the hardest do.)
         hard |= foe.tier >= GOLD_TIER;
         if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel) * TIER_DROPS[foe.tier] * (RunUniques.is(foe.kind) ? UNIQUE_XP : 1)) {
@@ -2876,6 +2915,12 @@ final class PlusRun {
         if (room < 0) {
             far = one[5] != one[1] && Math.abs(middle - one[5] - .5f) < .8f;
             if (!far && one[7] == 1 && (revealed & 1 << at) == 0) {
+                if (strongCrack(one) && dealt() < crackNeeds(level.number)) {
+                    clangX = one[1] + .5f;
+                    clangY = one[2] - 1;
+                    clangs++;
+                    return true;
+                }
                 revealed |= 1 << at;
                 reveals++;
                 return true;
@@ -5731,6 +5776,12 @@ final class PlusRun {
         for (int index = 0; index < level.rooms.size() && room < 0; index++) {
             int[] one = level.rooms.get(index);
             if (one[7] == 1 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
+                if (strongCrack(one) && dealt() < crackNeeds(level.number)) {
+                    clangX = one[1] + .5f;
+                    clangY = one[2] - 1;
+                    clangs++;
+                    continue;
+                }
                 revealed |= 1 << index;
                 reveals++;
             }
@@ -6224,7 +6275,8 @@ final class PlusRun {
         }
         if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
         if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > WAKES)) return;
-        if (RunUniques.is(foe.kind) && (room >= 0 && !foe.spawned || Math.abs(foe.x - x) > WAKES)) return;
+        // (One of them in the land keeps still while she is in a place off it; a hidden boss in its hideout, while she is not.)
+        if (RunUniques.is(foe.kind) && ((room >= 0) != (foe.x >= level.main) || Math.abs(foe.x - x) > WAKES)) return;
         if (!puddles.isEmpty() && mired(foe)) seconds *= PUDDLE_SLOWS;
         foe.clock += seconds;
         foe.guardMet += seconds;

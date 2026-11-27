@@ -579,6 +579,12 @@ final class RunStory {
             {"wind1", "Not yet! Second wind Sloppy~♡", "H", PLAYER + "She was about to be knocked out but her second wind kicks in and leaves her standing on half a heart. Gritty, defiant, catching her breath, then a cheeky grin."},
     };
 
+    /** Hideouts: near one for the first time, she feels it; a hidden boss beaten, she crows. */
+    static final String[][] SECRETS = {
+            {"hid1", "Something's hidden near here. I can feel it Sloppy~♡", "H", PLAYER + "She senses a secret place nearby, a hideout no one was meant to find. Hushed, intrigued, a little thrilled, leaning in."},
+            {"hid2", "A boss nobody was meant to find. Mine now Sloppy~♡", "H", PLAYER + "She has just beaten a hidden boss in a secret hideout and claims its treasure. Breathless, triumphant, smug."},
+    };
+
     /** A new level: she says so, glowing. */
     static final String[][] LEVEL = {
             {"lvl1", "Level up! Feel that? That's me getting stronger Sloppy~♡", "H", PLAYER + "She has just gone up a level in a game and glows with new power. Thrilled, smug, flexing."},
@@ -1214,6 +1220,7 @@ final class RunStory {
         groups.add(KEYS);
         groups.add(SKILLS);
         groups.add(MOVES);
+        groups.add(SECRETS);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
