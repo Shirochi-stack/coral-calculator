@@ -3819,7 +3819,8 @@ public class PlusRunTest {
         assertEquals(bonus + PlusRun.RANK_PAYS[PlusRun.RANK_S] + (one[10] != 0 ? 20 : 0), run.bonus());
         assertEquals(PlusRun.RANK_S, PlusRun.rank(60, 0, 0));
         assertEquals(PlusRun.RANK_S, PlusRun.rank(PlusRun.PAR, 2, 0));
-        assertEquals(PlusRun.RANK_A, PlusRun.rank(PlusRun.PAR + 1, 0, 0));
+        // (How long it took counts for nothing.)
+        assertEquals(PlusRun.RANK_S, PlusRun.rank(PlusRun.PAR * 10, 0, 0));
         assertEquals(PlusRun.RANK_A, PlusRun.rank(60, 3, 0));
         assertEquals(PlusRun.RANK_A, PlusRun.rank(60, 8, 0));
         assertEquals(PlusRun.RANK_B, PlusRun.rank(60, 9, 0));
@@ -7573,7 +7574,7 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.

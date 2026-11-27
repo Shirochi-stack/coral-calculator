@@ -218,6 +218,9 @@ final class RunLevels {
     static final int SISTERS_FROM = 13;
     /** How tall a place off the land is, from its floor to its ceiling. */
     static final int ROOM_TALL = 13;
+
+    /** How long the ground runs on past the gate of a land: to the way that leads on to the next. */
+    static final int PAST_GATE = 11;
     /**
      * A cellar is no room but an arena: a hundred and twenty squares across and forty-three
      * from floor to ceiling, which is more than two screens either way. A land that has one
@@ -931,7 +934,8 @@ final class RunLevels {
         builder.ground(3);
         draft.gate = builder.at;
         int gateFloor = builder.floor;
-        builder.ground(6);
+        // (Past the gate, the way on to the next land.)
+        builder.ground(PAST_GATE);
         draft.main = builder.at;
         builder.rooms();
         builder.asked(draft.gate, gateFloor);
@@ -1101,7 +1105,8 @@ final class RunLevels {
         builder.ground(3);
         draft.gate = builder.at;
         int gateFloor = builder.floor;
-        builder.ground(6);
+        // (Past the gate, the way on to the next land.)
+        builder.ground(PAST_GATE);
         draft.main = builder.at;
         builder.rooms();
         builder.asked(draft.gate, gateFloor);

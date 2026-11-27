@@ -1798,7 +1798,8 @@ final class PlusRun {
      * and otherwise only done.
      */
     static int rank(float time, int hurts, int lives) {
-        return lives > 0 ? RANK_C : hurts <= 2 && time <= PAR ? RANK_S : hurts <= 8 ? RANK_A : RANK_B;
+        // (How long it took counts for nothing: only how she came through it.)
+        return lives > 0 ? RANK_C : hurts <= 2 ? RANK_S : hurts <= 8 ? RANK_A : RANK_B;
     }
 
     /** How the wave stands and for how much longer; what is marked to come in; whether the lights are out; how the cellar is going; and how the last one cleared was ranked, or -1. */
@@ -3037,8 +3038,46 @@ final class PlusRun {
                 if (perks.flagHeart) heal();
             }
         }
-        if (middle >= level.gate && middle < level.main && gateOpen()) state = WON;
+        if (!passed && middle >= level.gate && middle < level.main && gateOpen()) state = WON;
     }
+
+    /** Whether she has passed the gate of this land and gone on: what passing it gave has been had, and the way on to the next land is open. */
+    private boolean passed;
+
+    boolean passed() { return passed; }
+
+    /** Passing the gate cleared the land, and she goes on past it, on her way to the next: nothing waits. */
+    void carryOn() {
+        if (state != WON) return;
+        passed = true;
+        state = PLAYING;
+    }
+
+    /** She is put at the gate of a land she has passed before, which takes her nowhere, as she has been through it: from there she goes on to the next. */
+    void atGate() {
+        passed = true;
+        // (Whoever waited at it was dealt with when she won it: she is not there now.)
+        for (Foe foe : foes) {
+            if (!RunLevels.boss(foe.kind) || RunLevels.rover(foe.kind)) continue;
+            foe.left = 0;
+            foe.flat = true;
+            foe.away = true;
+        }
+        locked = false;
+        int column = Math.min(level.main - 4, level.gate + 1);
+        place(column + (1 - WIDE) / 2, Math.max(0, RunLevels.top(level, column)) - TALL - .05f);
+        startX = x;
+        startY = y;
+    }
+
+    /** The stars a land won gives: one for reaching its gate, a second for six in ten of its pluses, a third for nine in ten. Nothing else counts, how long it took least of all. */
+    static int starsFor(float share) { return 1 + (share >= .6f ? 1 : 0) + (share >= .9f ? 1 : 0); }
+
+    /** How far before the end of the land the way into the next one opens. */
+    static final float THROUGH = 3.2f;
+
+    /** She has gone into the way that leads on to the next land. */
+    boolean through() { return passed && state == PLAYING && room < 0 && x + WIDE / 2 >= level.main - THROUGH; }
 
     /**
      * She calls on a colour that is hers to keep, and wears it with whatever else she
