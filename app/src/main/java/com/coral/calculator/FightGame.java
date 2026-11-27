@@ -99,6 +99,8 @@ final class FightGame {
     private int width, height;
     private int screen = SELECT;
     private float clock;
+    /** Whether the fighter standing picked has said her line yet, as she does when one is tapped. */
+    private boolean welcomed;
 
     // Who fights whom
     private int player, rung;
@@ -661,6 +663,11 @@ final class FightGame {
     void advance(float seconds) {
         clock += seconds;
         if (noticeLeft > 0) noticeLeft -= seconds;
+        // On opening, whoever stands picked says her line, a moment after the screen is up.
+        if (!welcomed && screen == SELECT && clock >= .4f) {
+            welcomed = true;
+            say(player, FightCast.PICK);
+        }
         if (screen == LOBBY) {
             lobby();
             return;
