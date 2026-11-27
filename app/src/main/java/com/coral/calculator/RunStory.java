@@ -586,6 +586,20 @@ final class RunStory {
     };
 
     /** Water: the first time she is in deep water, in blue and without it. */
+    /** The dungeons: the stairway found, going down, between floors, the keeper, cleared, lost, three kinds of floor, and her own double in ink. */
+    static final String[][] DUNGEONS = {
+            {"dng1", "Stairs going down... a whole dungeon under here! Want to see how deep it goes Sloppy~♡", "H", PLAYER + "She has found a stone stairway leading down into a dungeon. Curious, excited, a little daring."},
+            {"dng2", "Down we go. Stay close, it gets dark down here Sloppy~♡", "H", PLAYER + "She is heading down the stairs into a dungeon. Brave but whispering a little."},
+            {"dng3", "Another floor down! Pick a blessing, quick Sloppy~♡", "H", PLAYER + "She has cleared a dungeon floor and is offered a choice of blessings. Pleased, eager."},
+            {"dng4", "That's the keeper of this place. Big, and grumpy Sloppy~♡", "H", PLAYER + "A huge dungeon boss has appeared ahead. Nervous, but determined and a little teasing."},
+            {"dng5", "The whole dungeon, cleared! The keeper's treasure is ours Sloppy~♡", "H", PLAYER + "She has beaten the dungeon's keeper and cleared every floor. Triumphant, delighted."},
+            {"dng6", "The dungeon wins this time. Next dive, we go deeper Sloppy~♡", "H", PLAYER + "She has run out of lives in a dungeon. Disappointed but stubborn and hopeful."},
+            {"dng7", "It's so dark... I'll keep my lantern close Sloppy~♡", "H", PLAYER + "She has come down onto a pitch-dark dungeon floor. Hushed, a little spooked."},
+            {"dng8", "Look at all the pluses! A gilded floor Sloppy~♡", "H", PLAYER + "She has come down onto a dungeon floor glittering with treasure. Gleeful, greedy."},
+            {"dng9", "So many of them on this floor... careful Sloppy~♡", "H", PLAYER + "She has come down onto a dungeon floor crawling with monsters. Wary, bracing herself."},
+            {"dng10", "Is that... me? Made of ink? How rude Sloppy~♡", "H", PLAYER + "She meets a living ink shadow copying her. Startled, then offended and indignant."},
+    };
+
     static final String[][] WATER = {
             {"wat1", "Blue ribbon, deep water. I can swim in this Sloppy~♡", "H", PLAYER + "She dives into deep water wearing the blue ribbon and finds she can swim and breathe. Delighted, surprised, bubbly."},
             {"wat2", "Can't breathe down here! The blue ribbon, quick Sloppy~♡", "H", PLAYER + "She has fallen into deep water without the blue ribbon and is holding her breath. Urgent, flustered, a little panicked."},
@@ -1228,6 +1242,7 @@ final class RunStory {
         groups.add(MOVES);
         groups.add(SECRETS);
         groups.add(WATER);
+        groups.add(DUNGEONS);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
