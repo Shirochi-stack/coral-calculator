@@ -878,9 +878,18 @@ final class PlusRun {
         // (Attack and the tree's attack make every blow harder; intelligence, those of tomes, staffs and wands.)
         int thing = thingOf(with);
         boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
-        float more = 1 + (perks.skills.stats[RunSkills.ATK] + perks.skills.effects[RunSkills.E_ATK_PCT] + (minded ? perks.skills.stats[RunSkills.INT] : 0)) / 100f;
+        float more = 1 + (perks.skills.stats[RunSkills.ATK] + perks.skills.effects[RunSkills.E_ATK_PCT] + activeEffect(RunSkills.E_ATK_PCT) + (minded ? intelligence() : 0)) / 100f;
         return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
     }
+
+    /** Her intelligence: the tree's, with its percent, and what an active called on adds to that. */
+    int intelligence() { return RunSkills.intelligence(perks.skills, activeEffect(RunSkills.E_INT_PCT)); }
+
+    /** How much less a hurt costs, in percent: the tree's (a strong passive may make it more), and an active's. */
+    int defencePercent() { return RunSkills.defencePercent(perks.skills.effects[RunSkills.E_DEF_PCT] + activeEffect(RunSkills.E_DEF_PCT)); }
+
+    /** How much of energy spent becomes divine power, in percent, now. */
+    int dpMaking() { return Math.max(0, perks.skills.effects[RunSkills.E_DP] + activeEffect(RunSkills.E_DP)); }
 
     /** Blows that landed, for showing: where, how much, whether a great one, and how long ago. */
     private final List<float[]> hits = new ArrayList<>();
@@ -944,7 +953,7 @@ final class PlusRun {
 
     /** Up to three active skills in her slots, how long each is called on for, and what it costs and how long until it can be called again. */
     static final int SLOTS = 3;
-    static final float ACTIVE_LASTS = 8, ACTIVE_REST = 20, ACTIVE_COST = 30;
+    static final float ACTIVE_LASTS = RunSkills.ACTIVE_LASTS, ACTIVE_REST = RunSkills.ACTIVE_REST, ACTIVE_COST = RunSkills.ACTIVE_COST;
     private final float[] activeLeft = new float[SLOTS], activeRest = new float[SLOTS];
     /** Divine power: made of energy spent while an active that makes it is called on; full, her next blows are divine for a while. */
     static final float DP_MOST = 100, DIVINE_LASTS = 6;
@@ -988,7 +997,7 @@ final class PlusRun {
 
     /** Energy spent: while an active that makes divine power is called on, a part of it becomes divine power; full, it is let go. */
     private void noteSpent(float spent) {
-        int making = perks.skills.effects[RunSkills.E_DP] + activeEffect(RunSkills.E_DP);
+        int making = dpMaking();
         if (making <= 0) return;
         dp = Math.min(DP_MOST, dp + spent * making / 100f);
         if (dp >= DP_MOST) {
@@ -1038,7 +1047,7 @@ final class PlusRun {
 
     /** What she wears does, as time goes: energy and life come back, the shield bar fills, and what burns or is poisoned or frozen goes on being so. */
     private void wearing(float seconds) {
-        energy = Math.min(ENERGY_MOST, energy + ENERGY_BACK * (1 + (gear(RunLoot.ENERGY) + perks.skills.stats[RunSkills.INT] + perks.skills.effects[RunSkills.E_ENERGY]) / 100f) * seconds);
+        energy = Math.min(ENERGY_MOST, energy + ENERGY_BACK * Math.max(.2f, 1 + (gear(RunLoot.ENERGY) + intelligence() + perks.skills.effects[RunSkills.E_ENERGY] + activeEffect(RunSkills.E_ENERGY)) / 100f) * seconds);
         critAge += seconds;
         dodgeAge += seconds;
         shrugAge += seconds;
@@ -2827,7 +2836,23 @@ final class PlusRun {
      * more a life more now, and the rest holds from the next time it matters, the second
      * jump in the air from her next jump.
      */
+    /** What her skill tree gives is changed in the middle of a land: felt at once; HP more at most is HP more now. */
+    void learn(RunSkills.Built skills, List<RunSkills.Notable> slotted) {
+        int before = maxHp();
+        perks.skills = skills;
+        perks.slotted = slotted;
+        int after = maxHp();
+        if (hp > 0) hp = Math.max(1, Math.min(after, hp + Math.max(0, after - before)));
+        for (int slot = 0; slot < SLOTS; slot++) {
+            if (active(slot) == null) {
+                activeLeft[slot] = 0;
+                activeRest[slot] = 0;
+            }
+        }
+    }
+
     void grant(Perks now) {
+        learn(now.skills, now.slotted);
         if (now.hearts > perks.hearts) hp = Math.min(now.hearts * RunSkills.HEART + perks.skills.stats[RunSkills.HP], hp + (now.hearts - perks.hearts) * RunSkills.HEART);
         if (now.lives > perks.lives) lives += now.lives - perks.lives;
         perks.hearts = now.hearts;
@@ -5289,7 +5314,7 @@ final class PlusRun {
             // A letter that has been through a hurt is not one to hand over.
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
             int lost = costs * HALF;
-            if (!fell) lost = Math.max(Math.max(1, lost / 10), lost - perks.skills.stats[RunSkills.DEF] - lost * Math.max(0, perks.skills.effects[RunSkills.E_DEF_PCT]) / 100);
+            if (!fell) lost = Math.max(Math.max(1, lost / 10), lost - perks.skills.stats[RunSkills.DEF] - lost * defencePercent() / 100);
             hp -= lost;
             lastLost = lost;
         }

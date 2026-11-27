@@ -89,6 +89,135 @@ public class RunSkillsTest {
         assertTrue(RunSkills.pointsFor(500) > RunSkills.pointsFor(100));
     }
 
+    @Test public void aSaveKeepsOnlyWhatIsJoinedAndActivesGoIntoSlots() {
+        List<RunSkills.Node> tree = RunSkills.tree();
+        // A node far out, taken with nothing joining it to the centre (an old save): let go.
+        BitSet taken = new BitSet();
+        int first = tree.get(0).next.get(0);
+        taken.set(first);
+        taken.set(tree.size() - 1);
+        BitSet whole = RunSkills.whole(taken);
+        assertTrue(whole.get(first));
+        assertFalse(whole.get(tree.size() - 1));
+        // Walk out to the first active of the path; it goes into the first empty slot, and a second into the next.
+        BitSet path = new BitSet();
+        int at = 0, active = -1, second = -1;
+        for (int step = 0; step < 80 && second < 0; step++) {
+            int next = -1;
+            for (int one : tree.get(at).next) if (one != 0 && !path.get(one) && tree.get(one).path == tree.get(first).path) next = one;
+            if (next < 0) break;
+            path.set(next);
+            at = next;
+            RunSkills.Notable notable = RunSkills.notableAt(next);
+            if (notable != null && notable.kind == RunSkills.ACTIVE) {
+                if (active < 0) active = next;
+                else second = next;
+            }
+        }
+        assertTrue(active > 0 && second > 0);
+        int[] slots = RunSkills.slotIn(new int[3], path, active);
+        slots = RunSkills.slotIn(slots, path, second);
+        assertEquals(active, slots[0]);
+        assertEquals(second, slots[1]);
+        assertEquals(0, slots[2]);
+        // Kept and read back; and a slot whose node is no longer taken is empty.
+        assertEquals("" + active + "," + second + ",0", RunSkills.slotsNote(slots));
+        int[] read = RunSkills.slots(RunSkills.slotsNote(slots));
+        List<RunSkills.Notable> slotted = RunSkills.slotted(path, read);
+        assertEquals(RunSkills.notableAt(active), slotted.get(0));
+        assertEquals(RunSkills.notableAt(second), slotted.get(1));
+        assertEquals(null, slotted.get(2));
+        assertEquals(null, RunSkills.slotted(new BitSet(), read).get(0));
+        // A passive does not go into a slot.
+        int passive = -1;
+        for (int id = path.nextSetBit(0); id >= 0; id = path.nextSetBit(id + 1)) {
+            RunSkills.Notable notable = RunSkills.notableAt(id);
+            if (notable != null && notable.kind == RunSkills.PASSIVE) passive = id;
+        }
+        assertTrue(passive > 0);
+        assertEquals(0, RunSkills.slotIn(new int[3], path, passive)[0]);
+        // Rubbish in a save reads as nothing.
+        assertEquals(0, RunSkills.slots("x,,")[0]);
+        assertTrue(RunSkills.taken("%%%").isEmpty());
+        // Every node says what it is and what it does; notables know their path.
+        for (RunSkills.Node node : tree) {
+            assertTrue(RunSkills.title(node).length() > 2);
+            assertTrue(RunSkills.does(node).length() > 10);
+            if (node.type == RunSkills.NOTABLE) assertEquals(node.path, RunSkills.notableAt(node.id).path);
+        }
+    }
+
+    @Test public void theStatsComeToWhatTheRulesUse() {
+        RunSkills.Built built = new RunSkills.Built();
+        assertEquals(60, RunSkills.mostHp(3, built));
+        built.stats[RunSkills.HP] = 20;
+        built.effects[RunSkills.E_HP_PCT] = 50;
+        assertEquals(120, RunSkills.mostHp(3, built));
+        assertEquals(75, RunSkills.defencePercent(200));
+        assertEquals(-50, RunSkills.defencePercent(-90));
+        built.stats[RunSkills.INT] = 10;
+        built.effects[RunSkills.E_INT_PCT] = 50;
+        assertEquals(15, RunSkills.intelligence(built, 0));
+        assertEquals(20, RunSkills.intelligence(built, 50));
+        // In a land: HP more at most is HP more now, and a strong passive's cost to defence makes a hurt cost more.
+        PlusRun.Perks perks = new PlusRun.Perks();
+        RunLevels.Level level = new RunLevels.Level(1, 40);
+        for (int column = 0; column < 40; column++) for (int row = RunLevels.FLOOR; row < RunLevels.ROWS; row++) level.land[row][column] = RunLevels.BLOCK;
+        level.gate = 37;
+        PlusRun run = new PlusRun(level, perks);
+        int before = run.hp();
+        RunSkills.Built more = new RunSkills.Built();
+        more.stats[RunSkills.HP] = 40;
+        run.learn(more, new java.util.ArrayList<>());
+        assertEquals(before + 40, run.hp());
+        assertEquals(run.maxHp(), run.hp());
+        more.effects[RunSkills.E_DEF_PCT] = -30;
+        run.learn(more, new java.util.ArrayList<>());
+        assertEquals(-30, run.defencePercent());
+        // Actives in slots: called on for energy, resting after; energy spent while divine power is made fills it, and full, it is let go.
+        RunSkills.Notable active = null;
+        for (RunSkills.Notable notable : RunSkills.notables(1)) if (notable.kind == RunSkills.ACTIVE && active == null) active = notable;
+        RunSkills.Built divine = new RunSkills.Built();
+        divine.effects[RunSkills.E_DP] = 120;
+        java.util.List<RunSkills.Notable> slots = java.util.Arrays.asList(active, active, active);
+        run.learn(divine, new java.util.ArrayList<>(slots));
+        assertEquals(120, run.dpMaking());
+        assertTrue(run.callOn(0));
+        assertFalse(run.callOn(0));
+        assertEquals(PlusRun.ENERGY_MOST - PlusRun.ACTIVE_COST, run.energy(), .01f);
+        assertEquals(36, run.dp(), .01f);
+        assertTrue(run.callOn(1));
+        assertTrue(run.callOn(2));
+        assertEquals(1, run.divines());
+        assertTrue(run.divineLeft() > 0);
+        assertEquals(0, run.dp(), .01f);
+        // Taken out of its slot, an active stops at once.
+        run.learn(divine, new java.util.ArrayList<>());
+        assertEquals(0, run.activeLeft(0), 0);
+    }
+
+    @Test public void anActiveIsFeltOnlyWhileCalledOn() {
+        // A path walked out to its first active: the built tree does not carry the active's effect; its list does.
+        java.util.List<RunSkills.Node> tree = RunSkills.tree();
+        BitSet taken = new BitSet();
+        int at = 0, active = -1;
+        int path = tree.get(tree.get(0).next.get(0)).path;
+        for (int step = 0; step < 80 && active < 0; step++) {
+            int next = -1;
+            for (int one : tree.get(at).next) if (one != 0 && !taken.get(one) && tree.get(one).path == path) next = one;
+            if (next < 0) break;
+            taken.set(next);
+            at = next;
+            RunSkills.Notable notable = RunSkills.notableAt(next);
+            if (notable != null && notable.kind == RunSkills.ACTIVE) active = next;
+        }
+        RunSkills.Notable notable = RunSkills.notableAt(active);
+        BitSet before = (BitSet) taken.clone();
+        before.clear(active);
+        assertEquals(RunSkills.built(before).effects[notable.effect], RunSkills.built(taken).effects[notable.effect]);
+        assertEquals(1, RunSkills.built(taken).actives.size());
+    }
+
     @Test public void heartsAreTwentyHpAndPastTwentyTheyTurnColour() {
         assertEquals(20, RunSkills.HEART);
         // Three hearts, two and a half full.
