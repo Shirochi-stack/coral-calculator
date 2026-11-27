@@ -776,8 +776,9 @@ final class FightGame {
 
     /** What a player holds down: a button held, or pressed since the fight last moved on. */
     private void held(Fight.Pad into, boolean[] holding, boolean[] tapped) {
-        into.left = holding[LEFT];
-        into.right = holding[RIGHT];
+        // An arrow tapped and let go before the fight next moves on still counts, for a frame: two quick taps are a dash.
+        into.left = holding[LEFT] || tapped[LEFT];
+        into.right = holding[RIGHT] || tapped[RIGHT];
         into.block = holding[GUARD];
         into.jump = holding[JUMP] || tapped[JUMP];
         into.light = holding[LIGHT] || tapped[LIGHT];
@@ -860,7 +861,8 @@ final class FightGame {
             // A smash has come down: the ground shakes, and what she brought down with her bursts where she landed.
             seenQuakes = fight.quakes();
             int who = 0;
-            for (int side = 0; side < 2; side++) if (two[side].move == Fight.SMASH && Math.abs(two[side].x - fight.quakeX()) < .01f) who = side;
+            // Whoever has just come down from a smash: by her move, not by where she is, since landing on the other pushes her aside.
+            for (int side = 0; side < 2; side++) if (two[side].state == Fight.ATTACK && two[side].move == Fight.SMASH && two[side].landed != 0) who = side;
             audio.play("smash", .8f);
             sparks.add(new float[]{fight.quakeX(), 0, 0, 3, SMASH_FX[two[who].kind]});
             shake = .28f;
