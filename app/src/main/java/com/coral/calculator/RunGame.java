@@ -11511,7 +11511,8 @@ final class RunGame {
             int moving = !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
             int pose = dashAge < .3f ? KATANA_DASH : dashAge < .62f ? KATANA_AFTER : dashAge < .8f ? KATANA_SHEATHE : run.heldFor() > .14f ? KATANA_GATHER
                     : airAge < .3f ? KATANA_DOWN : cutAge < .05f ? KATANA_DRAW : cutAge < .2f ? KATANA_CUT : cutAge < .33f ? KATANA_SHEATHE : moving;
-            frame(canvas, herArmed(weapon), pose, KATANA_FRAMES, feetX, feetY, tall, leftward);
+            boolean fast = pose == KATANA_CUT || pose == KATANA_DASH || pose == KATANA_DOWN || pose == KATANA_DRAW;
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, fast)) frame(canvas, herArmed(weapon), pose, KATANA_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon >= PlusRun.TABLET) {
             int pose = beaming ? (run.beam() > 0 ? MAIN_HEAVY : MAIN_GATHER) : sinceHeavy < .3f ? MAIN_HEAVY : sinceHeavy < .5f ? MAIN_SETTLE
                     : run.heldFor() > .12f ? MAIN_GATHER : sinceUse < .09f ? MAIN_BACK : sinceUse < .26f ? MAIN_GO
@@ -11521,7 +11522,7 @@ final class RunGame {
         } else if (weapon != PlusRun.UNARMED) {
             int pose = sinceUse < .22f || run.swinging() >= 0 ? ARMED_USE : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL)
                     : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
-            frame(canvas, herArmed(weapon), pose, ARMED_FRAMES, feetX, feetY, tall, leftward);
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == ARMED_USE)) frame(canvas, herArmed(weapon), pose, ARMED_FRAMES, feetX, feetY, tall, leftward);
         } else {
             int pose;
             if (!run.onGround()) {
@@ -11550,6 +11551,10 @@ final class RunGame {
      * item's own picture along the frame's line, and her hands over it. Whether she was drawn so.
      */
     private boolean gripped(Canvas canvas, int weapon, int pose, float feetX, float feetY, float tall, boolean leftward) {
+        return gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == MAIN_GO || pose == MAIN_HEAVY || pose == MAIN_BACK);
+    }
+
+    private boolean gripped(Canvas canvas, int weapon, int pose, float feetX, float feetY, float tall, boolean leftward, boolean fast) {
         int grip = RunGrips.of(weapon), icon = heldIcon(weapon);
         if (grip < 0 || icon < 0) return false;
         float[] line = pose < RunGrips.LINES[grip].length ? RunGrips.LINES[grip][pose] : null;
@@ -11571,7 +11576,6 @@ final class RunGame {
         if (pose != lastGripFrame) {
             gripChanged = 0;
         }
-        boolean fast = pose == MAIN_GO || pose == MAIN_HEAVY || pose == MAIN_BACK;
         float[] was = lastGripFrame >= 0 && lastGripFrame < RunGrips.LINES[grip].length ? RunGrips.LINES[grip][lastGripFrame] : null;
         canvas.save();
         if (leftward) canvas.scale(-1, 1, feetX, feetY);
