@@ -68,6 +68,9 @@ The song may be any sound file, made anywhere. It is laid from the film's first 
 into the song instead (or, below zero, that long after the film begins), and --song-speed X plays it X times as fast with its
 pitch kept (1.03: a song 92.7 s long in 90). What is left over at the end is faded out; what is missing is silence.
 tools/fit_song.py measures a song against the board's seconds and says what these two should be.
+A take with a few bad frames is mended in the edit, not in its file: the board's "holds" name, for a shape and a take, spans of
+the take's own seconds ("holds": {"16x9": {"C": [[10.88, 10.92]]}}) through which the frame before the span is kept on screen.
+Taking the entry out of the board undoes it.
 
 Of Kling (kling/v4/reference-to-video on fal) a take is asked shot by shot, each with its
 seconds and at most 512 letters, with the first shot's still as the first frame, the other
@@ -972,6 +975,8 @@ def edit_takes(board, folder, which, song=None, named=None, song_from=0.0, song_
         video = cv2.VideoCapture(str(clip)) if clip else None
         speed = (video.get(cv2.CAP_PROP_FPS) or fps) if video is not None else fps
         read, fitted = -1, numpy.zeros((tall, wide, 3), numpy.uint8)
+        # Spans of the take's own seconds whose frames are not shown: the frame before each stays on screen through it.
+        held = board.get("holds", {}).get(which, {}).get(part["name"], []) if clip else []
         for step in range(count):
             if video is not None:
                 # The take's own clock: the picture it shows at this moment, whatever its frames a second; past its end, its last one.
@@ -981,6 +986,8 @@ def edit_takes(board, folder, which, song=None, named=None, song_from=0.0, song_
                     if not ok:
                         break
                     read += 1
+                    if any(begins - .001 <= read / speed <= ends + .001 for begins, ends in held):
+                        continue
                     if raw.shape[:2] == (tall, wide):
                         fitted = raw
                     else:
