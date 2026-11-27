@@ -808,6 +808,8 @@ final class PlusRun {
         int defence, stomp;
         /** Her level: how much harder her blows land comes from it. */
         int level = 1;
+        /** The weapon found in the lands that she holds as her own, or 0: what it is counts for more in her hands. */
+        int item;
         float mercy = 1;
         /** What she wears of what she has found: an armour and two accessories, added up. */
         RunLoot.Worn worn = RunLoot.NOTHING;
@@ -1078,6 +1080,22 @@ final class PlusRun {
      * spins. The line of the katana's last dash, and for how much longer it waits to be cut.
      */
     static final int KATANA = RunArms.KATANA, LANCE = RunArms.LANCE, CANNON = RunArms.CANNON, WHIP = RunArms.WHIP, INKBALL = 30;
+    static final int GREATSWORD = RunArms.GREATSWORD, STAFF = RunArms.STAFF, MACE = RunArms.MACE, HAMMER = RunArms.HAMMER, WAND = RunArms.WAND, SCYTHE = RunArms.SCYTHE;
+    /** What a blow of each of the six is made with. */
+    static final int GREAT = -13, MACED = -14, HAMMERED = -15, BOLTED = -16, SUMMONED = -17, REAPED = -18;
+    private int greats, summons, smashes, slams, bolts, reaps, whirls, quakesMade;
+    private float whirlLeft, reapLeft;
+    /** Where ink splashed as blows landed: the place of each, and how long since. */
+    private final List<float[]> splashes = new ArrayList<>();
+
+    List<float[]> splashes() { return splashes; }
+
+    int greats() { return greats; }
+    int summons() { return summons; }
+    int smashes() { return smashes; }
+    int slams() { return slams; }
+    int bolts() { return bolts; }
+    int reaps() { return reaps; }
     static final int CUT = -9, LANCED = -10, SHELLED = -11, WHIPPED = -12;
     private int cuts, chain, dashes, airCuts, thrusts, jets, shells, lashes, spins;
     private float sinceCut = 9, dashFrom, dashTo, dashY, dashLeft, spinLeft;
@@ -1143,6 +1161,19 @@ final class PlusRun {
     /** Whether something in her backpack can be taken in hand: it is there, and it is not empty. */
     boolean usable(int kind) {
         return kind >= 0 && kind < RunArms.COUNT && (owned >> kind & 1) != 0 && (kind != GUN || rounds > 0) && (kind != BOOK || books > 0);
+    }
+
+    /** A weapon found is taken in hand in the middle of a land: into her backpack as its kind, counting for more, and in her hands. */
+    void hold(int code) {
+        int kind = RunArms.kindOf(code);
+        perks.item = code;
+        owned |= 1 << kind;
+        if (state == PLAYING && disarmed <= 0 && !ranging) {
+            previous = weapon;
+            weapon = kind;
+            heldFor = 0;
+            heavied = false;
+        }
     }
 
     /** She takes something else out of her backpack: at once, whatever she is doing. Returns whether she did. */
@@ -1251,6 +1282,8 @@ final class PlusRun {
         float high;
         Foe last;
         boolean wipes, spent;
+        /** A wand's bolt: its element. */
+        int element = -1;
 
         Shot(int kind) {
             this.kind = kind;
@@ -3484,7 +3517,7 @@ final class PlusRun {
         sinceBrace += seconds;
         if (mastered) shine(seconds, strike);
         {
-            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= RunArms.rest(weapon, perks.levels[weapon]) * (1 - gear(RunLoot.HASTE) / 100f);
+            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= restOf(weapon) * (1 - gear(RunLoot.HASTE) / 100f);
             if (used) use();
             // Held, a tablet-book opens its panel and a ring of keys goes out in a fan: once for each hold. (With the white that is truly
             // hers the hold is her beam's.)
@@ -4024,6 +4057,36 @@ final class PlusRun {
         with = by;
         beat(foe);
         with = PLAIN;
+        // Ink splashes where it lands (no more than a few at once).
+        if (splashes.size() < 12) splashes.add(new float[]{foe.x + foe.wide() / 2, foe.y + foe.tall() * .5f, 0});
+        // A mace's smash, and a hammer's blow worked on to the last step, leave what they hit reeling (not those who wait).
+        if (!foe.flat && !RunLevels.boss(foe.kind) && (by == MACED || by == HAMMERED && perks.levels[HAMMER] >= 3)) {
+            foe.dazed = Math.max(foe.dazed, perks.levels[MACE] >= 1 || by == HAMMERED ? .9f : .6f);
+        }
+    }
+
+    /** A wand's bolt has hit something: what its element does. */
+    private void elemental(Shot shot, Foe hit) {
+        if (shot.element == RunArms.FIRE) fires.add(new float[]{shot.x, shot.y, 1.1f, 1.6f, .45f});
+        else if (shot.element == RunArms.ICE && !hit.flat && !RunLevels.boss(hit.kind)) hit.dazed = Math.max(hit.dazed, 1.1f);
+        else if (shot.element == RunArms.INKY) blast(shot.x, shot.y, 1.2f, BOLTED);
+        else if (shot.element == RunArms.LIGHTNING && shot.chain > 0) {
+            Foe next = null;
+            float best = 5 * 5;
+            for (Foe foe : foes) {
+                if (foe == hit || foe.flat || absent(foe) || foe.kind == RunLevels.TARGET) continue;
+                float across = foe.x + foe.wide() / 2 - shot.x, down = foe.y + foe.tall() / 2 - shot.y, far = across * across + down * down;
+                if (far < best) {
+                    best = far;
+                    next = foe;
+                }
+            }
+            if (next == null) return;
+            Shot jump = sendAt(next, BOLTED, WAND, shot.x, shot.y, RunArms.speed(WAND) * 1.4f, 6, 1);
+            jump.element = RunArms.LIGHTNING;
+            jump.chain = shot.chain - 1;
+            jump.last = hit;
+        }
     }
 
     /** What the blow being dealt is made with: nothing in particular; something nothing stands against; or the kind of thing thrown. */
@@ -4048,14 +4111,16 @@ final class PlusRun {
         if (with == LANDED || with == PLUNGED) return 1 + perks.stomp + (with == PLUNGED && weapon == KATANA ? RunArms.blows(KATANA, perks.levels[KATANA]) : 0);
         int thing = thingOf(with);
         // (The third cut of three in a row, and the cut that follows a dash, count for one more.)
-        return thing == UNARMED ? 1 : RunArms.blows(thing, perks.levels[thing]) + (with == CUT && (chain == 3 || dashCut) ? 1 : 0);
+        int found = perks.item != 0 && thing == RunArms.kindOf(perks.item) ? RunArms.itemBlows(perks.item) : 0;
+        return thing == UNARMED ? 1 : RunArms.blows(thing, perks.levels[thing]) + found + (with == CUT && (chain == 3 || dashCut) ? 1 : 0);
     }
 
     /** The thing a blow was dealt with, from what the blow is made with; or nothing. */
     private static int thingOf(int by) {
         return by == PLAIN ? BRUSH : by == SWORDED ? SWORD : by == BLASTED || by == BOOK ? BOOK : by == PEN || by == KNIFE || by == GUN ? by
                 : by == PAGE || by == PANELLED ? TABLET : by == THROWN_KEY ? KEYS : by == CUT ? KATANA : by == LANCED ? LANCE : by == SHELLED ? CANNON
-                : by == WHIPPED ? WHIP : UNARMED;
+                : by == WHIPPED ? WHIP : by == GREAT ? GREATSWORD : by == SUMMONED ? STAFF : by == MACED ? MACE : by == HAMMERED ? HAMMER : by == BOLTED ? WAND
+                : by == REAPED ? SCYTHE : UNARMED;
     }
 
     private boolean dashCut;
@@ -4288,6 +4353,181 @@ final class PlusRun {
         born.add(foe);
     }
 
+    /** How long the thing in her hands rests between uses: less for a weapon found of a better rarity; an ink gun that is a machine gun, far less. */
+    private float restOf(int kind) {
+        float rest = RunArms.rest(kind, perks.levels[kind]);
+        if (perks.item == 0 || RunArms.kindOf(perks.item) != kind) return rest;
+        return rest * RunArms.itemRest(perks.item) * (kind == GUN && RunArms.machine(perks.item) ? .4f : 1);
+    }
+
+    /** How far the thing in her hands reaches: further for a weapon found of a better rarity. */
+    private float reachOf(int kind) {
+        float reach = reachGear(kind, perks.levels[kind]) + (boost > 0 ? RunArms.BOOST_SWING : 0);
+        return perks.item != 0 && RunArms.kindOf(perks.item) == kind ? reach * RunArms.itemReach(perks.item) : reach;
+    }
+
+    /** The creatures nearest her, up to so many, within a reach: what spirits and bolts go after. */
+    private List<Foe> nearest(int count, float within) {
+        List<Foe> near = new ArrayList<>();
+        for (Foe foe : foes) if (!foe.flat && !absent(foe) && foe.kind != RunLevels.TARGET && Math.hypot(foe.x + foe.wide() / 2 - x - WIDE / 2, foe.y + foe.tall() / 2 - y - TALL / 2) < within) near.add(foe);
+        near.sort((one, other) -> Float.compare(Math.abs(one.x - x) + Math.abs(one.y - y), Math.abs(other.x - x) + Math.abs(other.y - y)));
+        return near.size() > count ? near.subList(0, count) : near;
+    }
+
+    /** A spirit or a bolt sent at a creature, or straight ahead if there is none. */
+    private Shot sendAt(Foe at, int by, int of, float fromX, float fromY, float speed, float reach, float way) {
+        float across = way, down = 0;
+        if (at != null) {
+            float toX = at.x + at.wide() / 2 - fromX, toY = at.y + at.tall() / 2 - fromY, far = Math.max(.3f, (float) Math.hypot(toX, toY));
+            across = toX / far;
+            down = toY / far;
+        }
+        Shot shot = shoot(SLASH, true, fromX, fromY, across * speed, down * speed, reach / speed);
+        shot.by = by;
+        shot.of = of;
+        shot.high = .4f;
+        return shot;
+    }
+
+    /** The six found in the lands, used: what a tap does with each. Whether it was one of them. */
+    private boolean useFound(int level, float way, float fromX, float fromY) {
+        if (weapon == GREATSWORD) {
+            // A great swing: what is in front of her and well over her head; worked on, a wave ahead too.
+            greats++;
+            float reach = reachOf(GREATSWORD), from = facingLeft ? x - reach : x + WIDE;
+            sweep(GREAT, from, from + reach, y + TALL - areaGear(GREATSWORD, level), y + TALL);
+            swing = SWING * 1.5f;
+            swungWith = GREATSWORD;
+            if (level >= 3) wave(SWORD, 2, way, fromX, fromY);
+        } else if (weapon == STAFF) {
+            // Spirits, at the nearest creatures.
+            summons++;
+            List<Foe> near = nearest(level >= 1 ? 3 : 2, reachOf(STAFF));
+            int count = level >= 1 ? 3 : 2;
+            for (int spirit = 0; spirit < count; spirit++) {
+                Shot sent = sendAt(near.isEmpty() ? null : near.get(spirit % near.size()), SUMMONED, STAFF, fromX, fromY - .3f - spirit * .25f, RunArms.speed(STAFF), reachOf(STAFF), way);
+                sent.pierce = level >= 2 ? 99 : 0;
+            }
+        } else if (weapon == MACE) {
+            // A smash at arm's length: what it hits reels.
+            smashes++;
+            float reach = reachOf(MACE), from = facingLeft ? x - reach : x + WIDE;
+            sweep(MACED, from, from + reach, y + TALL - areaGear(MACE, level), y + TALL);
+            swing = SWING;
+            swungWith = MACE;
+        } else if (weapon == HAMMER) {
+            // Slammed down: what is in front of her, and a shockwave along the ground both ways.
+            slams++;
+            float reach = reachOf(HAMMER), from = facingLeft ? x - reach : x + WIDE, quake = level >= 1 ? 3.4f : 2.6f;
+            sweep(HAMMERED, from, from + reach, y + TALL - 1.4f, y + TALL);
+            sweep(HAMMERED, x - quake, x + WIDE + quake, y + TALL - .7f, y + TALL + .2f);
+            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, 0, 0});
+            quakesMade++;
+            swing = SWING;
+            swungWith = HAMMER;
+        } else if (weapon == WAND) {
+            // A bolt of its element, at the nearest thing in front of her, or straight ahead.
+            bolts++;
+            int element = perks.item != 0 && RunArms.kindOf(perks.item) == WAND ? RunArms.element(perks.item) : RunArms.ICE;
+            List<Foe> near = nearest(2, reachOf(WAND));
+            for (int which = 0; which < (level >= 2 ? 2 : 1); which++) {
+                Foe at = null;
+                for (Foe foe : near) if (at == null && (foe.x > x) == !facingLeft) at = foe;
+                Shot bolt = sendAt(at, BOLTED, WAND, fromX, fromY - which * .4f, RunArms.speed(WAND), reachOf(WAND), way);
+                bolt.element = element;
+                bolt.chain = element == RunArms.LIGHTNING ? 2 : 0;
+                bolt.pierce = level >= 3 ? 99 : 0;
+            }
+        } else if (weapon == SCYTHE) {
+            // A wide arc in front of her, and behind her too.
+            reaps++;
+            float reach = reachOf(SCYTHE), from = facingLeft ? x - reach : x + WIDE, behind = facingLeft ? x + WIDE : x - reach * .55f;
+            float top = y + TALL - areaGear(SCYTHE, level) - (level >= 1 ? .3f : 0);
+            sweep(REAPED, from, from + reach, top, y + TALL);
+            sweep(REAPED, behind, behind + reach * .55f, top, y + TALL);
+            swing = SWING * 1.3f;
+            swungWith = SCYTHE;
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    /** The six found in the lands, held: the heavy thing of each. Whether it was one of them. */
+    private boolean heavyFound(int level, float way) {
+        if (weapon == GREATSWORD) {
+            // A spinning slam: both sides of her, and the ground cracks.
+            greats++;
+            float wide = 2.5f + (level >= 2 ? .8f : 0);
+            sweep(GREAT, x - wide, x + WIDE + wide, y + TALL - 2, y + TALL + .2f);
+            booms.add(new float[]{x + WIDE / 2, y + TALL, wide, 0, 0});
+            quakesMade++;
+            return true;
+        }
+        if (weapon == STAFF) {
+            // The great summoning: a ring of spirits going out after everything near.
+            summons++;
+            int count = level >= 3 ? 16 : 8;
+            List<Foe> near = nearest(count, 12);
+            for (int spirit = 0; spirit < count; spirit++) {
+                double turn = spirit * Math.PI * 2 / count;
+                Foe at = near.isEmpty() ? null : near.get(spirit % near.size());
+                Shot sent = sendAt(at, SUMMONED, STAFF, x + WIDE / 2 + (float) Math.cos(turn) * .8f, y + TALL / 2 + (float) Math.sin(turn) * .8f, RunArms.speed(STAFF) * .9f, 12,
+                        (float) Math.cos(turn));
+                sent.pierce = 99;
+            }
+            return true;
+        }
+        if (weapon == MACE) {
+            // A whirl round her, and round again once the smith has worked on it.
+            whirls++;
+            sweep(MACED, x - 1.8f, x + WIDE + 1.8f, y + TALL - 1.8f, y + TALL);
+            whirlLeft = level >= 2 ? .25f : 0;
+            return true;
+        }
+        if (weapon == HAMMER) {
+            // A leap and a slam: a shockwave far along the ground both ways.
+            slams++;
+            float quake = level >= 2 ? 6.5f : 5;
+            speedDown = Math.min(speedDown, -7);
+            sweep(HAMMERED, x - quake, x + WIDE + quake, y + TALL - 1, y + TALL + .3f);
+            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, 0, 0});
+            quakesMade++;
+            return true;
+        }
+        if (weapon == WAND) {
+            // A fan of bolts.
+            bolts++;
+            int element = perks.item != 0 && RunArms.kindOf(perks.item) == WAND ? RunArms.element(perks.item) : RunArms.ICE;
+            for (int which = 0; which < 5; which++) {
+                double turn = (which - 2) * .22;
+                Shot bolt = shoot(SLASH, true, x + WIDE / 2 + way * .5f, y + TALL * .45f, way * (float) Math.cos(turn) * RunArms.speed(WAND), (float) Math.sin(turn) * RunArms.speed(WAND),
+                        reachOf(WAND) / RunArms.speed(WAND));
+                bolt.by = BOLTED;
+                bolt.of = WAND;
+                bolt.high = .4f;
+                bolt.element = element;
+                bolt.chain = element == RunArms.LIGHTNING ? 1 : 0;
+            }
+            return true;
+        }
+        if (weapon == SCYTHE) {
+            // The reaping spin; and its hook pulls what stands in front of her close.
+            reaps++;
+            float hook = level >= 3 ? 6 : 4.5f;
+            for (Foe foe : foes) {
+                if (foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || Math.abs(foe.y + foe.tall() - y - TALL) > 1.5f) continue;
+                float ahead = facingLeft ? x - foe.x - foe.wide() : foe.x - x - WIDE;
+                if (ahead < 0 || ahead > hook) continue;
+                foe.x = facingLeft ? x - foe.wide() - .4f : x + WIDE + .4f;
+            }
+            sweep(REAPED, x - 3, x + WIDE + 3, y + TALL - 2.2f, y + TALL);
+            reapLeft = level >= 2 ? .25f : 0;
+            return true;
+        }
+        return false;
+    }
+
     /** She uses what she carries: throws it, fires it, or begins a swing of it. */
     private void use() {
         sinceStrike = 0;
@@ -4297,6 +4537,7 @@ final class PlusRun {
         // How fast it flies and how far it reaches are the table's; a find of something she has already makes it reach a third as far again.
         int level = perks.levels[weapon];
         float speed = RunArms.speed(weapon), lasts = speed > 0 ? reachGear(weapon, level) / speed * (boost > 0 ? RunArms.BOOST_FAR : 1) : 0;
+        if (useFound(level, way, fromX, fromY)) return;
         if (weapon == PEN || weapon == KNIFE) {
             shoot(weapon, true, fromX, fromY, way * speed, 0, lasts).pierce = piercesGear(weapon, level);
             if (weapon == KNIFE) wave(KNIFE, level, way, fromX, fromY);
@@ -4492,6 +4733,9 @@ final class PlusRun {
             dashCut = false;
         }
         if (spinLeft > 0 && (spinLeft -= seconds) <= 0) sweep(WHIPPED, x - RunArms.SPIN, x + WIDE + RunArms.SPIN, y + TALL - RunArms.SPIN_TALL, y + TALL);
+        if (whirlLeft > 0 && (whirlLeft -= seconds) <= 0) sweep(MACED, x - 1.8f, x + WIDE + 1.8f, y + TALL - 1.8f, y + TALL);
+        if (reapLeft > 0 && (reapLeft -= seconds) <= 0) sweep(REAPED, x - 3, x + WIDE + 3, y + TALL - 2.2f, y + TALL);
+        for (int index = splashes.size() - 1; index >= 0; index--) if ((splashes.get(index)[2] += seconds) > .5f) splashes.remove(index);
         for (int index = 0; index < shots.size(); index++) {
             Shot wave = shots.get(index);
             if (wave.kind != SLASH || !wave.wipes) continue;
@@ -4508,8 +4752,9 @@ final class PlusRun {
     /** The heavy thing: the tablet-book's panel, which takes all that stands in it and wipes away what is thrown into it; or the whole ring of keys, in a fan. */
     private void heavy() {
         float way = facingLeft ? -1 : 1;
-        sinceStrike = RunArms.rest(weapon, perks.levels[weapon]) - RunArms.heavyRest(weapon) * (1 - gear(RunLoot.SPECIAL) / 100f);
+        sinceStrike = restOf(weapon) - RunArms.heavyRest(weapon) * (1 - gear(RunLoot.SPECIAL) / 100f);
         strikes++;
+        if (heavyFound(perks.levels[weapon], way)) return;
         if (weapon == KEYS) {
             fans++;
             float fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f, speed = RunArms.speed(KEYS), lasts = reachGear(KEYS, perks.levels[KEYS]) / speed;
@@ -4801,6 +5046,7 @@ final class PlusRun {
                         }
                         // What the smith has made of an ink gun: its blot splashes, and jumps on.
                         if (shot.kind == GUN) blotted(shot, foe);
+                        if (shot.element >= 0) elemental(shot, foe);
                         // A book, fire and steam go on through, and so does what the mirror has sent back, but not through those who wait at the end.
                         // And so does what the smith has made go through: a wave or a key through all it meets, a pen through so many, none of them twice.
                         boolean on = (shot.kind == BOOK || shot.kind == FIRE || shot.kind == STEAM || shot.through || shot.pierce > 0) && !RunLevels.boss(foe.kind);

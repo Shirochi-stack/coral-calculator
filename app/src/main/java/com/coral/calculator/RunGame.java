@@ -109,7 +109,9 @@ final class RunGame {
     private static final int[] STALL_FORMS = {PlusRun.RED, PlusRun.BLUE, PlusRun.GREEN, PlusRun.YELLOW, PlusRun.PURPLE, PlusRun.BROWN};
     private static final int[] ARMED = {R.drawable.halgakos_arm0, R.drawable.halgakos_arm1, R.drawable.halgakos_arm2,
             R.drawable.halgakos_arm3, R.drawable.halgakos_arm4, R.drawable.halgakos_arm5, R.drawable.halgakos_arm6, R.drawable.halgakos_arm7,
-            R.drawable.halgakos_arm8, R.drawable.halgakos_arm9, R.drawable.halgakos_arm10, R.drawable.halgakos_arm11};
+            R.drawable.halgakos_arm8, R.drawable.halgakos_arm9, R.drawable.halgakos_arm10, R.drawable.halgakos_arm11,
+            R.drawable.halgakos_arm12, R.drawable.halgakos_arm13, R.drawable.halgakos_arm14, R.drawable.halgakos_arm15, R.drawable.halgakos_arm16,
+            R.drawable.halgakos_arm17};
     /**
      * The katana has fourteen pictures of her: after the seven of standing, running, rising
      * and falling come drawing, the cut, sheathing, the dash gathered, the dash's cut, the
@@ -812,6 +814,14 @@ final class RunGame {
         kept.hearts += RunLoot.hearts(kept.level);
         // What she wears of what she has found.
         kept.worn = RunLoot.worn(session.note("run_worn"));
+        // The weapon found that she has taken in hand: in her backpack as its kind, and what she begins every land with.
+        int hand = handCode();
+        if (hand != 0) {
+            int kind = RunArms.kindOf(hand);
+            kept.item = hand;
+            kept.pack |= 1 << kind;
+            kept.main = kind;
+        }
         // And how much harder she has chosen to have it, at the black market.
         kept.harder = hard();
         // The white that is truly hers, once it has been won in the last land: hers to call on in any land.
@@ -2691,6 +2701,7 @@ final class RunGame {
             if (hit[0] < first - 2 || hit[0] > last + 2) continue;
             if (hit[6] == 0) {
                 hit[6] = 1;
+                if (perks.item != 0 && RunLoot.rarity(perks.item) >= RunLoot.RED && RunArms.kindOf(perks.item) == run.weapon()) shake = Math.max(shake, .12f);
                 if (hit[3] > 0 || hit[2] >= 3 * PlusRun.BLOW) shake = Math.max(shake, hit[3] > 0 ? .14f : .08f);
             }
             float age = hit[4], x = (hit[0] - cameraX) * tile, y = (hit[1] - cameraY) * tile + tile * .25f;
@@ -8123,6 +8134,26 @@ final class RunGame {
         return order;
     }
 
+    /** The weapon found that she has taken in hand, or 0; kept as the number of the thing. */
+    private int handCode() {
+        String note = session.note("run_hand");
+        try {
+            int code = note == null || note.isEmpty() ? 0 : Integer.parseInt(note.trim());
+            return code != 0 && RunLoot.type(code) == RunLoot.WEAPON ? code : 0;
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    /** A weapon found is taken in hand: kept, and in a land put in her hands at once. */
+    private void takeInHand(int code) {
+        session.keepNote("run_hand", String.valueOf(code));
+        perks = kept();
+        if (run != null) run.hold(code);
+        audio.play("unlock", .8f);
+        buzz(true);
+    }
+
     /** What she wears, as it is kept. */
     private RunLoot.Worn wornNow() { return RunLoot.worn(session.note("run_worn")); }
 
@@ -8182,6 +8213,10 @@ final class RunGame {
         }
         if (!bagAct.isEmpty() && bagAct.contains(x, y)) {
             int code = bagLooked(bag, worn), type = RunLoot.type(code);
+            if (type == RunLoot.WEAPON) {
+                takeInHand(code);
+                return;
+            }
             if (bagSlot >= 0) {
                 // Taken off.
                 wearNow(new RunLoot.Worn(bagSlot == 0 ? 0 : worn.armour, bagSlot == 1 ? 0 : worn.first, bagSlot == 2 ? 0 : worn.second));
@@ -8384,8 +8419,12 @@ final class RunGame {
         text.setTextSize(dp(12.5f));
         if (type == RunLoot.WEAPON) {
             text.setColor(ink);
-            for (String one : wrapSized(RunLoot.addition(code) ? "The plus-book she began with, before she had a book of her own: found again. It is held as it always was, from the smiths' next work." : "A " + RunLoot.WEAPONS[RunLoot.base(code) % 12].toLowerCase(java.util.Locale.ROOT)
-                    + " found in the lands. Kept in her bag: weapons found are held from the smiths' next work.", wide, dp(12.5f))) {
+            int usedAs = RunArms.kindOf(code);
+            String used = RunArms.NAMES[usedAs] + ": " + (RunArms.itemBlows(code) > 0 ? "+" + RunArms.itemBlows(code) + (RunArms.itemBlows(code) == 1 ? " blow" : " blows") + ", " : "")
+                    + Math.round((RunArms.itemReach(code) - 1) * 100) + "% further, " + Math.round((1 - RunArms.itemRest(code)) * 100) + "% quicker"
+                    + (usedAs == PlusRun.GUN && RunArms.machine(code) ? ". A machine gun" : "") + (usedAs == RunArms.WAND ? ". Its element: " + RunArms.ELEMENTS[RunArms.element(code)] : "") + ". ";
+            for (String one : wrapSized((RunLoot.addition(code) ? "The plus-book she began with, before she had a book of her own: found again. " : "")
+                    + used + RunArms.does(usedAs), wide, dp(12.5f))) {
                 canvas.drawText(one, x, line, text);
                 line += dp(16.5f);
             }
@@ -8410,6 +8449,12 @@ final class RunGame {
         bagAct.set(x, bottom - dp(40), x + wide, bottom);
         boolean worn1 = bagSlot >= 0;
         boolean canWear = type != RunLoot.WEAPON && !worn1 && wearing(worn, code) < count(bag, code) && (type == RunLoot.ARMOUR || wearing(worn, code) < 2);
+        if (type == RunLoot.WEAPON) {
+            boolean held = handCode() == code;
+            smithButton(canvas, bagAct, held ? "In her hands" : "Take it in hand", !held, CalculatorLayout.CORAL);
+            if (held) bagAct.setEmpty();
+            return;
+        }
         if (worn1) {
             smithButton(canvas, bagAct, "Take it off", true, 0xFF8A5A33);
         } else if (canWear) {
@@ -8987,6 +9032,16 @@ final class RunGame {
      * quarter turn lays one flat with its point to the right; mirrored, to the left.
      */
     private void thing(Canvas canvas, int kind, float x, float y, float tall, float degrees, boolean mirrored, boolean byTheHandle) {
+        if (kind >= RunArms.GREATSWORD) {
+            int held = perks != null ? perks.item : 0;
+            int index = held != 0 && RunArms.kindOf(held) == kind ? iconOf(held) : RunArms.baseOf(kind) * 12;
+            canvas.save();
+            canvas.translate(x, y);
+            if (mirrored) canvas.scale(-1, 1);
+            drawIcon(canvas, index, 0, 0, tall * 1.4f);
+            canvas.restore();
+            return;
+        }
         if (kind >= PlusRun.KATANA) {
             // The four won in the black arena: pictures of their own, each lying level.
             if (arms3 == null) arms3 = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_arms3);
@@ -11453,6 +11508,7 @@ final class RunGame {
             int pose = beaming ? (run.beam() > 0 ? MAIN_HEAVY : MAIN_GATHER) : sinceHeavy < .3f ? MAIN_HEAVY : sinceHeavy < .5f ? MAIN_SETTLE
                     : run.heldFor() > .12f ? MAIN_GATHER : sinceUse < .09f ? MAIN_BACK : sinceUse < .26f ? MAIN_GO
                     : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
+            weaponAura(canvas, weapon, feetX + (leftward ? -1 : 1) * tall * .32f, feetY - tall * .5f, tall);
             frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon != PlusRun.UNARMED) {
             int pose = sinceUse < .22f || run.swinging() >= 0 ? ARMED_USE : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL)
@@ -11469,6 +11525,47 @@ final class RunGame {
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
         }
         paint.setAlpha(255);
+    }
+
+    /** About the weapon found in her hands, by its rarity: a glow from gold; flames and lightning from red; the rose's changing colour and petals. */
+    private void weaponAura(Canvas canvas, int weapon, float x, float y, float tall) {
+        int item = perks.item;
+        if (item == 0 || RunArms.kindOf(item) != weapon) return;
+        int rarity = RunLoot.rarity(item);
+        if (rarity < RunLoot.GOLD) return;
+        int colour = rarityColour(rarity);
+        glowAt(canvas, x, y, tall * (.35f + .05f * rarity), colour, 90 + (int) (40 * Math.sin(clock * 5)));
+        paint.setStyle(Paint.Style.FILL);
+        if (rarity == RunLoot.RED) {
+            // Flames licking up, and now and then a crack of lightning.
+            for (int flame = 0; flame < 4; flame++) {
+                float rise = (clock * 1.6f + flame * .25f) % 1, fx = x + (float) Math.sin(clock * 7 + flame * 1.7f) * tall * .12f, fy = y + tall * .1f - rise * tall * .35f;
+                paint.setColor(flame % 2 == 0 ? 0xFFFF6A2A : 0xFFFFD34A);
+                paint.setAlpha(Math.round(220 * (1 - rise)));
+                canvas.drawCircle(fx, fy, tall * .045f * (1 - rise * .6f), paint);
+            }
+            if ((int) (clock * 3) % 4 == 0) {
+                stroke.setColor(0xFFFFF4C2);
+                stroke.setStrokeWidth(tall * .012f);
+                path.reset();
+                path.moveTo(x - tall * .1f, y - tall * .2f);
+                path.lineTo(x, y - tall * .08f);
+                path.lineTo(x - tall * .04f, y + tall * .02f);
+                path.lineTo(x + tall * .1f, y + tall * .15f);
+                canvas.drawPath(path, stroke);
+            }
+        } else if (rarity == RunLoot.ROSE) {
+            // Petals turning about it.
+            for (int petal = 0; petal < 5; petal++) {
+                double turn = clock * 1.8 + petal * Math.PI * 2 / 5;
+                paint.setColor(RunLoot.rose(clock + petal * .4f));
+                paint.setAlpha(220);
+                canvas.drawOval(x + (float) Math.cos(turn) * tall * .22f - tall * .03f, y + (float) Math.sin(turn) * tall * .14f - tall * .018f,
+                        x + (float) Math.cos(turn) * tall * .22f + tall * .03f, y + (float) Math.sin(turn) * tall * .14f + tall * .018f, paint);
+            }
+        }
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
     }
 
     /** Halgakos with nothing in her hands, her feet at a place, as tall as asked when she stands. */
