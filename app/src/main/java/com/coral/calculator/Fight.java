@@ -226,7 +226,7 @@ final class Fight {
     static final class Pad {
         boolean left, right, jump, block, light, heavy, special, dodge, ultimate;
         int taps;
-        /** For one who plays herself only, never sent: the arrow she holds is taken as pressed twice, for a dash. */
+        /** The dash: in the way an arrow is held, or with none toward the other; on the ground and in the air. */
         boolean dash;
 
         void clear() {
@@ -246,7 +246,7 @@ final class Fight {
         /** What is held down as one number, a bit for each, to send to another device. */
         int bits() {
             return (left ? 1 : 0) | (right ? 2 : 0) | (jump ? 4 : 0) | (block ? 8 : 0) | (light ? 16 : 0) | (heavy ? 32 : 0) | (special ? 64 : 0)
-                    | (dodge ? 128 : 0) | (ultimate ? 256 : 0);
+                    | (dodge ? 128 : 0) | (ultimate ? 256 : 0) | (dash ? 512 : 0);
         }
 
         void set(int bits) {
@@ -259,6 +259,7 @@ final class Fight {
             special = (bits & 64) != 0;
             dodge = (bits & 128) != 0;
             ultimate = (bits & 256) != 0;
+            dash = (bits & 512) != 0;
         }
     }
 
@@ -301,7 +302,7 @@ final class Fight {
         /** How many dodges of hers have made a blow miss that would have landed; and whether this one has yet. */
         int slips;
         private boolean slipped;
-        private boolean light, heavy, special, jump, dodge, ultimate, left, right, followed;
+        private boolean light, heavy, special, jump, dodge, ultimate, dashing, left, right, followed;
         private float sinceLeft = 9, sinceRight = 9;
         /** What she pressed in the middle of a blow, to do as soon as she may: 1 a quick one, 2 a heavy one, 3 her special. */
         private int queued;
@@ -738,6 +739,29 @@ final class Fight {
 
     /** One fighter's moment: what she is in the middle of goes on, or she does what is asked of her. */
     private void act(Fighter me, Fighter foe, Pad pad, float seconds) {
+        if (foe.state == ATTACK && (foe.move == ULTIMATE || foe.move == CLASH) && foe.clock < foe.doing().startup && me.state != OUT) {
+            // The other's ultimate is coming out, after its flash: she is held where she is until it does, so that it cannot be
+            // jumped or walked out of. What she presses meanwhile is spent, but for her own ultimate, which meets it in a clash.
+            boolean ultimate = pad.ultimate && !me.ultimate;
+            me.light = pad.light;
+            me.heavy = pad.heavy;
+            me.special = pad.special;
+            me.jump = pad.jump;
+            me.dodge = pad.dodge;
+            me.ultimate = pad.ultimate;
+            me.dashing = pad.dash;
+            me.left = pad.left;
+            me.right = pad.right;
+            if (ultimate && me.charged() && pending(foe)) {
+                clash(me);
+            } else if (pad.block && !me.inAir() && (me.state == IDLE || me.state == WALK || me.state == LAND || me.state == BLOCK)) {
+                // She may still put up her guard against it, standing where she is.
+                if (me.state != BLOCK) me.clock = 0;
+                me.state = BLOCK;
+                me.across = 0;
+            }
+            return;
+        }
         for (int index = 0; index < me.rest.length; index++) me.rest[index] = Math.max(0, me.rest[index] - seconds);
         me.safe = Math.max(0, me.safe - seconds);
         me.dodgeRest = Math.max(0, me.dodgeRest - seconds);
@@ -758,13 +782,16 @@ final class Fight {
         me.jump = pad.jump;
         me.dodge = pad.dodge;
         me.ultimate = pad.ultimate;
+        boolean dash = pad.dash && !me.dashing;
+        me.dashing = pad.dash;
         me.left = pad.left;
         me.right = pad.right;
-        // An arrow pressed twice quickly is a dash, or a step back.
+        // An arrow pressed twice quickly is a dash, or a step back; so is the dash, the way an arrow is held or, with none, toward the other.
         boolean twice = left && me.sinceLeft <= DOUBLE_TAP || right && me.sinceRight <= DOUBLE_TAP;
         if (left) me.sinceLeft = 0;
         if (right) me.sinceRight = 0;
-        if (pad.dash && pad.left != pad.right && level[me.side] >= 0) twice = true;
+        int dashWay = twice && pad.left != pad.right ? (pad.left ? -1 : 1) : 0;
+        if (dash) dashWay = pad.left != pad.right ? (pad.left ? -1 : 1) : foe.x < me.x ? -1 : 1;
         // Her ultimate, gone for while the other's is under way and has not yet landed, is a clash, whatever she is in the middle of.
         if (ultimate && me.charged() && me.state != OUT && pending(foe)) {
             clash(me);
@@ -815,9 +842,9 @@ final class Fight {
             if (dodge && !me.airDodged && me.dodgeRest <= 0) {
                 me.airDodged = true;
                 dodge(me, pad);
-            } else if (twice && pad.left != pad.right && !me.airDashed && (level[me.side] < 0 || style[me.side] >= HARD)) {
-                // An arrow pressed twice in the air is a dash, toward the other or away from her, once a jump.
-                airDash(me, pad.left ? -1 : 1);
+            } else if (dashWay != 0 && !me.airDashed && (level[me.side] < 0 || style[me.side] >= HARD)) {
+                // A dash in the air, toward the other or away from her, once a jump.
+                airDash(me, dashWay);
             } else if (special && me.rest[SPECIAL] <= 0) {
                 begin(me, foe, AIR_SPECIAL);
             } else if (heavy) {
@@ -893,11 +920,12 @@ final class Fight {
                 me.clock = 0;
                 me.across = 0;
             }
-        } else if (twice && pad.left != pad.right) {
+        } else if (dashWay != 0) {
             // Toward the other it is a dash; away from her, a hop back.
-            me.state = away ? BACKSTEP : DASH;
+            boolean back = (dashWay < 0) != me.facingLeft;
+            me.state = back ? BACKSTEP : DASH;
             me.clock = 0;
-            me.across = (pad.left ? -1 : 1) * SPEED[me.kind] * (away ? 2.2f : 2.6f);
+            me.across = dashWay * SPEED[me.kind] * (back ? 2.2f : 2.6f);
         } else if (pad.left != pad.right) {
             if (me.state != WALK || me.backing != away) me.clock = 0;
             me.state = WALK;
@@ -1076,7 +1104,8 @@ final class Fight {
             boolean open = move.times > 1 ? me.landed < move.times && since >= me.landed * move.every : me.landed == 0 && since <= move.active;
             if (open) {
                 float ahead = (foe.x - me.x) * way;
-                boolean level = move.anywhere || (air ? Math.abs(foe.y - me.y) < 2.2f : foe.y < 1.5f);
+                // An ultimate reaches whoever is in front of her, high or low.
+                boolean level = move.anywhere || me.move == ULTIMATE || me.move == CLASH || (air ? Math.abs(foe.y - me.y) < 2.2f : foe.y < 1.5f);
                 boolean near = ahead > -.3f && ahead <= move.reach * weak + BODY / 2 && level;
                 if (move.times > 1) me.landed++;
                 // The last blow of the greater ultimate throws her down.
@@ -1194,7 +1223,10 @@ final class Fight {
     /** How large a thing is as it flies: half its width, and half its height. A flood is wide and low, to be jumped. */
     static float sizeOf(int kind) { return kind == FLOOD ? .9f : kind == ORB ? .5f : .3f; }
 
-    static float heightOf(int kind) { return kind == FLOOD ? .6f : sizeOf(kind); }
+    static float heightOf(int kind) { return kind == FLOOD ? FLOOD_HIGH : sizeOf(kind); }
+
+    /** How far up and down from its middle a flood reaches: it is a wave as high as a jump goes, and is not jumped. */
+    static final float FLOOD_HIGH = 1.9f;
 
     /** A fighter who is not acting for herself: reeling, falling, lying, getting up, or standing where the round left her. */
     private void settle(Fighter me, float seconds) {
@@ -1621,7 +1653,10 @@ final class Fight {
         }
         // Easy seldom guards; hard and brutal more often.
         if (danger && random.nextFloat() < sharp * .85f * (mood == EASY ? .5f : mood >= HARD ? 1.1f : 1)) {
-            if (flood || random.nextFloat() < .15f) {
+            if (flood) {
+                // A flood is not to be jumped: she guards against it.
+                pad.block = true;
+            } else if (random.nextFloat() < .15f) {
                 pad.jump = true;
             } else if (skill >= 2 && me.dodgeRest <= 0 && random.nextFloat() < (mood == BRUTAL ? .55f : mood == HARD ? .45f : .3f)) {
                 // The better ones slip a blow now and then instead of taking it on the guard.

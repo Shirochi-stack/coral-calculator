@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- For two devices to play Page brawl against each other over the Wi-Fi both are on. Nothing is sent anywhere else. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Played with a mouse and keyboard as well as by touch, as on Google Play Games on PC. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <!-- Releases before 1.2.0 had this ID and stay installed beside this one. Being able to
          see that one is there is what lets the app point the duplicate out. -->

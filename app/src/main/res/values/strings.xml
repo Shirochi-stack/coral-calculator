@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Halgakos Calculator</string>
+    <!-- The name under the icon and in Android's lists: short enough to show whole there. -->
+    <string name="app_name">Halgakos</string>
+    <!-- The full name, as the store and the app's own about screens give it. -->
+    <string name="app_title">Halgakos: Sloppy Copy</string>
     <string name="companion_settings">Halgakos companion</string>
     <string name="play_with_halgakos">Play with Halgakos</string>
 </resources>

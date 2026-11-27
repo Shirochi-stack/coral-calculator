@@ -30,7 +30,8 @@ final class FightGame {
     private static final int SOLO = 0, HOST = 2, GUEST = 3;
     private static final int RESUME = 0, AGAIN = 1, TO_SELECT = 2, NEXT = 3;
     /** The buttons, in the order their places are kept. */
-    private static final int LEFT = 0, RIGHT = 1, JUMP = 2, GUARD = 3, LIGHT = 4, HEAVY = 5, SPECIAL = 6, DODGE = 7, ULT = 8, BUTTONS = 9;
+    private static final int LEFT = FightKeys.LEFT, RIGHT = FightKeys.RIGHT, JUMP = FightKeys.JUMP, GUARD = FightKeys.GUARD, LIGHT = FightKeys.LIGHT,
+            HEAVY = FightKeys.HEAVY, SPECIAL = FightKeys.SPECIAL, DODGE = FightKeys.DODGE, ULT = FightKeys.ULT, DASH = FightKeys.DASH, BUTTONS = FightKeys.BUTTONS;
     private static final int[] STAGES = {R.drawable.fight_stage1, R.drawable.fight_stage2, R.drawable.fight_stage3};
     /** How tall a fighter stands in her frames, which {@link FightFrames} knows the places of and {@link FightPose} chooses among. */
     private static final int STANDING = FightFrames.STAND;
@@ -69,6 +70,10 @@ final class FightGame {
     private final RectF target = new RectF(), safe = new RectF(), box = new RectF();
     private final RectF[] buttons = new RectF[BUTTONS];
     private final boolean[] held = new boolean[BUTTONS], pressed = new boolean[BUTTONS];
+    /** The buttons held on a keyboard; whether there is one (it has been used, or the device says so); and which of a card's choices it has picked. */
+    private final boolean[] keys = new boolean[BUTTONS];
+    private boolean keyboard;
+    private int pillFocus;
     private final RectF pauseButton = new RectF(), closeButton = new RectF(), soundButton = new RectF(), fightButton = new RectF();
     private final RectF[] tiles = new RectF[Fight.FIGHTERS];
     private final RectF[] pills = {new RectF(), new RectF(), new RectF()};
@@ -127,6 +132,7 @@ final class FightGame {
     private final int[] counted = new int[FightTally.COUNT];
     private int drawn;
     private int slipTest;
+    private boolean hopTest;
     private final float[][] trail = new float[2][6];
     private final int[] seenState = new int[2], seenLanded = new int[2];
     private final boolean[] seenCharged = new boolean[2];
@@ -144,6 +150,7 @@ final class FightGame {
     FightGame(PlayStage stage, Context context, boolean dark, boolean haptics, Bitmap still, Bitmap pet) {
         this.stage = stage;
         this.context = context;
+        keyboard = context.getResources().getConfiguration().keyboard == android.content.res.Configuration.KEYBOARD_QWERTY;
         android.app.ActivityManager manager = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
         android.app.ActivityManager.MemoryInfo memory = new android.app.ActivityManager.MemoryInfo();
         if (manager != null) manager.getMemoryInfo(memory);
@@ -254,30 +261,35 @@ final class FightGame {
     }
 
     /**
-     * The buttons: on the left the arrows with the guard and the jump over them; on the right
-     * the quick and the heavy blow with the dodge and the special over them, and over those
-     * a place for the ultimate, which is only there while her meter is full.
+     * The buttons: on the left the two arrows, with the guard over them. On the right, under
+     * one thumb, the quick blow, the heavy one and the jump in a row, with the dodge, the
+     * special and the dash over them (the dash over the jump, for a dash in the air); and over
+     * those a place for the ultimate, which is only there while her meter is full.
      */
     private void arrange() {
         boolean landscape = width > height * 1.15f;
-        float edge = dp(18), size = Math.min(dp(landscape ? 62 : 68), (safe.width() - edge * 2 - dp(56)) / 4.1f), gap = size * .3f;
+        // Five columns across the screen, two on the left and three on the right, with room between the two.
+        float edge = dp(18), size = Math.min(dp(landscape ? 62 : 68), (safe.width() - edge * 2 - dp(24)) / 5.9f), gap = size * .3f;
         float low = safe.bottom - dp(24) - size, high = low - size - dp(12);
         float left = safe.left + edge, right = safe.right - edge;
         buttons[LEFT].set(left, low, left + size, low + size);
         buttons[RIGHT].set(left + size + gap, low, left + size * 2 + gap, low + size);
-        buttons[GUARD].set(left, high, left + size, high + size);
-        buttons[JUMP].set(left + size + gap, high, left + size * 2 + gap, high + size);
-        buttons[HEAVY].set(right - size, low, right, low + size);
-        buttons[LIGHT].set(right - size * 2 - gap, low, right - size - gap, low + size);
-        buttons[SPECIAL].set(right - size, high, right, high + size);
-        buttons[DODGE].set(right - size * 2 - gap, high, right - size - gap, high + size);
+        float guard = left + (size + gap) / 2;
+        buttons[GUARD].set(guard, high, guard + size, high + size);
+        float third = right - size, second = third - gap - size, first = second - gap - size;
+        buttons[LIGHT].set(first, low, first + size, low + size);
+        buttons[HEAVY].set(second, low, second + size, low + size);
+        buttons[JUMP].set(third, low, third + size, low + size);
+        buttons[DODGE].set(first, high, first + size, high + size);
+        buttons[SPECIAL].set(second, high, second + size, high + size);
+        buttons[DASH].set(third, high, third + size, high + size);
         float grand = size * 1.14f;
         if (landscape) {
             // On a wide screen it goes beside the others, clear of where the two stand.
-            float middle = right - size * 2 - gap * 2 - grand / 2, level = (high + low + size) / 2;
+            float middle = first - gap - grand / 2, level = (high + low + size) / 2;
             buttons[ULT].set(middle - grand / 2, level - grand / 2, middle + grand / 2, level + grand / 2);
         } else {
-            float middle = right - size - gap / 2, top = high - grand - dp(12);
+            float middle = second + size / 2, top = high - grand - dp(12);
             buttons[ULT].set(middle - grand / 2, top, middle + grand / 2, top + grand);
         }
         groundY = landscape ? height * .8f : height * .6f;
@@ -553,7 +565,8 @@ final class FightGame {
             // Normal climbs as it always did, the other side playing better at each step; easy stays at the bottom; hard and brutal at the top.
             int skill = difficulty == Fight.EASY ? 0 : difficulty >= Fight.HARD ? Fight.LEVELS - 1 : Math.min(Fight.LEVELS - 1, rung);
             // In a build made for testing, a number kept under this name has the other side stand still, to see the player's own moves.
-            boolean still = BuildConfig.DEBUG && session.tally("fight_still") > 0;
+            boolean still = BuildConfig.DEBUG && (session.tally("fight_still") > 0 || session.tally("fight_hop") > 0);
+            hopTest = BuildConfig.DEBUG && session.tally("fight_hop") > 0;
             fight = new Fight(player, ladder[rung], -1, still ? -1 : skill, System.nanoTime());
             fight.setStyle(1, difficulty);
         }
@@ -581,6 +594,7 @@ final class FightGame {
         // And a number kept under this one gives the dodge a way to go without a second finger, which a test cannot put down.
         slipTest = BuildConfig.DEBUG ? session.tally("fight_slip") : 0;
         java.util.Arrays.fill(held, false);
+        java.util.Arrays.fill(keys, false);
         java.util.Arrays.fill(pressed, false);
         pad2.clear();
         theirHeld = 0;
@@ -609,6 +623,7 @@ final class FightGame {
 
     private void pause() {
         java.util.Arrays.fill(held, false);
+        java.util.Arrays.fill(keys, false);
         screen = PAUSED;
         // On two devices the fight goes on behind the card: there is no stopping the other player's clock.
         pills("Carry on", RESUME, mode == SOLO ? "Fighters" : "Leave", TO_SELECT);
@@ -616,6 +631,7 @@ final class FightGame {
 
     private void pills(Object... labelled) {
         pillCount = labelled.length / 2;
+        pillFocus = 0;
         for (int index = 0; index < pillCount; index++) {
             pillLabels[index] = (String) labelled[index * 2];
             pillActions[index] = (Integer) labelled[index * 2 + 1];
@@ -633,6 +649,7 @@ final class FightGame {
         }
         if (mode != SOLO) session.keep("fight_net", session.tally("fight_net") + 1);
         java.util.Arrays.fill(held, false);
+        java.util.Arrays.fill(keys, false);
         screen = RESULT;
         if (mode != SOLO) {
             // Between two players nothing is kept: whoever won says so, and they may go again.
@@ -744,7 +761,12 @@ final class FightGame {
             held(pad, held, pressed);
             pad.taps = tapCount - tapsGiven;
             tapsGiven = tapCount;
-            if (mode == SOLO) {
+            if (mode == SOLO && hopTest) {
+                // For testing: the other side stands still but jumps again and again, to see a move meet one in the air.
+                pad2.clear();
+                pad2.jump = (int) (clock * 2) % 2 == 0;
+                fight.step(seconds, pad, pad2);
+            } else if (mode == SOLO) {
                 fight.step(seconds, pad);
             } else {
                 // The other side is played by hand too, on the other device.
@@ -777,20 +799,12 @@ final class FightGame {
     /** What a player holds down: a button held, or pressed since the fight last moved on. */
     private void held(Fight.Pad into, boolean[] holding, boolean[] tapped) {
         // An arrow tapped and let go before the fight next moves on still counts, for a frame: two quick taps are a dash.
-        into.left = holding[LEFT] || tapped[LEFT];
-        into.right = holding[RIGHT] || tapped[RIGHT];
-        into.block = holding[GUARD];
-        into.jump = holding[JUMP] || tapped[JUMP];
-        into.light = holding[LIGHT] || tapped[LIGHT];
-        into.heavy = holding[HEAVY] || tapped[HEAVY];
-        into.special = holding[SPECIAL] || tapped[SPECIAL];
-        into.dodge = holding[DODGE] || tapped[DODGE];
+        FightKeys.fill(into, holding, tapped, keys);
         if (slipTest != 0 && into.dodge) {
             // For testing: the dodge slips away from the other (1) or toward her (2), as if that arrow were held with it.
             into.left = (slipTest == 1) != fight.fighters[mode == GUEST ? 1 : 0].facingLeft;
             into.right = !into.left;
         }
-        into.ultimate = holding[ULT] || tapped[ULT];
         java.util.Arrays.fill(tapped, false);
     }
 
@@ -931,6 +945,63 @@ final class FightGame {
 
     // Touches
 
+    /**
+     * A key, from a keyboard. In a fight it holds the button it stands for, as a finger on the
+     * screen would, several at once; in a clash any key is a tap. Between fights the arrows
+     * (or A, D, W, S) choose and Enter, Space or J goes on. Esc is the Back key, handled by
+     * the stage. Returns whether the key was used.
+     */
+    boolean key(android.view.KeyEvent event) {
+        int code = event.getKeyCode(), action = event.getAction();
+        if (action != android.view.KeyEvent.ACTION_DOWN && action != android.view.KeyEvent.ACTION_UP) return false;
+        int button = FightKeys.button(code), menu = FightKeys.menu(code);
+        if (button < 0 && menu == FightKeys.NONE) return false;
+        keyboard = true;
+        boolean down = action == android.view.KeyEvent.ACTION_DOWN, fresh = down && event.getRepeatCount() == 0;
+        if (screen == FIGHT && fight != null) {
+            if (fight.phase() == Fight.CLASHING) {
+                if (fresh) {
+                    tapCount++;
+                    audio.play("tick", .35f);
+                }
+                return true;
+            }
+            if (button < 0) return false;
+            if (fresh && !keys[button]) pressed[button] = true;
+            keys[button] = down;
+            return true;
+        }
+        if (!fresh) return true;
+        if (screen == SELECT) {
+            if (menu == FightKeys.PREVIOUS || menu == FightKeys.NEXT) {
+                pick((player + (menu == FightKeys.NEXT ? 1 : Fight.FIGHTERS - 1)) % Fight.FIGHTERS);
+            } else if (menu == FightKeys.UP || menu == FightKeys.DOWN) {
+                difficulty = Math.max(Fight.EASY, Math.min(Fight.BRUTAL, difficulty + (menu == FightKeys.UP ? 1 : -1)));
+                session.keep("fight_level", difficulty + 1);
+                audio.play("tap", .5f);
+            } else if (menu == FightKeys.CHOOSE) {
+                audio.play("tap", .5f);
+                climb();
+            }
+        } else if (screen == VERSUS) {
+            if (menu != FightKeys.CHOOSE) return true;
+            if (++spoken == 1) {
+                say(ladder[rung], FightCast.REPLY);
+                audio.play("tap", .4f);
+            } else {
+                begin();
+            }
+        } else if (pillCount > 0) {
+            if (menu == FightKeys.PREVIOUS || menu == FightKeys.NEXT) {
+                pillFocus = (pillFocus + (menu == FightKeys.NEXT ? 1 : pillCount - 1)) % pillCount;
+                audio.play("tap", .35f);
+            } else if (menu == FightKeys.CHOOSE) {
+                act(pillActions[Math.min(pillFocus, pillCount - 1)]);
+            }
+        }
+        return true;
+    }
+
     void touch(MotionEvent event) {
         int action = event.getActionMasked();
         float x = event.getX(), y = event.getY();
@@ -943,6 +1014,7 @@ final class FightGame {
                     buzz(false);
                 }
                 java.util.Arrays.fill(held, false);
+        java.util.Arrays.fill(keys, false);
                 return;
             }
             if (action == MotionEvent.ACTION_DOWN && pauseButton.contains(x, y)) {
@@ -1068,8 +1140,23 @@ final class FightGame {
             drawFight(canvas);
             if (screen == PAUSED) {
                 canvas.drawColor(0x99000000);
-                card(canvas, mode == HOST || mode == GUEST ? "Leave the fight?" : "Paused",
-                        FightCast.NAMES[fight.fighters[0].kind] + " against " + FightCast.NAMES[fight.fighters[1].kind], 0);
+                // With a keyboard, the keys are shown on the card.
+                float room = keyboard ? FightKeys.HELP.length * dp(19) + dp(8) : 0;
+                float y = card(canvas, mode == HOST || mode == GUEST ? "Leave the fight?" : "Paused",
+                        FightCast.NAMES[fight.fighters[0].kind] + " against " + FightCast.NAMES[fight.fighters[1].kind], room);
+                if (keyboard) {
+                    text.setTextAlign(Paint.Align.LEFT);
+                    text.setColor(soft);
+                    text.setTextSize(dp(12.5f));
+                    float wide = Math.min(safe.width() - dp(32), dp(320)), left = safe.centerX() - wide / 2 + dp(20);
+                    for (int line = 0; line < FightKeys.HELP.length; line++) {
+                        String words = FightKeys.HELP[line];
+                        float fits = wide - dp(40), size = text.measureText(words);
+                        if (size > fits) text.setTextSize(dp(12.5f) * fits / size);
+                        canvas.drawText(words, left, y + dp(18) + line * dp(19), text);
+                        text.setTextSize(dp(12.5f));
+                    }
+                }
             } else if (screen == RESULT) {
                 canvas.drawColor(0x99000000);
                 drawResult(canvas);
@@ -1547,7 +1634,7 @@ final class FightGame {
      */
     private void button(Canvas canvas, int which, Fight.Fighter mine) {
         RectF where = buttons[which];
-        boolean down = held[which], grand = which == ULT;
+        boolean down = held[which] || keys[which], grand = which == ULT;
         if (grand && !mine.charged()) return;
         float x = where.centerX(), y = where.centerY(), round = where.width() / 2;
         if (grand) {
@@ -1604,6 +1691,20 @@ final class FightGame {
             path.quadTo(x - reach * .8f, y + reach * 1.05f, x - reach, y + reach * .1f);
             path.close();
             canvas.drawPath(path, paint);
+        } else if (which == DASH) {
+            // Two arrows one after the other, pointing the way she faces.
+            for (int one = 0; one < 2; one++) {
+                float at = x + (one - .5f) * reach * .9f;
+                path.reset();
+                path.moveTo(at + reach * .55f, y);
+                path.lineTo(at - reach * .35f, y - reach * .8f);
+                path.lineTo(at - reach * .35f, y + reach * .8f);
+                path.close();
+                canvas.save();
+                if (mine.facingLeft) canvas.scale(-1, 1, x, y);
+                canvas.drawPath(path, paint);
+                canvas.restore();
+            }
         } else if (which == DODGE) {
             // Someone slipping aside: a figure leaning into it, with the air she leaves behind her. Fainter while she cannot dodge again yet.
             paint.setAlpha(mine.dodgeRest > 0 ? 80 : down ? 255 : 215);
@@ -1847,6 +1948,14 @@ final class FightGame {
             text.setTextSize(dp(15.5f));
             text.setTextAlign(Paint.Align.CENTER);
             canvas.drawText(pillLabels[index], pills[index].centerX(), pills[index].centerY() + dp(5.5f), text);
+            if (keyboard && index == pillFocus && pillCount > 1) {
+                // The one the keys have picked, ringed.
+                stroke.setColor(ink);
+                stroke.setStrokeWidth(dp(2));
+                box.set(pills[index].left - dp(3), pills[index].top - dp(3), pills[index].right + dp(3), pills[index].bottom + dp(3));
+                canvas.drawRoundRect(box, button / 2 + dp(3), button / 2 + dp(3), stroke);
+                box.set(left, top, left + wide, bottom);
+            }
         }
         paint.setColor(Color.BLACK);
         return top + pad + dp(52);
