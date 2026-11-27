@@ -28,6 +28,9 @@ import idol_sync as sy  # noqa: E402
 D = pathlib.Path(r"C:\Users\ADMIN\Documents\ChatGPT\Calculator APP\dist\cutscenes")
 RATE = 48000
 LIMITS = (.8, 1.4)  # how much a line may be slowed and sped
+# The shots of the storyboard (tools/cutscenes/idol.json: A1, A7, B3, C3, C7) where Halgakos alone is shown, her mouth moving: she is heard wherever it moves, said a little long or squeezed to x1.3 if need be.
+H_SHOTS = [(0.0, 4.0), (24.0, 30.3), (38.0, 42.0), (68.0, 72.0), (84.0, 90.0)]
+H_CAP = 1.3
 INTRO = 7.9  # before this second nobody sings: what is said there stays where it was said
 LANG_SUFFIX = {"en": "", "ja": "-ja", "ko": "-ko", "zh": "-zh"}
 
@@ -110,7 +113,11 @@ def shortest_fit(group_lengths, window, cap=1.15):
     return level, total(), total() <= cap * window
 
 
-def assign_forms(lengths, phrases, starts, drop=7.0):
+def in_h(t):
+    return any(a <= t < b for a, b in H_SHOTS)
+
+
+def assign_forms(lengths, phrases, starts, drop=7.0, hph=None, hunit=None):
     """The same as assign, with the forms each line can be said in: a group of lines that cannot be made to fit a mouth costs a great deal, a line left out much less."""
     n, m = len(lengths), len(phrases)
     inf = 1e9
@@ -130,8 +137,11 @@ def assign_forms(lengths, phrases, starts, drop=7.0):
                     if i + k > n or abs(phrases[j][0] - starts[i + k - 1]) > 4.0:
                         break
                     window = phrases[j][1] - phrases[j][0]
-                    levels, total, fits = shortest_fit(lengths[i:i + k], window)
-                    if not fits and (k > 1 or window >= .78):
+                    hot = bool(hph and hph[j])
+                    levels, total, fits = shortest_fit(lengths[i:i + k], window, H_CAP if hot else 1.15)
+                    if not fits and hot:
+                        cost = here + 12 + 6 * (total - H_CAP * window)
+                    elif not fits and (k > 1 or window >= .78):
                         cost = here + 40 + 20 * (total - 1.15 * window)
                     elif not fits:
                         cost = here + 40
@@ -140,7 +150,7 @@ def assign_forms(lengths, phrases, starts, drop=7.0):
                     if cost < dp[i + k][j + 1]:
                         dp[i + k][j + 1], back[(i + k, j + 1)] = cost, (i, j, k)
             if i < n:
-                cost = here + drop
+                cost = here + (60.0 if hunit and hunit[i] else drop)
                 if cost < dp[i + 1][j]:
                     dp[i + 1][j], back[(i + 1, j)] = cost, (i, j, -1)
     placed, i, j = [None] * n, n, m
@@ -196,13 +206,32 @@ def main():
         lengths_en = lengths
     movable = [k for k, u in enumerate(units) if times[u[0]][0] >= INTRO - .3]
     starts_of = {k: times[units[k][0]][0] for k in movable}
+    # Her call section (A7, 24-30 s: Squish! Sloppy~ Squish! Sloppy~ Louder, zaako!) is put on the mouths of that shot one to one, in order, before anything else.
+    call_units, call_spans = [], []
+    if film == "idol":
+        call_units = [k for k in movable if 23.5 <= starts_of[k] < 28.9]
+        movable = [k for k in movable if k not in call_units]
+        raw = [list(s) for s in sy.spans(sy.on_mask(sy.envelope(str(vocals_path))))]
+        merged = []
+        for a, b in raw:
+            if merged and a - merged[-1][1] < .18:
+                merged[-1][1] = b
+            else:
+                merged.append([a, b])
+        call_spans = [(a, b) for a, b in merged if 23.9 <= a < 30.3 and b - a >= .3]
+        while len(call_spans) > len(call_units):
+            shortest = min(range(len(call_spans)), key=lambda q: call_spans[q][1] - call_spans[q][0])
+            call_spans.pop(shortest)
+        phrases = [ph for ph in phrases if not (23.9 <= ph[0] < 30.3)]
     def lengths_of(k):
         i = units[k][0]
         base_len = times[i][1] - times[i][0] + (.12 if spec["lines"][i][3] != "crowd" else .35)
         out = [base_len] + [times[j][1] - times[j][0] + .12 for j in forms_of.get(i, [])]
         return out
 
-    got = assign_forms([lengths_of(k) for k in movable], phrases, [starts_of[k] for k in movable])
+    hph = [in_h(a) for a, b in phrases] if film == "idol" else None
+    hunit = [in_h(starts_of[k]) for k in movable] if film == "idol" else None
+    got = assign_forms([lengths_of(k) for k in movable], phrases, [starts_of[k] for k in movable], hph=hph, hunit=hunit)
     pick_of = {k: g for k, g in zip(movable, got)}
     pick = [pick_of[k] for k in movable]
     track = numpy.zeros(90 * RATE, dtype=numpy.float32)
@@ -248,13 +277,15 @@ def main():
         level = {u: 0 for u in us}
         size = lambda u: len(forms[u][level[u]][1]) / RATE
         total = lambda: sum(size(u) for u in us) + .08 * (len(us) - 1)
+        hot = film == "idol" and in_h(a)
+        cap = H_CAP if hot else 1.15
         while total() > cap * (b - a):
             candidates = [u for u in us if level[u] + 1 < len(forms[u])]
             if not candidates:
                 break
             level[max(candidates, key=size)] += 1
         for u in list(us):
-            if total() > cap * (b - a) and size(u) > b - a and len(us) == 1 and b - a < .78:
+            if not hot and total() > cap * (b - a) and size(u) > b - a and len(us) == 1 and b - a < .78:
                 # a mouth shorter than any word she has: left silent
                 notes.append(f"{a:5.1f}-{b:5.1f} s mouth too short for a word ({W[lang][units[u][0]]}): left silent")
                 us.remove(u)
@@ -273,19 +304,30 @@ def main():
             rows.append((at, at + len(piece) / RATE, i2))
             over = at + share - b
             bad = over > .12
-            over_count += 1 if bad else 0
+            over_count += 1 if bad and not hot else 0
             if level[u]:
                 shortened.append(f"{W['en'][units[u][0]]} -> {W[lang][i2]}")
-            flag = f" <-- RUNS {over:.1f} s PAST ITS MOUTH even in its shortest form" if bad else ""
+            flag = (f" <-- (her close-up: said {over:.1f} s long, so that she is heard)" if hot else f" <-- RUNS {over:.1f} s PAST ITS MOUTH even in its shortest form") if bad else ""
             notes.append(f"{at:5.1f}-{at + share:5.1f} s phrase {a:.1f}-{b:.1f}: x{factor:.2f}  form {level[u]}  {W[lang][i2]}{flag}")
             free = at + share + .08
             at += share + .08
+    for n, k in enumerate(call_units):
+        a, b = call_spans[min(n, len(call_spans) - 1)]
+        i2, piece0 = forms[k][0]
+        share = min(max(b - a, len(piece0) / RATE / H_CAP), len(piece0) / RATE / .8)
+        if n >= len(call_spans):
+            a = max(a, free)
+        piece, factor = stretch_to(piece0, share)
+        s = int(a * RATE)
+        track[s:s + len(piece)] += piece[: len(track) - s]
+        rows.append((a, a + len(piece) / RATE, i2))
+        notes.append(f"{a:5.1f}-{a + share:5.1f} s her call, on the mouth {a:.1f}-{b:.1f} (her close-up): x{factor:.2f}  {W[lang][i2]}")
     # A mouth that is left with no line (0.6 s or more) is given a call she already has, said again: "Squish!" for a short one, "Louder" for a longer.
     short_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Squish!") and spec["lines"][u[0]][3] == "call" and times[u[0]][0] >= INTRO)
     long_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Louder"))
     filled = []
     for j, (a, b) in enumerate(phrases):
-        if j in byphrase or b - a < .78:
+        if j in byphrase or b - a < (.3 if film == "idol" and in_h(a) else .78):
             continue
         k = long_unit if b - a >= 1.5 else short_unit
         piece, factor = stretch_to(cut[k][2], min(max(b - a, len(cut[k][2]) / RATE / cap), len(cut[k][2]) / RATE / .85))
@@ -294,6 +336,20 @@ def main():
         rows.append((a, a + len(piece) / RATE, units[k][0]))
         filled.append(f"{a:.1f}-{b:.1f}")
         notes.append(f"{a:5.1f}-{b:5.1f} s mouth with no line: filled with her call again, x{factor:.2f}  {W[lang][units[k][0]]}")
+    if film == "idol":
+        # (And any mouth of her close-ups, 0.3 s or more, that nothing covers yet, even one too short to have been a phrase.)
+        for a, b in merged:
+            if b - a < .3 or not in_h(a):
+                continue
+            covered = sum(max(0, min(b, r1) - max(a, r0)) for r0, r1, _ in rows) / (b - a)
+            if covered >= .35:
+                continue
+            piece, factor = stretch_to(cut[short_unit][2], min(max(b - a, len(cut[short_unit][2]) / RATE / H_CAP), len(cut[short_unit][2]) / RATE / .8))
+            s = int(a * RATE)
+            track[s:s + len(piece)] += piece[: len(track) - s]
+            rows.append((a, a + len(piece) / RATE, units[short_unit][0]))
+            filled.append(f"{a:.1f}-{b:.1f}")
+            notes.append(f"{a:5.1f}-{b:5.1f} s her close-up, mouth with nothing on it: filled with her call again, x{factor:.2f}  {W[lang][units[short_unit][0]]}")
     bare = [f"{a:.1f}-{b:.1f}" for j, (a, b) in enumerate(phrases) if j not in byphrase and f"{a:.1f}-{b:.1f}" not in filled]
     notes.append("mouths still with no voice (shorter than any word she has): " + (", ".join(bare) if bare else "none"))
     notes.append(f"RESULT {shape} {lang}: lines over their mouth: {over_count}")

@@ -7,10 +7,17 @@
 13.32	14.66	Sing.
 14.76	15.69	Loud.
 17.21	19.27	Hands up. Higher.
-20.22	21.88	Call my name.
-21.98	23.17	Squish!
+20.22	23.62	Call my name. Slowly. Right.
+24.00	25.02	Squish!
+24.33	25.10	Squish!
+25.00	26.25	Sloppy~♡
 25.24	26.57	Sloppy~♡
-28.84	29.97	Sloppy~♡
+26.00	27.02	Squish!
+26.99	27.76	Squish!
+27.00	28.25	Sloppy~♡
+28.00	29.54	Louder, zaako.
+28.02	28.98	Sloppy~♡
+28.84	30.02	Louder, zaako.
 30.68	31.90	Eyes up!
 32.56	33.74	Squish!
 34.15	35.81	Miss the beat —
@@ -26,7 +33,7 @@
 52.70	53.79	Illya!
 54.04	55.21	Purple.
 55.32	56.60	Tsubakieh!
-58.07	58.94	Squish!
+58.07	58.93	Squish!
 59.15	60.45	Tsubakieh!
 60.56	63.61	Down the runway. Don't let go.
 64.07	65.50	Hold on.
@@ -38,4 +45,8 @@
 77.30	79.33	Jump!
 80.50	81.48	Squish!
 81.79	83.25	Don't stop!
-87.34	88.48	Sloppy~♡
+84.37	85.14	Squish!
+86.22	86.99	Squish!
+87.34	88.37	Welcome.
+88.47	89.36	Ice cream.
+89.45	90.20	Sloppy~♡
