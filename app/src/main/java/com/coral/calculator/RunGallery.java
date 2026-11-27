@@ -77,6 +77,13 @@ final class RunGallery {
         return items;
     }
 
+    /** Everything in the gallery, with the clips of the story (RunClips) in the table kept with them as well. */
+    static List<Item> all(String table, String clips) {
+        List<Item> items = all(table);
+        items.addAll(RunClips.items(RunClips.parse(clips)));
+        return items;
+    }
+
     /** Whether a rule is one that can be read. */
     static boolean valid(String rule) {
         String[] parts = rule.split(":");
