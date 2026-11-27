@@ -60,6 +60,8 @@ final class RunRide {
     static final float FOLLOWS = .5f, LOCKS = .3f;
     /** How tall a sweep is from its middle; how wide a ring's band is, and how wide it grows; how wide a gap in the rain; how wide a beam's band; and how near a burst or one of its pieces must land. */
     static final float BAND = .2f, RING_WIDE = .13f, RING_TO = .62f, RAIN_GAP = .2f, RAY_WIDE = .16f, SHARD_NEAR = .19f;
+    /** Where she is seen, in the same measure as they are: so much nearer the middle than her own place, and so far above them. */
+    static final float FAR = .5f, ABOVE = -1.41f;
     /** From how little of her is left she is desperate. */
     static final int DESPERATE = 8;
     private static final float[] EVERY = {2.1f, 1.75f, 1.5f}, HER_SPEED = {.28f, .38f, .48f}, TURNS = {2.8f, 2.3f, 1.9f};
@@ -93,6 +95,8 @@ final class RunRide {
     private float sinceSent = 9, sinceRead = 9, sinceHurt = 9, sinceChip = 9, sinceHelp = 9, sinceMet = 9, sinceDesperate = 9;
     private boolean desperate;
     private int bursts, met;
+    /** Where the last of Lucy's blasts arrived, far off, and how long ago; and where the last word burst, and how long ago. */
+    private float blastX, blastY, sinceBlast = 9, burstX, burstY, sinceBurst = 9;
     private final int[] sentOf = new int[10];
 
     RunRide(int halves, int costs, long seed) {
@@ -142,6 +146,12 @@ final class RunRide {
     boolean desperate() { return desperate; }
     float sinceDesperate() { return sinceDesperate; }
     int bursts() { return bursts; }
+    float blastX() { return blastX; }
+    float blastY() { return blastY; }
+    float sinceBlast() { return sinceBlast; }
+    float burstX() { return burstX; }
+    float burstY() { return burstY; }
+    float sinceBurst() { return sinceBurst; }
     /** How many of a kind she has sent. */
     int sentOf(int kind) { return sentOf[kind]; }
     float time() { return time; }
@@ -176,6 +186,8 @@ final class RunRide {
         sinceHelp += seconds;
         sinceMet += seconds;
         sinceDesperate += seconds;
+        sinceBlast += seconds;
+        sinceBurst += seconds;
         if (safe > 0) safe -= seconds;
         shine(seconds, strike);
         if (state != FLYING) return;
@@ -205,6 +217,9 @@ final class RunRide {
             }
             if (puff.gone < 1) continue;
             breaths.remove(index);
+            blastX = puff.x;
+            blastY = puff.y;
+            sinceBlast = 0;
             if (reel > 0 || passing > 0 || Math.abs(puff.x - herX) > BREATH_TRUE || Math.abs(puff.y - herY) > BREATH_TRUE) continue;
             // (A blast that reaches her while the beam is on her: the two meet on her.)
             if (onHer()) {
@@ -302,6 +317,9 @@ final class RunRide {
     /** A word that has burst: four pieces of it, which land a moment later on four sides of where it did. */
     private void shatter(Thing burst) {
         bursts++;
+        burstX = burst.x;
+        burstY = burst.y;
+        sinceBurst = 0;
         for (int piece = 0; piece < 4; piece++) {
             Thing shard = new Thing();
             shard.kind = SHARD;
@@ -407,10 +425,10 @@ final class RunRide {
             thing.other = thing.x + (thing.x < 0 ? 1 : -1) * (.6f + random.nextFloat() * .4f);
             thing.speed = .4f;
         } else if (kind == RAY) {
-            // Across where they are, at a slant: clear of it is either side.
+            // From her mouth, through where they are and on: clear of it is either side.
             thing.x = x;
             thing.y = y;
-            thing.size = (float) (Math.PI / 4 + random.nextFloat() * Math.PI / 2);
+            thing.size = (float) Math.atan2(y - (ABOVE + herY * FAR), x - herX * FAR);
             thing.speed = .44f;
         } else if (kind == BURST) {
             thing.x = x;
