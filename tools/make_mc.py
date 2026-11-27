@@ -2,7 +2,7 @@
 A film's track in Halgakos's own voice and no other: she does not sing, she talks and calls on
 the beat over a band; a crowd that answers her is her own shout, many times over.
 
-    python tools/make_mc.py SPEC [--again]
+    python tools/make_mc.py SPEC [--again] [--tongue ja|ko|zh] [--only-times]
 
 SPEC is a file in tools/cutscenes (idol-mc, prologue-mc): where the track goes, the band under
 her, how she is asked to speak, and her lines, each with the second it begins on, the seconds it
@@ -30,8 +30,15 @@ band is held down while she is heard (down in a tenth of a second, back up in a 
 gaps between her lines are full), and a little more of her and less of the band where words are
 made out (2 to 4 kHz). It says how far above the band she sits while she speaks, in decibels,
 for this mix and for the first one (her at .9, the band held down by a third).
-Writes OUT.wav and OUT-voice.wav (her voice alone). Needs numpy, soundfile, av, requests; the
-voice's key, by name.
+Writes OUT.wav and OUT-voice.wav (her voice alone), and OUT.times.json: when each line of the
+spec begins and ends in the track, for what is written under the film. With --only-times only
+that last is written, and no sound is touched.
+
+In another tongue (--tongue ja): the spec's "tongues" has, for that tongue, the same lines in
+it, one for one ("lines"), and what it says in place of words her voice would misread
+("says"); the voice is told which language it is speaking, and everything else is the same:
+the same seconds, the same band, the same mix. The files are OUT-ja.wav and so on.
+Needs numpy, soundfile, av, requests; the voice's key, by name.
 """
 import hashlib
 import importlib.util
@@ -136,6 +143,13 @@ def main():
     if not name:
         raise SystemExit(__doc__)
     spec = json.loads((ROOT / "tools" / "cutscenes" / f"{name}.json").read_text(encoding="utf-8"))
+    tongue = sys.argv[sys.argv.index("--tongue") + 1] if "--tongue" in sys.argv else None
+    if tongue:
+        # The same lines in another language: its words in place of each line's, said as that language.
+        other = spec["tongues"][tongue]
+        if len(other["lines"]) != len(spec["lines"]):
+            raise SystemExit(f"{name}: {len(other['lines'])} lines in {tongue} for {len(spec['lines'])}")
+        spec = dict(spec, lines=[[line[0], line[1], words, line[3]] for line, words in zip(spec["lines"], other["lines"])], says=other.get("says", {}), out=spec["out"] + "-" + tongue)
     voice, first = module("make_run_voice"), module("make_idol_mc")
     key = voice.secret("INWORLD_API_KEY")
     kept = SHOTS / spec["kept"]
@@ -149,12 +163,12 @@ def main():
         sent = words
         for shown, read in spec.get("says", {}).items():
             sent = sent.replace(shown, read)
-        path = kept / (hashlib.sha1((f"{sent}|{scene}|{take}" + (f"|{pace}" if pace != 1.0 else "")).encode("utf-8")).hexdigest()[:10] + ".wav")
+        path = kept / (hashlib.sha1((f"{sent}|{scene}|{take}" + (f"|{pace}" if pace != 1.0 else "") + (f"|{tongue}" if tongue else "")).encode("utf-8")).hexdigest()[:10] + ".wav")
         if not path.exists() or "--again" in sys.argv:
             who, hers = voice.VOICES["H"][0], voice.VOICES["H"]
             voice.VOICES["H"] = (who, hers[1] * pace, hers[2])
             try:
-                sound, _ = voice.speak(key, sent, "H", scene)
+                sound, _ = voice.speak(key, sent, "H", scene, tongue)
             finally:
                 voice.VOICES["H"] = hers
             soundfile.write(path, voice.finished(sound, hers[2]), voice.RATE_OUT)
@@ -198,6 +212,7 @@ def main():
     # (Her lines and the crowd are kept apart until the mix: each has its own loudness there.)
     track, answers = numpy.zeros((seconds * RATE, 2)), numpy.zeros((seconds * RATE, 2))
     shouts, free, sped, late, paced = {}, 0.0, [], [], []
+    times = []
     for line in spec["lines"]:
         at, room, words, how = line[:4]
         sent = line[4] if len(line) > 4 else words
@@ -207,6 +222,7 @@ def main():
             piece = shouts[words]
             begins = int(at * RATE)
             answers[begins:begins + len(piece)] += piece[: len(answers) - begins]
+            times.append([round(float(at), 2), round(float(at) + .9, 2)])
             continue
         pieces = [piece.strip() for piece in sent.split("\u2014") if piece.strip()]
         # How long each piece is when she says it her own way; its share of the line's seconds goes by that.
@@ -240,9 +256,14 @@ def main():
         ends = now - gap
         # (A recording keeps a twentieth of a second after its last sound: the next line may begin on that.)
         free = ends - .05
+        times.append([round(begins, 2), round(ends, 2)])
         over = ends - (at + room)
         print((f"{at:5.1f} s  place {room:3.1f}  her own way {came:4.1f} -> {ends - begins:4.1f} s" + (f" [{'; '.join(steps)}]" if steps else "") + (f" (a pause of {gap:.2f} s at its dash)" if len(waves) > 1 else "")
                + (f" BEGINS {begins - at:.2f} s LATE" if begins > at + .05 else "") + (f" runs {over:.2f} s past its place" if over > .1 else "") + f"  {words}").encode("ascii", "replace").decode(), flush=True)
+    pathlib.Path(str(out) + ".times.json").write_text(json.dumps(times), encoding="utf-8")
+    if "--only-times" in sys.argv:
+        print("times written:", str(out) + ".times.json")
+        return
     alone = numpy.abs(track).max(axis=1) > .03
     first = track * .9, answers * .55 * .9
     voice = bell(track, mixed["presence"]) * mixed["voice"]

@@ -180,7 +180,8 @@ def lucy(said):
     return said
 
 
-def speak(key, text, who, scene):
+def speak(key, text, who, scene, language=None):
+    """Someone's voice saying some words, the scene told to it; in a language named (ja, ko, zh...) if the words are not English, so that the voice speaks it as its own."""
     voice, rate, _ = VOICES[who]
     said = spoken(text)
     if who == "e":
@@ -191,7 +192,9 @@ def speak(key, text, who, scene):
     body = {"text": said, "voiceId": voice, "modelId": MODEL, "deliveryMode": "CREATIVE",
             "audioConfig": {"audioEncoding": "PCM", "sampleRateHertz": RATE_IN, "speakingRate": rate},
             "synthesisContext": {"reasoning": "REASONING_ON", "reasoningContext": scene[:600]}}
-    headers = {"Authorization": f"Basic {key}", "Content-Type": "application/json", "Accept": "application/json"}
+    if language:
+        body["language"] = language
+    headers ={"Authorization": f"Basic {key}", "Content-Type": "application/json", "Accept": "application/json"}
     pcm, chosen = b"", ""
     with requests.post(URL, json=body, headers=headers, stream=True, timeout=(15, 120)) as reply:
         if reply.status_code != 200:

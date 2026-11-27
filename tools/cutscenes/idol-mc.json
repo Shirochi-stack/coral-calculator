@@ -10,6 +10,8 @@
  "brisk": "She is the centre of an idol group on stage before a cheering hall, the group's MC over fast idol pop. She does not sing: she snaps the line out right on the beat, quick, crisp and dry, smug and teasing, loud enough for a hall. As brisk as she can say it clearly, with no pauses between the phrases. 'zah-ko' is her taunt (Japanese 'zako', small fry).",
  "shout": "She is on stage and shouts one word to a cheering hall, as loud and bright and short as she can, like a concert call.",
  "says": {"zaako": "zah-ko"},
+ "captions_about": "Which of the lines below make each line of the lyrics as the user wrote them (her call and the crowd's answer are one line there), for what is written under the film.",
+ "captions": [[0, 1], [2, 3], [4], [5], [6], [7], [8], [9], [10, 11], [12, 13], [14], [15], [16], [17], [18], [19], [20, 21], [22], [23, 24], [25], [26, 27], [28], [29, 30], [31], [32, 33], [34], [35], [36], [37], [38], [39], [40], [41], [42], [43], [44]],
  "lines": [
   [1.0, 0.9, "Squish!", "call"], [2.0, 1.4, "Sloppy~♡", "call"],
   [5.0, 0.9, "Squish!", "call"], [6.0, 1.4, "Sloppy~♡", "call"],
