@@ -1,0 +1,361 @@
+{
+ "about": "The idol opening, 'Sloppy Stage': ninety seconds upright (9:16), three takes of thirty seconds that are three scenes (backstage and the entrance; the performance and the five's introductions; the finale and after), made on MAGI-2 through Higgsfield by hand, once upright and once wide (16:9), from the prompts and pictures in dist/cutscenes/idol/magi-9x16 and magi-16x9; the takes are named A-9x16-....mp4 and A-16x9-....mp4, and 'make_cutscene.py idol --edit --with 9x16' (or 16x9) joins them. Names and the title are put on by tools/make_cutscene.py.",
+ "ratio": "9:16",
+ "shapes": {
+  "9x16": "9:16",
+  "16x9": "16:9"
+ },
+ "holds": {
+  "16x9": {
+   "C": [
+    [
+     10.88,
+     10.92
+    ]
+   ]
+  }
+ },
+ "resolution": "720p",
+ "bar": 2.0,
+ "title": {
+  "text": "Sloppy☆Stage",
+  "under": "Halgakos Calculator",
+  "from": 86.0,
+  "top": {
+   "9x16": 0.8,
+   "16x9": 0.7
+  }
+ },
+ "wear": {
+  "H": "Halgakos: long pink hair, pink cat ears, two dark curled horns, one white feathered wing and one black bat wing, a pink cat tail; her stage costume is a black and pink frilled idol dress to the knee with white bows and a pink ribbon at the collar, black stockings",
+  "C": "Chikuwa: brown hair in two long tails; her stage costume is a red and white idol dress to the knee with white fur trim and a little red Santa cap, white gloves and stockings",
+  "R": "Rune: very long pale blue hair in two low tails; her stage costume is a blue and black idol jacket-dress to the knee with a blue ribbon tie, dark stockings",
+  "I": "Illya: very long peach-blond hair with white ribbons; her stage costume is a gold and pink magical idol dress to the knee with a white frilled skirt, long white gloves, pink boots",
+  "T": "Tsubakieh: short purple-grey hair with one curl standing up, round dot eyes and a calm blank face; her stage costume is a purple and cream sailor-collar idol dress to the knee with a purple ribbon, black tights, and a white baseball bat she carries like a penlight"
+ },
+ "look": "2D anime idol concert, cel shading, bright stage lights. No text.",
+ "music": "Music: bright, bouncy idol pop, 120 bpm, handclaps, synths, crowd calls.",
+ "voice": "Cute, high, light girls' singing voices.",
+ "shots": [
+  {
+   "name": "A1",
+   "bar": 0,
+   "bars": 2,
+   "cast": "H",
+   "still": "stills/A1.png",
+   "frame": "Backstage, warm bulbs round a dressing-room mirror. Halgakos, full figure in the middle, in her stage costume, licks the last of a cone of pale green mint chocolate-chip ice cream with a smug half-lidded look, a microphone waiting on the table beside her.",
+   "short": "{H} finishes her mint ice cream with a smug look, sets the cone down and picks up her microphone.",
+   "heard": "muffled crowd, a bass thump through the wall.",
+   "sung by": "the crowd, off screen, chants",
+   "lyric": "Squish! Sloppy~! Squish! Sloppy~!"
+  },
+  {
+   "name": "A2",
+   "bar": 2,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/A2.png",
+   "frame": "A dark backstage corridor seen from behind: the five walk away from the viewer in a row toward a bright doorway of stage light at the end, Halgakos in the middle, their figures rimmed with light.",
+   "short": "The five walk down the dark corridor toward the bright doorway of the stage, seen from behind; {H} in the middle twirls her microphone.",
+   "heard": "footsteps, the crowd getting louder.",
+   "sung by": "the crowd, off screen, chants",
+   "lyric": "Squish! Sloppy~! Squish! Sloppy~!"
+  },
+  {
+   "name": "A3",
+   "bar": 4,
+   "bars": 2,
+   "cast": "",
+   "still": "stills/A3.png",
+   "frame": "A dark concert hall seen from the back over the heads of a crowd of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes, each waving a glowing penlight (pink, red, blue, gold or purple); far ahead on the stage a giant closed green book with gold corners stands under one spotlight.",
+   "short": "The little numerals wave their penlights in time, a sea of five colours; on the stage the giant green book stands closed under a spotlight.",
+   "heard": "a roaring crowd, claps in time.",
+   "sung by": "five girls' voices, off screen, sing together",
+   "lyric": "Lights go up, the pages fly, five of us beneath the sky;"
+  },
+  {
+   "name": "A4",
+   "bar": 6,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/A4.png",
+   "frame": "The stage: the giant green book has just swung open and light floods up out of it; loose pages burst upward like confetti; five dark silhouettes of the girls rise on a lift in the middle of the book, backlit.",
+   "short": "The giant book swings open, pages burst up like confetti, light floods the stage and the five rise as silhouettes on a lift.",
+   "heard": "a big whoosh, a cymbal crash, cheers.",
+   "sung by": "five girls' voices sing together",
+   "lyric": "open the book, the story's ours, sing it loud and light the stars!"
+  },
+  {
+   "name": "A5",
+   "bar": 8,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/A5.png",
+   "frame": "A concert stage that is a giant open green book with gold corners: its pages are the floor and the tall glowing screen behind. Spotlights snap on: the five stand in their opening pose, full figures, Halgakos in the centre with her microphone raised and a wink, Chikuwa and Illya to her left, Rune and Tsubakieh to her right, pages drifting down.",
+   "short": "Spotlights snap on over the five in their opening pose; {H} in the centre winks and raises her microphone, singing.",
+   "heard": "spotlights thunk on, a cheer.",
+   "sung by": "{H} sings, her mouth moving with the song",
+   "lyric": "Hands up high, penlights bright,"
+  },
+  {
+   "name": "A6",
+   "bar": 10,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/A6.png",
+   "frame": "A concert stage that is a giant open green book with gold corners: its pages are the floor and the tall glowing screen behind, seen full height from the hall. The five dance in a row, full figures from head to shoes, all in the same step: right arm up with the microphone, left hand on the hip, one knee lifted.",
+   "short": "The five dance in a row in perfect unison, full figures: a step to the side, an arm up, a turn; all five sing, their mouths moving with the song.",
+   "heard": "claps in time, cheers.",
+   "sung by": "all five sing together, their mouths moving with the song",
+   "lyric": "call my name and call it right!"
+  },
+  {
+   "name": "A7",
+   "bar": 12,
+   "bars": 3,
+   "cast": "H",
+   "still": "stills/A7.png",
+   "frame": "Close on Halgakos from the waist up on the stage, pink light, leaning toward the viewer with a smug grin, holding her microphone out toward the crowd; penlights glow out of focus in front of her.",
+   "short": "{H} shouts the call into her microphone and thrusts it toward the crowd, who shout the answer; she does it twice, cups a hand to her ear, then grins, smug.",
+   "heard": "the crowd shouting back, claps.",
+   "sung by": "{H} calls and the crowd answers",
+   "lyric": "Squish! (Sloppy~!) Squish! (Sloppy~!) Louder!"
+  },
+  {
+   "name": "B1",
+   "bar": 15,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/B1.png",
+   "frame": "A concert stage that is a giant open green book with gold corners: its pages are the floor and the tall glowing screen behind, the screen behind blazing pink. The five dance side by side, full figures, mid-step: both hands making a squashing clap in front of them, big smiles, Halgakos in the centre.",
+   "short": "The five dance the chorus side by side, full figures: a squashing clap on each call, a hop, a spin; all five sing, their mouths moving with the song.",
+   "heard": "claps, the crowd calling.",
+   "sung by": "all five sing together, their mouths moving with the song",
+   "lyric": "Squish, Sloppy~ we're on tonight! Squish, Sloppy~ five colours of light!"
+  },
+  {
+   "name": "B2",
+   "bar": 17,
+   "bars": 2,
+   "cast": "",
+   "still": "stills/B2.png",
+   "frame": "The hall from the stage: a crowd of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes, each waving a glowing penlight (pink, red, blue, gold or purple), packed to the back, penlights raised, mouths open in a cheer; pages drift down over them.",
+   "short": "The little numerals jump in time and thrust their penlights up on every call, shouting along.",
+   "heard": "a crowd shouting in time, claps.",
+   "sung by": "the five, off screen, and the crowd sing together",
+   "lyric": "Every heart, every page, every beat, Squish, Sloppy~ get up on your feet!"
+  },
+  {
+   "name": "B3",
+   "bar": 19,
+   "bars": 2,
+   "cast": "H",
+   "card": {
+    "name": "Halgakos",
+    "says": "Pink. The centre. Obviously.",
+    "side": "left"
+   },
+   "still": "stills/B3.png",
+   "frame": "Close on Halgakos from the chest up, pink spotlight, a smug half-lidded look and a small fanged smile, making a heart with the fingers of one hand beside her cheek, microphone in the other. The lower third of the picture is calm.",
+   "short": "{H} sings her own introduction into her microphone with a smug half-lidded look, makes a finger heart and winks.",
+   "heard": "the crowd answers with a shout.",
+   "sung by": "{H} sings, her mouth moving with the song; the crowd shouts back",
+   "lyric": "Pink in the centre, smug as can be: Halgakos! (Sloppy~!)"
+  },
+  {
+   "name": "B4",
+   "bar": 21,
+   "bars": 2,
+   "cast": "C",
+   "card": {
+    "name": "Chikuwa",
+    "says": "Red. Feeds the front row.",
+    "side": "left"
+   },
+   "still": "stills/B4.png",
+   "frame": "Chikuwa from the knees up, red spotlight, beaming, microphone in one hand, tossing a golden bread roll from a little basket on her arm toward the viewer. The lower third of the picture is calm.",
+   "short": "{C} sings her introduction, beaming, and tosses bread rolls from her basket to the crowd.",
+   "heard": "the crowd shouts her name.",
+   "sung by": "{C} sings, her mouth moving with the song; the crowd shouts back",
+   "lyric": "Red as a ribbon, warm as bread: Chikuwa! (Chikuwa!)"
+  },
+  {
+   "name": "B5",
+   "bar": 23,
+   "bars": 2,
+   "cast": "R",
+   "card": {
+    "name": "Rune",
+    "says": "Blue. Cries on the high notes.",
+    "side": "left"
+   },
+   "still": "stills/B5.png",
+   "frame": "Rune from the knees up, blue spotlight, a shy little wave, one tear on her cheek and a brave smile, microphone held in both hands; small drops of ink float around her turning into blue sparkles. The lower third of the picture is calm.",
+   "short": "{R} sings her introduction shyly, waves, and one tear rolls down as she smiles; drops of ink around her turn into blue sparkles.",
+   "heard": "the crowd shouts her name.",
+   "sung by": "{R} sings, her mouth moving with the song; the crowd shouts back",
+   "lyric": "Blue as the ink and the tears I've shed: Rune! (Rune!)"
+  },
+  {
+   "name": "B6",
+   "bar": 25,
+   "bars": 2,
+   "cast": "I",
+   "card": {
+    "name": "Illya",
+    "says": "Gold. The heroine, she says.",
+    "side": "left"
+   },
+   "still": "stills/B6.png",
+   "frame": "Illya, full figure, gold spotlight, mid-twirl with her hair flying, a feather-quill microphone raised, a wink; gold sparkles spiral round her. The lower third of the picture is calm.",
+   "short": "{I} sings her introduction, twirls once with her quill microphone and lands in a pose with a wink, gold sparkles spiralling.",
+   "heard": "the crowd shouts her name.",
+   "sung by": "{I} sings, her mouth moving with the song; the crowd shouts back",
+   "lyric": "Gold in the spotlight, born to lead: Illya! (Illya!)"
+  },
+  {
+   "name": "B7",
+   "bar": 27,
+   "bars": 3,
+   "cast": "T",
+   "card": {
+    "name": "Tsubakieh",
+    "says": "Purple. Swings on the beat.",
+    "side": "left"
+   },
+   "still": "stills/B7.png",
+   "frame": "Tsubakieh from the knees up, purple spotlight, perfectly blank-faced with round dot eyes, in a flawless idol pose: one hand up in a V sign by her eye, the white bat held in the other like a penlight. The lower third of the picture is calm.",
+   "short": "{T} sings her introduction with a perfectly blank face, swings her bat once like a penlight in time, then holds a flawless idol pose with a tiny V sign.",
+   "heard": "the crowd shouts her name, a swish.",
+   "sung by": "{T} sings, her mouth moving with the song; the crowd shouts back",
+   "lyric": "Purple and calm, I swing, I speed: Tsubakieh! (Tsubakieh!)"
+  },
+  {
+   "name": "C1",
+   "bar": 30,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/C1.png",
+   "frame": "A runway running out from the stage into the hall, seen from the front: the five run toward the viewer along it hand in hand, full figures, laughing, a crowd of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes, each waving a glowing penlight (pink, red, blue, gold or purple) on both sides.",
+   "short": "The five run down the runway into the hall hand in hand, toward the camera, singing; penlights wave on both sides.",
+   "heard": "running feet, cheers.",
+   "sung by": "all five sing together, their mouths moving with the song",
+   "lyric": "Down the runway, hand in hand,"
+  },
+  {
+   "name": "C2",
+   "bar": 32,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/C2.png",
+   "frame": "Low angle from the foot of the runway looking up: the five in a V formation, full figures, Halgakos at the point, all with one arm thrown up, pages falling like confetti against the lights.",
+   "short": "Low angle: the five dance in a V formation, arms sweeping up together, pages falling like confetti; all five sing.",
+   "heard": "claps, cheers.",
+   "sung by": "all five sing together, their mouths moving with the song",
+   "lyric": "every voice in storybook land;"
+  },
+  {
+   "name": "C3",
+   "bar": 34,
+   "bars": 2,
+   "cast": "H",
+   "still": "stills/C3.png",
+   "frame": "Close on Halgakos from the shoulders up, pink light, looking at the viewer over her microphone with a smug half-lidded look and a small fanged smile, one brow raised.",
+   "short": "{H} looks the viewer up and down over her microphone, smug, sings her line with a small nod, and flicks her hair back.",
+   "heard": "a drum fill.",
+   "sung by": "{H} sings, her mouth moving with the song",
+   "lyric": "not bad, for you, you kept the beat, one more time, up on your feet!"
+  },
+  {
+   "name": "C4",
+   "bar": 36,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/C4.png",
+   "frame": "A concert stage that is a giant open green book with gold corners: its pages are the floor and the tall glowing screen behind. All five in mid-jump together, full figures, arms and microphones thrown up, pages bursting above them like fireworks in five colours.",
+   "short": "All five jump together, arms up, and pages burst above them like fireworks; all five sing.",
+   "heard": "a boom of fireworks, a roar.",
+   "sung by": "all five sing together, their mouths moving with the song",
+   "lyric": "Squish, Sloppy~ we're on tonight! Squish, Sloppy~ five colours of light!"
+  },
+  {
+   "name": "C5",
+   "bar": 38,
+   "bars": 2,
+   "cast": "",
+   "still": "stills/C5.png",
+   "frame": "The hall from high above: the crowd's penlights have gathered into one great heart of five colours, pink in the middle; the stage glows at the top of the picture.",
+   "short": "From above, the crowd's penlights sway and form one great heart in five colours.",
+   "heard": "the whole hall singing.",
+   "sung by": "the five, off screen, and the crowd sing together",
+   "lyric": "Every heart, every page, every beat,"
+  },
+  {
+   "name": "C6",
+   "bar": 40,
+   "bars": 2,
+   "cast": "HCRIT",
+   "still": "stills/C6.png",
+   "frame": "A concert stage that is a giant open green book with gold corners: its pages are the floor and the tall glowing screen behind. The five stand in a line at the front of the stage, full figures, hands joined and raised, Halgakos in the centre, smiling out at the hall.",
+   "short": "The five stand in a line with joined hands raised, sing the last line, and bow deeply together.",
+   "heard": "a huge cheer, applause.",
+   "sung by": "all five sing together, their mouths moving with the song",
+   "lyric": "Squish, Sloppy~ encore, repeat!"
+  },
+  {
+   "name": "C7",
+   "bar": 42,
+   "bars": 3,
+   "cast": "HCRIT",
+   "still": "stills/C7.png",
+   "frame": "Backstage after the show, warm light, in the lower two thirds of the picture: Halgakos flopped on a sofa, tired and content, holding a big cone of pale green mint chocolate-chip ice cream; Chikuwa, Rune, Illya and Tsubakieh around her, laughing. The upper third of the picture is a plain dark wall with soft lights and nothing else on it.",
+   "short": "After the show {H} flops on the sofa with a big mint ice cream and takes a blissful lick; the others laugh around her; she says her last line toward the viewer with a tired smug smile.",
+   "heard": "distant applause, a happy sigh.",
+   "sung by": "{H} says, not singing, her mouth moving",
+   "lyric": "Thank you! Now where is my mint ice cream? Sloppy~"
+  }
+ ],
+ "segments": {
+  "resolution": "1080p",
+  "stills": "stills",
+  "models": {},
+  "list": [
+   {
+    "name": "A",
+    "shots": [
+     "A1",
+     "A2",
+     "A3",
+     "A4",
+     "A5",
+     "A6",
+     "A7"
+    ]
+   },
+   {
+    "name": "B",
+    "shots": [
+     "B1",
+     "B2",
+     "B3",
+     "B4",
+     "B5",
+     "B6",
+     "B7"
+    ]
+   },
+   {
+    "name": "C",
+    "shots": [
+     "C1",
+     "C2",
+     "C3",
+     "C4",
+     "C5",
+     "C6",
+     "C7"
+    ]
+   }
+  ]
+ }
+}

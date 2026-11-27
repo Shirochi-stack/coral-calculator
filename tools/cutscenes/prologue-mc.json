@@ -1,0 +1,40 @@
+{
+ "about": "The prologue's track in Halgakos's own voice, on the words the user wrote (2026-11-27), word for word: for tools/make_mc.py. The picture is the first opening as Seedance 2.5 made it and the edit joined it (dist/cutscenes/opening/opening-seedance.mp4); each line begins a little after the cut that opens its shot, as the cuts were measured in that film and not as they were planned: 6.0, 9.7, 14.0, 17.9, 21.8, 25.5 | 30, 33.8, 37.6, 40.0, 42.0, 44.25 (Chikuwa), 48.1 (Rune), 52.25 (Illya), 56.0 (Tsubakieh) | 60, 65.7, 71.5, 75.8, 80.0, 83.5. The band under her is made from tools/cutscenes/prologue-song.json.",
+ "out": "opening/prologue-halgakos",
+ "kept": "opening/mc",
+ "band": "prologue/songs/eleven-band-1.mp3",
+ "seconds": 90,
+ "beat": 0.5,
+ "mix": {"voice": 0.9, "crowd": 0.5, "band": 1.0, "under": -3.7, "down": 0.1, "up": 0.2, "presence": 0.0, "dip": 0.0},
+ "mix_about": "The user heard the first mix of this track (her at .9, the band held down by a third under her) and found it fine: these settings are that mix. The file in use, dist/cutscenes/opening/prologue-halgakos.wav, is the very one the user heard.",
+ "scene": "She talks over the opening theme of her own show, bouncy anime pop at 120 beats a minute, straight to the viewer who followed her on her day off. She does not sing: she talks on the beat in short dry phrases, smug, bratty and teasing, looking down her nose, unhurried and pleased with herself. Full stops are clipped: no long pauses. 'zah-ko' is her taunt (Japanese 'zako', small fry), said with a drawl. 'nim' and 'sshi' are Korean honorifics.",
+ "brisk": "She talks over the fast opening theme of her own show, straight to the viewer. She does not sing: she snaps the line out right on the beat, quick, crisp and dry, smug and teasing. As brisk as she can say it clearly, with no pauses between the phrases. 'zah-ko' is her taunt (Japanese 'zako', small fry). 'nim' and 'sshi' are Korean honorifics.",
+ "shout": "She calls one word out over the opening theme of her own show, as loud and bright and short as she can.",
+ "says": {"zaako": "zah-ko", "-nim": "nim", "-ssi": "sshi"},
+ "lines": [
+  [1.5, 2.5, "Sloppy~♡", "solo"],
+  [6.25, 3.4, "One day off. One cone. You followed me anyway.", "solo"],
+  [10.0, 3.9, "Book fell. Look at the mess. Your fault? Doesn't matter.", "solo"],
+  [14.25, 3.5, "Sums grew legs. Words ran wild.", "solo"],
+  [18.0, 3.7, "Who cleans it? Me. You just stand there, zaako.", "solo"],
+  [22.0, 3.4, "Carry the one. Footnote. Focus.", "solo"],
+  [25.75, 4.0, "Thumbs out. Don't slow me down, Sloppy~♡", "solo"],
+
+  [30.25, 3.4, "Calculation! Translation! And Sloppy~♡", "solo"],
+  [33.7, 4.0, "Two plus two is four. Clap for yourself. Slowly.", "solo"],
+  [37.75, 2.6, "Every word as written. Every sum just right.", "solo"],
+  [40.4, 3.7, "Squish, Sloppy~♡ Flat as a page. Chin up.", "solo"],
+  [44.5, 3.5, "Chikuwa! Not always bread, genius.", "solo"],
+  [48.25, 3.9, "Rune! Stop crying in the ink. It's sad to watch.", "solo"],
+  [52.5, 3.4, "Illya! One heroine is plenty. Sit.", "solo"],
+  [56.25, 3.6, "Tsubakieh! Put the bat down. Normally!", "solo"],
+
+  [60.25, 3.6, "Calculation! Translation! And Sloppy~♡", "solo"],
+  [65.75, 2.9, "-nim and -ssi. I keep both. You drop them.", "solo"],
+  [68.75, 2.7, "Miss one honorific and you're Sloppy~♡", "solo"],
+  [71.75, 3.9, "Not bad. For you. Sloppy~♡", "solo"],
+  [76.0, 3.8, "Calculation! Translation! And Sloppy~♡", "solo"],
+  [80.0, 3.6, "Sloppy, sloppy, sloppy. Louder. Sloppy~♡", "solo"],
+  [84.0, 5.5, "Now where is my ice cream. I was promised. Sloppy~♡", "solo"]
+ ]
+}

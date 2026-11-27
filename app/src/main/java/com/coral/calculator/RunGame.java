@@ -395,6 +395,18 @@ final class RunGame {
     /** And while a clip is being watched: nothing of the land goes on under it. The clip, while there is one. */
     private static final int WATCHING = 7;
     private RunVideo video;
+    /**
+     * The gallery, while it is open; its button on the map and the face on it; everything that is in it; whether something in it
+     * has opened that she has yet to say so of, and whether that has been looked for since the game was opened; and the line
+     * she said of it last, which she is shown saying on the map for a while.
+     */
+    private RunShelf shelf;
+    private final RectF cringeButton = new RectF();
+    private Bitmap cringe;
+    private List<RunGallery.Item> gallery;
+    private boolean galleryNews, galleryChecked;
+    private String[] galleryWords;
+    private float galleryShown;
     private static final String[] BLOCK_WORDS = {"Mr.", "Miss", "Sir", "Madam"}, NAME_WORDS = {"Missy", "young lady", "little one", "dear girl", "Lulu"};
     private RunRide ride;
     private Bitmap rideArt, motherArt, pagesSky;
@@ -2653,6 +2665,10 @@ final class RunGame {
     // The screen
 
     void layout(int width, int height, RectF insets) {
+        // (The gallery, open while the screen changes shape, is laid again at the new shape: it may be a window of its own, which
+        // keeps the size it was given.)
+        boolean reshaped = shelf != null && !shelf.closed() && (width != this.width || height != this.height);
+        if (reshaped) shelf.close();
         this.width = width;
         this.height = height;
         safe.set(insets);
@@ -2720,6 +2736,7 @@ final class RunGame {
             float down = safe.top + dp(142) + index * (high + dp(8));
             wares[index].set(safe.centerX() - across / 2, down, safe.centerX() + across / 2, down + high);
         }
+        if (reshaped) stage.post(this::openGallery);
     }
 
     /**
@@ -2735,14 +2752,23 @@ final class RunGame {
         text.setTextSize(dp(26));
         float from0 = safe.left + dp(18) + text.measureText("Plus run") + dp(12), to = soundButton.left - dp(8);
         shopButton.set(Math.max(from0, to - dp(128)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
+        // The way into the gallery: her cringing face with its name under it, at the foot of the map on the right, across from her
+        // and clear of what she says. Where there is little room under the lands it is smaller, and loses its name before its face.
+        float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
+        float across = Math.min(dp(66), tall);
+        cringeButton.set(safe.right - dp(14) - across, foot - tall, safe.right - dp(14), foot);
     }
 
-    void close() { audio.close(); }
+    void close() {
+        if (shelf != null) shelf.close();
+        audio.close();
+    }
 
     /** Left for the home screen: a run stops on its pause, and whoever was speaking stops, so that it can be come back to as it stands. */
     void hold() {
-        // (A clip being watched is over with: what follows it waits to be gone on with.)
+        // (A clip being watched is over with: what follows it waits to be gone on with. So is a film; and the gallery is shut.)
         if (video != null) video.skip();
+        if (shelf != null) shelf.close();
         if (screen == PLAY) pause();
         audio.hush();
     }
@@ -2752,6 +2778,12 @@ final class RunGame {
         // A clip being watched is what Back ends, as a tap does.
         if (video != null) {
             video.skip();
+            return true;
+        }
+        // The gallery: Back is out of a picture being looked at, and then out of the gallery, to the map.
+        if (shelf != null && !shelf.closed()) {
+            if (!shelf.back()) shelf.close();
+            audio.play("tap", .3f);
             return true;
         }
         // Whatever sheet is open over the screen is what Back closes: her backpack, or the colours opened out.
@@ -2806,6 +2838,111 @@ final class RunGame {
         audio.hush();
         screen = MAP;
         session.refresh();
+        news();
+    }
+
+    // The films and the gallery
+
+    /** Everything in the gallery: what is always there, and the pictures of the table kept with them. */
+    private List<RunGallery.Item> gallery() {
+        if (gallery == null) gallery = RunGallery.all(RunShelf.text(context, "gallery/pictures.tsv"));
+        return gallery;
+    }
+
+    /** The gallery is opened over the map. (In a build made for testing, with everything in it open if that is asked for.) */
+    private void openGallery() {
+        if (shelf != null && !shelf.closed()) return;
+        audio.hush();
+        galleryShown = 0;
+        int[] edges = {Math.round(safe.left), Math.round(safe.top), Math.round(width - safe.right), Math.round(height - safe.bottom)};
+        shelf = RunShelf.over(stage, session, dark, BuildConfig.DEBUG && session.tally("run_gallery") == 1, edges, new RunShelf.Host() {
+            @Override public void play(int film, android.view.View over) { showFilm(film, over, null); }
+
+            @Override public void tap() { audio.play("tap", .5f); }
+        });
+    }
+
+    /**
+     * A film is played, over the game or over the gallery, and then something is done. Which picture is its picture goes by the
+     * shape of what it is played over as it begins, and is not changed while it plays. Its sound is the one chosen for it, in the
+     * language chosen if that has been recorded and in English if not; with the game's sound off it is silent. What is written
+     * under it is in the language chosen for that, if what is heard has been written out in it; if not, nothing is. That it has
+     * been played is kept, and is what opens it in the gallery; if it could not be played nothing is kept, and the game goes on.
+     */
+    private void showFilm(int film, android.view.View over, Runnable then) {
+        if (video != null) return;
+        audio.hush();
+        captionLeft = 0;
+        RunVideo.Ends ends = played -> {
+            video = null;
+            if (played) {
+                session.keep(RunFilms.SEEN, session.tally(RunFilms.SEEN) | RunFilms.bit(film));
+                news();
+            }
+            if (shelf != null && !shelf.closed()) shelf.fill();
+            if (then != null) then.run();
+        };
+        int script = session.tally(RunFilms.CAPTIONS);
+        if (film == RunFilms.CLIP) {
+            boolean heard = audio.on() && Chatter.DEFAULT_NAME.equals(names.nickname());
+            video = RunVideo.over(over, R.raw.run_cut_mother, heard, script < RunFilms.CLIP_SAYS.length ? names.named(RunFilms.CLIP_SAYS[script]) : null, ends);
+            return;
+        }
+        boolean upright = RunFilms.upright(over.getWidth(), over.getHeight());
+        String shown = RunFilms.picture(film, upright), sound = null;
+        int picture = RunShelf.raw(context, "run_film_" + shown), voice = 0;
+        if (picture == 0) {
+            ends.ended(false);
+            return;
+        }
+        for (String name : RunFilms.sounds(film, session.tally(RunFilms.SOUND + film), session.tally(RunFilms.TONGUE), upright)) {
+            if (voice == 0 && RunShelf.raw(context, "run_film_" + name) != 0) {
+                sound = name;
+                voice = RunShelf.raw(context, "run_film_" + name);
+            }
+        }
+        String written = sound == null ? null : RunFilms.captions(sound, script);
+        List<RunFilms.Line> lines = written == null ? null : RunFilms.lines(RunShelf.text(context, written));
+        if (BuildConfig.DEBUG) {
+            android.util.Log.i("RunFinale", "film " + film + ": picture " + shown + ", sound " + (audio.on() ? sound : "off (" + sound + ")") + ", written " + (lines == null || lines.isEmpty() ? "nothing" : written));
+        }
+        video = RunVideo.film(over, picture, audio.on() ? voice : 0, lines, ends);
+    }
+
+    /** Whether more of the gallery is open than when she last said so: if it is, she will say so, once, when she next can. */
+    private void news() {
+        int open = RunGallery.open(gallery(), session);
+        if (open > session.tally(RunGallery.TOLD)) {
+            session.keep(RunGallery.TOLD, open);
+            galleryNews = true;
+        }
+    }
+
+    /**
+     * She says that something new is in the gallery when she can: on the map, where she is shown saying it; or in a land, in her
+     * corner as her other lines are, when nothing is being told and no one is speaking. Never over a film, a card, or the gallery
+     * itself. However many things opened, she says it once.
+     */
+    private void sayNews(float seconds) {
+        if (galleryShown > 0) galleryShown -= seconds;
+        if (!galleryChecked) {
+            galleryChecked = true;
+            news();
+        }
+        // (For looking, in a build made for testing: a film asked for is played from the map, as it would be after its land.)
+        if (BuildConfig.DEBUG && screen == MAP && video == null && session.tally("run_film") > 0) {
+            int film = session.tally("run_film") - 1;
+            session.keep("run_film", 0);
+            if (film <= RunFilms.CLIP) showFilm(film, stage, null);
+        }
+        if (!galleryNews || video != null || shelf != null && !shelf.closed()) return;
+        boolean free = screen == MAP || screen == PLAY && finale == NO_FINALE && !talking && captionLeft <= 0 && personLeft <= 0;
+        if (!free || audio.speaking()) return;
+        galleryNews = false;
+        galleryWords = RunStory.GALLERY[random.nextInt(RunStory.GALLERY.length)];
+        galleryShown = 8;
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "gallery news: " + galleryWords[0] + (screen == PLAY ? " in land " + number : " on the map"));
+        speak(galleryWords, screen == PLAY);
     }
 
     private void buzz(boolean strongly) {
@@ -3109,6 +3246,7 @@ final class RunGame {
         banked = run.purse() * (100 + RunGear.luck(gearOn()) + RunMarket.PAYS * hard()) / 100;
         session.keep("run_bank", bank() + banked);
         if (won) {
+            if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "won " + number);
             float share = run.total() == 0 ? 1 : run.collected() / (float) run.total();
             stars = 1 + (share >= .6f ? 1 : 0) + (share >= .9f ? 1 : 0);
             if (stars > starsOf(number)) session.keep("run_stars_" + number, stars);
@@ -3125,6 +3263,8 @@ final class RunGame {
             session.keep("run_pet_kills", session.tally("run_pet_kills") + run.petKills());
             pills(number < RunLevels.OPEN_TO ? number == RunLevels.COUNT ? RunStory.SEQUEL : number == RunLevels.SECOND ? RunStory.THIRD : "Next" : "The end", NEXT, "Again", AGAIN,
                     "Lands", TO_MAP);
+            // (What this land opened in the gallery, if anything, she will say when she next can.)
+            news();
         } else {
             stars = 0;
             session.keep("run_lost", session.tally("run_lost") + 1);
@@ -3142,8 +3282,12 @@ final class RunGame {
         buzz(false);
         // What came of getting past one of them is told once, before whatever was asked for.
         String[][] outro = screen == RESULT && won ? RunStory.outro(number) : null;
-        if (outro != null && untold("run_outro2", number)) tell(outro, RunLevels.chapterOf(number), () -> carryOut(action));
-        else carryOut(action);
+        // And after that, where a film belongs to the story, it is shown, the first time: the prologue after the first of them, the
+        // idol song after the true ending.
+        int film = screen == RESULT && blackRung == 0 ? RunFilms.due(number, won, session.tally("run_ending"), session.tally(RunFilms.SEEN)) : RunFilms.NONE;
+        Runnable then = film == RunFilms.NONE ? () -> carryOut(action) : () -> showFilm(film, stage, () -> carryOut(action));
+        if (outro != null && untold("run_outro2", number)) tell(outro, RunLevels.chapterOf(number), then);
+        else then.run();
     }
 
     private void carryOut(int action) {
@@ -3203,8 +3347,15 @@ final class RunGame {
         int chapter = RunLevels.chapterOf(number);
         boolean heard = audio.on() && Chatter.DEFAULT_NAME.equals(names.nickname());
         if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "watch");
-        video = RunVideo.over(stage, R.raw.run_cut_mother, heard, names.named(RunStory.CUT_SAYS), played -> {
+        // (Its words are under it in the language chosen for what is written under the films, or not at all.)
+        int script = session.tally(RunFilms.CAPTIONS);
+        video = RunVideo.over(stage, R.raw.run_cut_mother, heard, script < RunFilms.CLIP_SAYS.length ? names.named(RunFilms.CLIP_SAYS[script]) : null, played -> {
             video = null;
+            // (Watched here, it can be watched again in the gallery.)
+            if (played) {
+                session.keep(RunFilms.SEEN, session.tally(RunFilms.SEEN) | RunFilms.bit(RunFilms.CLIP));
+                news();
+            }
             if (finale != WATCHING) return;
             finale = FLOWN;
             finaleAge = 0;
@@ -3754,6 +3905,7 @@ final class RunGame {
         } else if (unmadeSaid == 3 && finaleAge > unmadeAt + 4.6f && !audio.speaking()) {
             // It has been seen: that is kept; what she collected is hers; and the card says what was missing.
             session.keep("run_ending", session.tally("run_ending") | 1);
+            news();
             won = false;
             idle();
             resultClock = 0;
@@ -4208,6 +4360,7 @@ final class RunGame {
 
     void advance(float seconds) {
         clock += seconds;
+        sayNews(seconds);
         if (captionLeft > 0) captionLeft -= seconds;
         if (refused > 0) refused -= seconds;
         if (knockAge >= 0 && (knockAge += seconds) > KNOCK) knockAge = -1;
@@ -5718,6 +5871,10 @@ final class RunGame {
                 counterFrom = MAP;
                 screen = SHOP;
                 speak(RunStory.SHOP[0], false);
+            } else if (cringeButton.contains(x, y)) {
+                audio.play("tap", .5f);
+                buzz(false);
+                openGallery();
             } else if (gearButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 buzz(false);
@@ -10780,6 +10937,27 @@ final class RunGame {
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(ink);
         fitted(canvas, "Gear", gearButton.left + dp(32), gearButton.centerY() + dp(5), dp(13.5f), gearButton.width() - dp(40));
+        // The gallery: her face as she cringes, and the word for it; and a dot on its corner, as on the counter, while something in
+        // it has opened since it was last looked into.
+        plate(canvas, cringeButton, dp(16), 235);
+        if (cringe == null) cringe = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_cringe);
+        boolean worded = cringeButton.height() >= dp(64);
+        float face = Math.min(cringeButton.width() - dp(8), cringeButton.height() - dp(worded ? 22 : 8));
+        box.set(cringeButton.centerX() - face / 2, cringeButton.top + dp(4), cringeButton.centerX() + face / 2, cringeButton.top + dp(4) + face);
+        paint.setAlpha(255);
+        paint.setFilterBitmap(true);
+        if (cringe != null) canvas.drawBitmap(cringe, null, box, paint);
+        if (worded) {
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(ink);
+            fitted(canvas, "Cringe", cringeButton.centerX(), cringeButton.bottom - dp(6.5f), dp(12), cringeButton.width() - dp(8));
+        }
+        if (RunGallery.open(gallery(), session) > session.tally(RunGallery.LOOKED)) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(CalculatorLayout.CORAL);
+            canvas.drawCircle(cringeButton.right - dp(7), cringeButton.top + dp(6), dp(5), paint);
+            paint.setColor(Color.BLACK);
+        }
         text.setTextAlign(Paint.Align.LEFT);
         // Her, under it all, with a word about what is next.
         float tall = Math.min(dp(96), safe.bottom - goButton.bottom - dp(20));
@@ -10804,10 +10982,12 @@ final class RunGame {
                     + " to win, in land " + open + " Sloppy~♡"
                     : waiting >= 0 ? waitName(waiting) + (waiting == RunLevels.MIRI ? " are" : " is") + " waiting in land " + open + " Sloppy~♡"
                     : "Land " + open + " is waiting Sloppy~♡");
+            // (For a while after something has opened in the gallery, what she says is that.)
+            if (galleryShown > 0 && galleryWords != null) words = names.named(galleryWords[1]);
             text.setTextSize(dp(14));
             text.setTextAlign(Paint.Align.LEFT);
             // Her words go onto as many lines as it takes to fit them beside her at a size that can be read: they are never made small.
-            float room = safe.right - middle - tall * .5f - dp(40);
+            float room = cringeButton.left - dp(10) - middle - tall * .5f - dp(24);
             List<String> said = wrap(words, room);
             float wide = 0;
             for (String one : said) wide = Math.max(wide, Math.min(room, text.measureText(one)));

@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The sounds and voices of Plus run and Page brawl are looked up by name, so nothing in the code names them. -->
+<!-- The sounds and voices of Plus run and Page brawl, and Plus run's films, are looked up by name, so nothing in the code names them. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@raw/run_s_*,@raw/run_v_*,@raw/fight_s_*,@raw/fight_v_*" />
+    tools:keep="@raw/run_s_*,@raw/run_v_*,@raw/run_film_*,@raw/fight_s_*,@raw/fight_v_*" />

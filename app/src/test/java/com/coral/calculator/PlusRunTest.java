@@ -7465,7 +7465,8 @@ public class PlusRunTest {
                 assertEquals("more than one heart: " + line[1], line[1].indexOf('♡'), line[1].lastIndexOf('♡'));
             }
         }
-        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4, lines);
+        assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length, lines);
+        assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.
         assertEquals("rev7", RunStory.REVEAL[RunStory.CUT_AT][0]);

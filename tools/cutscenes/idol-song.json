@@ -1,0 +1,40 @@
+{
+ "about": "The idol opening's song, 'Squish! Sloppy~♡': an idol anthem with calls and answers, each part with the seconds it has on the picture (tools/cutscenes/idol.json: three takes of thirty seconds; 120 beats a minute, a bar is two seconds). 'Squish!' is the idol's call and 'Sloppy~♡' the crowd's answer. For a model that takes a plan with seconds (ElevenLabs Music), every part here is a part of the plan.",
+ "title": "Squish! Sloppy~♡",
+ "seconds": 90,
+ "style": "A cute, catchy idol-pop anthem in the Japanese idol style, 120 BPM in 4/4: bright synths, handclaps, a four-on-the-floor kick, slap bass, sparkle chimes, and a crowd doing call-and-response shouts. A group of five girls sings in unison with solo lines: kawaii anime character-song voices, high-pitched, light, bright and cute, never mature, deep, husky or belting. Sung in English. About ninety seconds, with a clean ending.",
+ "shades": {
+  "idol": "A cute, catchy idol-pop anthem in the Japanese idol style, 120 BPM in 4/4: bright synths, handclaps, a four-on-the-floor kick, slap bass, sparkle chimes, and a crowd doing call-and-response shouts. A group of five girls sings in unison with solo lines: kawaii anime character-song voices, high-pitched, light, bright and cute, never mature, deep, husky or belting. Sung in English. About ninety seconds, with a clean ending."
+ },
+ "tags": "idol pop, j-pop, kawaii, 120 bpm, bright synths, handclaps, crowd calls, girl group, cute high voices, english",
+ "plans": {
+  "idol": {
+   "positive": ["cute, catchy Japanese-style idol pop anthem", "bright synths, handclaps, four-on-the-floor kick, slap bass, sparkle chimes", "a group of five girls singing in unison, with solo lines", "kawaii anime character-song vocals: high-pitched, light, bright, cute girls' voices", "a crowd shouting call-and-response answers", "sung in English", "120 BPM"],
+   "negative": ["mature voice", "deep voice", "husky voice", "belting diva vocal", "male lead vocal", "slow tempo", "sad", "rock guitars", "long instrumental passages"]
+  },
+  "local": {
+   "intro": ["a big opening hit, then a crowd chanting two words over a build"],
+   "verse": ["the group sings quick, bright lines in unison"],
+   "pre-chorus": ["one girl sings over a rising build with claps"],
+   "call": ["one girl shouts a word and a crowd shouts the answer, twice; the band stops and starts on the hits"],
+   "chorus": ["the whole group sings a huge sing-along hook, the crowd shouting along"],
+   "member": ["one girl sings her own introduction line alone, then the crowd shouts her name back"],
+   "outro": ["the music falls to a soft sparkle; one girl speaks her line, laughing; a last chime"]
+  }
+ },
+ "sections": [
+  {"tag": "intro", "from": 0, "to": 8, "picture": "backstage, the corridor", "lines": ["Squish! Sloppy~♡", "Squish! Sloppy~♡"]},
+  {"tag": "verse", "from": 8, "to": 16, "picture": "the hall, the book opens", "lines": ["Lights go up, the pages fly,", "five of us beneath the sky;", "open the book, the story's ours,", "sing it loud and light the stars!"]},
+  {"tag": "pre-chorus", "from": 16, "to": 24, "picture": "the opening pose, the first steps", "lines": ["Hands up high, penlights bright,", "call my name and call it right!"]},
+  {"tag": "call", "from": 24, "to": 30, "picture": "Halgakos and the crowd", "lines": ["Squish! (Sloppy~♡)", "Squish! (Sloppy~♡)", "Louder!"]},
+  {"tag": "chorus", "from": 30, "to": 38, "picture": "the dance, the crowd", "lines": ["Squish, Sloppy~♡ we're on tonight!", "Squish, Sloppy~♡ five colours of light!", "Every heart, every page, every beat,", "Squish, Sloppy~♡ get up on your feet!"]},
+  {"tag": "member", "from": 38, "to": 42, "picture": "Halgakos, pink", "lines": ["Pink in the centre, smug as can be:", "Halgakos! (Sloppy~♡)"]},
+  {"tag": "member", "from": 42, "to": 46, "picture": "Chikuwa, red", "lines": ["Red as a ribbon, warm as bread:", "Chikuwa! (Chikuwa!)"]},
+  {"tag": "member", "from": 46, "to": 50, "picture": "Rune, blue", "lines": ["Blue as the ink and the tears I've shed:", "Rune! (Rune!)"]},
+  {"tag": "member", "from": 50, "to": 54, "picture": "Illya, gold", "lines": ["Gold in the spotlight, born to lead:", "Illya! (Illya!)"]},
+  {"tag": "member", "from": 54, "to": 60, "picture": "Tsubakieh, purple", "lines": ["Purple and calm, I swing, I speed:", "Tsubakieh! (Tsubakieh!)"]},
+  {"tag": "verse", "from": 60, "to": 72, "picture": "the runway, the formation, the smug look", "lines": ["Down the runway, hand in hand,", "every voice in storybook land;", "not bad, for you, you kept the beat,", "one more time, up on your feet!"]},
+  {"tag": "chorus", "from": 72, "to": 84, "picture": "the jump, the penlight heart, the bow", "lines": ["Squish, Sloppy~♡ we're on tonight!", "Squish, Sloppy~♡ five colours of light!", "Every heart, every page, every beat,", "Squish, Sloppy~♡ encore, repeat!"]},
+  {"tag": "outro", "from": 84, "to": 90, "picture": "backstage, the mint ice cream", "lines": ["Thank you!", "Now where is my mint ice cream? Sloppy~♡"]}
+ ]
+}

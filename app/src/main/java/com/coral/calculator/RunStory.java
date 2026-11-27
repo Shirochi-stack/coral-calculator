@@ -397,6 +397,18 @@ final class RunStory {
             {"lose3", "Hmph. One more try. I'm not done Sloppy~♡", "H", PLAYER + "She has lost all her lives but refuses to give up. Huffy, stubborn, determined."},
     };
 
+    /**
+     * Something has opened in the gallery, the page behind the Cringe button on the map: she says so, once, the next moment she
+     * can, in place of any notice on the screen.
+     */
+    static final String[][] GALLERY = {
+            {"gal1", "A new picture in the gallery. The Cringe page. Don't stare too long Sloppy~♡", "H", PLAYER + "She tells the player, in passing, that a new picture has been added to the gallery page called Cringe. Dry, smug, offhand, a little embarrassed that it exists."},
+            {"gal2", "Something new on the Cringe page. I didn't put it there Sloppy~♡", "H", PLAYER + "She mentions that the gallery page called Cringe has something new in it, and denies having anything to do with it. Dry, airy, obviously lying."},
+            {"gal3", "The gallery has a new picture. Go and look. I'll wait Sloppy~♡", "H", PLAYER + "She tells the player a new picture is in the gallery. Smug, bossy, pleased with herself, tapping her foot."},
+            {"gal4", "New in the gallery, under Cringe. You earned it. Barely Sloppy~♡", "H", PLAYER + "She tells the player something new has opened in the gallery page called Cringe. Teasing, a backhanded compliment."},
+            {"gal5", "Another one unlocked. It's in the gallery. Cringe, they call it Sloppy~♡", "H", PLAYER + "She notes that another picture has been unlocked in the gallery, whose name, Cringe, she finds beneath her. Deadpan, unimpressed, faintly offended."},
+    };
+
     /** At the counter where her pluses buy what she keeps. */
     static final String[][] SHOP = {
             {"shop1", "The guild counter. Spend my pluses wisely Sloppy~♡", "H", PLAYER + "She opens the upgrade shop. Businesslike, possessive of her coins, teasing."},
@@ -1017,6 +1029,7 @@ final class RunStory {
     static String[][][] all() {
         java.util.List<String[][]> groups = new java.util.ArrayList<>();
         groups.add(PROLOGUE);
+        groups.add(GALLERY);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
             if (intro(land) != null) groups.add(intro(land));
             if (outro(land) != null) groups.add(outro(land));
