@@ -73,7 +73,7 @@ final class CompanionPrefs {
     boolean animated() { return preferences.getBoolean(ANIMATED, true); }
     boolean tapCalculator() { return preferences.getBoolean(TAP_CALCULATOR, true); }
     boolean doubleTap() { return preferences.getBoolean(DOUBLE_TAP, true); }
-    boolean tapGames() { return preferences.getBoolean(TAP_GAMES, false); }
+    boolean tapGames() { return preferences.getBoolean(TAP_GAMES, true); }
     boolean startGames() { return preferences.getBoolean(START_GAMES, false); }
     boolean closeOutside() { return preferences.getBoolean(CLOSE_OUTSIDE, true); }
     boolean chatter() { return preferences.getBoolean(CHATTER, true); }
