@@ -32,7 +32,8 @@ final class CompanionPermission {
                     try {
                         activity.startActivity(intent);
                         if (opened != null) opened.run();
-                    } catch (ActivityNotFoundException missing) {
+                    } catch (ActivityNotFoundException | SecurityException missing) {
+                        // (Where there is no such setting, as on a computer, the games go on without her.)
                         if (unavailable != null) unavailable.run();
                     }
                 })
