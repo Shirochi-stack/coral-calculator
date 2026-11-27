@@ -18,6 +18,8 @@ The models, as fal's pages describe them (read 2026-11-27):
   acestep    fal-ai/ace-step              tags and the words with [parts]; an exact length; $0.0002 a second
   minimax26  fal-ai/minimax-music/v2.6    a style and the words; its own length; $0.15 a song
   eleven     fal-ai/elevenlabs/music      a plan: what the song is and is not to be, and its parts each with its own seconds and lines; $0.60 a minute, rounded up
+  mureka     mureka/v9.5/generate/song    the words, a style of at most 1,024 letters, a woman's or a man's voice; two minutes at the least when a length is given; $0.15 a song
+  lyria      fal-ai/lyria3/pro            one description, with the words inside it; its own length; $0.08 a song
 Only the last takes times (a part's seconds, held to); of the others, where a part falls is what the model makes of it,
 and --hear measures it afterwards (fal-ai/whisper, word by word; a sung word is not always
 heard right, so a name is looked for by how it begins).
@@ -56,6 +58,10 @@ def planned(song, shade, short):
 
 
 MODELS = {
+    "mureka": {"id": "mureka/v9.5/generate/song", "costs": lambda seconds: .15,
+               "asks": lambda song, words, seed: {"lyrics": words, "prompt": song["style"][:1024], "gender": "female", **({"duration": 120} if song["seconds"] >= 60 else {})}},
+    "lyria": {"id": "fal-ai/lyria3/pro", "costs": lambda seconds: .08,
+              "asks": lambda song, words, seed: {"prompt": song["style"] + (f" About {song['seconds']} seconds long." if song["seconds"] < 60 else "") + "\n\nLyrics:\n" + words}},
     "eleven": {"id": "fal-ai/elevenlabs/music", "costs": lambda seconds: .6 * -(-seconds // 60), "asks": None},
     "minimax3": {"id": "minimax/music-3", "costs": lambda seconds: .002 * seconds,
                  "asks": lambda song, words, seed: {"prompt": song["style"], "lyrics": words, "duration": song["seconds"], "seed": seed}},
