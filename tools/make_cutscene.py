@@ -46,6 +46,25 @@ sound, which has no switch and is whatever the prompt asks to be heard; it has n
 for the camera either, so that too is asked for in words. Its still is put in fal's file
 store when the shot is sent, since fal takes pictures by their address.
 
+Long takes: a board's "segments" divide it into a few takes of many shots each, so that a
+film is a handful of requests and not one for every shot.
+
+    python tools/make_cutscene.py BOARD --segment A --with kling            what would be sent, its cost, what is left to spend; sends nothing
+    python tools/make_cutscene.py BOARD --segment A --with kling --go       sends that one take
+    python tools/make_cutscene.py BOARD --segment A --with seedance --go    the same take, of Seedance 2.5
+    python tools/make_cutscene.py BOARD --edit --with kling                 joins the takes of one model into the film (BOARD-kling.mp4), with their own sound
+    python tools/make_cutscene.py BOARD --edit --with kling --song FILE     the same picture with a song laid over in place of the takes' sound (BOARD-kling-edited.mp4)
+Beside each film a copy under 28 MB is written, the same size and sound at a lower bit rate (...-for-phone.mp4).
+
+Of Kling (kling/v4/reference-to-video on fal) a take is asked shot by shot, each with its
+seconds and at most 512 letters, with the first shot's still as the first frame, the other
+shots' stills as pictures to go by, and each character as an element (her front, side and
+back). Of Seedance it is asked as one prompt that lists the same shots with their times,
+with the stills and the characters' sheets as reference pictures. What every shot says is
+the same for both: what happens, how it is drawn, the music, what sounds, and the words
+sung. What is spent is kept in takes/spending.json, with a ceiling for each service that
+no call may pass; a call that makes no clip is not counted.
+
 Sound: the board's "sound" says whether the shots are made with it ("on"), and what the
 music and the singing voice are like; a shot's own "sound" says what else is heard in it
 ("effects") and what words are sung in it ("lyric"). With it on, these are put at the end
@@ -92,7 +111,7 @@ FAL = "https://queue.fal.run"
 FAL_STORE = "https://rest.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3"
 FAL_KEY_NAMES = ("FAL_KEY",)
 # What fal's models cost, in dollars a second of what they make, by size (pictures put in cost nothing).
-FAL_RATES = {"kling/v4/image-to-video": {"720p": .157, "1080p": .235, "4k": .549}}
+FAL_RATES = {"kling/v4/image-to-video": {"720p": .157, "1080p": .235, "4k": .549}, "kling/v4/reference-to-video": {"720p": .157, "1080p": .235, "4k": .549}}
 # What a clip is made of, in pixels, for each size and shape the 2.5 series makes; and what a million tokens cost, in dollars, with no video put in.
 SIZES = {"480p": {"16:9": (854, 480), "4:3": (752, 560), "1:1": (640, 640), "3:4": (560, 752), "9:16": (480, 854), "21:9": (992, 432)},
          "720p": {"16:9": (1280, 720), "4:3": (1112, 834), "1:1": (960, 960), "3:4": (834, 1112), "9:16": (720, 1280), "21:9": (1470, 630)},
@@ -182,7 +201,7 @@ def board_request(board, folder, shot):
         shown = {"model": model, "prompt": text, "start_image_url": f"<{still.name}, {still.stat().st_size} bytes: put in fal's file store when sent>" if still.exists()
                  else f"<{still.name}: NOT MADE YET>", **rest, "ratio": board.get("ratio", "16:9"), "sound": "always made; what is heard is in the prompt" if heard
                  else "always made by this model; none was asked for, and the film's edit drops it"}
-        return ({"model": model, "prompt": text, "still": str(still), **rest} if still.exists() else None), shown
+        return ({"model": model, "asked": {"prompt": text, "start_image_url": "file:" + str(still), **rest}, **rest} if still.exists() else None), shown
     pictures = [(folder / shot["still"], "first_frame" if way == "first_frame" else "reference_image")]
     rest = {"resolution": board.get("resolution", "720p"), "ratio": board.get("ratio", "16:9"), "duration": seconds,
             "generate_audio": heard, "watermark": False}
@@ -245,10 +264,44 @@ def say(shown):
     print("Estimated cost: " + ("not known for this model and size" if costs is None else f"${costs:.2f} (at ${rate} a million tokens; nothing is charged if it fails)"))
 
 
+def stored(value, headers, kept):
+    """What fal is asked, with every local file in it (a string "file:PATH") put in fal's file store and its address there in its place."""
+    if isinstance(value, dict):
+        return {key: stored(inner, headers, kept) for key, inner in value.items()}
+    if isinstance(value, list):
+        return [stored(inner, headers, kept) for inner in value]
+    if not (isinstance(value, str) and value.startswith("file:")):
+        return value
+    local = pathlib.Path(value[5:])
+    mark = f"{local}|{local.stat().st_size}|{int(local.stat().st_mtime)}"
+    if mark not in kept:
+        kind = KINDS[local.suffix.lower()]
+        # (The store is asked up to four times: a connection that does not open is tried again, and nothing has been asked of the model yet.)
+        for attempt in range(4):
+            try:
+                place = requests.post(FAL_STORE, headers=headers, json={"file_name": local.name, "content_type": kind}, timeout=60)
+                if place.status_code != 200:
+                    raise SystemExit(f"fal's file store refused {local.name}: HTTP {place.status_code} {place.text[:400]}")
+                place = place.json()
+                put = requests.put(place["upload_url"], data=local.read_bytes(), headers={"Content-Type": kind}, timeout=(30, 300))
+                if put.status_code not in (200, 201, 204):
+                    raise SystemExit(f"{local.name} could not be put in fal's file store: HTTP {put.status_code} {put.text[:400]}")
+                break
+            except requests.RequestException as error:
+                print(f"putting {local.name} in fal's file store: {type(error).__name__}, try {attempt + 1} of 4", flush=True)
+                if attempt == 3:
+                    raise SystemExit(f"{local.name} could not be put in fal's file store: {type(error).__name__}, four times.")
+                time.sleep(5)
+        kept[mark] = place["file_url"]
+        if "__book__" in kept:
+            pathlib.Path(kept["__book__"]).write_text(json.dumps({key: value for key, value in kept.items() if key != "__book__"}, indent=1), encoding="utf-8")
+    return kept[mark]
+
+
 def make_fal(body, folder, stem, task):
     """
-    The same of fal: the still is put in fal's file store, the request is sent to its queue (or one already sent is asked after), it is
-    waited for, and the clip and what fal answered are saved under a name with the request's number in it.
+    The same of fal: the pictures are put in fal's file store, the request is sent to its queue (or one already sent is asked after), it
+    is waited for, and the clip and what fal answered are saved under a name with the request's number in it. Gives the clip's place.
     """
     key = secret(FAL_KEY_NAMES)
     if not key:
@@ -259,32 +312,27 @@ def make_fal(body, folder, stem, task):
     if task:
         sent = json.loads((folder / f"{stem}-{task}.sent.json").read_text(encoding="utf-8"))
     else:
-        still = pathlib.Path(body["still"])
-        kind = KINDS[still.suffix.lower()]
-        place = requests.post(FAL_STORE, headers=headers, json={"file_name": still.name, "content_type": kind}, timeout=60)
-        if place.status_code != 200:
-            raise SystemExit(f"fal's file store refused the picture: HTTP {place.status_code} {place.text[:400]}")
-        place = place.json()
-        put = requests.put(place["upload_url"], data=still.read_bytes(), headers={"Content-Type": kind}, timeout=300)
-        if put.status_code not in (200, 201, 204):
-            raise SystemExit(f"The picture could not be put in fal's file store: HTTP {put.status_code} {put.text[:400]}")
-        asked = {"prompt": body["prompt"], "start_image_url": place["file_url"], "duration": body["duration"], "resolution": body["resolution"]}
+        book = folder / "uploads.json"
+        kept = json.loads(book.read_text(encoding="utf-8")) if book.exists() else {}
+        kept["__book__"] = str(book)
+        asked = stored(body["asked"], headers, kept)
         reply = requests.post(f"{FAL}/{model}", headers=headers, json=asked, timeout=300)
         if reply.status_code not in (200, 201, 202):
-            raise SystemExit(f"The service refused the request: HTTP {reply.status_code} {reply.text[:800]}")
+            raise SystemExit(f"The service refused the request: HTTP {reply.status_code} {reply.text[:1200]}")
         sent = reply.json()
         task = sent["request_id"]
         (folder / f"{stem}-{task}.sent.json").write_text(json.dumps({**sent, "asked": asked}, indent=1, ensure_ascii=False), encoding="utf-8")
     print("request", task, flush=True)
     status, began = {}, time.time()
-    while time.time() - began < 45 * 60:
-        time.sleep(8)
+    while time.time() - began < 5 * 3600:
+        time.sleep(15)
         try:
             status = requests.get(sent["status_url"], headers=headers, timeout=60).json()
         except (requests.RequestException, ValueError) as error:
             print("asking again after", type(error).__name__, flush=True)
             continue
-        print(f"{int(time.time() - began):4d} s", status.get("status"), flush=True)
+        if int(time.time() - began) % 120 < 16 or status.get("status") not in ("IN_QUEUE", "IN_PROGRESS"):
+            print(f"{int(time.time() - began):5d} s", status.get("status"), flush=True)
         if status.get("status") not in ("IN_QUEUE", "IN_PROGRESS"):
             break
     result = requests.get(sent["response_url"], headers=headers, timeout=120)
@@ -294,7 +342,7 @@ def make_fal(body, folder, stem, task):
         answer = {"text": result.text[:2000]}
     (folder / f"{stem}-{task}.json").write_text(json.dumps({"status": status, "http": result.status_code, "answer": answer}, indent=1, ensure_ascii=False), encoding="utf-8")
     if result.status_code != 200 or not isinstance(answer, dict) or "video" not in answer:
-        raise SystemExit(f"No clip: HTTP {result.status_code} {json.dumps(answer, ensure_ascii=False)[:800]}")
+        raise SystemExit(f"No clip: HTTP {result.status_code} {json.dumps(answer, ensure_ascii=False)[:1500]}")
     clip = requests.get(answer["video"]["url"], timeout=600)
     clip.raise_for_status()
     target = folder / f"{stem}-{task}.mp4"
@@ -307,6 +355,7 @@ def make_fal(body, folder, stem, task):
             print(f"fal's price for {price.get('endpoint_id')}: {price.get('unit_price')} {price.get('currency')} a {price.get('unit')}")
     except (requests.RequestException, ValueError) as error:
         print("fal's price could not be asked:", type(error).__name__)
+    return target, None
 
 
 def make(body, folder, stem, task):
@@ -314,6 +363,7 @@ def make(body, folder, stem, task):
     if body["model"] in FAL_RATES:
         return make_fal(body, folder, stem, task)
     rate = RATES.get(body["model"], {}).get(body["resolution"])
+    body = {key: value for key, value in body.items() if key != "asked"}
     key = secret()
     if not key:
         raise SystemExit(f"No key: put {KEY_NAMES[0]}=... in {PROJECT / '.env'} (or in the environment).")
@@ -326,15 +376,16 @@ def make(body, folder, stem, task):
         task = reply.json().get("id")
     print("task", task, flush=True)
     answer, began = {}, time.time()
-    while time.time() - began < 45 * 60:
-        time.sleep(0 if asked and not answer else 10)
+    while time.time() - began < 5 * 3600:
+        time.sleep(0 if asked and not answer else 15)
         try:
             answer = requests.get(f"{BASE}/{task}", headers=headers, timeout=60).json()
         except requests.RequestException as error:
             print("asking again after", type(error).__name__, flush=True)
             continue
         status = answer.get("status")
-        print(f"{int(time.time() - began):4d} s", status, flush=True)
+        if int(time.time() - began) % 120 < 16 or status in ("succeeded", "failed", "expired", "cancelled"):
+            print(f"{int(time.time() - began):5d} s", status, flush=True)
         if status in ("succeeded", "failed", "expired", "cancelled"):
             break
     folder.mkdir(parents=True, exist_ok=True)
@@ -349,6 +400,7 @@ def make(body, folder, stem, task):
     print("saved", target, f"{len(clip.content):,} bytes")
     if used and rate:
         print(f"used {used:,} tokens: ${used * rate / 1e6:.2f}")
+    return target, (used * rate / 1e6 if used and rate else None)
 
 
 def takes(folder, board):
@@ -551,6 +603,364 @@ def edit(board, folder):
           + ("" if clips == len(board["shots"]) else ", the rest their stills, held"))
 
 
+def spending(folder):
+    """What has been spent, by service, with the ceiling no call may pass: kept beside the takes."""
+    book = folder / "takes" / "spending.json"
+    return book, (json.loads(book.read_text(encoding="utf-8")) if book.exists() else {})
+
+
+def left_of(spent, who):
+    """What a service's ceiling still allows: the ceiling less every call that made a clip or is still out."""
+    account = spent.get(who) or {}
+    if account.get("ceiling") is None:
+        raise SystemExit(f"No ceiling is set for {who} in spending.json: nothing is sent without one.")
+    return account["ceiling"] - sum(call["price"] for call in account.get("calls", []) if call["state"] != "no clip, not charged")
+
+
+def take_request(board, folder, part, which):
+    """
+    One long take: several shots in order, asked of Kling shot by shot, or of Seedance as one prompt listing them. What each shot
+    says is the same for both. Gives what is sent (local files as "file:..." for fal), what is shown of it, its seconds and its price.
+    """
+    plan = board["segments"]
+    model, size = plan["models"][which], plan["resolution"]
+    shots = [next(shot for shot in board["shots"] if shot["name"] == name) for name in part["shots"]]
+    stills = [folder / plan["stills"] / f"{shot['name']}.png" for shot in shots]
+    cast = [letter for letter in board["sheets"] if any(letter in shot.get("cast", "") for shot in shots)]
+    total = int(round(sum(shot["bars"] for shot in shots) * board["bar"]))
+
+    def said(shot, names, scene, room=None):
+        # What happens; how it is drawn; the music; what sounds; and the words sung. If there is not room, what sounds goes first, then how it is drawn.
+        told = shot["short"].format(**names)
+        sung = f'{plan["voice"]} "{shot["sound"]["lyric"]}"'
+        for pieces in ([scene, told, plan["look"], plan["music"], "Sounds: " + shot["heard"], sung], [scene, told, plan["look"], plan["music"], sung], [scene, told, plan["music"], sung]):
+            line = " ".join(pieces)
+            if room is None or len(line) <= room:
+                return line
+        raise SystemExit(f"{shot['name']}: its words are {len(line)} letters, and a shot may have {room}.")
+
+    if model in FAL_RATES:
+        names = {letter: f"@Element{index + 1}" for index, letter in enumerate(cast)}
+        multi = [{"prompt": said(shot, names, "Begins on the first frame." if index == 0 else f"Scene as in @Image{index}.", 512),
+                  "duration": int(round(shot["bars"] * board["bar"]))} for index, shot in enumerate(shots)]
+        asked = {"multi_prompt": multi, "start_image_url": "file:" + str(stills[0]), "image_urls": ["file:" + str(still) for still in stills[1:]],
+                 "elements": [{"frontal_image_url": "file:" + str(folder / board["sheets"][letter]["views"][0]),
+                               "reference_image_urls": ["file:" + str(folder / view) for view in board["sheets"][letter]["views"][1:]]} for letter in cast],
+                 "resolution": size, "aspect_ratio": board.get("ratio", "16:9")}
+        price = total * FAL_RATES[model][size]
+        return {"model": model, "asked": asked}, {"POST": f"{FAL}/{model}", **asked, "elements are": [board["sheets"][letter]["name"] for letter in cast]}, total, price, "fal"
+    pictures = stills + [folder / board["sheets"][letter]["file"] for letter in cast]
+    names = {letter: f"{board['sheets'][letter]['name']} (@Image {len(stills) + index + 1})" for index, letter in enumerate(cast)}
+    head = (f"An anime opening: one {total}-second sequence of {len(shots)} shots, with a hard cut between shots at the times given. @Image 1 to @Image {len(stills)} are the first "
+            f"pictures of the shots, in order; the sequence begins exactly on @Image 1. "
+            + " ".join(f"@Image {len(stills) + index + 1} is the reference sheet of {board['sheets'][letter]['name']}: she looks exactly as on it from every side." for index, letter in enumerate(cast)))
+    lines, at = [], 0
+    for index, shot in enumerate(shots):
+        lasts = int(round(shot["bars"] * board["bar"]))
+        lines.append(f"Shot {index + 1} ({at}-{at + lasts} s): " + said(shot, names, "Begins on @Image 1." if index == 0 else f"Scene as in @Image {index + 1}."))
+        at += lasts
+    words = head + " " + " ".join(lines)
+    rest = {"resolution": size, "ratio": board.get("ratio", "16:9"), "duration": total, "generate_audio": True, "watermark": False, "omni_reference_task_type": "reference"}
+    body = {"model": model, "content": [{"type": "text", "text": words}] + [{"type": "image_url", "image_url": {"url": inline(picture)}, "role": "reference_image"} for picture in pictures], **rest}
+    shown = {"POST": BASE, "model": model, "text": words, "pictures": [picture.name for picture in pictures], **rest}
+    wide, tall = SIZES[size][rest["ratio"]]
+    price = total * wide * tall * FRAMES_A_SECOND / 1024 * RATES[model][size] / 1e6
+    return body, shown, total, price, "byteplus"
+
+
+def one_take(board, folder, part, which, go, task):
+    """Says what a long take would send and cost and what is left to spend; and, asked to, sends it, counting it against the ceiling only if it makes a clip."""
+    body, shown, seconds, price, who = take_request(board, folder, part, which)
+    print(json.dumps(shown, indent=1, ensure_ascii=False))
+    if "multi_prompt" in shown:
+        print("letters in each shot's words:", [len(shot["prompt"]) for shot in shown["multi_prompt"]])
+    book, spent = spending(folder)
+    left = left_of(spent, who)
+    size = board["segments"]["resolution"]
+    print(f"\nOne take: {seconds} s at {size}, with sound. Estimated cost: ${price:.2f}. Left to spend with {who}: ${left:.2f}; after this, ${left - price:.2f}.")
+    if not go and not task:
+        print("Nothing sent. To make it: --go.")
+        return None
+    stem = f"{part['name']}-{which}"
+    if task:
+        return make(body, folder / "takes", stem, task)
+    if price > left + 1e-9:
+        raise SystemExit(f"Not sent: it would cost ${price:.2f} and ${left:.2f} is left with {who}.")
+    mark = f"{time.time():.3f}-{os.getpid()}"
+
+    def noted(**changes):
+        # (Read again each time and written at once: more than one take may be out together, each keeping this book.)
+        _, now = spending(folder)
+        calls = now[who].setdefault("calls", [])
+        mine = next((call for call in calls if call.get("mark") == mark), None)
+        if mine is None:
+            mine = {"mark": mark}
+            calls.append(mine)
+        mine.update(changes)
+        book.write_text(json.dumps(now, indent=1), encoding="utf-8")
+        return now
+
+    noted(when=time.strftime("%Y-%m-%d %H:%M:%S"), what=f"{board_name(folder)} take {part['name']} with {which}", seconds=seconds, resolution=size, price=round(price, 2), state="sent")
+    began = time.time()
+    try:
+        target, real = make(body, folder / "takes", stem, None)
+    except BaseException as failed:
+        # If the request had gone to the model before this, it may still make its clip and be charged: it stays counted, to be asked after.
+        out = [note for note in (folder / "takes").glob(f"{stem}-*.sent.json") if note.stat().st_mtime >= began - 1]
+        if out and not isinstance(failed, SystemExit):
+            noted(state="sent, not heard from: ask after it with --task " + out[-1].name[len(stem) + 1:-len(".sent.json")], said=type(failed).__name__)
+        else:
+            noted(state="no clip, not charged", said=(str(failed) or type(failed).__name__)[:600])
+        raise
+    now = noted(state="made", clip=target.name, **({"price": round(real, 2)} if real is not None else {}))
+    print(f"spent with {who} so far: ${now[who]['ceiling'] - left_of(now, who):.2f}; left: ${left_of(now, who):.2f}")
+    return target
+
+
+def board_name(folder):
+    return folder.name
+
+
+def for_phone(film, limit=28_000_000):
+    """A copy of a film small enough to send to a phone: the same pictures and sound, at the bit rate that brings it under the limit."""
+    import av
+
+    source = av.open(str(film))
+    seconds = float(source.duration) / 1e6
+    source.close()
+    target = film.with_name(film.stem + "-for-phone.mp4")
+    rate = int((limit * 8 / seconds - 128_000) * .93)
+    while True:
+        source = av.open(str(film))
+        out = av.open(str(target), "w")
+        seen, heard = source.streams.video[0], source.streams.audio[0] if source.streams.audio else None
+        picture = out.add_stream("libx264", rate=seen.average_rate)
+        picture.width, picture.height, picture.pix_fmt = seen.codec_context.width, seen.codec_context.height, "yuv420p"
+        picture.bit_rate = rate
+        picture.options = {"preset": "slow", "profile": "high", "maxrate": str(int(rate * 1.3)), "bufsize": str(rate * 2)}
+        sound = None
+        if heard is not None:
+            sound = out.add_stream("aac", rate=48000)
+            sound.bit_rate = 128000
+            sound.layout = "stereo"
+            resampler = av.AudioResampler(format=sound.format, layout="stereo", rate=48000)
+        for packet in source.demux():
+            for frame in packet.decode():
+                if packet.stream.type == "video":
+                    frame.pict_type = 0
+                    for made in picture.encode(frame.reformat(format="yuv420p")):
+                        out.mux(made)
+                elif sound is not None:
+                    for again in resampler.resample(frame):
+                        for made in sound.encode(again):
+                            out.mux(made)
+        for made in picture.encode():
+            out.mux(made)
+        if sound is not None:
+            for made in sound.encode():
+                out.mux(made)
+        out.close()
+        source.close()
+        if target.stat().st_size <= limit:
+            break
+        rate = int(rate * .9)
+    print(f"saved {target} {target.stat().st_size:,} bytes")
+    return target
+
+
+def edit_takes(board, folder, which, song=None):
+    """
+    The film from the long takes of one model: each take as long as its shots, in order, at the takes' own size; their own sound, eased
+    down and up across each join; and the names and the title drawn on. A take not made yet is its shots' stills, held, in silence.
+    """
+    import fractions
+
+    import av
+    import cv2
+    import numpy
+    from PIL import Image, ImageDraw, ImageFont
+
+    plan = board["segments"]
+    wide, tall = SIZES[plan["resolution"]][board.get("ratio", "16:9")]
+    fps, bar, rate = FRAMES_A_SECOND, board["bar"], 48000
+    scale = tall / 720
+    picks = json.loads((folder / "picks.json").read_text(encoding="utf-8")) if (folder / "picks.json").exists() else {}
+
+    def font(kind, size):
+        for name in FONTS[kind]:
+            place = pathlib.Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / name
+            if place.exists():
+                return ImageFont.truetype(str(place), int(size * scale))
+        return ImageFont.load_default()
+
+    def write(layer, text, x, top, size, kind, fill, edge, line, anchor):
+        letters, signs = font(kind, size), font("signs", size)
+        parts = []
+        for letter in text:
+            mine = signs if letter in "\u2661\u2665\u266a\u266b" else letters
+            if parts and parts[-1][1] is mine:
+                parts[-1][0] += letter
+            else:
+                parts.append([letter, mine])
+        width = sum(mine.getlength(run) for run, mine in parts)
+        x = x - width / 2 if anchor == "middle" else x if anchor == "left" else x - width
+        draw = ImageDraw.Draw(layer)
+        for run, mine in parts:
+            draw.text((x, top), run, font=mine, fill=fill, stroke_width=int(line * scale), stroke_fill=edge)
+            x += mine.getlength(run)
+        return width
+
+    def chosen(part):
+        made = sorted((folder / "takes").glob(f"{part['name']}-{which}-*.mp4"), key=lambda clip: clip.stat().st_mtime)
+        return folder / "takes" / picks[f"{part['name']}-{which}"] if f"{part['name']}-{which}" in picks else made[-1] if made else None
+
+    # Where each shot really begins and ends: a take cuts near where it was asked to, not on it, so the cuts are looked for in the take
+    # itself (a frame quite unlike the one before), and a shot's is the one found nearest where it was asked, within a second and a bit.
+    real, base = {}, 0.0
+    for part in plan["list"]:
+        shots = [next(shot for shot in board["shots"] if shot["name"] == shot_name) for shot_name in part["shots"]]
+        asked, at = [], 0.0
+        for shot in shots:
+            asked.append(at)
+            at += shot["bars"] * bar
+        found = []
+        clip = chosen(part)
+        if clip is not None:
+            video = cv2.VideoCapture(str(clip))
+            speed = video.get(cv2.CAP_PROP_FPS) or fps
+            before, steps = None, []
+            while True:
+                ok, frame = video.read()
+                if not ok:
+                    break
+                small = cv2.resize(frame, (480, 270), interpolation=cv2.INTER_AREA).astype(numpy.float32)
+                if before is not None:
+                    steps.append(float(numpy.abs(small - before).mean()))
+                before = small
+            video.release()
+            steps = numpy.array(steps)
+            found = [(i + 1) / speed for i in range(len(steps)) if steps[i] > 28 and steps[i] > 3.5 * numpy.median(steps[max(0, i - 12):i + 12])]
+        begins = [min((cut for cut in found if abs(cut - a) < 1.2), key=lambda cut: abs(cut - a), default=a) if a > 0 else 0.0 for a in asked]
+        for index, shot in enumerate(shots):
+            real[shot["name"]] = (base + begins[index], base + (begins[index + 1] if index + 1 < len(shots) else at))
+        base += at
+    over = []
+    for shot in board["shots"]:
+        card = shot.get("card")
+        if not card:
+            continue
+        layer = Image.new("RGBA", (wide, tall), (0, 0, 0, 0))
+        left = card.get("side", "right") == "left"
+        x = 70 * scale if left else wide - 70 * scale
+        write(layer, card["name"], x, tall - 300 * scale, 84, "heavy", (255, 255, 255, 255), (214, 51, 108, 255), 7, "left" if left else "right")
+        write(layer, card["says"], x, tall - 186 * scale, 36, "plain", (255, 255, 255, 255), (60, 20, 60, 255), 4, "left" if left else "right")
+        begins, ends = real[shot["name"]]
+        over.append((layer, begins + .35, ends - .3, .25))
+    total = sum(shot["bars"] for shot in board["shots"]) * bar
+    title = board.get("title")
+    if title:
+        layer = Image.new("RGBA", (wide, tall), (0, 0, 0, 0))
+        lines, size = title["text"].split("\n"), 104
+        top = tall * .1
+        for line in lines:
+            write(layer, line, wide / 2, top, size, "heavy", (255, 255, 255, 255), (214, 51, 108, 255), 9, "middle")
+            top += size * scale * 1.22
+        if title.get("under"):
+            write(layer, title["under"], wide / 2, top + size * scale * .25, 36, "plain", (255, 255, 255, 255), (60, 20, 60, 255), 4, "middle")
+        over.append((layer, title["from"], total + 1, .5))
+    layers = []
+    for layer, begins, ends, fades in over:
+        box = layer.getbbox()
+        piece = numpy.asarray(layer.crop(box), dtype=numpy.float32)
+        layers.append((piece[:, :, :3], piece[:, :, 3:4] / 255, box, begins, ends, fades))
+
+    name = f"{folder.name}-{which}-edited.mp4" if song else f"{folder.name}-{which}.mp4"
+    out = av.open(str(folder / name), "w")
+    picture = out.add_stream("libx264", rate=fps)
+    picture.width, picture.height, picture.pix_fmt = wide, tall, "yuv420p"
+    picture.options = {"crf": "18", "preset": "medium", "profile": "high"}
+    sound = out.add_stream("aac", rate=rate)
+    sound.bit_rate = 192000
+    sound.layout = "stereo"
+    index, heard, used = 0, [], []
+    for part in plan["list"]:
+        shots = [next(shot for shot in board["shots"] if shot["name"] == shot_name) for shot_name in part["shots"]]
+        count = int(round(sum(shot["bars"] for shot in shots) * bar * fps))
+        clip = chosen(part)
+        used.append(clip.name if clip else "its stills")
+        video = cv2.VideoCapture(str(clip)) if clip else None
+        last = numpy.zeros((tall, wide, 3), numpy.uint8)
+        for step in range(count):
+            if video is not None:
+                ok, frame = video.read()
+                frame = last if not ok else cv2.resize(frame, (wide, tall), interpolation=cv2.INTER_LANCZOS4) if frame.shape[:2] != (tall, wide) else frame
+            else:
+                now = step / fps
+                at = 0
+                for shot in shots:
+                    if now < at + shot["bars"] * bar or shot is shots[-1]:
+                        frame = cv2.resize(cv2.imread(str(folder / plan["stills"] / f"{shot['name']}.png")), (wide, tall), interpolation=cv2.INTER_LANCZOS4)
+                        break
+                    at += shot["bars"] * bar
+            last = frame
+            now = index / fps
+            shown = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if any(begins <= now < ends for _, _, _, begins, ends, _ in layers) or now < .5 or total - now < 1:
+                shown = shown.astype(numpy.float32)
+                for colour, alpha, box, begins, ends, fades in layers:
+                    if begins <= now < ends:
+                        strength = min(1.0, (now - begins) / fades, (ends - now) / fades)
+                        area = shown[box[1]:box[3], box[0]:box[2]]
+                        shown[box[1]:box[3], box[0]:box[2]] = area * (1 - alpha * strength) + colour * alpha * strength
+                shown = numpy.clip(shown * min(1.0, now / .5 + .0001, (total - now) / 1.0), 0, 255).astype(numpy.uint8)
+            image = av.VideoFrame.from_ndarray(numpy.ascontiguousarray(shown), format="rgb24")
+            image.pts = index
+            image.time_base = fractions.Fraction(1, fps)
+            for packet in picture.encode(image):
+                out.mux(packet)
+            index += 1
+        if video is not None:
+            video.release()
+        # The take's own sound, as long as its picture; eased up at its beginning and down at its end, which is where the takes join.
+        wave = numpy.zeros((int(count / fps * rate), 2), numpy.float32)
+        if clip is not None:
+            box = av.open(str(clip))
+            if box.streams.audio:
+                resampler = av.AudioResampler(format="flt", layout="stereo", rate=rate)
+                chunks = [made_.to_ndarray().reshape(-1, 2) for frame_ in box.decode(audio=0) for made_ in resampler.resample(frame_)]
+                got = numpy.concatenate(chunks)[: len(wave)] if chunks else wave[:0]
+                wave[: len(got)] = got
+        ease = int(.15 * rate)
+        wave[:ease] *= numpy.linspace(0, 1, ease)[:, None]
+        wave[-ease:] *= numpy.linspace(1, 0, ease)[:, None]
+        heard.append(wave)
+    for packet in picture.encode():
+        out.mux(packet)
+    wave = numpy.concatenate(heard)
+    if song:
+        # A song laid over: the takes' own sound is left out, and the song is as long as the film, come what may.
+        box = av.open(str(song))
+        resampler = av.AudioResampler(format="flt", layout="stereo", rate=rate)
+        got = numpy.concatenate([made_.to_ndarray().reshape(-1, 2) for frame_ in box.decode(audio=0) for made_ in resampler.resample(frame_)])[: len(wave)]
+        wave = numpy.zeros_like(wave)
+        wave[: len(got)] = got
+        wave *= .97 / max(.97, float(numpy.abs(wave).max()))
+    wave[-rate:] *= numpy.linspace(1, 0, rate)[:, None]
+    samples = (numpy.clip(wave, -1, 1) * 32767).astype(numpy.int16)
+    for start in range(0, len(samples), 1024):
+        chunk = av.AudioFrame.from_ndarray(numpy.ascontiguousarray(samples[start:start + 1024].reshape(1, -1)), format="s16", layout="stereo")
+        chunk.sample_rate = rate
+        chunk.pts = start
+        chunk.time_base = fractions.Fraction(1, rate)
+        for packet in sound.encode(chunk):
+            out.mux(packet)
+    for packet in sound.encode():
+        out.mux(packet)
+    out.close()
+    print(f"saved {folder / name} {(folder / name).stat().st_size:,} bytes: {index / fps:.1f} s at {wide} x {tall}, made of {used}" + (f", with {pathlib.Path(song).name} laid over" if song else ""))
+    for_phone(folder / name)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("shot", help="a folder under dist/cutscenes; or the name of a storyboard in tools/cutscenes")
@@ -558,11 +968,22 @@ def main():
     parser.add_argument("--go", action="store_true", help="send it: this costs money")
     parser.add_argument("--task", help="a task already made: ask after it and save its clip, sending nothing new")
     parser.add_argument("--edit", action="store_true", help="of a storyboard: join its shots into the film, with its song, names, words and title")
+    parser.add_argument("--segment", help="of a storyboard with long takes: the one take meant")
+    parser.add_argument("--with", dest="which", help="kling or seedance: whose long takes are meant")
+    parser.add_argument("--song", help="with --edit and --with: a song to lay over the film in place of the takes' own sound")
     args = parser.parse_args()
     folder = SHOTS / args.shot
     if (BOARDS / f"{args.shot}.json").exists():
         board = json.loads((BOARDS / f"{args.shot}.json").read_text(encoding="utf-8"))
         (folder / "takes").mkdir(parents=True, exist_ok=True)
+        if args.segment:
+            part = next((part for part in board["segments"]["list"] if part["name"] == args.segment), None)
+            if part is None or args.which not in board["segments"]["models"]:
+                raise SystemExit("Name a take of this board (--segment) and whose it is (--with kling, or --with seedance).")
+            one_take(board, folder, part, args.which, args.go, args.task)
+            return None
+        if args.edit and args.which:
+            return edit_takes(board, folder, args.which, args.song)
         if args.edit:
             return edit(board, folder)
         chosen = [shot for shot in board["shots"] if args.one in (None, shot["name"])]
@@ -581,7 +1002,8 @@ def main():
             return None
         if body is None:
             raise SystemExit(f"{args.one} has no still yet ({folder / chosen[0]['still']}): nothing sent.")
-        return make(body, folder / "takes", args.one + ("-kling" if body["model"] in FAL_RATES else ""), args.task)
+        make(body, folder / "takes", args.one + ("-kling" if body["model"] in FAL_RATES else ""), args.task)
+        return None
     if args.edit or args.one:
         raise SystemExit(f"{args.shot} is not a storyboard: there is no {BOARDS / (args.shot + '.json')}.")
     shot = json.loads((folder / "shot.json").read_text(encoding="utf-8"))
@@ -590,7 +1012,8 @@ def main():
     if not args.go and not args.task:
         print("\nNothing sent. Run again with --go to make the clip.")
         return None
-    return make(body, folder, args.shot, args.task)
+    make(body, folder, args.shot, args.task)
+    return None
 
 
 if __name__ == "__main__":

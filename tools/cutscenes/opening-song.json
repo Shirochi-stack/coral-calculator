@@ -1,0 +1,21 @@
+{
+ "about": "The opening's song, as it is to be sung over the finished picture by a model that sings: an action-anime opening built on her hook, 'Squish Sloppy~♡'. The times are where each part should fall on the picture (120 beats a minute, a bar is two seconds). The takes themselves sang other words (each shot's 'lyric' in opening.json); these are for the films with the song laid over.",
+ "title": "Squish Sloppy~♡",
+ "seconds": 90,
+ "style": "High-energy anime opening theme, J-rock and J-pop, 120 BPM in 4/4 with a driving double-time feel: pounding drums, fast electric guitars, bass, bright synth stabs. Urgent, punchy verses; a big anthemic chorus with gang shouts on the hook 'Squish, Sloppy!'; the feeling of a fight about to start. Lead vocal: a cute, high, youthful anime-girl singing voice, smug, bratty and teasing, sing-song but forceful, with real pitch and energy. Sung in English. No long intro: the voice comes in within six seconds. About ninety seconds, ending on a hard final hit right after the last word.",
+ "tags": "anime opening, j-rock, j-pop, 120 bpm, high energy, driving drums, fast electric guitar, synth stabs, anthemic chorus, gang shouts, female vocal, cute high youthful voice, bratty, teasing, powerful, english",
+ "sections": [
+  {"tag": "intro", "from": 0, "to": 6, "picture": "the book falls out of the sky", "lines": ["Sloppy~♡"]},
+  {"tag": "verse", "from": 6, "to": 30, "picture": "her day off goes wrong: the stroll, the book on her head, the words loose, the empty cone, the take-off",
+   "lines": ["One day off, mint ice cream, sun on the street,", "then a book hit my head and swept me off my feet.", "Pages tore, the words ran wild and free,", "and somebody owes a scoop of mint to me.", "Wings spread wide, I'm done being nice:", "every word as written, I won't say it twice!"]},
+  {"tag": "chorus", "from": 30, "to": 44, "picture": "she takes charge: the hero pose, the squish, the smug look",
+   "lines": ["Squish, Sloppy~♡ Try and stop me!", "Squish, Sloppy~♡ Flat and floppy!", "Word for word, I'm breaking through,", "Squish, Sloppy~♡ I'm coming for you!"]},
+  {"tag": "bridge", "from": 44, "to": 60, "picture": "the four friends, four seconds each, in this order",
+   "lines": ["Chikuwa! Chikuwa!", "Bread rolls, fire away!", "Rune! Rune!", "Drown the field in ink today!", "Illya! Illya!", "Spotlight, steal the stage!", "Tsubakieh! Tsubakieh!", "Swing, and turn the page!"]},
+  {"tag": "verse", "from": 60, "to": 76, "picture": "all five running, the honorific ribbons, the smug look over the calculator",
+   "lines": ["Five of us running down the final line,", "every -nim, every -ssi, I keep them, they're mine.", "Drop one word and you deal with me:", "not bad, for you, Sloppy~♡"]},
+  {"tag": "chorus", "from": 76, "to": 88, "picture": "the strike, the leap, the book snaps shut",
+   "lines": ["Squish, Sloppy~♡ Try and stop me!", "Squish, Sloppy~♡ Flat and floppy!", "One bright beam and the dragon falls,", "Squish, Sloppy~♡ I read them all!"]},
+  {"tag": "outro", "from": 88, "to": 90, "picture": "the mint ice cream at last", "lines": ["Sloppy~♡"]}
+ ]
+}

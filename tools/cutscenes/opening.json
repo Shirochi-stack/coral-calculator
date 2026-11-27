@@ -8,23 +8,48 @@
  "sheets": {
   "H": {
    "name": "Halgakos",
-   "file": "sheets/halgakos.png"
+   "file": "sheets/halgakos.png",
+   "views": [
+    "elements/halgakos_front.png",
+    "elements/halgakos_side.png",
+    "elements/halgakos_back.png"
+   ]
   },
   "C": {
    "name": "Chikuwa",
-   "file": "sheets/chikuwa.png"
+   "file": "sheets/chikuwa.png",
+   "views": [
+    "elements/chikuwa_front.png",
+    "elements/chikuwa_side.png",
+    "elements/chikuwa_back.png"
+   ]
   },
   "R": {
    "name": "Rune",
-   "file": "sheets/rune.png"
+   "file": "sheets/rune.png",
+   "views": [
+    "elements/rune_front.png",
+    "elements/rune_side.png",
+    "elements/rune_back.png"
+   ]
   },
   "I": {
    "name": "Illya",
-   "file": "sheets/illya.png"
+   "file": "sheets/illya.png",
+   "views": [
+    "elements/illya_front.png",
+    "elements/illya_side.png",
+    "elements/illya_back.png"
+   ]
   },
   "T": {
    "name": "Tsubakieh",
-   "file": "sheets/tsubakieh.png"
+   "file": "sheets/tsubakieh.png",
+   "views": [
+    "elements/tsubakieh_front.png",
+    "elements/tsubakieh_side.png",
+    "elements/tsubakieh_back.png"
+   ]
   }
  },
  "bar": 2.0,
@@ -45,19 +70,21 @@
   {
    "name": "S01",
    "bar": 0,
-   "bars": 2,
+   "bars": 3,
    "cast": "",
    "still": "stills/S01.png",
    "frame": "A bright summer sky full of soft white clouds seen from high up, a pastel storybook town of red roofs far below. A thick old green book with gold corners tumbles down through the sky in the upper middle of the picture, its cover flapping, a few loose pages trailing behind it. No people.",
    "prompt": "The green book tumbles down through the clouds, turning over and over and shedding loose pages, and the camera falls after it toward the little town below.",
    "sound": {
     "effects": "wind rushing past, pages fluttering, a far-off whistle of something falling.",
-    "lyric": "Sloppy~♡"
-   }
+    "lyric": "Sloppy~"
+   },
+   "short": "High in a bright summer sky a thick green book with gold corners tumbles down through the clouds, shedding pages; the camera falls after it toward a pastel town of red roofs.",
+   "heard": "wind, fluttering pages."
   },
   {
    "name": "S02",
-   "bar": 2,
+   "bar": 3,
    "bars": 2,
    "cast": "H",
    "card": {
@@ -72,12 +99,12 @@
     "effects": "her footsteps on the cobbles, the bustle of the street, a happy little hum as she licks the ice cream.",
     "lyric": "My one day off, one ice cream cone,"
    },
-   "model": "kling/v4/image-to-video",
-   "made_from": "first_frame"
+   "short": "{H} strolls toward the camera down the sunny shopping street, licking her mint chocolate-chip ice cream, tail swaying. The camera glides backward ahead of her; shopfronts, signs and lamps stay fixed as drawn.",
+   "heard": "footsteps on cobbles, street bustle."
   },
   {
    "name": "S03",
-   "bar": 4,
+   "bar": 5,
    "bars": 2,
    "cast": "H",
    "still": "stills/S03.png",
@@ -86,11 +113,13 @@
    "sound": {
     "effects": "a whistle of something falling, a comic bonk, a wobbling boing, a soft plop.",
     "lyric": "a book fell down and now I'm thrown!"
-   }
+   },
+   "short": "The green book drops on {H}'s head with a comic bonk: her eyes spin, she wobbles, the mint scoop pops off her cone and flies up; the book falls open on the cobbles, glowing.",
+   "heard": "a bonk, a boing, a plop."
   },
   {
    "name": "S04",
-   "bar": 6,
+   "bar": 7,
    "bars": 2,
    "cast": "",
    "still": "stills/S04.png",
@@ -99,11 +128,13 @@
    "sound": {
     "effects": "a magical shimmer, a patter of dozens of tiny feet, little squeaks and giggles.",
     "lyric": "The sums grew legs, the words ran wild,"
-   }
+   },
+   "short": "Low on the cobbles: out of the glowing open book pour dozens of cute little numerals and plus signs with tiny legs, scampering past the camera in every direction.",
+   "heard": "a shimmer, tiny pattering feet."
   },
   {
    "name": "S05",
-   "bar": 8,
+   "bar": 9,
    "bars": 2,
    "cast": "H",
    "still": "stills/S05.png",
@@ -111,12 +142,14 @@
    "prompt": "She looks at the empty cone, lets out a long sigh with drooping ears, then narrows her eyes, tosses the cone aside, draws a big pink pocket calculator from behind her back like a sword and jabs a thumb at herself.",
    "sound": {
     "effects": "a long deadpan sigh, tiny feet pattering by, a bright ting as she draws the calculator.",
-    "lyric": "who cleans it up? Me, Sloppy~♡"
-   }
+    "lyric": "who cleans it up? Me, Sloppy~"
+   },
+   "short": "Close on {H}, deadpan, holding her empty cone with a drip of mint; she sighs, ears drooping, then narrows her eyes and draws a big pink calculator from behind her back like a sword.",
+   "heard": "a long sigh, a bright ting."
   },
   {
    "name": "S06",
-   "bar": 10,
+   "bar": 11,
    "bars": 2,
    "cast": "H",
    "still": "stills/S06.png",
@@ -125,11 +158,13 @@
    "sound": {
     "effects": "quick plastic key clicks, faster and faster, with a bright chime on each.",
     "lyric": "Carry the one, mind the footnote,"
-   }
+   },
+   "short": "Very close on {H}'s hands: her thumbs hammer the pink calculator's round keys faster and faster, each press popping out a little glowing plus sign.",
+   "heard": "quick key clicks, chimes."
   },
   {
    "name": "S07",
-   "bar": 12,
+   "bar": 13,
    "bars": 2,
    "cast": "H",
    "still": "stills/S07.png",
@@ -137,12 +172,14 @@
    "prompt": "She cracks her thumbs, springs forward, spreads her mismatched wings and takes off down the street close above the cobbles, dust and loose pages whirling behind her; the camera whips round to follow.",
    "sound": {
     "effects": "thumbs cracking, a whoosh of wings, a gust of wind.",
-    "lyric": "stretch your thumbs, here we go Sloppy~♡"
-   }
+    "lyric": "stretch your thumbs, here we go Sloppy~"
+   },
+   "short": "{H} crouches like a sprinter, springs forward, spreads her white wing and her bat wing and takes off low along the street; the camera whips round after her.",
+   "heard": "a whoosh of wings."
   },
   {
    "name": "S08",
-   "bar": 14,
+   "bar": 15,
    "bars": 2,
    "cast": "H",
    "still": "stills/S08.png",
@@ -150,12 +187,14 @@
    "prompt": "The camera circles her slowly as she strikes two poses in turn: she thrusts the calculator up high, then swings the open book forward, winks and points straight at the viewer, pages and plus signs swirling round her.",
    "sound": {
     "effects": "a heroic whoosh, sparkling chimes, pages fluttering round her.",
-    "lyric": "Calculation! Translation! And Sloppy~♡"
-   }
+    "lyric": "Calculation! Translation! And Sloppy~"
+   },
+   "short": "{H} hovers above the town, wings wide, calculator raised in one hand and the open green book in the other, pages and glowing plus signs circling her; she winks and points at the viewer; the camera orbits.",
+   "heard": "a heroic whoosh, sparkles."
   },
   {
    "name": "S09",
-   "bar": 16,
+   "bar": 17,
    "bars": 2,
    "cast": "H",
    "still": "stills/S09.png",
@@ -163,13 +202,15 @@
    "prompt": "She raps the chalkboard twice with the pointer, pushes up her glasses so they flash, and wags the pointer slowly at the viewer; the smug half-lidded look and the small smile never leave her face. Chalk dust puffs.",
    "sound": {
     "effects": "two raps of a pointer on a chalkboard, a bright ting as her glasses flash.",
-    "lyric": "Two plus two is four. You're still Sloppy~♡"
-   }
+    "lyric": "Two plus two is four. You're still Sloppy~"
+   },
+   "short": "In a classroom {H}, in small round glasses, raps a green chalkboard with a pointer, then wags it at the viewer with a smug half-lidded look and a small fanged smile.",
+   "heard": "two raps, a ting."
   },
   {
    "name": "S10",
-   "bar": 18,
-   "bars": 2,
+   "bar": 19,
+   "bars": 1,
    "cast": "H",
    "still": "stills/S10.png",
    "frame": "A long writing desk by a sunny window. Halgakos sits at its left end, seen from the waist up, writing in the open green book with a white feather quill, the pink calculator by her elbow, a pleased little smile; along the desk in front of her a row of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes stands to attention in one perfectly straight line, like little soldiers on parade, each saluting her.",
@@ -177,7 +218,9 @@
    "sound": {
     "effects": "a quill scratching, a row of tiny heels clicking together one after another.",
     "lyric": "Every word as written, every sum just right,"
-   }
+   },
+   "short": "At a desk {H} dots a line in the green book with a quill; a row of little numerals snaps to attention and salutes.",
+   "heard": "tiny heels clicking."
   },
   {
    "name": "S11",
@@ -189,8 +232,10 @@
    "prompt": "At once she drops and lands on the ink blob with both feet, in the first second of the shot, and it squashes perfectly flat, like a sheet of paper, with a puff of ink droplets; she bounces once on the flat sheet.",
    "sound": {
     "effects": "a falling whistle, then a big soft squish and a splat.",
-    "lyric": "Squish Sloppy~♡ Flat as a page tonight!"
-   }
+    "lyric": "Squish Sloppy~"
+   },
+   "short": "{H} drops feet first out of the sky onto a round blob of dark blue ink, which squashes flat as a sheet of paper.",
+   "heard": "a squish, a splat."
   },
   {
    "name": "S12",
@@ -201,8 +246,11 @@
    "frame": "Close on Halgakos from the chest up, a little right of the middle of the picture, on the town street, just after stamping something flat: she brushes her hands together in front of her, chin a little raised, with her smug look exactly as in the SECOND attached picture: half-lidded eyes, relaxed brows, and a small closed self-satisfied cat-like smile with one tiny fang showing; a few dark blue ink droplets hang in the air around her; the street behind her is out of focus.",
    "prompt": "She dusts her hands off, tilts her chin up and raises a small V sign beside her face, smug and unhurried, the half-lidded look never leaving her face; a last ink droplet falls past.",
    "sound": {
-    "effects": "hands dusting off, a smug little hum, one last drip."
-   }
+    "effects": "hands dusting off, a smug little hum, one last drip.",
+    "lyric": "Flat as a page tonight!"
+   },
+   "short": "Close on {H} dusting her hands, chin up, smug half-lidded eyes and a small fanged smile; she flicks a V sign.",
+   "heard": "a smug hum."
   },
   {
    "name": "S13",
@@ -220,7 +268,9 @@
    "sound": {
     "effects": "a cheerful bakery bell, the soft thump of bread rolls.",
     "lyric": "Chikuwa! The answer is not always bread!"
-   }
+   },
+   "short": "At a bakery stall {C}, a fish-cake stick in her mouth, bounces on her toes with her arms full of bread rolls and holds one out to the viewer, beaming; a little plus sign chews a roll, baffled.",
+   "heard": "a bakery bell."
   },
   {
    "name": "S14",
@@ -238,7 +288,9 @@
    "sound": {
     "effects": "sniffles, slow drips into a puddle.",
     "lyric": "Rune! Stop crying in the ink!"
-   }
+   },
+   "short": "In a dim archive {R} sits hugging her knees by an ink bottle, big tears rolling into a puddle of dark blue ink; she wipes an eye with her sleeve and gives a wobbly smile.",
+   "heard": "sniffles, drips."
   },
   {
    "name": "S15",
@@ -256,7 +308,9 @@
    "sound": {
     "effects": "a spotlight thunk, a sparkling swirl of chimes.",
     "lyric": "Illya! One heroine is plenty!"
-   }
+   },
+   "short": "On a stage in a spotlight {I} twirls once, sweeps a feather quill in an arc of pink sparkles and hearts, and ends in a pose with a wink.",
+   "heard": "sparkling chimes."
   },
   {
    "name": "S16",
@@ -274,7 +328,9 @@
    "sound": {
     "effects": "a bat set down with a soft tock, a small nervous squeak.",
     "lyric": "Tsubakieh! Put the bat down. Normally!"
-   }
+   },
+   "short": "On a street corner {T}, blank-faced with round dot eyes, slowly lowers her white baseball bat to the ground and raises a tiny peace sign; little numerals with bumps on their heads shiver behind a barrel.",
+   "heard": "a soft tock."
   },
   {
    "name": "S17",
@@ -286,8 +342,10 @@
    "prompt": "They run toward the viewer, hair and ribbons streaming, each in her own way: Halgakos sprinting with her wings out, Chikuwa munching, Rune crying as she runs, Illya skipping with sparkles, Tsubakieh jogging blank-faced; the wave of little creatures and pages rolls along behind them.",
    "sound": {
     "effects": "five pairs of running feet, a rolling patter of tiny feet behind them.",
-    "lyric": "Calculation! Translation! And Sloppy~♡ -nim and -ssi, I keep them all,"
-   }
+    "lyric": "Calculation! Translation! And Sloppy~"
+   },
+   "short": "All five run toward the camera down the street: {H} in front with her calculator, {C} munching bread, {R} crying as she runs, {I} skipping with sparkles, {T} jogging blank-faced with her bat; a wave of little numerals rolls behind them.",
+   "heard": "running feet."
   },
   {
    "name": "S18",
@@ -299,8 +357,10 @@
    "prompt": "One by one she catches three of the drifting golden ribbons with great care, between finger and thumb, and tucks each between the pages of the open book, which glows a little brighter each time; she smiles softly.",
    "sound": {
     "effects": "soft chimes as each ribbon is caught, pages turning.",
-    "lyric": "drop one honorific and you're Sloppy~♡"
-   }
+    "lyric": "-nim and -ssi, I keep them all, drop one honorific and you're Sloppy~"
+   },
+   "short": "{H} floats in a golden sky among drifting pages and, one by one, gently catches three small glowing ribbon bookmarks and tucks each into her open green book; she smiles softly.",
+   "heard": "soft chimes."
   },
   {
    "name": "S19",
@@ -312,8 +372,10 @@
    "prompt": "She looks the viewer slowly up and down, gives one small approving nod, taps the calculator twice against her cheek, and the small smug smile widens just a little; she flicks her hair back over her shoulder.",
    "sound": {
     "effects": "two light taps of plastic on a cheek, a soft sparkle.",
-    "lyric": "not bad. For you. Sloppy~♡"
-   }
+    "lyric": "not bad. For you. Sloppy~"
+   },
+   "short": "Close on {H} looking the viewer up and down over the calculator held by her cheek, smug half-lidded eyes and a small fanged smile; one slow approving nod, then she flicks her hair back.",
+   "heard": "two light taps."
   },
   {
    "name": "S20",
@@ -325,8 +387,10 @@
    "prompt": "All five strike at once: a beam of golden light bursts from the calculator, bread rolls fly, a wave of ink splashes out, a spiral of pink sparkles sweeps round, the bat swings; the little creatures pop one after another into tidy rows of sparkles.",
    "sound": {
     "effects": "a beam of light firing, a swing and a crack, a splash, a volley of pops.",
-    "lyric": "Calculation! Translation! And Sloppy~♡"
-   }
+    "lyric": "Calculation! Translation! And Sloppy~"
+   },
+   "short": "In the town square the five strike at once: a beam of light from {H}'s calculator, {C}'s bread rolls, a splash of {R}'s ink, {I}'s spiral of sparkles, {T}'s swinging bat; the little numerals pop into tidy rows of sparkles.",
+   "heard": "a beam, a crack, pops."
   },
   {
    "name": "S21",
@@ -338,8 +402,10 @@
    "prompt": "They leap up together and hang in the air with arms thrown up as the tidy rows of sparkles stream into the green book, which snaps shut in Halgakos's hands; the camera pulls back and up into the sunset sky.",
    "sound": {
     "effects": "a big whoosh upward, a book snapping shut, a sparkling burst.",
-    "lyric": "Sloppy, sloppy, sloppy, Sloppy~♡"
-   }
+    "lyric": "Sloppy, sloppy, sloppy, Sloppy~"
+   },
+   "short": "At sunset all five leap into the air together, arms thrown up, as the rows of sparkles stream into the green book and it snaps shut in {H}'s hands; the camera pulls back.",
+   "heard": "a whoosh, a snap, sparkles."
   },
   {
    "name": "S22",
@@ -351,8 +417,61 @@
    "prompt": "Chikuwa holds the bread roll closer and Halgakos sighs with drooping ears; then Rune nudges the mint ice cream into her view: Halgakos's ears spring up, she takes the cone in both hands and takes one blissful lick with her eyes closed, and the others laugh without a sound; the camera drifts slowly up toward the evening sky.",
    "sound": {
     "effects": "evening street murmur, a long sigh, then a happy gasp and a little hum.",
-    "lyric": "Now where is my ice cream Sloppy~♡ Sloppy~♡"
-   }
+    "lyric": "Now where is my ice cream, Sloppy~"
+   },
+   "short": "Evening street, warm lamps: {C} offers {H} a bread roll and she sighs at her empty cone; then {R} holds up a fresh mint ice cream: {H}'s ears spring up, she takes it and licks it blissfully; the others laugh. The camera drifts up to the sky.",
+   "heard": "a sigh, a happy gasp."
   }
- ]
+ ],
+ "segments": {
+  "about": "The film in three takes of thirty seconds, each several shots in order, made whole by one request each. The same three lines go into every shot of every take, word for word: how it is drawn, the music, and the voice.",
+  "resolution": "1080p",
+  "stills": "stills_hd",
+  "models": {
+   "kling": "kling/v4/reference-to-video",
+   "seedance": "dreamina-seedance-2-5-260628"
+  },
+  "look": "2D anime, cel shading, pastel. No text.",
+  "music": "Music: bouncy anime pop, 120 bpm, C major, handclaps.",
+  "voice": "A smug, bratty, teasing girl sings off screen:",
+  "list": [
+   {
+    "name": "A",
+    "shots": [
+     "S01",
+     "S02",
+     "S03",
+     "S04",
+     "S05",
+     "S06",
+     "S07"
+    ]
+   },
+   {
+    "name": "B",
+    "shots": [
+     "S08",
+     "S09",
+     "S10",
+     "S11",
+     "S12",
+     "S13",
+     "S14",
+     "S15",
+     "S16"
+    ]
+   },
+   {
+    "name": "C",
+    "shots": [
+     "S17",
+     "S18",
+     "S19",
+     "S20",
+     "S21",
+     "S22"
+    ]
+   }
+  ]
+ }
 }
