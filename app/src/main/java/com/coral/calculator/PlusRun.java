@@ -528,9 +528,9 @@ final class PlusRun {
             puddles.add(new float[]{it.x, it.y, PUDDLE_LASTS});
         }
         // A mini Chikuwa has a roll for her every so often while she is short of a heart: half of one back.
-        if (kind == MINI_CHIKUWA && halves < perks.hearts * 2 && state == PLAYING && (it.gift -= seconds) <= 0) {
+        if (kind == MINI_CHIKUWA && hp < maxHp() && state == PLAYING && (it.gift -= seconds) <= 0) {
             it.gift = GIFT_EVERY;
-            halves++;
+            hp = Math.min(maxHp(), hp + HALF);
             petGifts++;
         }
         // The ring of light: when it is ready, the first thing thrown at her that comes near is turned aside.
@@ -811,6 +811,9 @@ final class PlusRun {
         /** The weapon found in the lands that she holds as her own, or 0: what it is counts for more in her hands. */
         int item;
         float mercy = 1;
+        /** What her skill tree gives her; and the active skills in her slots. */
+        RunSkills.Built skills = new RunSkills.Built();
+        List<RunSkills.Notable> slotted = new ArrayList<>();
         /** What she wears of what she has found: an armour and two accessories, added up. */
         RunLoot.Worn worn = RunLoot.NOTHING;
     }
@@ -871,7 +874,13 @@ final class PlusRun {
     }
 
     /** What a blow of hers counts for against a creature, in tenths: her weapon's blows, made harder by her level. */
-    private int dealt() { return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level))); }
+    private int dealt() {
+        // (Attack and the tree's attack make every blow harder; intelligence, those of tomes, staffs and wands.)
+        int thing = thingOf(with);
+        boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
+        float more = 1 + (perks.skills.stats[RunSkills.ATK] + perks.skills.effects[RunSkills.E_ATK_PCT] + (minded ? perks.skills.stats[RunSkills.INT] : 0)) / 100f;
+        return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
+    }
 
     /** Blows that landed, for showing: where, how much, whether a great one, and how long ago. */
     private final List<float[]> hits = new ArrayList<>();
@@ -888,12 +897,114 @@ final class PlusRun {
     static final float POISON_LASTS = 4, BURN_LASTS = 2, FREEZE_LASTS = 1.4f, POISON_EVERY = 1, BURN_EVERY = .5f;
     /** What a blow of ink-poison, of burning, and of thorns is made with. */
     static final int POISONED = -20, BURNT = -21, THORNY = -22;
+    /** HP the last hurt took. */
+    private int lastLost;
+
+    int lastLost() { return lastLost; }
+
     private float energy = ENERGY_MOST, ward, wardWait, regenClock, critAge = 9, dodgeAge = 9, shrugAge = 9, regenAge = 9;
     private int regens, dodges, shrugs, crits, wardHurts, poisons, burns, freezes, leeches, thorned, specialsUsed;
     private float critX, critY;
 
     /** How much of an effect what she wears gives her, with what is in her hands. */
-    int gear(int effect) { return perks.worn.of(effect, RunLoot.classOf(weapon)); }
+    int gear(int effect) { return perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect); }
+
+    /** What her skill tree adds to one of the effects gear has: its passives, and the actives called on just now. */
+    private int skill(int effect) {
+        int[] from = SKILL_OF[effect];
+        if (from == null) return 0;
+        int sum = 0;
+        for (int index = 0; index < from.length; index += 2) sum += (perks.skills.effects[from[index]] + activeEffect(from[index])) * from[index + 1];
+        return sum;
+    }
+
+    /** For each of gear's effects, which of the tree's effects add to it and how many times over. */
+    private static final int[][] SKILL_OF = new int[RunLoot.EFFECTS][];
+
+    static {
+        SKILL_OF[RunLoot.CRIT] = new int[]{RunSkills.E_CRIT, 1};
+        SKILL_OF[RunLoot.CRITX] = new int[]{RunSkills.E_CRITX, 1};
+        SKILL_OF[RunLoot.HASTE] = new int[]{RunSkills.E_HASTE, 1, RunSkills.E_COMBO, 5};
+        SKILL_OF[RunLoot.LEECH] = new int[]{RunSkills.E_LEECH, 1};
+        SKILL_OF[RunLoot.POISON] = new int[]{RunSkills.E_POISON, 1};
+        SKILL_OF[RunLoot.BURN] = new int[]{RunSkills.E_BURN, 1};
+        SKILL_OF[RunLoot.FREEZE] = new int[]{RunSkills.E_FREEZE, 1, RunSkills.E_STUN, 1};
+        SKILL_OF[RunLoot.REACH] = new int[]{RunSkills.E_REACH, 1};
+        SKILL_OF[RunLoot.AREA] = new int[]{RunSkills.E_AREA, 1};
+        SKILL_OF[RunLoot.PIERCE] = new int[]{RunSkills.E_PIERCE, 1, RunSkills.E_PROJECTILES, 1};
+        SKILL_OF[RunLoot.DODGE] = new int[]{RunSkills.E_DODGE, 1};
+        SKILL_OF[RunLoot.THORNS] = new int[]{RunSkills.E_THORNS, 1};
+        SKILL_OF[RunLoot.WARD] = new int[]{RunSkills.E_SHIELD, 1};
+        SKILL_OF[RunLoot.THRIFT] = new int[]{RunSkills.E_SPECIAL_COST, 1};
+        // (Life back: the tree counts HP a second, gear halves of a heart a minute; one HP a second is six halves a minute.)
+        SKILL_OF[RunLoot.REGEN] = new int[]{RunSkills.E_REGEN, 6};
+    }
+
+    // Active skills
+
+    /** Up to three active skills in her slots, how long each is called on for, and what it costs and how long until it can be called again. */
+    static final int SLOTS = 3;
+    static final float ACTIVE_LASTS = 8, ACTIVE_REST = 20, ACTIVE_COST = 30;
+    private final float[] activeLeft = new float[SLOTS], activeRest = new float[SLOTS];
+    /** Divine power: made of energy spent while an active that makes it is called on; full, her next blows are divine for a while. */
+    static final float DP_MOST = 100, DIVINE_LASTS = 6;
+    private float dp, divineLeft;
+    private int activesUsed, divines;
+
+    float dp() { return dp; }
+    float divineLeft() { return divineLeft; }
+    int activesUsed() { return activesUsed; }
+    int divines() { return divines; }
+    float activeLeft(int slot) { return activeLeft[slot]; }
+    float activeRest(int slot) { return activeRest[slot]; }
+
+    /** The active skill in a slot, or null. */
+    RunSkills.Notable active(int slot) { return slot < perks.slotted.size() ? perks.slotted.get(slot) : null; }
+
+    /** She calls on an active skill: if it is there, rested, and she has the energy. Whether she did. */
+    boolean callOn(int slot) {
+        RunSkills.Notable skill = active(slot);
+        if (skill == null || activeRest[slot] > 0 || energy < ACTIVE_COST || state != PLAYING) return false;
+        energy -= ACTIVE_COST;
+        noteSpent(ACTIVE_COST);
+        activeLeft[slot] = ACTIVE_LASTS;
+        activeRest[slot] = ACTIVE_REST;
+        activesUsed++;
+        return true;
+    }
+
+    /** What the actives called on just now add to one of the tree's effects. */
+    private int activeEffect(int effect) {
+        int sum = 0;
+        for (int slot = 0; slot < SLOTS; slot++) {
+            RunSkills.Notable skill = active(slot);
+            if (skill != null && activeLeft[slot] > 0) {
+                if (skill.effect == effect) sum += skill.figure;
+                if (skill.cost == effect) sum += skill.costFigure;
+            }
+        }
+        return sum;
+    }
+
+    /** Energy spent: while an active that makes divine power is called on, a part of it becomes divine power; full, it is let go. */
+    private void noteSpent(float spent) {
+        int making = perks.skills.effects[RunSkills.E_DP] + activeEffect(RunSkills.E_DP);
+        if (making <= 0) return;
+        dp = Math.min(DP_MOST, dp + spent * making / 100f);
+        if (dp >= DP_MOST) {
+            dp = 0;
+            divineLeft = DIVINE_LASTS;
+            divines++;
+        }
+    }
+
+    private void actives(float seconds) {
+        for (int slot = 0; slot < SLOTS; slot++) {
+            if (activeLeft[slot] > 0) activeLeft[slot] -= seconds;
+            if (activeRest[slot] > 0) activeRest[slot] -= seconds;
+        }
+        if (divineLeft > 0) divineLeft -= seconds;
+    }
 
     float energy() { return energy; }
     float specialCost() { return SPECIAL_COST * (1 - gear(RunLoot.THRIFT) / 100f); }
@@ -927,7 +1038,7 @@ final class PlusRun {
 
     /** What she wears does, as time goes: energy and life come back, the shield bar fills, and what burns or is poisoned or frozen goes on being so. */
     private void wearing(float seconds) {
-        energy = Math.min(ENERGY_MOST, energy + ENERGY_BACK * (1 + gear(RunLoot.ENERGY) / 100f) * seconds);
+        energy = Math.min(ENERGY_MOST, energy + ENERGY_BACK * (1 + (gear(RunLoot.ENERGY) + perks.skills.stats[RunSkills.INT] + perks.skills.effects[RunSkills.E_ENERGY]) / 100f) * seconds);
         critAge += seconds;
         dodgeAge += seconds;
         shrugAge += seconds;
@@ -937,11 +1048,11 @@ final class PlusRun {
         if (wardWait > 0) wardWait -= seconds;
         else if (ward < most) ward = Math.min(most, ward + seconds / WARD_FILL * (1 + gear(RunLoot.WARD_FAST) / 100f));
         int regen = gear(RunLoot.REGEN);
-        if (regen > 0 && halves > 0 && halves < perks.hearts * 2) {
+        if (regen > 0 && hp > 0 && hp < maxHp()) {
             regenClock += seconds * regen / 60f;
             if (regenClock >= 1) {
                 regenClock -= 1;
-                halves++;
+                hp = Math.min(maxHp(), hp + HALF);
                 regens++;
                 regenAge = 0;
             }
@@ -1003,8 +1114,8 @@ final class PlusRun {
         // And after it: energy; a piece of shield back, half a heart back, ink-poison, burning, freezing, by chance.
         energy = Math.min(ENERGY_MOST, energy + SPARK + gear(RunLoot.SPARK));
         if (ward < wardMost() && chance(gear(RunLoot.WARD_HIT))) ward = Math.min(wardMost(), (float) Math.floor(ward) + 1);
-        if (halves > 0 && halves < perks.hearts * 2 && chance(gear(RunLoot.LEECH))) {
-            halves++;
+        if (hp > 0 && hp < maxHp() && chance(gear(RunLoot.LEECH))) {
+            hp = Math.min(maxHp(), hp + HALF);
             leeches++;
             regenAge = 0;
         }
@@ -1668,7 +1779,15 @@ final class PlusRun {
     private boolean sprung;
     private float sinceGround = 1, sinceJump = 1, safe;
     /** Her hearts, counted in halves; her lives; and how many of those she has lost here. */
-    private int halves = HEARTS * 2, lives = LIVES, livesLost, state = PLAYING;
+    private int hp = HEARTS * RunSkills.HEART, lives = LIVES, livesLost, state = PLAYING;
+    /** HP in half a heart. */
+    static final int HALF = RunSkills.HEART / 2;
+
+    /** The most HP she can have: her hearts, and what her skill tree gives. */
+    int maxHp() {
+        int base = perks.hearts * RunSkills.HEART + perks.skills.stats[RunSkills.HP];
+        return Math.max(RunSkills.HEART / 2, base + base * perks.skills.effects[RunSkills.E_HP_PCT] / 100);
+    }
     /** The last firm ground she stood on, where a fall puts her back; how much longer she flinches from a hurt, and which way it sent her. */
     private float firmX, firmY, flinch, knock;
     private float sinceCast = 1, sinceBrace = 1, braceX, braceY;
@@ -1689,7 +1808,7 @@ final class PlusRun {
         this.perks = perks;
         tough = RunLevels.toughOf(level.number) + perks.harder;
         bite = RunLevels.biteOf(level.number) + perks.harder + RunMarket.bites(perks.black);
-        halves = perks.hearts * 2;
+        hp = maxHp();
         ward = wardMost();
         lives = perks.lives;
         // What is in her backpack is with her from the start, and what she begins a land with is in her hands.
@@ -1964,7 +2083,7 @@ final class PlusRun {
         sinceGround = other.sinceGround;
         sinceJump = other.sinceJump;
         safe = other.safe;
-        halves = other.halves;
+        hp = other.hp;
         lives = other.lives;
         livesLost = other.livesLost;
         firmX = other.firmX;
@@ -2084,7 +2203,7 @@ final class PlusRun {
     int refusal(int kind, int cost) {
         if (stallSold(kind) >= stock(kind)) return SOLD_OUT;
         if (kind > FORM && (coloured() || cursed > 0)) return WORN;
-        if (kind == BREAD && halves >= perks.hearts * 2 || kind == SHIELD && shield || kind == ICE && rush > 0) return NEEDLESS;
+        if (kind == BREAD && hp >= maxHp() || kind == SHIELD && shield || kind == ICE && rush > 0) return NEEDLESS;
         return purse() < cost ? POOR : SOLD;
     }
 
@@ -2709,7 +2828,7 @@ final class PlusRun {
      * jump in the air from her next jump.
      */
     void grant(Perks now) {
-        if (now.hearts > perks.hearts) halves = Math.min(now.hearts * 2, halves + (now.hearts - perks.hearts) * 2);
+        if (now.hearts > perks.hearts) hp = Math.min(now.hearts * RunSkills.HEART + perks.skills.stats[RunSkills.HP], hp + (now.hearts - perks.hearts) * RunSkills.HEART);
         if (now.lives > perks.lives) lives += now.lives - perks.lives;
         perks.hearts = now.hearts;
         perks.lives = now.lives;
@@ -2746,7 +2865,7 @@ final class PlusRun {
         perks.defence = now.defence;
         perks.stomp = now.stomp;
         perks.mercy = now.mercy;
-        halves = Math.max(1, Math.min(halves, perks.hearts * 2));
+        hp = Math.max(HALF, Math.min(hp, maxHp()));
     }
 
     /** Whether she has a second jump in the air to her name. */
@@ -3066,8 +3185,9 @@ final class PlusRun {
     /** Whether she has just been knocked back, and cannot be again for a moment. */
     boolean safe() { return safe > 0; }
     /** Her hearts: how many she has any of, and the same counted in halves; her lives; and how many of those she has lost in this land. */
-    int hearts() { return (halves + 1) / 2; }
-    int halves() { return halves; }
+    int hearts() { return (hp + RunSkills.HEART - 1) / RunSkills.HEART; }
+    int halves() { return (hp + HALF - 1) / HALF; }
+    int hp() { return hp; }
     int lives() { return lives; }
     int livesLost() { return livesLost; }
     /** Whether she is flinching from a hurt just now. */
@@ -3128,7 +3248,7 @@ final class PlusRun {
     }
 
     /** Takes a heart from her, and never her last: for checking what gives one back. */
-    void wound() { halves = Math.max(1, halves - 2); }
+    void wound() { hp = Math.max(HALF, hp - RunSkills.HEART); }
 
     /** Puts something in her hands: for checking the rules, and for looking at them. */
     void arm(int with) {
@@ -3183,6 +3303,7 @@ final class PlusRun {
         }
         scatter(seconds);
         wearing(seconds);
+        actives(seconds);
         // The moment of the black ribbon: nothing else moves.
         if (moment > 0) {
             momentous(seconds);
@@ -3428,9 +3549,9 @@ final class PlusRun {
             }
             // A shrine takes a heart from whoever has more than one, and gives its ribbon; from anyone else it takes nothing and gives nothing.
             if (item[0] == SHRINE) {
-                if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f && halves > 2 && cursed <= 0) {
+                if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f && hp > RunSkills.HEART && cursed <= 0) {
                     items.remove(index);
-                    halves -= 2;
+                    hp -= RunSkills.HEART;
                     shrines++;
                     tookX = item[1] + .5f;
                     tookY = item[2] + .5f;
@@ -3526,6 +3647,7 @@ final class PlusRun {
                 if (heldFor >= RunArms.CHARGE && !heavied && energy >= specialCost()) {
                     heavied = true;
                     energy -= specialCost();
+                    noteSpent(specialCost());
                     specialsUsed++;
                     heavy();
                 }
@@ -4000,8 +4122,8 @@ final class PlusRun {
 
     /** A heart back, if she is short of one: a whole one, or as much of one as she is short of. */
     private boolean heal() {
-        if (halves >= perks.hearts * 2) return false;
-        halves = Math.min(perks.hearts * 2, halves + 2);
+        if (hp >= maxHp()) return false;
+        hp = Math.min(maxHp(), hp + RunSkills.HEART);
         return true;
     }
 
@@ -4112,7 +4234,7 @@ final class PlusRun {
         int thing = thingOf(with);
         // (The third cut of three in a row, and the cut that follows a dash, count for one more.)
         int found = perks.item != 0 && thing == RunArms.kindOf(perks.item) ? RunArms.itemBlows(perks.item) : 0;
-        return thing == UNARMED ? 1 : RunArms.blows(thing, perks.levels[thing]) + found + (with == CUT && (chain == 3 || dashCut) ? 1 : 0);
+        return thing == UNARMED ? 1 : Math.max(1, RunArms.blows(thing, perks.levels[thing]) + found) + (with == CUT && (chain == 3 || dashCut) ? 1 : 0);
     }
 
     /** The thing a blow was dealt with, from what the blow is made with; or nothing. */
@@ -5166,18 +5288,21 @@ final class PlusRun {
             if (room >= 0 && wave > 0) arenaHurts++;
             // A letter that has been through a hurt is not one to hand over.
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
-            halves -= costs;
+            int lost = costs * HALF;
+            if (!fell) lost = Math.max(Math.max(1, lost / 10), lost - perks.skills.stats[RunSkills.DEF] - lost * Math.max(0, perks.skills.effects[RunSkills.E_DEF_PCT]) / 100);
+            hp -= lost;
+            lastLost = lost;
         }
         safe = SAFE * perks.mercy;
-        if (halves <= 0) {
-            halves = 0;
+        if (hp <= 0) {
+            hp = 0;
             if (--lives <= 0) {
                 lives = 0;
                 state = LOST;
                 return true;
             }
             livesLost++;
-            halves = perks.hearts * 2;
+            hp = maxHp();
         ward = wardMost();
             fade(false);
             cursed = 0;

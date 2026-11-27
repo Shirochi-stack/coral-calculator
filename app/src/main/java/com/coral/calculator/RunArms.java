@@ -181,13 +181,15 @@ final class RunArms {
      */
     static int itemBlows(int code) {
         int rarity = RunLoot.rarity(code);
+        // (Paper is weaker than the real thing: a blow less, never more than the plain thing it is used as.)
+        if (RunLoot.paper(code)) return -1;
         return (rarity == RunLoot.ROSE ? 5 : rarity * 3 / 4) + RunLoot.theme(code) / 4;
     }
 
     /** How much further it reaches, and how much sooner it can be used again, as parts of what the thing reaches and rests. */
-    static float itemReach(int code) { return 1 + .06f * RunLoot.rarity(code); }
+    static float itemReach(int code) { return RunLoot.paper(code) ? .9f : 1 + .06f * RunLoot.rarity(code); }
 
-    static float itemRest(int code) { return 1 - .05f * RunLoot.rarity(code); }
+    static float itemRest(int code) { return RunLoot.paper(code) ? 1.1f : 1 - .05f * RunLoot.rarity(code); }
 
     /** A wand's element, from the chapter it was found in: fire, ice, lightning or ink. */
     static final int FIRE = 0, ICE = 1, LIGHTNING = 2, INKY = 3;

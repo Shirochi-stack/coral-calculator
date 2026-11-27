@@ -2417,12 +2417,7 @@ final class RunGame {
     }
 
     /** Which of the pictures in the sheet of them a thing found is: a weapon by its kind and chapter (the rose's its own), armour and accessories each their own. */
-    static int iconOf(int code) {
-        int type = RunLoot.type(code), base = RunLoot.base(code);
-        if (RunLoot.addition(code)) return ADDITION_ICON;
-        if (type == RunLoot.WEAPON) return RunLoot.rarity(code) == RunLoot.ROSE ? ROSE_ICONS + base % 12 : base % 12 * 12 + Math.min(11, RunLoot.theme(code));
-        return type == RunLoot.ARMOUR ? ARMOUR_ICONS + base % RunLoot.ARMOURS.length : ACCESSORY_ICONS + base % RunLoot.ACCESSORIES.length;
-    }
+    static int iconOf(int code) { return RunLoot.iconOf(code); }
 
     /** One of the pictures in the sheet, as a square of a size about a place. */
     private void drawIcon(Canvas canvas, int index, float x, float y, float size) {
@@ -2528,6 +2523,18 @@ final class RunGame {
         if (part > 0) canvas.drawRoundRect(left + dp(52), top + high / 2 - dp(3), left + dp(52) + (wide - dp(61)) * part, top + high / 2 + dp(3), dp(3), dp(3), paint);
         paint.setColor(Color.BLACK);
         canvas.restore();
+    }
+
+    /** A layer of hearts' colour over the red of the heart: none for the first; gold, purple, orange, blue, green after. */
+    private final android.graphics.ColorFilter[] heartFilters = new android.graphics.ColorFilter[RunSkills.LAYER_COLOURS.length];
+
+    private android.graphics.ColorFilter heartFilter(int layer) {
+        if (layer <= 0 || layer >= heartFilters.length) return null;
+        if (heartFilters[layer] == null) {
+            int colour = RunSkills.LAYER_COLOURS[layer];
+            heartFilters[layer] = new android.graphics.LightingColorFilter(0xFF000000 | colour & 0xFFFFFF, 0x00202020);
+        }
+        return heartFilters[layer];
     }
 
     /** A piece of her shield bar: a small shield, blue as far as it is filled. */
@@ -5786,6 +5793,7 @@ final class RunGame {
         // A card that says something was won is read while the land is on the screen: it does not run out behind a pause.
         if (toastLeft > 0 && screen == PLAY) toastLeft -= seconds;
         wardFlash += seconds;
+        gripChanged += seconds;
         // The keys, said once the story told as the first land begins is over (said over it, it would not be heard).
         if (keysHintDue && screen == PLAY && !(talking && !told) && captionLeft <= 0) {
             keysHintDue = false;
@@ -11503,17 +11511,18 @@ final class RunGame {
             int moving = !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
             int pose = dashAge < .3f ? KATANA_DASH : dashAge < .62f ? KATANA_AFTER : dashAge < .8f ? KATANA_SHEATHE : run.heldFor() > .14f ? KATANA_GATHER
                     : airAge < .3f ? KATANA_DOWN : cutAge < .05f ? KATANA_DRAW : cutAge < .2f ? KATANA_CUT : cutAge < .33f ? KATANA_SHEATHE : moving;
-            frame(canvas, herArmed(weapon), pose, KATANA_FRAMES, feetX, feetY, tall, leftward);
+            boolean fast = pose == KATANA_CUT || pose == KATANA_DASH || pose == KATANA_DOWN || pose == KATANA_DRAW;
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, fast)) frame(canvas, herArmed(weapon), pose, KATANA_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon >= PlusRun.TABLET) {
             int pose = beaming ? (run.beam() > 0 ? MAIN_HEAVY : MAIN_GATHER) : sinceHeavy < .3f ? MAIN_HEAVY : sinceHeavy < .5f ? MAIN_SETTLE
                     : run.heldFor() > .12f ? MAIN_GATHER : sinceUse < .09f ? MAIN_BACK : sinceUse < .26f ? MAIN_GO
                     : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
             weaponAura(canvas, weapon, feetX + (leftward ? -1 : 1) * tall * .32f, feetY - tall * .5f, tall);
-            frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward)) frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon != PlusRun.UNARMED) {
             int pose = sinceUse < .22f || run.swinging() >= 0 ? ARMED_USE : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL)
                     : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
-            frame(canvas, herArmed(weapon), pose, ARMED_FRAMES, feetX, feetY, tall, leftward);
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == ARMED_USE)) frame(canvas, herArmed(weapon), pose, ARMED_FRAMES, feetX, feetY, tall, leftward);
         } else {
             int pose;
             if (!run.onGround()) {
@@ -11525,6 +11534,138 @@ final class RunGame {
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
         }
         paint.setAlpha(255);
+    }
+
+    // Her hands, for a weapon found
+
+    private final Bitmap[] gripSheets = new Bitmap[RunGrips.KINDS.length], gripOvers = new Bitmap[RunGrips.KINDS.length];
+    /** The frame drawn last for the weapon in her hands, and how long since it changed: for the smear of a fast swing. */
+    private int lastGripFrame = -1;
+    private float gripChanged = 9;
+
+    /** The icon of the weapon she holds, if it is a weapon found of this kind; or -1. */
+    int heldIcon(int weapon) { return RunGrips.heldIcon(perks.item, weapon); }
+
+    /**
+     * She holds a weapon found, of a kind with a grip: drawn from her grip frame (in her form's colour, and dressed as she is), the weapon the
+     * item's own picture along the frame's line, and her hands over it. Whether she was drawn so.
+     */
+    private boolean gripped(Canvas canvas, int weapon, int pose, float feetX, float feetY, float tall, boolean leftward) {
+        return gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == MAIN_GO || pose == MAIN_HEAVY || pose == MAIN_BACK);
+    }
+
+    private boolean gripped(Canvas canvas, int weapon, int pose, float feetX, float feetY, float tall, boolean leftward, boolean fast) {
+        int grip = RunGrips.of(weapon), icon = heldIcon(weapon);
+        if (grip < 0 || icon < 0) return false;
+        float[] line = pose < RunGrips.LINES[grip].length ? RunGrips.LINES[grip][pose] : null;
+        // (A katana found, out of its sheath in her hands: its blade drawn out; at her hip, sheathed as its icon.)
+        if (weapon == PlusRun.KATANA && !RunLoot.paper(perks.item) && pose < RunGrips.HIP[grip].length && !RunGrips.HIP[grip][pose]) icon = RunGrips.bladeIcon(perks.item);
+        short[] axis = RunGrips.axis(icon);
+        if (line == null || axis == null) return false;
+        if (gripSheets[grip] == null) {
+            int body = context.getResources().getIdentifier("run_grip_" + RunGrips.NAMES[grip], "drawable", context.getPackageName());
+            int over = context.getResources().getIdentifier("run_grip_" + RunGrips.NAMES[grip] + "_over", "drawable", context.getPackageName());
+            if (body == 0 || over == 0) return false;
+            gripSheets[grip] = BitmapFactory.decodeResource(context.getResources(), body);
+            gripOvers[grip] = BitmapFactory.decodeResource(context.getResources(), over);
+        }
+        int frames = RunGrips.FRAMES[grip], form = drawn();
+        Bitmap body = dressed("grip" + weapon, form == 0 ? gripSheets[grip] : dyedGrip(grip, form)), over = gripOvers[grip];
+        // Where a point of the cell is on the screen: as frame() places the cell.
+        float scale = tall / (pet.getHeight() / (float) PetArt.FRAMES.length), cw = body.getWidth() / (float) frames, ch = body.getHeight();
+        float down = grounded(body, ch * scale);
+        // The smear: on a fast frame, the weapon where it was a moment ago too, fading.
+        if (pose != lastGripFrame) {
+            gripChanged = 0;
+        }
+        float[] was = lastGripFrame >= 0 && lastGripFrame < RunGrips.LINES[grip].length ? RunGrips.LINES[grip][lastGripFrame] : null;
+        canvas.save();
+        if (leftward) canvas.scale(-1, 1, feetX, feetY);
+        canvas.translate(feetX - cw * scale / 2, feetY + down - ch * scale);
+        canvas.scale(scale, scale);
+        if (fast && was != null && gripChanged < .2f) {
+            for (int ghost = 3; ghost >= 1; ghost--) {
+                float through = ghost / 4f;
+                float[] mix = {was[0] + (line[0] - was[0]) * (1 - through), was[1] + (line[1] - was[1]) * (1 - through), was[2] + (line[2] - was[2]) * (1 - through),
+                        was[3] + (line[3] - was[3]) * (1 - through)};
+                heldWeapon(canvas, icon, axis, mix, weapon, Math.round(90 * (1 - through) * (1 - gripChanged / .2f)));
+            }
+        }
+        // The slash trail along where its tip went: the real thing's bright, in its rarity's colour and wider the rarer; paper's thin and plain.
+        if (fast && was != null && gripChanged < .25f) {
+            boolean plain = RunLoot.paper(perks.item);
+            int rarity = RunLoot.rarity(perks.item);
+            float fade = 1 - gripChanged / .25f;
+            path.reset();
+            path.moveTo(was[2], was[3]);
+            float midX = (was[2] + line[2]) / 2 + (line[1] - was[1]) * .3f, midY = (was[3] + line[3]) / 2 - (line[0] - was[0]) * .3f;
+            path.quadTo(midX, midY, line[2], line[3]);
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            stroke.setColor(plain ? 0xFFE8E4DA : rarityColour(Math.max(RunLoot.BLUE, rarity)));
+            stroke.setAlpha(Math.round((plain ? 120 : 200) * fade));
+            stroke.setStrokeWidth(plain ? 4 : 8 + rarity * 3);
+            canvas.drawPath(path, stroke);
+            if (!plain) {
+                stroke.setColor(Color.WHITE);
+                stroke.setAlpha(Math.round(230 * fade));
+                stroke.setStrokeWidth(3 + rarity);
+                canvas.drawPath(path, stroke);
+            }
+            stroke.setAlpha(255);
+            stroke.setStrokeCap(Paint.Cap.BUTT);
+        }
+        heldWeapon(canvas, icon, axis, line, weapon, 255);
+        // A gleam along a real blade now and then.
+        if (!RunLoot.paper(perks.item)) {
+            float gleam = (clock * .7f + weapon * .3f) % 2.2f;
+            if (gleam < 1) {
+                float gx = line[0] + (line[2] - line[0]) * (.4f + .6f * gleam), gy = line[1] + (line[3] - line[1]) * (.4f + .6f * gleam);
+                glowAt(canvas, gx, gy, 14, 0xFFFFFFFF, Math.round(200 * (float) Math.sin(gleam * Math.PI)));
+                paint.setAlpha(255);
+            }
+        }
+        canvas.restore();
+        lastGripFrame = pose;
+        frame(canvas, body, pose, frames, feetX, feetY, tall, leftward);
+        frame(canvas, over, pose, frames, feetX, feetY, tall, leftward);
+        return true;
+    }
+
+    /** The weapon's own picture laid along a grip line (in the cell's own pixels): its handle at the grip, its tip toward where the line points. */
+    private void heldWeapon(Canvas canvas, int icon, short[] axis, float[] line, int weapon, int alpha) {
+        float hx = axis[1], hy = axis[2], tx = axis[3], ty = axis[4];
+        float iconLength = (float) Math.hypot(tx - hx, ty - hy), lineLength = (float) Math.hypot(line[2] - line[0], line[3] - line[1]);
+        // (Never smaller than reads at the game's size: a knife or a pen is shown as long as a third of her.)
+        float length = Math.max(lineLength, weapon == PlusRun.KNIFE || weapon == PlusRun.PEN ? 75 : 0) * 1.05f;
+        float scale = length / Math.max(1, iconLength);
+        double angle = Math.atan2(line[3] - line[1], line[2] - line[0]) - Math.atan2(ty - hy, tx - hx);
+        canvas.save();
+        canvas.translate(line[0], line[1]);
+        canvas.rotate((float) Math.toDegrees(angle));
+        canvas.scale(scale, scale);
+        canvas.translate(-hx, -hy);
+        if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
+        int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
+        source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        target.set(0, 0, LOOT_ICON, LOOT_ICON);
+        int was = paint.getAlpha();
+        paint.setAlpha(alpha);
+        canvas.drawBitmap(lootIcons, source, target, paint);
+        paint.setAlpha(was);
+        canvas.restore();
+    }
+
+    /** A grip sheet in her form's colour, made once for each. */
+    private final android.util.SparseArray<Bitmap> dyedGrips = new android.util.SparseArray<>();
+
+    private Bitmap dyedGrip(int grip, int form) {
+        int key = grip * 64 + form;
+        Bitmap made = dyedGrips.get(key);
+        if (made == null) {
+            made = dyedArm(gripSheets[grip], RunGrips.KINDS[grip], form);
+            dyedGrips.put(key, made);
+        }
+        return made;
     }
 
     /** About the weapon found in her hands, by its rarity: a glow from gold; flames and lightning from red; the rose's changing colour and petals. */
@@ -11965,7 +12106,8 @@ final class RunGame {
         }
         // Her hearts, her lives and her pluses, in a plate at the top. The hearts are hearts, and empty by halves; the lives are her own
         // face and a count beside it, so that the two are never taken for each other.
-        int hearts = run.maxHearts(), halves = run.halves(), wards = run.wardMost();
+        int mostHp = run.maxHp(), hp = run.hp(), allHearts = Math.max(1, (mostHp + RunSkills.HEART - 1) / RunSkills.HEART), hearts = Math.min(RunSkills.ROW, allHearts),
+                halves = run.halves(), wards = run.wardMost();
         float tall = dp(wards > 0 ? 58 : 44), margin = dp(10), heart = hearts > 5 ? dp(15) : hearts > 3 ? dp(18) : dp(22);
         text.setTextSize(dp(15));
         text.setTextAlign(Paint.Align.LEFT);
@@ -11991,20 +12133,36 @@ final class RunGame {
         }
         for (int index = 0; index < hearts; index++) {
             float middle = plateLeft + dp(14) + heart * (index + .5f), bottom = plateMiddle + heart * .42f;
-            int has = Math.max(0, Math.min(2, halves - index * 2));
+            // The layer showing at this place, and how full its heart is; under it, the layer below, full, if there is one.
+            float[] shown = RunSkills.heart(index, hp, mostHp);
+            int layer = (int) shown[0];
+            float fill = shown[1];
             // Down to the last of them, they beat.
-            float size = heart * .92f * (halves <= 2 && has > 0 ? 1 + .1f * (float) Math.sin(clock * 9) : 1);
-            if (has < 2) {
+            float size = heart * .92f * (hp <= RunSkills.HEART && fill > 0 ? 1 + .1f * (float) Math.sin(clock * 9) : 1);
+            if (layer > 0) {
+                paint.setAlpha(255);
+                paint.setColorFilter(heartFilter(layer - 1));
+                art(canvas, HEART_ART, middle, bottom, size, false);
+            } else if (fill < 1) {
+                paint.setColorFilter(null);
                 paint.setAlpha(60);
                 art(canvas, HEART_ART, middle, bottom, size, false);
             }
-            if (has > 0) {
+            if (fill > 0) {
                 paint.setAlpha(255);
+                paint.setColorFilter(heartFilter(layer));
                 canvas.save();
-                if (has == 1) canvas.clipRect(middle - heart, bottom - heart * 1.2f, middle, bottom + heart * .2f);
+                if (fill < 1) canvas.clipRect(middle - heart, bottom - heart * 1.2f, middle - heart * .46f + heart * .92f * fill, bottom + heart * .2f);
                 art(canvas, HEART_ART, middle, bottom, size, false);
                 canvas.restore();
             }
+            paint.setColorFilter(null);
+        }
+        // Past three hearts, her HP, small, under them.
+        if (allHearts > 3) {
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(soft);
+            fitted(canvas, hp + " / " + mostHp + " HP", plateLeft + dp(14), plateMiddle + heart * .42f + dp(10), dp(9.5f), heart * hearts);
         }
         paint.setAlpha(255);
         // What she wears, under her hearts: a small picture of each piece, in the colour of its set.

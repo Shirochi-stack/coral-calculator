@@ -308,9 +308,26 @@ final class RunLoot {
 
     static boolean addition(int code) { return type(code) == WEAPON && base(code) == BOOK && theme(code) == ADDITION; }
 
+    /**
+     * The paper variants: the cheap, early version of a weapon, folded from plain paper; a "chapter" of their own after the Book of Addition's.
+     * Never better than blue, weaker than the real thing, and plain. For each, the kind of weapon it is (by its place among the twelve), its name and its picture.
+     */
+    static final int PAPER = 13, SCYTHE = 11;
+    static final int[] PAPER_BASES = {SCYTHE};
+    static final String[] PAPER_NAMES = {"Folded Page Scythe"};
+    static final int PAPER_ICONS = 229;
+
+    static boolean paper(int code) { return type(code) == WEAPON && theme(code) == PAPER; }
+
+    static int paperIndex(int code) {
+        for (int index = 0; index < PAPER_BASES.length; index++) if (PAPER_BASES[index] == base(code)) return index;
+        return 0;
+    }
+
     /** What it is called: its rarity is said by its colour, not its name; the rose is named for her. */
     static String name(int code) {
         if (addition(code)) return "Book of Addition";
+        if (paper(code)) return PAPER_NAMES[paperIndex(code)];
         int type = type(code), base = base(code), theme = Math.min(THEMES.length - 1, theme(code));
         String what = type == WEAPON ? WEAPONS[base % WEAPONS.length] : type == ARMOUR ? ARMOURS[base % ARMOURS.length] : ACCESSORIES[base % ACCESSORIES.length];
         // (The rose's own accessory is named for her already.)
@@ -341,10 +358,25 @@ final class RunLoot {
         }
         // (In the first two chapters, a white or blue book is now and then the old plus-book.)
         if (type == WEAPON && baseRoll % WEAPONS.length == BOOK && theme <= 1 && rarity <= BLUE && baseRoll % 3 == 0) return code(WEAPON, ADDITION, BOOK, rarity);
+        // (And in the first three chapters, a white or blue weapon that has a paper version is that, half the time.)
+        if (type == WEAPON && theme <= 2 && rarity <= BLUE && baseRoll / WEAPONS.length % 2 == 0) {
+            for (int paperBase : PAPER_BASES) if (baseRoll % WEAPONS.length == paperBase) return code(WEAPON, PAPER, paperBase, rarity);
+        }
         int count = type == WEAPON ? WEAPONS.length : ARMOURS.length;
         // (The better armours come from the later chapters: of thirty, a chapter's run of them goes up with it.)
         int base = type == WEAPON ? baseRoll % count : Math.min(count - 1, theme * 2 + baseRoll % 8);
         return code(type, theme, base, rarity);
+    }
+
+    /** Where a thing found's picture is in the sheet of them: a weapon by its kind and chapter (a rose its own), armour and accessories each their own. */
+    static final int ROSE_ICONS = 144, ARMOUR_ICONS = 156, ACCESSORY_ICONS = 186, ADDITION_ICON = 228;
+
+    static int iconOf(int code) {
+        if (addition(code)) return ADDITION_ICON;
+        if (paper(code)) return PAPER_ICONS + paperIndex(code);
+        int type = type(code), base = base(code);
+        if (type == WEAPON) return rarity(code) == ROSE ? ROSE_ICONS + base % 12 : base % 12 * 12 + Math.min(11, theme(code));
+        return type == ARMOUR ? ARMOUR_ICONS + base % ARMOURS.length : ACCESSORY_ICONS + base % ACCESSORIES.length;
     }
 
     // Her level
