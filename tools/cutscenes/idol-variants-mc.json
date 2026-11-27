@@ -1,0 +1,1030 @@
+{
+ "about": "The idol film's track in Halgakos's own voice, on the words the user wrote (2026-11-27), word for word: for tools/make_mc.py. Each line: the second it begins on, the seconds it has, its words, and how it is said (solo: talked; call: shouted; crowd: her own shout many times over, the words in brackets in the lyrics); a fifth thing, where there is one, is what the voice is sent for that line when only its marks differ (the chorus's 'Sloppy' without the '~' that would draw it out). The parts and their seconds are the picture's (tools/cutscenes/idol-song.json), with two liberties: the verse and the pre-chorus (8 to 24 s) are six lines laid one after another across both, since four of these lines do not go into the verse's eight seconds at any pace she can speak them clearly; and the call and the first chorus begin half a second before their parts (24.0 and 29.5 s) and the chorus ends a quarter of a second after its own, for the same reason. A long dash is a pause of a beat where the line's seconds allow.",
+ "out": "idol/songs/idol-variants",
+ "kept": "idol/mc",
+ "band": "idol/songs/eleven-idol-band-1.mp3",
+ "seconds": 350,
+ "beat": 0.5,
+ "mix": {
+  "voice": 1.0,
+  "crowd": 0.5,
+  "band": 0.9,
+  "under": -6.0,
+  "down": 0.1,
+  "up": 0.33,
+  "presence": 2.5,
+  "dip": -2.5
+ },
+ "scene": "She is the centre of an idol group on stage before a cheering hall, the group's MC over bouncy idol pop at 120 beats a minute. She does not sing: she talks on the beat in short dry phrases, smug, bratty and teasing, looking down her nose at the crowd, unhurried and pleased with herself, loud enough for a hall. Full stops are clipped: no long pauses. 'zah-ko' is her taunt (Japanese 'zako', small fry), said with a drawl.",
+ "brisk": "She is the centre of an idol group on stage before a cheering hall, the group's MC over fast idol pop. She does not sing: she snaps the line out right on the beat, quick, crisp and dry, smug and teasing, loud enough for a hall. As brisk as she can say it clearly, with no pauses between the phrases. 'zah-ko' is her taunt (Japanese 'zako', small fry).",
+ "shout": "She is on stage and shouts one word to a cheering hall, as loud and bright and short as she can, like a concert call.",
+ "says": {
+  "zaako": "zah-ko"
+ },
+ "captions_about": "Which of the lines below make each line of the lyrics as the user wrote them (her call and the crowd's answer are one line there), for what is written under the film.",
+ "captions": [
+  [
+   0,
+   1
+  ],
+  [
+   2,
+   3
+  ],
+  [
+   4
+  ],
+  [
+   5
+  ],
+  [
+   6
+  ],
+  [
+   7
+  ],
+  [
+   8
+  ],
+  [
+   9
+  ],
+  [
+   10,
+   11
+  ],
+  [
+   12,
+   13
+  ],
+  [
+   14
+  ],
+  [
+   15
+  ],
+  [
+   16
+  ],
+  [
+   17
+  ],
+  [
+   18
+  ],
+  [
+   19
+  ],
+  [
+   20,
+   21
+  ],
+  [
+   22
+  ],
+  [
+   23,
+   24
+  ],
+  [
+   25
+  ],
+  [
+   26,
+   27
+  ],
+  [
+   28
+  ],
+  [
+   29,
+   30
+  ],
+  [
+   31
+  ],
+  [
+   32,
+   33
+  ],
+  [
+   34
+  ],
+  [
+   35
+  ],
+  [
+   36
+  ],
+  [
+   37
+  ],
+  [
+   38
+  ],
+  [
+   39
+  ],
+  [
+   40
+  ],
+  [
+   41
+  ],
+  [
+   42
+  ],
+  [
+   43
+  ],
+  [
+   44
+  ]
+ ],
+ "lines": [
+  [
+   1.0,
+   0.9,
+   "Squish!",
+   "call"
+  ],
+  [
+   2.0,
+   1.4,
+   "Sloppy~♡",
+   "call"
+  ],
+  [
+   5.0,
+   0.9,
+   "Squish!",
+   "call"
+  ],
+  [
+   6.0,
+   1.4,
+   "Sloppy~♡",
+   "call"
+  ],
+  [
+   8.0,
+   2.5,
+   "Lights up. You're staring. How cute.",
+   "solo"
+  ],
+  [
+   10.5,
+   2.5,
+   "Five of us. Try to keep count.",
+   "solo"
+  ],
+  [
+   13.0,
+   2.5,
+   "Book's open. Story's mine. Sing.",
+   "solo"
+  ],
+  [
+   15.5,
+   2.0,
+   "Loud. I'll tell you if it's right.",
+   "solo"
+  ],
+  [
+   17.5,
+   1.7,
+   "Hands up. Higher.",
+   "solo"
+  ],
+  [
+   20.5,
+   3.0,
+   "Call my name. Slowly. Right.",
+   "solo"
+  ],
+  [
+   24.0,
+   0.9,
+   "Squish!",
+   "call"
+  ],
+  [
+   25.0,
+   1.0,
+   "Sloppy~♡",
+   "crowd"
+  ],
+  [
+   26.0,
+   0.9,
+   "Squish!",
+   "call"
+  ],
+  [
+   27.0,
+   1.0,
+   "Sloppy~♡",
+   "crowd"
+  ],
+  [
+   28.0,
+   1.4,
+   "Louder, zaako.",
+   "solo"
+  ],
+  [
+   29.5,
+   1.25,
+   "Squish, Sloppy~♡ — eyes up!",
+   "solo",
+   "Squish, Sloppy! — eyes up!"
+  ],
+  [
+   31.7,
+   1.3,
+   "Squish, Sloppy~♡ — five colors!",
+   "solo",
+   "Squish, Sloppy! — five colors!"
+  ],
+  [
+   34.2,
+   2.0,
+   "Miss the beat and I restart you —",
+   "solo"
+  ],
+  [
+   36.2,
+   2.0,
+   "Squish, Sloppy~♡ — up on your feet!",
+   "solo",
+   "Squish, Sloppy! — up on your feet!"
+  ],
+  [
+   38.25,
+   2.2,
+   "Pink. Center. Obviously.",
+   "solo"
+  ],
+  [
+   40.5,
+   0.8,
+   "Halgakos!",
+   "call"
+  ],
+  [
+   41.3,
+   0.7,
+   "Sloppy~♡",
+   "crowd"
+  ],
+  [
+   42.0,
+   2.4,
+   "Red. Warm. Still not bread.",
+   "solo"
+  ],
+  [
+   44.45,
+   0.9,
+   "Chikuwa!",
+   "call"
+  ],
+  [
+   45.35,
+   0.65,
+   "Chikuwa!",
+   "crowd"
+  ],
+  [
+   46.0,
+   2.4,
+   "Blue. Crying. We can all see.",
+   "solo"
+  ],
+  [
+   48.45,
+   0.9,
+   "Rune!",
+   "call"
+  ],
+  [
+   49.35,
+   0.65,
+   "Rune!",
+   "crowd"
+  ],
+  [
+   50.0,
+   1.3,
+   "Gold. Lead.",
+   "solo"
+  ],
+  [
+   52.45,
+   0.9,
+   "Illya!",
+   "call"
+  ],
+  [
+   53.35,
+   0.65,
+   "Illya!",
+   "crowd"
+  ],
+  [
+   54.0,
+   0.9,
+   "Purple.",
+   "solo"
+  ],
+  [
+   57.5,
+   1.1,
+   "Tsubakieh!",
+   "call"
+  ],
+  [
+   58.7,
+   1.2,
+   "Tsubakieh!",
+   "crowd"
+  ],
+  [
+   60.0,
+   3.0,
+   "Down the runway. Don't let go.",
+   "solo"
+  ],
+  [
+   63.0,
+   3.0,
+   "You're holding on like it's a favor.",
+   "solo"
+  ],
+  [
+   66.0,
+   3.0,
+   "Not bad. For you. You kept the beat.",
+   "solo"
+  ],
+  [
+   69.0,
+   2.9,
+   "Once more. Up. That was easy.",
+   "solo"
+  ],
+  [
+   72.0,
+   1.5,
+   "Squish, Sloppy~♡ — encore!",
+   "solo",
+   "Squish, Sloppy! — encore!"
+  ],
+  [
+   75.0,
+   1.5,
+   "Squish, Sloppy~♡ — say it!",
+   "solo",
+   "Squish, Sloppy! — say it!"
+  ],
+  [
+   78.0,
+   1.7,
+   "Jump, heart, bow — again.",
+   "solo"
+  ],
+  [
+   81.0,
+   1.4,
+   "Squish, Sloppy~♡ — don't stop!",
+   "solo",
+   "Squish, Sloppy! — don't stop!"
+  ],
+  [
+   84.5,
+   1.4,
+   "You're welcome.",
+   "solo"
+  ],
+  [
+   86.0,
+   1.2,
+   "My mint ice cream.",
+   "solo"
+  ],
+  [
+   88.2,
+   0.8,
+   "Sloppy~♡",
+   "solo"
+  ],
+  [
+   100.0,
+   4.5,
+   "Lights up. How cute.",
+   "solo"
+  ],
+  [
+   105.0,
+   4.5,
+   "How cute.",
+   "call"
+  ],
+  [
+   110.0,
+   4.5,
+   "Five of us.",
+   "solo"
+  ],
+  [
+   115.0,
+   4.5,
+   "Five.",
+   "call"
+  ],
+  [
+   120.0,
+   4.5,
+   "Book's open. Sing.",
+   "solo"
+  ],
+  [
+   125.0,
+   4.5,
+   "Sing.",
+   "call"
+  ],
+  [
+   130.0,
+   4.5,
+   "Loud.",
+   "solo"
+  ],
+  [
+   135.0,
+   4.5,
+   "Louder!",
+   "call"
+  ],
+  [
+   140.0,
+   4.5,
+   "Hands up.",
+   "solo"
+  ],
+  [
+   145.0,
+   4.5,
+   "Up!",
+   "call"
+  ],
+  [
+   150.0,
+   4.5,
+   "Call my name.",
+   "solo"
+  ],
+  [
+   155.0,
+   4.5,
+   "My name.",
+   "call"
+  ],
+  [
+   160.0,
+   4.5,
+   "Sloppy~♡ — eyes up!",
+   "solo"
+  ],
+  [
+   165.0,
+   4.5,
+   "Eyes up!",
+   "call"
+  ],
+  [
+   170.0,
+   4.5,
+   "Sloppy~♡ — five colors!",
+   "solo"
+  ],
+  [
+   175.0,
+   4.5,
+   "Five colors!",
+   "call"
+  ],
+  [
+   180.0,
+   4.5,
+   "Miss the beat —",
+   "solo"
+  ],
+  [
+   185.0,
+   4.5,
+   "Beat!",
+   "call"
+  ],
+  [
+   190.0,
+   4.5,
+   "Sloppy~♡ — up!",
+   "solo"
+  ],
+  [
+   195.0,
+   4.5,
+   "Up!",
+   "call"
+  ],
+  [
+   200.0,
+   4.5,
+   "Pink. Center.",
+   "solo"
+  ],
+  [
+   205.0,
+   4.5,
+   "Pink.",
+   "call"
+  ],
+  [
+   210.0,
+   4.5,
+   "Red. Warm.",
+   "solo"
+  ],
+  [
+   215.0,
+   4.5,
+   "Red.",
+   "call"
+  ],
+  [
+   220.0,
+   4.5,
+   "Blue. Crying.",
+   "solo"
+  ],
+  [
+   225.0,
+   4.5,
+   "Blue.",
+   "call"
+  ],
+  [
+   230.0,
+   4.5,
+   "Gold. Lead.",
+   "solo"
+  ],
+  [
+   235.0,
+   4.5,
+   "Gold.",
+   "call"
+  ],
+  [
+   240.0,
+   4.5,
+   "Down the runway.",
+   "solo"
+  ],
+  [
+   245.0,
+   4.5,
+   "Runway.",
+   "call"
+  ],
+  [
+   250.0,
+   4.5,
+   "Hold on.",
+   "solo"
+  ],
+  [
+   255.0,
+   4.5,
+   "Hold.",
+   "call"
+  ],
+  [
+   260.0,
+   4.5,
+   "Not bad. For you.",
+   "solo"
+  ],
+  [
+   265.0,
+   4.5,
+   "Not bad.",
+   "call"
+  ],
+  [
+   270.0,
+   4.5,
+   "Once more. Up.",
+   "solo"
+  ],
+  [
+   275.0,
+   4.5,
+   "Again.",
+   "call"
+  ],
+  [
+   280.0,
+   4.5,
+   "Sloppy~♡ — encore!",
+   "solo"
+  ],
+  [
+   285.0,
+   4.5,
+   "Encore!",
+   "call"
+  ],
+  [
+   290.0,
+   4.5,
+   "Sloppy~♡ — say it!",
+   "solo"
+  ],
+  [
+   295.0,
+   4.5,
+   "Say it!",
+   "call"
+  ],
+  [
+   300.0,
+   4.5,
+   "Jump, heart, bow.",
+   "solo"
+  ],
+  [
+   305.0,
+   4.5,
+   "Jump!",
+   "call"
+  ],
+  [
+   310.0,
+   4.5,
+   "Sloppy~♡ — don't stop!",
+   "solo"
+  ],
+  [
+   315.0,
+   4.5,
+   "Don't stop!",
+   "call"
+  ],
+  [
+   320.0,
+   4.5,
+   "You're welcome.",
+   "solo"
+  ],
+  [
+   325.0,
+   4.5,
+   "Welcome.",
+   "call"
+  ],
+  [
+   330.0,
+   4.5,
+   "Mint ice cream.",
+   "solo"
+  ],
+  [
+   335.0,
+   4.5,
+   "Ice cream.",
+   "call"
+  ]
+ ],
+ "tongues": {
+  "ja": {
+   "lines": [
+    "スクイッシュ！",
+    "Sloppy~♡",
+    "スクイッシュ！",
+    "Sloppy~♡",
+    "ライトアップ。見とれてるの？ かーわいい。",
+    "私たちは五人。数え間違えないでね。",
+    "本が開いた。物語は私のもの。歌って。",
+    "大きな声で。合ってるか教えてあげる。",
+    "手を上げて。もっと高く。",
+    "私の名前を呼んで。ゆっくり。そう。",
+    "スクイッシュ！",
+    "Sloppy~♡",
+    "スクイッシュ！",
+    "Sloppy~♡",
+    "もっと大きく、ざぁこ。",
+    "スクイッシュ、Sloppy~♡ ——顔を上げて！",
+    "スクイッシュ、Sloppy~♡ ——五色よ！",
+    "リズムを外したら最初からやり直し——",
+    "スクイッシュ、Sloppy~♡ ——立ち上がって！",
+    "ピンク。センター。当然でしょ。",
+    "ハルガコス！",
+    "Sloppy~♡",
+    "赤。あったかい。まだパンじゃない。",
+    "ちくわ！",
+    "ちくわ！",
+    "青。泣き虫。みんな見てるよ。",
+    "ルーン！",
+    "ルーン！",
+    "金。リード。",
+    "イリヤ！",
+    "イリヤ！",
+    "紫。",
+    "ツバキエ！",
+    "ツバキエ！",
+    "ランウェイを進んで。手を離さないで。",
+    "お願いされたみたいにしがみついてる。",
+    "悪くない。あなたにしては。リズムは守れたね。",
+    "もう一回。上へ。簡単だったでしょ。",
+    "スクイッシュ、Sloppy~♡ ——アンコール！",
+    "スクイッシュ、Sloppy~♡ ——言って！",
+    "ジャンプ、ハート、お辞儀——もう一回。",
+    "スクイッシュ、Sloppy~♡ ——止めないで！",
+    "どういたしまして。",
+    "私のミントアイス。",
+    "Sloppy~♡",
+    "ライトアップ。かわいい。",
+    "かわいい。",
+    "私たち五人。",
+    "五人。",
+    "本が開いた。歌って。",
+    "歌って。",
+    "大きく。",
+    "もっと！",
+    "手を上げて。",
+    "上げて。",
+    "名前を呼んで。",
+    "呼んで。",
+    "Sloppy~♡ ——顔上げて！",
+    "顔上げて！",
+    "Sloppy~♡ ——五色！",
+    "五色！",
+    "リズム外したら——",
+    "リズム！",
+    "Sloppy~♡ ——立って！",
+    "立って！",
+    "ピンク。センター。",
+    "ピンク。",
+    "赤。あったかい。",
+    "赤。",
+    "青。泣き虫。",
+    "青。",
+    "金。リード。",
+    "金。",
+    "ランウェイ。",
+    "進んで。",
+    "しがみついてる。",
+    "必死。",
+    "悪くない。",
+    "いいね。",
+    "もう一回。",
+    "もう。",
+    "Sloppy~♡ ——アンコール！",
+    "アンコール！",
+    "Sloppy~♡ ——言って！",
+    "言って！",
+    "ジャンプ、ハート、お辞儀。",
+    "ジャンプ！",
+    "Sloppy~♡ ——止めないで！",
+    "止めないで！",
+    "どういたしまして。",
+    "どうぞ。",
+    "ミントアイス。",
+    "アイス。"
+   ],
+   "says": {
+    "Sloppy": "スロッピー",
+    "Squish": "スクイッシュ",
+    "Chikuwa": "ちくわ",
+    "Rune": "ルーン",
+    "Illya": "イリヤ",
+    "Tsubakieh": "ツバキエ",
+    "Halgakos": "ハルガコス"
+   }
+  },
+  "ko": {
+   "lines": [
+    "스퀴시!",
+    "Sloppy~♡",
+    "스퀴시!",
+    "Sloppy~♡",
+    "조명 켜졌다. 넋 놓고 보네? 귀여워라.",
+    "우리는 다섯. 세는 거 놓치지 마.",
+    "책이 열렸어. 이야기는 내 거야. 노래해.",
+    "크게. 맞는지 내가 말해 줄게.",
+    "손 들어. 더 높이.",
+    "내 이름을 불러 봐. 천천히. 그래.",
+    "스퀴시!",
+    "Sloppy~♡",
+    "스퀴시!",
+    "Sloppy~♡",
+    "더 크게, 허접.",
+    "스퀴시, Sloppy~♡ ——눈 들어!",
+    "스퀴시, Sloppy~♡ ——다섯 가지 색!",
+    "박자 놓치면 처음부터 다시 시켜——",
+    "스퀴시, Sloppy~♡ ——일어서!",
+    "핑크. 센터. 당연하지.",
+    "할가코스!",
+    "Sloppy~♡",
+    "빨강. 따뜻해. 그래도 빵은 아니야.",
+    "치쿠와!",
+    "치쿠와!",
+    "파랑. 울보. 다 보이거든.",
+    "루네!",
+    "루네!",
+    "금색. 리드.",
+    "일리야!",
+    "일리야!",
+    "보라.",
+    "츠바키에!",
+    "츠바키에!",
+    "런웨이를 따라가. 놓지 마.",
+    "무슨 부탁이라도 받은 것처럼 매달리네.",
+    "나쁘지 않아. 너치곤. 박자 잘 맞췄네.",
+    "한 번 더. 위로. 쉬웠지.",
+    "스퀴시, Sloppy~♡ ——앙코르!",
+    "스퀴시, Sloppy~♡ ——말해 봐!",
+    "점프, 하트, 인사——다시.",
+    "스퀴시, Sloppy~♡ ——멈추지 마!",
+    "천만에.",
+    "내 민트 아이스크림.",
+    "Sloppy~♡",
+    "조명 켜졌다. 귀여워.",
+    "귀여워.",
+    "우리 다섯.",
+    "다섯.",
+    "책이 열렸어. 노래해.",
+    "노래해.",
+    "크게.",
+    "더!",
+    "손 들어.",
+    "위로.",
+    "내 이름 불러.",
+    "불러.",
+    "Sloppy~♡ ——눈 들어!",
+    "눈 들어!",
+    "Sloppy~♡ ——다섯 색!",
+    "다섯 색!",
+    "박자 놓치면——",
+    "박자!",
+    "Sloppy~♡ ——일어서!",
+    "일어서!",
+    "핑크. 센터.",
+    "핑크.",
+    "빨강. 따뜻해.",
+    "빨강.",
+    "파랑. 울보.",
+    "파랑.",
+    "금색. 리드.",
+    "금색.",
+    "런웨이.",
+    "걸어.",
+    "꽉 잡아.",
+    "잡아.",
+    "나쁘지 않아.",
+    "좋아.",
+    "한 번 더.",
+    "다시.",
+    "Sloppy~♡ ——앙코르!",
+    "앙코르!",
+    "Sloppy~♡ ——말해 봐!",
+    "말해!",
+    "점프, 하트, 인사.",
+    "점프!",
+    "Sloppy~♡ ——멈추지 마!",
+    "멈추지 마!",
+    "천만에.",
+    "별말씀.",
+    "민트 아이스.",
+    "아이스."
+   ],
+   "says": {
+    "Sloppy": "슬로피",
+    "Squish": "스퀴시",
+    "Chikuwa": "치쿠와",
+    "Rune": "루네",
+    "Illya": "일리야",
+    "Tsubakieh": "츠바키에",
+    "Halgakos": "할가코스"
+   }
+  },
+  "zh": {
+   "lines": [
+    "啪叽！",
+    "Sloppy~♡",
+    "啪叽！",
+    "Sloppy~♡",
+    "灯亮了。看呆了？真可爱。",
+    "我们五个人。别数错了。",
+    "书打开了。故事归我。唱吧。",
+    "大声点。对不对我会告诉你。",
+    "举起手。再高点。",
+    "叫我的名字。慢一点。对了。",
+    "啪叽！",
+    "Sloppy~♡",
+    "啪叽！",
+    "Sloppy~♡",
+    "再大声点，杂鱼。",
+    "啪叽，Sloppy~♡ ——抬起头！",
+    "啪叽，Sloppy~♡ ——五种颜色！",
+    "跟丢节拍我就让你重来——",
+    "啪叽，Sloppy~♡ ——站起来！",
+    "粉色。中心。理所当然。",
+    "哈尔加科斯！",
+    "Sloppy~♡",
+    "红色。温暖。还是不是面包。",
+    "竹轮！",
+    "竹轮！",
+    "蓝色。爱哭。大家都看见了。",
+    "露恩！",
+    "露恩！",
+    "金色。领唱。",
+    "伊莉雅！",
+    "伊莉雅！",
+    "紫色。",
+    "椿！",
+    "椿！",
+    "沿着 T 台走。别松手。",
+    "你抓得那么紧，像是在帮我的忙。",
+    "还不错。对你来说。你跟上了节拍。",
+    "再来一次。起来。很简单吧。",
+    "啪叽，Sloppy~♡ ——安可！",
+    "啪叽，Sloppy~♡ ——说出来！",
+    "跳、爱心、鞠躬——再来。",
+    "啪叽，Sloppy~♡ ——别停！",
+    "不客气。",
+    "我的薄荷冰淇淋。",
+    "Sloppy~♡",
+    "灯亮了。真可爱。",
+    "可爱。",
+    "我们五个。",
+    "五个。",
+    "书开了。唱吧。",
+    "唱！",
+    "大声点。",
+    "大声！",
+    "举起手。",
+    "举手。",
+    "叫我名字。",
+    "叫！",
+    "Sloppy~♡ ——抬头！",
+    "抬头！",
+    "Sloppy~♡ ——五色！",
+    "五色！",
+    "漏拍就重来——",
+    "节拍！",
+    "Sloppy~♡ ——站起来！",
+    "站起来！",
+    "粉色。中心。",
+    "粉色。",
+    "红色。温暖。",
+    "红色。",
+    "蓝色。爱哭。",
+    "蓝色。",
+    "金色。领唱。",
+    "金色。",
+    "走T台。",
+    "走！",
+    "抓紧了。",
+    "抓紧。",
+    "还不错。",
+    "不错。",
+    "再来。",
+    "再来！",
+    "Sloppy~♡ ——安可！",
+    "安可！",
+    "Sloppy~♡ ——说出来！",
+    "说！",
+    "跳、爱心、鞠躬。",
+    "跳！",
+    "Sloppy~♡ ——别停！",
+    "别停！",
+    "不客气。",
+    "不客气。",
+    "薄荷冰淇淋。",
+    "冰淇淋。"
+   ],
+   "says": {
+    "Sloppy": "斯洛皮",
+    "Squish": "啪叽",
+    "Chikuwa": "竹轮",
+    "Rune": "露恩",
+    "Illya": "伊莉雅",
+    "Tsubakieh": "椿",
+    "Halgakos": "哈尔加科斯"
+   }
+  }
+ }
+}

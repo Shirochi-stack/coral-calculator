@@ -53,12 +53,18 @@ def main():
         with torch.no_grad():
             out = apply_model(model, mix, device="cpu", split=True, overlap=.25, progress=False)[0]
         names = model.sources
+        import os
+        if os.environ.get("STEMS"):
+            for k, nm in enumerate(names):
+                soundfile.write(target.replace("-bed", "-" + nm), scipy.signal.resample_poly(out[k].mean(0).numpy(), RATE_OUT, rate).astype("float32"), RATE_OUT)
         vocals = out[names.index("vocals")]
         bed = mix[0] - vocals
         bed_mono = bed.mean(0).numpy()
         orig_mono = mix[0].mean(0).numpy()
         up = scipy.signal.resample_poly(bed_mono, RATE_OUT, rate).astype("float32")
         soundfile.write(target, up, RATE_OUT)
+        voc = scipy.signal.resample_poly(vocals.mean(0).numpy(), RATE_OUT, rate).astype("float32")
+        soundfile.write(target.replace("-bed", "-vocals"), voc, RATE_OUT)
         print(f"{source}: bed written to {target}; speech band {speech_db(orig_mono, rate):.1f} dB before, {speech_db(bed_mono, rate):.1f} dB after; total {10 * numpy.log10(float((orig_mono ** 2).mean()) + 1e-12):.1f} -> {10 * numpy.log10(float((bed_mono ** 2).mean()) + 1e-12):.1f} dB", flush=True)
 
 
