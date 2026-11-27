@@ -3142,7 +3142,12 @@ final class RunGame {
             perks.hearts = 1;
             perks.lives = 1;
         }
-        run = new PlusRun(RunLevels.level(land), perks);
+        // The land itself is as its number makes it; its other layers are laid afresh for each play (in a build made for testing, from a
+        // number asked for, to look at the same ones again).
+        int plays = session.tally("run_plays") + 1;
+        session.keep("run_plays", plays);
+        long play = BuildConfig.DEBUG && session.tally("run_seed") > 0 ? session.tally("run_seed") : plays * 7919L + land;
+        run = new PlusRun(blackRung > 0 ? RunLevels.level(land) : RunLevels.layered(RunLevels.level(land), play), perks);
         huntsHere();
         // How tough the land is, said the first time its creatures take more, or a hurt costs more, than in any land she has been in.
         int tougher = run.tough() * 10 + run.bite();
@@ -3167,9 +3172,11 @@ final class RunGame {
             RunLevels.Level here = run.level();
             int column = from > 1000 ? Math.min(here.columns - 2, from - 1000) : from <= here.flags.size() ? here.flags.get(from - 1)
                     : here.arena >= 0 ? here.arena + 4 : here.gate - 10;
-            // Over a pit, the first ground to the right of it.
-            while (column < here.columns - 2 && RunLevels.top(here, column) < 0) column++;
-            run.place(column, RunLevels.top(here, column) - PlusRun.TALL - .05f);
+            // Over a pit, the first ground to the right of it; on a hatch, on the hatch.
+            int stand = RunLevels.top(here, column);
+            for (int row = 0; row < RunLevels.ROWS && stand < 0; row++) if (here.land[row][column] == RunLevels.THIN) stand = row;
+            while (column < here.columns - 2 && stand < 0) stand = RunLevels.top(here, ++column);
+            run.place(column + (1 - PlusRun.WIDE) / 2, stand - PlusRun.TALL - .05f);
         }
         // And, for the same, she may start in a colour, as from a ribbon, and with something in her hands.
         if (BuildConfig.DEBUG && session.tally("run_wear") > 0) run.lend(session.tally("run_wear"));
@@ -5130,7 +5137,10 @@ final class RunGame {
         boolean held = knockAge >= 0 && knockAge < .5f;
         if (!held) cameraX += (goal - cameraX) * Math.min(1, seconds * 7);
         // Where the land is taller than the screen, the view goes up and down with her.
-        float level = down >= RunLevels.ROWS ? restingCamera()
+        // Down in a cave under the land, the view follows her there, as deep as the land goes.
+        boolean deep = run.level().under != null && run.room() < 0 && run.y() + PlusRun.TALL > RunLevels.ROWS - .5f;
+        float level = deep ? Math.max(0, Math.min(run.level().land.length - down, run.y() + PlusRun.TALL - down * .55f))
+                : down >= RunLevels.ROWS ? restingCamera()
                 : Math.max(0, Math.min(RunLevels.ROWS - down, run.y() + PlusRun.TALL - down * .62f));
         if (run.room() >= 0) {
             // A place off the land has a floor and a ceiling of its own: an arena's are far apart, and the view follows her between them.
@@ -5958,7 +5968,8 @@ final class RunGame {
             chestX = run.tookX();
             chestY = run.tookY();
             flyTo((chestX - cameraX) * tile, (chestY - cameraY) * tile, false, 8);
-            pop(herX, herY - 1.6f, "+ 10");
+            // (What it held: ten in a plain one; more in a cave's, and more again behind a false wall.)
+            pop(herX, herY - 1.6f, "+ " + Math.max(1, run.bonus() - seenBonus));
             seenBonus = run.bonus();
             for (int spark = 0; spark < 12; spark++) {
                 double way = random.nextFloat() * Math.PI * 2;
@@ -7388,6 +7399,68 @@ final class RunGame {
      * paler for being further off. Where each stands, and which it is, comes from its place in the
      * wood, so the same wood is there each time she comes back to the same place.
      */
+    /** What lies under each chapter's ground, behind its caves; and the vine and ladder that lead between layers, and the hatch in the ground. */
+    private static final int[] UNDERS = {R.drawable.run_under1, R.drawable.run_under2, R.drawable.run_under3, R.drawable.run_under4, R.drawable.run_under5,
+            R.drawable.run_under6, R.drawable.run_under7, R.drawable.run_under8, R.drawable.run_under9, R.drawable.run_under10, R.drawable.run_under11, R.drawable.run_under12};
+    private Bitmap under, vineArt, ladderArt, hatchArt;
+    private int underOf = -1;
+
+    /** Under the land, where the view goes down into a cave: the chapter's underground, from the bottom of the land's own rows down, going by slowly. */
+    private void drawUnder(Canvas canvas, RunLevels.Level level) {
+        float top = (RunLevels.ROWS - cameraY) * tile;
+        int chapter = Math.max(0, Math.min(UNDERS.length - 1, level.chapter));
+        if (underOf != chapter) {
+            if (under != null) under.recycle();
+            under = BitmapFactory.decodeResource(context.getResources(), UNDERS[chapter]);
+            underOf = chapter;
+        }
+        // (Down the shaft under a hatch, and up the one a vine climbs, it is dark: the cave under the land shows, not the sky.)
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF1C1626);
+        for (int[] way : level.ways) {
+            if (way[2] > 1) continue;
+            float x = (way[0] - cameraX) * tile;
+            if (x < -tile || x > width) continue;
+            canvas.drawRect(x - 1, (way[1] + .3f - cameraY) * tile, x + tile + 1, (RunLevels.ROWS - cameraY) * tile + 1, paint);
+        }
+        paint.setColor(Color.BLACK);
+        if (top >= height) return;
+        float tall = tile * RunLevels.LOWER, wide = tall * under.getWidth() / under.getHeight(), drift = cameraX * tile * .35f % (wide * 2);
+        paint.setAlpha(255);
+        for (int copy = -1; copy * wide - drift < width; copy++) {
+            float left = copy * wide - drift;
+            target.set(left - 1, top, left + wide + 1, top + tall);
+            canvas.save();
+            if (Math.floorMod(copy, 2) != 0) canvas.scale(-1, 1, left + wide / 2, 0);
+            canvas.drawBitmap(under, null, target, paint);
+            canvas.restore();
+        }
+    }
+
+    /** A vine (in the lands of the first volume and the shore) or a ladder (indoors), one square of it. */
+    private void drawVine(Canvas canvas, int chapter, float left, float y) {
+        boolean ladder = chapter == 1 || chapter >= 5 && chapter != 8 && chapter != 10;
+        if (vineArt == null) vineArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_vine);
+        if (ladderArt == null) ladderArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ladder);
+        Bitmap shown = ladder ? ladderArt : vineArt;
+        float wide = tile * .9f;
+        paint.setAlpha(255);
+        target.set(left + tile / 2 - wide / 2, y - 1, left + tile / 2 + wide / 2, y + tile + 1);
+        canvas.drawBitmap(shown, null, target, paint);
+    }
+
+    /** A hatch in the ground: a trapdoor, with a glint running along it now and then, to say it opens. */
+    private void drawHatch(Canvas canvas, float left, float y, int column) {
+        if (hatchArt == null) hatchArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_hatch);
+        float tall = tile * .34f;
+        paint.setAlpha(255);
+        target.set(left - tile * .06f, y - tall * .2f, left + tile * 1.06f, y - tall * .2f + tall);
+        canvas.drawBitmap(hatchArt, null, target, paint);
+        float glint = (clock * .7f + column * .37f) % 2.2f;
+        if (glint < 1) glowAt(canvas, left + tile * glint, y + tile * .12f, tile * .3f, 0xFFFFE6A0, Math.round(200 * (float) Math.sin(glint * Math.PI)));
+        paint.setAlpha(255);
+    }
+
     /** The ways on from one land to the next, one for each chapter: a bridge into a paper tree, a shelf that opens, a mine, a castle gate, a path behind a waterfall... */
     private static final int[] WAYS = {R.drawable.run_way1, R.drawable.run_way2, R.drawable.run_way3, R.drawable.run_way4, R.drawable.run_way5, R.drawable.run_way6,
             R.drawable.run_way7, R.drawable.run_way8, R.drawable.run_way9, R.drawable.run_way10, R.drawable.run_way11, R.drawable.run_way12};
@@ -7660,6 +7733,7 @@ final class RunGame {
         // In the Contents Village, between the sky and the land, a wood of paper trees.
         if (run.room() < 0 && chapter == 0) drawPaperTrees(canvas, level);
         if (run.room() < 0) drawJoins(canvas, level);
+        if (run.room() < 0 && level.under != null) drawUnder(canvas, level);
         float across = width / tile, down = height / tile;
         int first = Math.max(0, (int) cameraX), last = Math.min(run.columns() - 1, (int) (cameraX + across) + 1);
         int top = Math.max(0, (int) Math.floor(cameraY)), bottom = Math.min(level.land.length - 1, (int) (cameraY + down) + 1);
@@ -7698,6 +7772,22 @@ final class RunGame {
             for (int row = top; row <= bottom; row++) {
                 char here = run.at(column, row);
                 float y = (row - cameraY) * tile;
+                paint.setAlpha(255);
+                // A false wall is drawn as the rock it pretends to be, until she is in it or right by it: then it is all but gone.
+                if (here == RunLevels.FAKE) {
+                    boolean by = Math.abs(run.x() + PlusRun.WIDE / 2 - column - .5f) < 1.6f && Math.abs(run.y() + PlusRun.TALL / 2 - row - .5f) < 2.2f;
+                    here = RunLevels.BLOCK;
+                    paint.setAlpha(by ? 70 : 255);
+                }
+                if (here == RunLevels.VINE) {
+                    drawVine(canvas, chapter, left, y);
+                    continue;
+                }
+                if (here == RunLevels.THIN && run.room() < 0 && row < RunLevels.ROWS && (run.at(column - 1, row) == RunLevels.BLOCK || run.at(column + 1, row) == RunLevels.BLOCK)
+                        && run.at(column, row - 1) != RunLevels.BLOCK) {
+                    drawHatch(canvas, left, y, column);
+                    continue;
+                }
                 char laid = run.room() >= 0 ? run.laid(column, row) : RunLevels.AIR;
                 if (laid == RunLevels.LOCKED || laid == RunLevels.SPAN || laid == RunLevels.GRILLE) {
                     if (laid != RunLevels.SPAN || here == RunLevels.AIR) {
@@ -7844,6 +7934,13 @@ final class RunGame {
                     }
                 }
             }
+        }
+        // Under the land it is darker: the caves and the rock round them.
+        if (run.room() < 0 && level.under != null && (RunLevels.ROWS - cameraY) * tile < height) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0x47000814);
+            canvas.drawRect(-tile, (RunLevels.ROWS - cameraY) * tile, width + tile, height + tile, paint);
+            paint.setColor(Color.BLACK);
         }
         // Of a place off the land only itself is seen: what lies to either side of its walls is dark.
         if (run.room() >= 0) {

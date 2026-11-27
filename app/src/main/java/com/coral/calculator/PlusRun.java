@@ -933,6 +933,12 @@ final class PlusRun {
     static final float WARNING = .8f;
 
     private static final float RUN = 6.2f, PUSH = 40, PUSH_IN_AIR = 24, DRAG = 50;
+    /** How fast she climbs a vine; and whether she is on one. */
+    static final float CLIMB = 5.5f;
+    private boolean climbing;
+
+    boolean climbing() { return climbing; }
+
     private static final float GRAVITY = 42, LEAP = 15.5f, SHORT_LEAP = 6, FALL = 22, BOUNCE = 10, SPRING = 22.5f;
     /** A jump still counts this long after she has run off an edge, and this long before she lands. */
     private static final float LATE = .08f, EARLY = .1f;
@@ -1404,6 +1410,7 @@ final class PlusRun {
         startX = other.startX;
         startY = other.startY;
         onGround = other.onGround;
+        climbing = other.climbing;
         facingLeft = other.facingLeft;
         jumpHeld = other.jumpHeld;
         sprung = other.sprung;
@@ -2745,6 +2752,25 @@ final class PlusRun {
         else if (has(GREEN) && jump && !down && !onGround && y > 1) speedDown = Math.max(mastered ? -10 : named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * seconds);
         // On the tide she does not drop out of the air: let go of, the jump lets her down slowly.
         else if (named(TIDE) && !onGround && !down) speedDown = Math.min(speedDown, 2.6f);
+        // On a vine (or a ladder) she climbs: up while the jump is held, down with the down button, and holds on otherwise; off the top of it,
+        // still climbing, she is given a little lift, onto whatever it leads up to.
+        boolean onVine = about == RunLevels.VINE || at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL - .05f)) == RunLevels.VINE;
+        if (onVine && (jump || down || climbing)) {
+            climbing = !(onGround && !jump && !down);
+            if (climbing) {
+                speedDown = jump ? -CLIMB : down ? CLIMB : 0;
+                speedAcross *= .8f;
+                airJumps = 0;
+                // Climbing and nothing else, she keeps to the middle of it, clear of the sides of the shaft it goes up.
+                if (left == right && (jump || down)) {
+                    float aim = (float) Math.floor(x + WIDE / 2) + .5f - WIDE / 2;
+                    x += (aim - x) * Math.min(1, seconds * 14);
+                }
+            }
+        } else if (climbing) {
+            climbing = false;
+            if (jump) speedDown = Math.min(speedDown, -CLIMB * 2);
+        }
         // Water she cannot swim in lets her down slowly, and out through the bottom.
         if (about == RunLevels.WATER && !has(BLUE)) {
             speedDown = Math.min(speedDown, 3.5f);
@@ -2880,7 +2906,7 @@ final class PlusRun {
                 // A chest is opened: ten pluses in it, whatever else; and a stash is done with when its chest is.
                 if (item[0] == CHEST) {
                     chests++;
-                    bonus += 10;
+                    bonus += item.length > 4 && item[4] > 0 ? item[4] : 10;
                     if (room >= 0 && level.rooms.get(room)[0] == RunLevels.STASH && (roomsDone & 1 << room) == 0) {
                         roomsDone |= 1 << room;
                         roomWins++;
@@ -3020,7 +3046,7 @@ final class PlusRun {
                 if (hurt(false)) return;
             }
         }
-        if (y > (room >= 0 ? level.land.length : RunLevels.ROWS) + 1) {
+        if (y > bottomAt((int) Math.floor(x + WIDE / 2)) + 1) {
             cause = wet ? SANK : FELL;
             hurt(true);
             return;
@@ -4172,7 +4198,7 @@ final class PlusRun {
             } else if (shot.kind == DEBRIS) shot.down = shot.age < HANGS ? 0 : 13;
             // A ledge is thin: it stops only what comes down on it, which makes it somewhere to shelter.
             char in = at((int) Math.floor(shot.x), (int) Math.floor(shot.y));
-            if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > (room >= 0 ? level.land.length : RunLevels.ROWS)
+            if ((shot.left -= seconds) <= 0 || shot.x < 0 || shot.x > columns || shot.y > bottomAt((int) Math.floor(shot.x))
                     || (in == RunLevels.LEDGE ? shot.down > Math.abs(shot.across) : solid(in))) {
                 // A book of hers bursts where it lands, on the ground, a ledge or a wall, or where it falls out of the air.
                 if (shot.kind == BOOK && shot.hers && !shot.pets) blast(shot.x, shot.y);
@@ -4474,13 +4500,19 @@ final class PlusRun {
     }
 
     /** Whether, under a square, the first thing there is can be stood on. */
+    /** How deep a fall goes at a column before it is the end: the bottom of the land, or under the land's lower layer where it has one there. */
+    private int bottomAt(int column) {
+        if (room >= 0) return level.land.length;
+        return level.under != null && column >= 0 && column < level.under.length && level.under[column] ? level.land.length : RunLevels.ROWS;
+    }
+
     private boolean lands(int column, int row) {
-        int rows = room >= 0 ? level.land.length : RunLevels.ROWS;
+        int rows = bottomAt(column);
         for (int below = row + 1; below < rows; below++) {
             char here = at(column, below);
             if (here == RunLevels.AIR) continue;
             return here == RunLevels.THIN || here == RunLevels.LEDGE || here == RunLevels.BLOCK || here == RunLevels.CRUMBLE || here == RunLevels.BELT_LEFT
-                    || here == RunLevels.BELT_RIGHT || here == RunLevels.SLICK;
+                    || here == RunLevels.BELT_RIGHT || here == RunLevels.SLICK || here == RunLevels.VINE;
         }
         return false;
     }

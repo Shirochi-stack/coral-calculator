@@ -320,6 +320,12 @@ final class RunLevels {
      */
     static final int HOP = 0, STACK = 1, SHELF = 2, CRUMBLING = 3, RIDE = 4, LOCK = 5, SPAN_PIT = 6, BARRED = 7, GUARDS = 8, SPRING_OVER = 9, PIECES = 10;
 
+    /**
+     * What leads between a land's layers: a vine (or ladder) she climbs, up with the jump held and down with the down button; and a false
+     * wall, drawn as rock until she is in it, which she walks through.
+     */
+    static final char VINE = 'v', FAKE = 'x';
+
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
@@ -869,6 +875,10 @@ final class RunLevels {
         int gate;
         /** Whether the gate stays shut until Zero has been dealt with. */
         boolean guarded;
+        /** Where it has a lower layer: for each column of the land, whether there is a cave under it (a fall there lands in it); null if it has none. */
+        boolean[] under;
+        /** The hatches in its ground that drop into a cave, the vines up from one, and its high ledges' ways up: the column and row of each, and what it is (0 hatch, 1 vine foot, 2 hidden). */
+        final List<int[]> ways = new ArrayList<>();
 
         Level(int number, int columns) { this(number, columns, ROWS); }
 
@@ -885,6 +895,230 @@ final class RunLevels {
     }
 
     private RunLevels() {}
+
+    /** How many rows a land's lower layer has, under the rows of the land itself; the row its caves' floor is at its lowest. */
+    static final int LOWER = 16, CAVE_FLOOR = ROWS + LOWER - 3;
+
+    /**
+     * A land as it is for one play: the land itself, as the number kept for it makes it, always the same and always fair; and laid over it
+     * afresh for each play, from the play's own number, its other layers. Under it, a cave or more, each dropped into by a hatch in the
+     * ground (or by a pit over it, which is not the end there but a way down), with creatures, pluses and a chest in it, a false wall at an
+     * end with a better chest behind it, and a vine up out of it further on. Over it, where the sky is clear, high ledges climbed to by a
+     * vine, with pluses and a chest along them, and a spring at their end up to one more, hidden, at the top. More of them later on. Not
+     * in the last land, nor anywhere for the black arena.
+     */
+    static Level layered(Level base, long play) {
+        if (base.number >= OPEN_TO) return base;
+        Random dice = new Random(play * 7349L + base.number * 1299721L);
+        int rows = Math.max(base.land.length, ROWS + LOWER);
+        Level level = new Level(base.number, base.columns, rows);
+        for (int row = 0; row < base.land.length; row++) System.arraycopy(base.land[row], 0, level.land[row], 0, base.columns);
+        level.main = base.main;
+        level.quest = base.quest;
+        level.arena = base.arena;
+        level.gate = base.gate;
+        level.guarded = base.guarded;
+        level.pluses.addAll(base.pluses);
+        level.foes.addAll(base.foes);
+        level.weapons.addAll(base.weapons);
+        level.items.addAll(base.items);
+        level.flags.addAll(base.flags);
+        level.movers.addAll(base.movers);
+        level.doors.addAll(base.doors);
+        level.decor.addAll(base.decor);
+        level.rooms.addAll(base.rooms);
+        level.lodgers.addAll(base.lodgers);
+        level.spawns.addAll(base.spawns);
+        level.lofts.addAll(base.lofts);
+        level.made.addAll(base.made);
+        level.nooks.addAll(base.nooks);
+        level.ways.addAll(base.ways);
+        level.under = new boolean[level.columns];
+        // Under the land proper, rock; but under its pits nothing, as deep as ever.
+        for (int column = 0; column < level.main; column++) {
+            if (level.land[ROWS - 1][column] != BLOCK) continue;
+            for (int row = ROWS; row < ROWS + LOWER; row++) level.land[row][column] = BLOCK;
+        }
+        int caves = 1 + (level.chapter >= CHAPTERS ? 1 : 0) + (dice.nextInt(3) == 0 ? 1 : 0);
+        for (int tries = 0; tries < 160 && caves > 0; tries++) if (cave(level, dice)) caves--;
+        int heights = 1 + (dice.nextInt(2) == 0 ? 1 : 0) + (level.chapter >= CHAPTERS * 2 ? 1 : 0);
+        for (int tries = 0; tries < 160 && heights > 0; tries++) if (heights(level, dice)) heights--;
+        return level;
+    }
+
+    /** How far from the start, and from the gate or whoever waits, a layer keeps. */
+    private static int layersTo(Level level) { return (level.arena >= 0 ? level.arena : level.gate) - 12; }
+
+    /** Whether a column is plain ground: rock at the top of it, open sky over it, and nothing there that a hole would spoil. */
+    private static boolean plain(Level level, int column) {
+        int floor = top(level, column);
+        if (floor < 6 || floor >= ROWS) return false;
+        for (int row = floor - 3; row < floor; row++) if (level.land[row][column] != AIR) return false;
+        for (int row = floor; row < ROWS; row++) if (level.land[row][column] != BLOCK) return false;
+        // (On flat ground, not by a pit or a step, where a jump might come down on it.)
+        for (int near = column - 5; near <= column + 5; near++) if (near < 0 || near >= level.columns || top(level, near) != floor) return false;
+        for (int[] item : level.items) if (Math.abs(item[1] - column) < 2) return false;
+        for (int[] decor : level.decor) if (Math.abs(decor[1] - column) < 2) return false;
+        for (int flag : level.flags) if (Math.abs(flag - column) < 2) return false;
+        for (int[] mover : level.movers) if (Math.abs(mover[0] - column) < 3) return false;
+        // (Well clear of whatever walks the land: a creature turns at a hatch, and must not be left pacing a step or two of ground.)
+        for (int[] foe : level.foes) if (foe[2] < ROWS && Math.abs(foe[1] - column) < 5) return false;
+        for (int near = column - 3; near <= column + 3; near++) {
+            for (int row = Math.max(0, floor - 2); row < floor; row++) {
+                char thing = level.land[row][Math.max(0, Math.min(level.columns - 1, near))];
+                if (thing == SPIKE || thing == SPRING || thing == ENTRY || thing == GATE || thing == FLAG) return false;
+            }
+        }
+        return true;
+    }
+
+    /** A cave under the land, if there is room for one at a place chosen by chance. */
+    private static boolean cave(Level level, Random dice) {
+        int wide = 24 + dice.nextInt(17), last = layersTo(level) - wide;
+        if (last <= 18) return false;
+        int from = 16 + dice.nextInt(last - 16), to = from + wide - 1;
+        for (int column = from - 8; column <= to + 8; column++) if (column >= 0 && column < level.columns && level.under[column]) return false;
+        // (Its walls are rock under the ground, not under a pit, which would let her fall out of it.)
+        if (level.land[ROWS - 1][from - 1] != BLOCK || level.land[ROWS - 1][to + 1] != BLOCK) return false;
+        // Its hatch near its near end, and the vine up near its far end, each in plain ground.
+        int hatch = -1, vine = -1;
+        for (int column = from + 1; column < from + 10 && hatch < 0; column++) if (plain(level, column)) hatch = column;
+        for (int column = to - 1; column > to - 10 && vine < 0; column--) if (plain(level, column)) vine = column;
+        if (hatch < 0 || vine < 0) return false;
+        int top = ROWS, bottom = CAVE_FLOOR - 1;
+        // Its floor goes up and down a little; here and there the roof hangs down, and a ledge or two to climb on.
+        int floor = bottom;
+        int[] floors = new int[wide];
+        for (int along = 0; along < wide; along++) {
+            if (along > 2 && along < wide - 3 && dice.nextInt(4) == 0) floor = Math.max(bottom - 2, Math.min(bottom, floor + (dice.nextBoolean() ? 1 : -1)));
+            floors[along] = floor;
+            int column = from + along;
+            level.under[column] = true;
+            for (int row = top; row <= floors[along]; row++) level.land[row][column] = AIR;
+            // (And rock under its floor, even where a pit over it went all the way down.)
+            for (int row = floors[along] + 1; row < ROWS + LOWER; row++) level.land[row][column] = BLOCK;
+            if (along > 3 && along < wide - 4 && dice.nextInt(7) == 0) {
+                int hang = 1 + dice.nextInt(2);
+                for (int row = top; row < top + hang; row++) level.land[row][column] = BLOCK;
+            }
+        }
+        // (Its walls stand under the land's own ground at either end; under a pit at its ends there is rock to stand on.)
+        for (int column = from; column <= to; column++) if (level.land[ROWS - 1][column] != BLOCK) level.land[ROWS - 1][column] = AIR;
+        for (int ledge = 0; ledge < 1 + wide / 14; ledge++) {
+            int at = from + 5 + dice.nextInt(Math.max(1, wide - 12)), row = floors[at - from] - 3 - dice.nextInt(2), length = 3 + dice.nextInt(3);
+            for (int column = at; column < Math.min(to - 2, at + length); column++) if (level.land[row][column] == AIR) level.land[row][column] = LEDGE;
+            pluses(level, at, Math.min(to - 2, at + length) - 1, row - 1);
+        }
+        // The hatch: a trapdoor in the ground, stood on like the ground and dropped through with the down button; a shaft under it.
+        int hatchTop = top(level, hatch);
+        level.land[hatchTop][hatch] = THIN;
+        // (Clear all the way down to the cave's floor: nothing hangs from its roof under a hatch.)
+        for (int row = hatchTop + 1; row <= floors[hatch - from]; row++) level.land[row][hatch] = AIR;
+        level.ways.add(new int[]{hatch, hatchTop, 0});
+        // The vine up: from the cave's floor to the ground, and a hatch at its top she climbs up through.
+        int vineTop = top(level, vine);
+        level.land[vineTop][vine] = THIN;
+        for (int row = vineTop + 1; row <= floors[vine - from]; row++) level.land[row][vine] = VINE;
+        level.ways.add(new int[]{vine, vineTop, 1});
+        // What is in it: pluses along its floor, creatures walking on it, and a chest.
+        for (int along = 3; along < wide - 3; along += 3 + dice.nextInt(3)) level.pluses.add(new int[]{from + along, floors[along] - 1});
+        int[] walkers = walkersOf(level);
+        int creatures = 2 + dice.nextInt(3) + level.chapter / 3;
+        for (int one = 0; one < creatures; one++) {
+            int along = 6 + dice.nextInt(Math.max(1, wide - 12));
+            if (Math.abs(from + along - vine) < 3) continue;
+            level.foes.add(new int[]{walkers[dice.nextInt(walkers.length)], from + along, floors[along]});
+        }
+        int chest = from + wide / 2 + dice.nextInt(Math.max(1, wide / 3));
+        level.items.add(new int[]{PlusRun.CHEST, chest, floors[chest - from], 0, 15 + 5 * dice.nextInt(4)});
+        // And at one end, more often the far one, a false wall with a better chest behind it, and a ribbon or a treat with it.
+        boolean far = dice.nextInt(3) != 0;
+        int wall = far ? to + 1 : from - 1, way = far ? 1 : -1;
+        boolean room = wall + way * 4 > 2 && wall + way * 4 < level.main - 2;
+        for (int deep = 0; deep <= 4 && room; deep++) room = level.land[ROWS - 1][wall + way * deep] == BLOCK && !level.under[wall + way * deep];
+        if (room) {
+            int row = floors[far ? wide - 1 : 0];
+            for (int deep = 0; deep < 4; deep++) {
+                int column = wall + way * deep;
+                level.under[column] = true;
+                for (int up = row - 2; up <= row; up++) level.land[up][column] = deep == 0 ? FAKE : AIR;
+            }
+            level.items.add(new int[]{PlusRun.CHEST, wall + way * 2, row, 0, 40 + 10 * dice.nextInt(3)});
+            level.items.add(new int[]{secretPrize(dice), wall + way * 3, row, 0});
+            level.ways.add(new int[]{wall, row, 2});
+        }
+        return true;
+    }
+
+    /** Something worth finding behind a false wall: a ribbon of any colour, or a treat. */
+    private static int secretPrize(Random dice) {
+        int[] prizes = {PlusRun.FORM + PlusRun.GREEN, PlusRun.FORM + PlusRun.YELLOW, PlusRun.FORM + PlusRun.PURPLE, PlusRun.FORM + PlusRun.BROWN, PlusRun.MAGNET, PlusRun.NOTES, PlusRun.ICE};
+        return prizes[dice.nextInt(prizes.length)];
+    }
+
+    /** The creatures that walk in a land, as its own are: what walks in a cave under it. */
+    private static int[] walkersOf(Level level) {
+        List<Integer> kinds = new ArrayList<>();
+        for (int[] foe : level.foes) if ((foe[0] == MINUS || foe[0] == TIMES || foe[0] == SLIME || foe[0] == DIVIDE || foe[0] == THROWER) && !kinds.contains(foe[0])) kinds.add(foe[0]);
+        if (kinds.isEmpty()) kinds.add(MINUS);
+        int[] out = new int[kinds.size()];
+        for (int index = 0; index < out.length; index++) out[index] = kinds.get(index);
+        return out;
+    }
+
+    /** Pluses along a row, from one column to another. */
+    private static void pluses(Level level, int from, int to, int row) {
+        for (int column = from; column <= to; column++) if (row > 0 && level.land[row][column] == AIR) level.pluses.add(new int[]{column, row});
+    }
+
+    /** High ledges over the land, where the sky over it is clear, if there is room for them at a place chosen by chance. */
+    private static boolean heights(Level level, Random dice) {
+        int wide = 14 + dice.nextInt(11), last = layersTo(level) - wide;
+        if (last <= 18) return false;
+        int from = 16 + dice.nextInt(last - 16), to = from + wide - 1;
+        int lowest = ROWS;
+        // (Clear of any other high ledges by a few squares: one run of them is not taken for the next.)
+        for (int column = Math.max(0, from - 6); column <= Math.min(level.columns - 1, to + 6); column++) {
+            for (int row = 0; row < 9; row++) if (level.land[row][column] == LEDGE || level.land[row][column] == VINE) return false;
+        }
+        for (int column = from - 2; column <= to + 2; column++) {
+            int floor = top(level, column);
+            if (floor >= 0) lowest = Math.min(lowest, floor);
+            if (floor >= 0 && floor < 9) return false;
+            for (int row = 0; row < floor - 2; row++) if (level.land[row][column] != AIR) return false;
+            for (int[] way : level.ways) if (way[2] == 3 && Math.abs(way[0] - column) < 6) return false;
+        }
+        if (!plain(level, from)) return false;
+        // A vine up from the ground to the first of them, and a ledge after another along the way, a jump apart, with pluses over each.
+        int high = Math.min(7, lowest - 4);
+        if (high < 3) return false;
+        int row = Math.min(high, 4 + dice.nextInt(3)), column = from + 1;
+        int foot = top(level, from);
+        // (The vine goes up past the first ledge's top, so that she holds on there with her feet over it and steps across onto it.)
+        for (int up = row - 2; up < foot; up++) level.land[up][from] = VINE;
+        level.ways.add(new int[]{from, foot - 1, 3});
+        while (column < to - 2) {
+            int length = 3 + dice.nextInt(3);
+            for (int along = 0; along < length && column + along <= to; along++) level.land[row][column + along] = LEDGE;
+            pluses(level, column, Math.min(to, column + length - 1), row - 1);
+            column += length + 1 + dice.nextInt(2);
+            row = Math.max(3, Math.min(high, row + dice.nextInt(3) - 1));
+        }
+        // At the end a chest, and a spring up to one more ledge, hidden at the very top, with a better chest on it.
+        int end = Math.min(to, column - 2);
+        int endRow = 0;
+        for (int up = 2; up < 9; up++) if (level.land[up][end] == LEDGE) endRow = up;
+        if (endRow > 0) {
+            level.items.add(new int[]{PlusRun.CHEST, end, endRow - 1, 0, 20});
+            if (endRow - 1 >= 3 && level.land[endRow - 1][end - 1] == AIR) {
+                level.land[endRow - 1][end - 1] = SPRING;
+                for (int along = -1; along <= 1; along++) if (level.land[0][end - 1 + along] == AIR) level.land[1][end - 1 + along] = LEDGE;
+                level.items.add(new int[]{PlusRun.CHEST, end - 1, 0, 0, 35});
+                level.ways.add(new int[]{end - 1, 1, 2});
+            }
+        }
+        return true;
+    }
 
     /** Which chapter a land belongs to, from 0; lands are numbered from 1. */
     static int chapterOf(int number) { return number > COUNT ? CHAPTERS + (number - COUNT - 1) / IN_LATER_CHAPTER : (number - 1) / IN_CHAPTER; }

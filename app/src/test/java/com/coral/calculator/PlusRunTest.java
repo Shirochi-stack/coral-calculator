@@ -7671,6 +7671,14 @@ public class PlusRunTest {
         PlusRun run = new PlusRun(level);
         float furthest = run.x(), since = 0;
         while (run.state() == PlusRun.PLAYING && run.time() < seconds) {
+            // Fallen into a cave under the land, it makes for the vine up out of it, and climbs it.
+            int below = (int) Math.floor(run.x() + PlusRun.WIDE / 2);
+            if (run.y() > RunLevels.ROWS - .5f && level.under != null && below >= 0 && below < level.under.length && level.under[below]) {
+                caveOut(run, level);
+                furthest = run.x();
+                since = run.time();
+                continue;
+            }
             // Getting nowhere, it backs off for a run at whatever is in the way.
             if (run.x() > furthest + .05f) {
                 furthest = run.x();
@@ -7702,6 +7710,32 @@ public class PlusRunTest {
             }
         }
         return run;
+    }
+
+    /** In a cave: across to the vine up out of it (the nearest one on, or behind), jumping what is in the way, and up it. */
+    private static void caveOut(PlusRun run, RunLevels.Level level) {
+        // (The vine of this cave: within the run of columns with a cave under them that she is in.)
+        int at = (int) Math.floor(run.x() + PlusRun.WIDE / 2), from = at, to = at;
+        while (from > 0 && level.under[from - 1]) from--;
+        while (to < level.under.length - 1 && level.under[to + 1]) to++;
+        int vine = -1;
+        for (int[] way : level.ways) if (way[2] == 1 && way[0] >= from && way[0] <= to) vine = way[0];
+        if (vine < 0) {
+            run.step(STEP, false, true, false);
+            return;
+        }
+        boolean right = vine + .5f > run.x() + PlusRun.WIDE / 2;
+        float last = run.x(), stuck = 0, jumping = 0;
+        for (float gone = 0; gone < 20 && Math.abs(run.x() + PlusRun.WIDE / 2 - vine - .5f) > .3f && run.state() == PlusRun.PLAYING; gone += STEP) {
+            stuck = Math.abs(run.x() - last) < .001f ? stuck + STEP : 0;
+            last = run.x();
+            if (stuck > .15f && run.onGround()) jumping = .35f;
+            run.step(STEP, !right, right, jumping > 0);
+            jumping -= STEP;
+        }
+        for (float gone = 0; gone < 8 && run.state() == PlusRun.PLAYING && !(run.onGround() && run.y() + PlusRun.TALL < RunLevels.ROWS - .5f); gone += STEP) {
+            run.step(STEP, false, false, true);
+        }
     }
 
     /** The land round where she is, as text, for a message about where she got stuck. */
@@ -7737,6 +7771,20 @@ public class PlusRunTest {
             assertEquals("land " + number + " stopped at " + run.x() + " of " + run.columns() + " with " + run.hearts() + " hearts" + around(run),
                     PlusRun.WON, run.state());
             assertEquals("land " + number, PlusRun.HEARTS, run.hearts());
+        }
+    }
+
+    /** Laid in layers for a play, every land can still be crossed along its main way, whatever is under it and over it. */
+    @Test public void everyLandInItsLayersCanStillBeCrossed() {
+        for (int number = 1; number < RunLevels.TOTAL; number++) {
+            for (long play : new long[]{1, 2}) {
+                RunLevels.Level level = unguarded(RunLevels.layered(RunLevels.level(number), play));
+                // (Nor what walks in the caves: going through one is a choice, and fighting there a matter of skill.)
+                for (int index = level.foes.size() - 1; index >= 0; index--) if (level.foes.get(index)[2] >= RunLevels.ROWS) level.foes.remove(index);
+                PlusRun run = cross(level, number > RunLevels.COUNT ? 400 : 240);
+                assertEquals("land " + number + " play " + play + " stopped at " + run.x() + ", " + run.y() + " of " + run.columns() + " with " + run.hearts() + " hearts" + around(run),
+                        PlusRun.WON, run.state());
+            }
         }
     }
 
