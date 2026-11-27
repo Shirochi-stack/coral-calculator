@@ -524,7 +524,7 @@ final class RunGame {
      * chapter's look; the twelve rose weapons; the thirty armours; the thirty accessories; and the smiths' twelve pieces.
      */
     private Bitmap lootIcons;
-    private static final int LOOT_ICON = 128, LOOT_COLUMNS = 16, ROSE_ICONS = 144, ARMOUR_ICONS = 156, ACCESSORY_ICONS = 186, SMITH_ICONS = 216;
+    private static final int LOOT_ICON = 128, LOOT_COLUMNS = 16, ROSE_ICONS = 144, ARMOUR_ICONS = 156, ACCESSORY_ICONS = 186, SMITH_ICONS = 216, ADDITION_ICON = 228;
     /** Her bag, open over the screen: from where; which tab, which page; the thing looked at (its place in the bag) or a worn slot; and its parts. */
     private boolean bagOpen;
     private int bagFrom, bagTab, bagPage, bagOn = -1, bagSlot = -1, seenWardHurts;
@@ -2400,6 +2400,7 @@ final class RunGame {
     /** Which of the pictures in the sheet of them a thing found is: a weapon by its kind and chapter (the rose's its own), armour and accessories each their own. */
     static int iconOf(int code) {
         int type = RunLoot.type(code), base = RunLoot.base(code);
+        if (RunLoot.addition(code)) return ADDITION_ICON;
         if (type == RunLoot.WEAPON) return RunLoot.rarity(code) == RunLoot.ROSE ? ROSE_ICONS + base % 12 : base % 12 * 12 + Math.min(11, RunLoot.theme(code));
         return type == RunLoot.ARMOUR ? ARMOUR_ICONS + base % RunLoot.ARMOURS.length : ACCESSORY_ICONS + base % RunLoot.ACCESSORIES.length;
     }
@@ -2632,6 +2633,109 @@ final class RunGame {
         }
         text.setAlpha(255);
         text.setTypeface(Typeface.DEFAULT);
+    }
+
+    /** Each colour of toughness's bar of health: plain red, then its own colour. */
+    private static final int[] TIER_BARS = {0xFFE0362F, 0xFFFF4A3A, 0xFFB463FF, 0xFFFFC433, 0xFF6A4CC8};
+    private final android.graphics.ColorFilter[] tierFilters = new android.graphics.ColorFilter[PlusRun.TIERS];
+    private android.graphics.ColorFilter struck;
+
+    /**
+     * A colour of toughness laid over a creature's own picture: its light and dark kept, so its outline and face still read, and its colours
+     * turned toward red, purple, gold, or the near-black of ink. Plain creatures as they are drawn.
+     */
+    private android.graphics.ColorFilter tierFilter(int tier) {
+        if (tier <= PlusRun.NORMAL || tier >= PlusRun.TIERS) return null;
+        if (tierFilters[tier] == null) {
+            float[][] tints = {{0, 0, 0}, {1f, .26f, .22f}, {.58f, .24f, 1f}, {1f, .8f, .28f}, {.3f, .25f, .42f}};
+            float[] keepOf = {0, .3f, .3f, .28f, .2f}, bright = {0, 1.45f, 1.4f, 1.5f, .95f};
+            float k = 1 - keepOf[tier], s = bright[tier];
+            float[] c = tints[tier];
+            float[] m = new float[20];
+            // (Its light lifted a little first, so that a creature drawn near black takes the colour too; its outline stays the darkest of it.)
+            for (int row = 0; row < 3; row++) {
+                m[row * 5] = keepOf[tier] * (row == 0 ? 1 : 0) + k * s * c[row] * .3f * .75f;
+                m[row * 5 + 1] = keepOf[tier] * (row == 1 ? 1 : 0) + k * s * c[row] * .59f * .75f;
+                m[row * 5 + 2] = keepOf[tier] * (row == 2 ? 1 : 0) + k * s * c[row] * .11f * .75f;
+                m[row * 5 + 4] = k * s * c[row] * (tier == PlusRun.INK_TIER ? 30 : 64);
+            }
+            m[18] = 1;
+            tierFilters[tier] = new android.graphics.ColorMatrixColorFilter(m);
+        }
+        return tierFilters[tier];
+    }
+
+    /** The white of a blow landing: everything of the picture lifted near to white for a moment. */
+    private android.graphics.ColorFilter struckFilter() {
+        if (struck == null) struck = new android.graphics.LightingColorFilter(0xFF606060, 0x00B8B8B8);
+        return struck;
+    }
+
+    /**
+     * Blows landing: a spark where each landed, ink splashing out from it (ink, never anything else), and the number it took off rising and
+     * fading, gold and bigger for a great blow. A heavy blow shakes the screen a little.
+     */
+    private void drawHits(Canvas canvas, int first, int last) {
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        for (float[] hit : run.hits()) {
+            if (hit[0] < first - 2 || hit[0] > last + 2) continue;
+            if (hit[6] == 0) {
+                hit[6] = 1;
+                if (hit[3] > 0 || hit[2] >= 3 * PlusRun.BLOW) shake = Math.max(shake, hit[3] > 0 ? .14f : .08f);
+            }
+            float age = hit[4], x = (hit[0] - cameraX) * tile, y = (hit[1] - cameraY) * tile + tile * .25f;
+            // The spark.
+            if (age < .14f) {
+                float through = age / .14f, reach = tile * (.25f + .35f * through);
+                stroke.setColor(0xFFFFF4C2);
+                stroke.setAlpha(Math.round(255 * (1 - through)));
+                stroke.setStrokeWidth(tile * .05f);
+                for (int ray = 0; ray < 6; ray++) {
+                    double turn = ray * Math.PI / 3 + hit[0];
+                    canvas.drawLine(x + (float) Math.cos(turn) * reach * .35f, y + (float) Math.sin(turn) * reach * .35f, x + (float) Math.cos(turn) * reach, y + (float) Math.sin(turn) * reach, stroke);
+                }
+                stroke.setAlpha(255);
+            }
+            // The ink.
+            if (age < .35f) {
+                float through = age / .35f;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFF1B2152);
+                paint.setAlpha(Math.round(220 * (1 - through)));
+                for (int drop = 0; drop < 7; drop++) {
+                    double turn = drop * 0.9 + hit[1] * 3;
+                    float far = tile * (.15f + .5f * through) * (.6f + .4f * (drop % 3) / 2f);
+                    canvas.drawCircle(x + (float) Math.cos(turn) * far, y + (float) Math.sin(turn) * far + through * through * tile * .3f, tile * (.07f - .03f * through) * (drop % 2 == 0 ? 1 : .7f), paint);
+                }
+                paint.setAlpha(255);
+            }
+            // The number.
+            boolean great = hit[3] > 0;
+            float rise = age / .9f, size = dp(great ? 19 : 14) * (age < .1f ? 1 + (1 - age / .1f) * .4f : 1);
+            text.setTextSize(size);
+            String said = String.valueOf((int) hit[2]) + (great ? "!" : "");
+            float tx = x + (float) Math.sin(hit[0] * 7) * tile * .15f, ty = y - tile * .5f - rise * tile * .9f;
+            int alpha = Math.round(255 * Math.min(1, (1 - rise) * 2.5f));
+            stroke.setColor(0xFF1F2328);
+            stroke.setStrokeWidth(dp(3));
+            stroke.setAlpha(alpha);
+            Paint.Style was = text.getStyle();
+            text.setStyle(Paint.Style.STROKE);
+            text.setStrokeWidth(dp(3.5f));
+            text.setColor(0xFF1F2328);
+            text.setAlpha(alpha);
+            canvas.drawText(said, tx, ty, text);
+            text.setStyle(was);
+            text.setStrokeWidth(0);
+            text.setColor(great ? 0xFFFFC433 : Color.WHITE);
+            text.setAlpha(alpha);
+            canvas.drawText(said, tx, ty, text);
+            stroke.setAlpha(255);
+        }
+        text.setAlpha(255);
+        text.setTypeface(Typeface.DEFAULT);
+        paint.setColor(Color.BLACK);
     }
 
     /** The stroke paint, in a colour and width. */
@@ -3636,6 +3740,8 @@ final class RunGame {
         popWords.clear();
         cameraX = 0;
         cameraY = restingCamera();
+        woodReset = true;
+        camFeet = -99;
         screen = PLAY;
         captionLeft = 0;
         // And, in the last land, the flight or the land unmade at once, for looking at them.
@@ -5453,6 +5559,7 @@ final class RunGame {
         if (refused > 0) refused -= seconds;
         if (knockAge >= 0 && (knockAge += seconds) > KNOCK) knockAge = -1;
         if (shake > 0) shake -= seconds;
+        woodSeconds += seconds;
         if (flash > 0) flash -= seconds;
         if (personLeft > 0) personLeft -= seconds;
         // A card that says something was won is read while the land is on the screen: it does not run out behind a pause.
@@ -5616,9 +5723,14 @@ final class RunGame {
         // Where the land is taller than the screen, the view goes up and down with her.
         // Down in a cave under the land, the view follows her there, as deep as the land goes.
         boolean deep = run.level().under != null && run.room() < 0 && run.y() + PlusRun.TALL > RunLevels.ROWS - .5f;
+        // (The height it follows: her feet when she stands somewhere a good way off from the last; in the air, only once she is well above
+        // or below it. A step, a jump or a hop onto a ledge leaves it where it is.)
+        float feet = run.y() + PlusRun.TALL;
+        if (camFeet < -50 || run.entered() != seenEntered) camFeet = feet;
+        else if (run.onGround() ? Math.abs(feet - camFeet) > CAMERA_STILL : feet > camFeet + 3 || feet < camFeet - 4.5f) camFeet = feet;
         float level = deep ? Math.max(0, Math.min(run.level().land.length - down, run.y() + PlusRun.TALL - down * .55f))
                 : down >= RunLevels.ROWS ? restingCamera()
-                : Math.max(0, Math.min(RunLevels.ROWS - down, run.y() + PlusRun.TALL - down * .62f));
+                : Math.max(0, Math.min(RunLevels.ROWS - down, camFeet - down * .62f));
         if (run.room() >= 0) {
             // A place off the land has a floor and a ceiling of its own: an arena's are far apart, and the view follows her between them.
             int[] in = run.level().rooms.get(run.room());
@@ -5634,7 +5746,9 @@ final class RunGame {
         } else if (run.entered() != seenEntered) {
             cameraY = level;
         }
-        if (!held) cameraY += (level - cameraY) * Math.min(1, seconds * 6);
+        // Gently; but quickly when she is near the bottom or the top of the view.
+        float fromTop = feet - cameraY, pace = fromTop > down * .86f || fromTop < down * .18f ? 9 : 2.5f;
+        if (!held) cameraY += (level - cameraY) * Math.min(1, seconds * pace);
         if (squash > 0) squash -= seconds;
         float herX = run.x() + PlusRun.WIDE / 2, herY = run.y() + PlusRun.TALL;
         // The colour she is drawn in: when it changes, the one fades into the other.
@@ -7806,17 +7920,22 @@ final class RunGame {
                 text.setTextAlign(Paint.Align.CENTER);
                 text.setColor(soft);
                 fitted(canvas, slotNames[index], bagSlots[index].centerX(), bagSlots[index].centerY() + dp(4), dp(10.5f), slot - dp(8));
+            } else {
+                // Its slot named under it, so an accessory is never taken for something else.
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(soft);
+                fitted(canvas, slotNames[index], bagSlots[index].centerX(), bagSlots[index].bottom + dp(10), dp(9.5f), slot);
             }
         }
         // What a set adds: beside the slots, or under them when wide.
         String setWords = worn.set >= 2 ? RunLoot.THEMES[Math.min(11, RunLoot.theme(worn.armour))] + " set of three: +1 shield, 10% harder blows, life back"
                 : worn.set == 1 ? RunLoot.THEMES[Math.min(11, RunLoot.theme(worn.armour))] + " set of two: +1 shield piece" : "Armour and an accessory of one chapter make a set";
         text.setTextAlign(Paint.Align.LEFT);
-        float setX = side ? x : x + 3 * (slot + dp(10)), setY = side ? y + slot + dp(18) : y + dp(16);
+        float setX = side ? x : x + 3 * (slot + dp(10)), setY = side ? y + slot + dp(32) : y + dp(16);
         List<String> setLines = wrapSized(setWords, x + columnWide - setX, dp(11.5f));
         text.setColor(worn.set > 0 ? 0xFF3F7FC4 : soft);
         for (int line = 0; line < Math.min(4, setLines.size()); line++) canvas.drawText(setLines.get(line), setX, setY + line * dp(14), text);
-        y += slot + dp(10) + (side ? dp(46) : 0);
+        y += slot + dp(22) + (side ? dp(46) : 0);
         // Tabs: in a row, or two rows of two when wide.
         int across = side ? 2 : 4;
         float tabWide = (columnWide - dp(6) * (across - 1)) / across;
@@ -7904,6 +8023,19 @@ final class RunGame {
         text.setColor(rarity == RunLoot.WHITE ? ink : mixed(rarityColour(rarity), dark ? Color.WHITE : Color.BLACK, dark ? .1f : .25f));
         fitted(canvas, RunLoot.name(code), words, y + dp(18), dp(15), wide - dp(76));
         text.setTypeface(Typeface.DEFAULT);
+        // Which slot it goes in, in a small coloured tag over its picture.
+        String slotWord = type == RunLoot.WEAPON ? "WEAPON" : type == RunLoot.ARMOUR ? "ARMOUR" : "ACCESSORY";
+        text.setTextSize(dp(9.5f));
+        float tagWide = text.measureText(slotWord) + dp(10);
+        RectF tag = new RectF(x + dp(32) - tagWide / 2, y + dp(56), x + dp(32) + tagWide / 2, y + dp(70));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(type == RunLoot.WEAPON ? 0xFFB46A2A : type == RunLoot.ARMOUR ? 0xFF3F7FC4 : 0xFF8E5BE8);
+        canvas.drawRoundRect(tag, dp(7), dp(7), paint);
+        paint.setColor(Color.BLACK);
+        text.setColor(Color.WHITE);
+        text.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(slotWord, tag.centerX(), tag.bottom - dp(3.5f), text);
+        text.setTextAlign(Paint.Align.LEFT);
         text.setColor(soft);
         int[] does = RunLoot.does(code);
         String kind = type == RunLoot.WEAPON ? "Weapon" : type == RunLoot.ARMOUR ? "Armour  ·  leans to " + (RunLoot.leansTo(RunLoot.base(code)) == RunLoot.ANY ? "every class"
@@ -7918,7 +8050,7 @@ final class RunGame {
         text.setTextSize(dp(12.5f));
         if (type == RunLoot.WEAPON) {
             text.setColor(ink);
-            for (String one : wrapSized("A " + RunLoot.WEAPONS[RunLoot.base(code) % 12].toLowerCase(java.util.Locale.ROOT)
+            for (String one : wrapSized(RunLoot.addition(code) ? "The plus-book she began with, before she had a book of her own: found again. It is held as it always was, from the smiths' next work." : "A " + RunLoot.WEAPONS[RunLoot.base(code) % 12].toLowerCase(java.util.Locale.ROOT)
                     + " found in the lands. Kept in her bag: weapons found are held from the smiths' next work.", wide, dp(12.5f))) {
                 canvas.drawText(one, x, line, text);
                 line += dp(16.5f);
@@ -8189,19 +8321,19 @@ final class RunGame {
             canvas.restore();
             return;
         }
-        canvas.save();
-        canvas.rotate(shot.age * 540, x, y);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF7FE7DA);
-        paint.setAlpha(110);
-        canvas.drawRoundRect(x - size * .62f, y - size * .78f, x + size * .62f, y + size * .78f, size * .2f, size * .2f, paint);
-        paint.setColor(Color.WHITE);
+        // A page of her own book: pink glow, and two fainter pages behind it fanning out the way it came.
+        glowAt(canvas, x, y, size * 1.1f, 0xFFFF7AB8, 150);
         paint.setAlpha(255);
-        canvas.drawRoundRect(x - size * .46f, y - size * .62f, x + size * .46f, y + size * .62f, size * .08f, size * .08f, paint);
-        paint.setColor(0xFF2FB5A8);
-        for (int line = 0; line < 4; line++) canvas.drawRect(x - size * .3f, y - size * .42f + line * size * .25f, x + size * (line == 3 ? .05f : .3f), y - size * .34f + line * size * .25f, paint);
-        paint.setColor(Color.BLACK);
-        canvas.restore();
+        float back = shot.across < 0 ? 1 : -1;
+        for (int behind = 2; behind >= 0; behind--) {
+            canvas.save();
+            float bx = x + back * behind * size * .55f, by = y + (behind == 1 ? -1 : 1) * behind * size * .18f;
+            canvas.rotate(shot.age * 540 - behind * 35, bx, by);
+            paint.setAlpha(behind == 0 ? 255 : behind == 1 ? 130 : 70);
+            halgaBit(canvas, 0, bx, by, size * 1.6f);
+            canvas.restore();
+        }
+        paint.setAlpha(255);
     }
 
     /** The panel of translation her tablet-book opens: a pane of light in front of her with lines of writing in it, there for a third of a second. */
@@ -8211,9 +8343,13 @@ final class RunGame {
         float near = (panelX - cameraX) * tile, top = (panelY - cameraY) * tile, far = near + (panelLeft ? -1 : 1) * wide * open;
         float from = Math.min(near, far), to = Math.max(near, far);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF7FE7DA);
+        paint.setColor(0xFFFF8AC4);
         paint.setAlpha(Math.round(120 * (1 - through)));
         canvas.drawRoundRect(from, top, to, top + tall, tile * .2f, tile * .2f, paint);
+        // Her stamp in the middle of it, pressed in and fading.
+        paint.setAlpha(Math.round(255 * (1 - through)));
+        halgaBit(canvas, 1, (from + to) / 2, top + tall / 2, Math.min(tall, to - from) * (.7f + .3f * Math.min(1, through * 3)));
+        paint.setAlpha(255);
         stroke.setColor(Color.WHITE);
         stroke.setStrokeWidth(tile * .07f);
         stroke.setAlpha(Math.round(255 * (1 - through)));
@@ -8227,6 +8363,17 @@ final class RunGame {
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);
         stroke.setAlpha(255);
+    }
+
+    /** Her own book's page, and its stamp. */
+    private Bitmap halgaBits;
+
+    private void halgaBit(Canvas canvas, int which, float x, float y, float size) {
+        if (halgaBits == null) halgaBits = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_halga_bits);
+        int side = halgaBits.getHeight();
+        source.set(which * side, 0, which * side + side, side);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        canvas.drawBitmap(halgaBits, source, target, paint);
     }
 
     /** One of the four pictures that go with the tablet-book and the keys, its middle at a place. */
@@ -8246,7 +8393,13 @@ final class RunGame {
     /** The sky of a chapter over the whole screen, drifting by at a fifth of the land's pace. */
     /** The paper trees: four drawings, in a strip; and the line on which the wood behind the land stands, as it was last drawn. */
     private Bitmap paperTrees;
-    private float woodLine = -1;
+    private float woodLine = -1, camFeet = -99;
+    /** How far her feet must be from the height the view follows, standing, before it follows them. */
+    static final float CAMERA_STILL = 1.2f;
+    /** The wood's ground, in rows of the land: where it stands, where it is going, and the view it was last at rest with; and time since it was last drawn. */
+    private float woodGround = -1, woodTarget = -1, woodCamera, woodSeconds;
+    private boolean woodReset;
+
     private static final float WOOD_PACE = .45f, WOOD_EVERY = 4.6f;
 
     /**
@@ -8382,9 +8535,21 @@ final class RunGame {
         if (paperTrees == null) paperTrees = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_paper_trees);
         if (paperTrees == null) return;
         int middle = Math.max(0, Math.min(run.columns() - 1, (int) (cameraX + width / tile / 2)));
-        int ground = RunLevels.top(level, middle);
-        float line = ground < 0 ? woodLine : (ground - cameraY) * tile + tile * .35f;
-        woodLine = woodLine < 0 ? line : woodLine + (line - woodLine) * .06f;
+        // The wood's ground: the land's usual height over a wide stretch about the middle of the view (the middle of its heights, so a step,
+        // a ledge or a pit makes no difference), moved to only when it is well away from where the wood stands now, and then slowly.
+        float usual = RunLevels.usualGround(level, middle);
+        if (woodGround < 0 || woodReset) {
+            woodGround = woodTarget = usual;
+            woodCamera = cameraY;
+            woodReset = false;
+        }
+        if (usual >= 0 && Math.abs(usual - woodTarget) > RunLevels.WOOD_STILL) woodTarget = usual;
+        float rate = Math.min(1, woodSeconds * 1.1f);
+        woodGround += (woodTarget - woodGround) * rate;
+        woodCamera += (cameraY - woodCamera) * Math.min(1, woodSeconds * .9f);
+        woodSeconds = 0;
+        // (And the view going up and down moves it only by half as much: it is further off than the land.)
+        woodLine = (woodGround - woodCamera) * tile - (cameraY - woodCamera) * tile * RunLevels.WOOD_FOLLOWS + tile * .35f;
         int kinds = 4, cellWide = paperTrees.getWidth() / kinds, cellTall = paperTrees.getHeight();
         float back = cameraX * WOOD_PACE;
         int first = (int) Math.floor(back / WOOD_EVERY) - 2, last = (int) Math.ceil((back + width / tile) / WOOD_EVERY) + 2;
@@ -8980,8 +9145,17 @@ final class RunGame {
             }
         }
         for (PlusRun.Foe foe : run.foes()) {
+            paint.setColorFilter(null);
             if (foe.x + foe.wide() < first - 9 || foe.x > last + 9) continue;
             float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, feet = (foe.y + foe.tall() - cameraY) * tile;
+            if (!RunLevels.boss(foe.kind)) {
+                // Gold glows faintly; black ink has a dark aura that breathes.
+                if (!foe.flat && (foe.tier == PlusRun.RED_TIER || foe.tier == PlusRun.PURPLE_TIER)) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * .95f, TIER_BARS[foe.tier], 70);
+                if (!foe.flat && foe.tier == PlusRun.GOLD_TIER) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * 1.1f, 0xFFFFD45A, 120 + (int) (40 * Math.sin(clock * 3 + foe.x)));
+                if (!foe.flat && foe.tier == PlusRun.INK_TIER) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * 1.2f, 0xFF1A1030, 170 + (int) (50 * Math.sin(clock * 2 + foe.x)));
+                paint.setAlpha(255);
+                paint.setColorFilter(foe.struck < .1f && !foe.flat ? struckFilter() : tierFilter(foe.tier));
+            }
             boolean second = (int) (clock * 6 + foe.x) % 2 != 0;
             // The pictures face left, and are turned about to go right.
             boolean turned = !foe.leftward && !foe.flat;
@@ -9009,8 +9183,8 @@ final class RunGame {
             } else if (foe.kind >= RunLevels.SLIME) {
                 // The signs of the second volume: two pictures of each about its business, and two of its going, after which it fades.
                 int which = SIGN_ART + (foe.kind - RunLevels.SLIME) * 4 + (foe.flat ? (foe.act < .22f ? 2 : 3) : second ? 1 : 0);
-                if (foe.flat && foe.act > 1.6f) continue;
-                if (foe.flat) paint.setAlpha(Math.round(255 * Math.min(1, (1.6f - foe.act) / .5f)));
+                if (foe.flat && foe.act > 1f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (1f - foe.act) / .4f))));
                 else if (foe.dazed > 0 && (int) (clock * 16) % 2 == 0) paint.setAlpha(120);
                 boolean stretched = foe.kind == RunLevels.BAR;
                 if (stretched) piece(canvas, two, which, middle, feet + tile * .06f, foe.wide() * tile * 1.25f, turned);
@@ -9019,8 +9193,8 @@ final class RunGame {
             } else if (foe.kind == RunLevels.MINUS || foe.kind == RunLevels.THROWER) {
                 boolean walking = foe.kind == RunLevels.MINUS && second;
                 // (Down, it lies flat a moment and then fades, as everything beaten does.)
-                if (foe.flat && foe.act > 2.4f) continue;
-                if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
+                if (foe.flat && foe.act > 1f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (1f - foe.act) / .4f))));
                 if (!foe.flat && foe.dazed > 0 && (int) (clock * 16) % 2 == 0) paint.setAlpha(120);
                 art(canvas, foe.flat ? MINUS_FLAT_ART : MINUS_ART + (walking ? 1 : 0), middle, feet, foe.wide() * tile * 1.3f, turned);
                 paint.setAlpha(255);
@@ -9032,10 +9206,10 @@ final class RunGame {
             } else if (foe.kind == RunLevels.TIMES && foe.flat) {
                 // A times beaten: knocked into the air with its eyes spinning, turning over, and then flat on its back, cracked, its spikes
                 // limp; and after a moment it fades.
-                if (foe.act > 2.4f) continue;
+                if (foe.act > 1.3f) continue;
                 if (timesDown == null) timesDown = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_times_down);
                 float up = Math.min(1, foe.act / .45f), tall = foe.tall() * tile * 1.55f * 124 / 110;
-                paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
+                paint.setAlpha(Math.round(255 * Math.max(0, Math.min(1, (1.3f - foe.act) / .4f))));
                 canvas.save();
                 if (up < 1) canvas.rotate((foe.leftward ? 1 : -1) * 200 * up, middle, feet - tall * .4f - (float) Math.sin(up * Math.PI) * tile * 1.1f);
                 cell(canvas, timesDown, up < 1 ? 0 : 1, 2, middle, feet + tile * .05f - (up < 1 ? (float) Math.sin(up * Math.PI) * tile * 1.1f : 0), tall, false);
@@ -9046,8 +9220,8 @@ final class RunGame {
                 art(canvas, TIMES_ART + (second ? 1 : 0), middle, feet, foe.wide() * tile * 1.25f, turned);
                 paint.setAlpha(255);
             } else {
-                if (foe.flat && foe.act > 2.4f) continue;
-                if (foe.flat) paint.setAlpha(Math.round(110 * Math.max(0, Math.min(1, (2.4f - foe.act) / .6f))));
+                if (foe.flat && foe.act > 1f) continue;
+                if (foe.flat) paint.setAlpha(Math.round(110 * Math.max(0, Math.min(1, (1f - foe.act) / .4f))));
                 // Low on the ground and stretched in the air.
                 artTall(canvas, DIVIDE_ART + (foe.ground - foe.y > .3f ? 1 : 0), middle, feet, foe.tall() * tile * (foe.flat ? .6f : 1.5f), false);
                 paint.setAlpha(255);
@@ -9058,18 +9232,23 @@ final class RunGame {
                 }
             }
         }
+        paint.setColorFilter(null);
+        drawHits(canvas, first, last);
         // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
         for (PlusRun.Foe foe : run.foes()) {
-            if (foe.flat || foe.left <= 1 || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
-            int marks = Math.min(6, foe.left);
-            float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, over = (foe.y - cameraY) * tile - tile * .2f, each = tile * .17f;
-            for (int index = 0; index < marks; index++) {
-                float px = middle + (index - (marks - 1) / 2f) * each;
-                paint.setStyle(Paint.Style.FILL);
+            if (foe.flat || foe.most <= PlusRun.BLOW || foe.left >= foe.most || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
+            float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, over = (foe.y - cameraY) * tile - tile * .22f;
+            float wide = Math.max(tile * .9f, foe.wide() * tile), high = tile * .11f, part = Math.max(0, foe.left / (float) foe.most);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xCC15171A);
+            canvas.drawRoundRect(middle - wide / 2 - tile * .03f, over - high / 2 - tile * .03f, middle + wide / 2 + tile * .03f, over + high / 2 + tile * .03f, high, high, paint);
+            paint.setColor(TIER_BARS[foe.tier]);
+            canvas.drawRoundRect(middle - wide / 2, over - high / 2, middle - wide / 2 + wide * part, over + high / 2, high / 2, high / 2, paint);
+            if (foe.struck < .2f) {
                 paint.setColor(Color.WHITE);
-                canvas.drawCircle(px, over, tile * .075f, paint);
-                paint.setColor(0xFFE0362F);
-                canvas.drawCircle(px, over, tile * .052f, paint);
+                paint.setAlpha(Math.round(255 * (1 - foe.struck / .2f)));
+                canvas.drawRoundRect(middle - wide / 2, over - high / 2, middle + wide / 2, over + high / 2, high / 2, high / 2, paint);
+                paint.setAlpha(255);
             }
             paint.setColor(Color.BLACK);
         }

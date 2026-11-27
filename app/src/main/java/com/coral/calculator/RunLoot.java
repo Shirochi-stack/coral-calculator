@@ -63,8 +63,8 @@ final class RunLoot {
             "Tidewrack Raiment", "Palace Regalia", "Bookmark Banner Coat", "Dragonhide Jacket", "Colophon Aegis", "Mother Tongue Vestment", "Rosebound Armour"};
     static final String[] ACCESSORIES = {"Heartstring Locket", "Margin Ward Brooch", "Inkwell Heart", "Thimble of Turning", "Second Wind Feather", "Lucky Plus Coin",
             "Lodestone Compass", "Hare's-Foot Anklet", "Thornbriar Ring", "Hourglass Pendant", "Bladesong Charm", "Whetstone Earring", "Duelist's Ribbon",
-            "Archivist's Seal", "Footnote Venom Tag", "Summoner's Bell", "Quickdraw Quiver Clip", "Venom Nib", "Ricochet Charm", "Anvil Heart", "Quake Bangle",
-            "Ironbound Gauntlet", "Gunslinger's Ink Drum", "Ember Cartridge", "Frostglass Focus", "Stormcall Gem", "Reaper's Hook", "Crescent Pin",
+            "Archivist's Seal", "Footnote Venom Tag", "Summoner's Bell", "Quickdraw Quill Brooch", "Venom Nib Pendant", "Ricochet Charm", "Anvil Heart", "Quake Bangle",
+            "Ironbound Amulet", "Gunslinger's Drum Pendant", "Ember Vial Pendant", "Frostglass Focus", "Stormcall Gem", "Reaper's Hook Earring", "Crescent Pin",
             "Colophon Signet", "Rose of Halgakos"};
 
     // Classes: the weapons a thing she wears is for
@@ -300,8 +300,17 @@ final class RunLoot {
 
     static int rarity(int code) { return code % 8; }
 
+    /**
+     * The old plus-book her first book once was: a book of the first chapters' own, found now and then in place of one of their books, white
+     * or blue. As a thing found it is a book of the "chapter" after the last.
+     */
+    static final int ADDITION = 12, BOOK = 3;
+
+    static boolean addition(int code) { return type(code) == WEAPON && base(code) == BOOK && theme(code) == ADDITION; }
+
     /** What it is called: its rarity is said by its colour, not its name; the rose is named for her. */
     static String name(int code) {
+        if (addition(code)) return "Book of Addition";
         int type = type(code), base = base(code), theme = Math.min(THEMES.length - 1, theme(code));
         String what = type == WEAPON ? WEAPONS[base % WEAPONS.length] : type == ARMOUR ? ARMOURS[base % ARMOURS.length] : ACCESSORIES[base % ACCESSORIES.length];
         // (The rose's own accessory is named for her already.)
@@ -330,6 +339,8 @@ final class RunLoot {
             else if (rarity >= GOLD && baseRoll % 5 == 0) base = SIGNET;
             return code(ACCESSORY, theme, base, rarity);
         }
+        // (In the first two chapters, a white or blue book is now and then the old plus-book.)
+        if (type == WEAPON && baseRoll % WEAPONS.length == BOOK && theme <= 1 && rarity <= BLUE && baseRoll % 3 == 0) return code(WEAPON, ADDITION, BOOK, rarity);
         int count = type == WEAPON ? WEAPONS.length : ARMOURS.length;
         // (The better armours come from the later chapters: of thirty, a chapter's run of them goes up with it.)
         int base = type == WEAPON ? baseRoll % count : Math.min(count - 1, theme * 2 + baseRoll % 8);
