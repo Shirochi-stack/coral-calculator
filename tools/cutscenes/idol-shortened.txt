@@ -1,0 +1,52 @@
+The idol song's lines that were shortened, because they ran past the mouths of the singers in the film (before -> after).
+The user's own lyrics, dist/cutscenes/lyrics-from-user.txt, are untouched. Only words were cut; none was rewritten (but the last, the "Now." of the ice-cream line).
+
+EN  Hands up. Higher. Don't get shy.  ->  Hands up. Higher.
+JA  手を上げて。もっと高く。恥ずかしがらないの。  ->  手を上げて。もっと高く。
+KO  손 들어. 더 높이. 부끄러워하지 마.  ->  손 들어. 더 높이.
+ZH  举起手。再高点。别害羞。  ->  举起手。再高点。
+
+EN  Squish, Sloppy~♡ — eyes up, zaako!  ->  Squish, Sloppy~♡ — eyes up!
+JA  スクイッシュ、Sloppy~♡ ——顔を上げて、ざぁこ！  ->  スクイッシュ、Sloppy~♡ ——顔を上げて！
+KO  스퀴시, Sloppy~♡ ——눈 들어, 허접!  ->  스퀴시, Sloppy~♡ ——눈 들어!
+ZH  啪叽，Sloppy~♡ ——抬起头，杂鱼！  ->  啪叽，Sloppy~♡ ——抬起头！
+
+EN  Squish, Sloppy~♡ — five colors, don't choke!  ->  Squish, Sloppy~♡ — five colors!
+JA  スクイッシュ、Sloppy~♡ ——五色よ、むせないでね！  ->  スクイッシュ、Sloppy~♡ ——五色よ！
+KO  스퀴시, Sloppy~♡ ——다섯 가지 색이야, 사레들리지 마!  ->  스퀴시, Sloppy~♡ ——다섯 가지 색!
+ZH  啪叽，Sloppy~♡ ——五种颜色，别呛着！  ->  啪叽，Sloppy~♡ ——五种颜色！
+
+EN  Gold. Lead. You can watch.  ->  Gold. Lead.
+JA  金。リード。あなたは見てて。  ->  金。リード。
+KO  금색. 리드. 넌 구경이나 해.  ->  금색. 리드.
+ZH  金色。领唱。你就看着吧。  ->  金色。领唱。
+
+EN  Purple. Calm. Then I swing. Don't flinch.  ->  Purple.
+JA  紫。冷静。そして振る。ひるまないでね。  ->  紫。
+KO  보라. 침착. 그러고 나서 휘두르지. 움찔하지 마.  ->  보라.
+ZH  紫色。冷静。然后我挥棒。别退缩。  ->  紫色。
+
+EN  Squish, Sloppy~♡ — you want the encore.  ->  Squish, Sloppy~♡ — encore!
+JA  スクイッシュ、Sloppy~♡ ——アンコール、したいんでしょ。  ->  スクイッシュ、Sloppy~♡ ——アンコール！
+KO  스퀴시, Sloppy~♡ ——앙코르가 듣고 싶구나.  ->  스퀴시, Sloppy~♡ ——앙코르!
+ZH  啪叽，Sloppy~♡ ——你想要安可。  ->  啪叽，Sloppy~♡ ——安可！
+
+EN  Squish, Sloppy~♡ — five colors, say it!  ->  Squish, Sloppy~♡ — say it!
+JA  スクイッシュ、Sloppy~♡ ——五色よ、言ってみて！  ->  スクイッシュ、Sloppy~♡ ——言って！
+KO  스퀴시, Sloppy~♡ ——다섯 가지 색이야, 말해 봐!  ->  스퀴시, Sloppy~♡ ——말해 봐!
+ZH  啪叽，Sloppy~♡ ——五种颜色，说出来！  ->  啪叽，Sloppy~♡ ——说出来！
+
+EN  Jump, heart, bow — you blinked. Again.  ->  Jump, heart, bow — again.
+JA  ジャンプ、ハート、お辞儀——瞬きしたね。もう一回。  ->  ジャンプ、ハート、お辞儀——もう一回。
+KO  점프, 하트, 인사——눈 깜빡였네. 다시.  ->  점프, 하트, 인사——다시.
+ZH  跳、爱心、鞠躬——你眨眼了。再来。  ->  跳、爱心、鞠躬——再来。
+
+EN  Squish, Sloppy~♡ — I didn't say stop!  ->  Squish, Sloppy~♡ — don't stop!
+JA  スクイッシュ、Sloppy~♡ ——止めなんて言ってない！  ->  スクイッシュ、Sloppy~♡ ——止めないで！
+KO  스퀴시, Sloppy~♡ ——그만이라고 안 했어!  ->  스퀴시, Sloppy~♡ ——멈추지 마!
+ZH  啪叽，Sloppy~♡ ——我没说停！  ->  啪叽，Sloppy~♡ ——别停！
+
+EN  Now. My mint ice cream.  ->  My mint ice cream.
+JA  さあ。私のミントアイス。  ->  私のミントアイス。
+KO  자. 내 민트 아이스크림.  ->  내 민트 아이스크림.
+ZH  现在。我的薄荷冰淇淋。  ->  我的薄荷冰淇淋。

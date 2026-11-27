@@ -3110,8 +3110,13 @@ final class RunGame {
             return;
         }
         boolean upright = RunFilms.upright(over.getWidth(), over.getHeight());
-        String shown = RunFilms.picture(film, upright), sound = null;
+        String shown = RunFilms.picture(film, upright, session.tally(RunFilms.SOUND + film), session.tally(RunFilms.TONGUE)), sound = null;
         int picture = RunShelf.raw(context, "run_film_" + shown), voice = 0;
+        if (picture == 0 && !shown.equals(RunFilms.picture(film, upright))) {
+            // (Where the picture made for a language is not there, the usual one is shown.)
+            shown = RunFilms.picture(film, upright);
+            picture = RunShelf.raw(context, "run_film_" + shown);
+        }
         if (picture == 0) {
             ends.ended(false);
             return;

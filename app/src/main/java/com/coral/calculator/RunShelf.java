@@ -260,7 +260,7 @@ final class RunShelf extends FrameLayout {
         List<Integer> found = new ArrayList<>();
         found.add(RunFilms.ENGLISH);
         for (int tongue = RunFilms.ENGLISH + 1; tongue < RunFilms.TONGUES.length; tongue++) {
-            if (raw(getContext(), "run_film_prologue_h_" + RunFilms.TONGUES[tongue]) != 0 || raw(getContext(), "run_film_idol_h_" + RunFilms.TONGUES[tongue]) != 0) found.add(tongue);
+            if (raw(getContext(), "run_film_prologue_h_" + RunFilms.TONGUES[tongue]) != 0 || raw(getContext(), "run_film_idol_tall_h_" + RunFilms.TONGUES[tongue]) != 0) found.add(tongue);
         }
         return found;
     }
