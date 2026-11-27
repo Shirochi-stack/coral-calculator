@@ -141,6 +141,23 @@ final class PlusRun {
     static final int INKPOT = 26;
     /** A friend, standing in a land of the third volume to pledge her help: which of them is her fifth number. She is walked up to. */
     static final int PLEDGE = 27;
+    /**
+     * In homes: a diary page, which is kept and read; and a loose floorboard, which comes up when it is stood on with the down button held,
+     * and what was under it is a chest (its fifth number is what is in it).
+     */
+    static final int DIARY = 28, LOOSE = 29;
+    private int diaries, lastDiary = -1, lifted;
+
+    int diaries() { return diaries; }
+
+    int lastDiary() { return lastDiary; }
+
+    int lifted() { return lifted; }
+
+    /** What the last chest opened held. */
+    private int lastChest;
+
+    int lastChest() { return lastChest; }
     private int pledges, lastPledge = -1;
     private boolean pledged;
 
@@ -2881,8 +2898,23 @@ final class PlusRun {
                 }
                 continue;
             }
+            if (item[0] == LOOSE) {
+                if (down && onGround && x < item[1] + .85f && x + WIDE > item[1] + .15f && Math.abs(y + TALL - item[2] - 1) < .2f) {
+                    item[0] = CHEST;
+                    lifted++;
+                }
+                continue;
+            }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST) continue;
+                if (item[0] == DIARY) {
+                    items.remove(index);
+                    diaries++;
+                    lastDiary = item.length > 4 ? item[4] : 0;
+                    tookX = item[1] + .5f;
+                    tookY = item[2] + .5f;
+                    continue;
+                }
                 if (item[0] >= PET && item[0] < PET + PETS && strays() >= perks.tempSlots) {
                     offered = item;
                     continue;
@@ -2906,7 +2938,8 @@ final class PlusRun {
                 // A chest is opened: ten pluses in it, whatever else; and a stash is done with when its chest is.
                 if (item[0] == CHEST) {
                     chests++;
-                    bonus += item.length > 4 && item[4] > 0 ? item[4] : 10;
+                    lastChest = item.length > 4 && item[4] > 0 ? item[4] : 10;
+                    bonus += lastChest;
                     if (room >= 0 && level.rooms.get(room)[0] == RunLevels.STASH && (roomsDone & 1 << room) == 0) {
                         roomsDone |= 1 << room;
                         roomWins++;

@@ -373,9 +373,11 @@ final class RunGame {
     private static final int[] LOOK_ART = {R.drawable.plus_run_room_wine, R.drawable.plus_run_room_maps, R.drawable.plus_run_room_vault, R.drawable.plus_run_room_clock,
             R.drawable.plus_run_room_green, R.drawable.plus_run_room_print, R.drawable.plus_run_room_crystal, R.drawable.plus_run_room_treasure,
             R.drawable.plus_run_room_pets, R.drawable.plus_run_room_guild, R.drawable.plus_run_room_home, R.drawable.plus_run_room_smithy, R.drawable.plus_run_room_market,
-            R.drawable.plus_run_room_gacha};
+            R.drawable.plus_run_room_gacha, R.drawable.run_home1, R.drawable.run_home2, R.drawable.run_home3, R.drawable.run_home4, R.drawable.run_home5,
+            R.drawable.run_home6};
     private static final String[] LOOK_NAMES = {"A wine cellar", "A map room", "A flooded vault", "Inside a clock tower", "A greenhouse", "A printing room", "A crystal cave",
-            "A treasure vault", "The pet shop", "The guild hall", "A home", "The smithy", "The black market", "The ribbon gacha"};
+            "A treasure vault", "The pet shop", "The guild hall", "A home", "The smithy", "The black market", "The ribbon gacha", "A cosy kitchen",
+            "A reading nook", "An attic bedroom", "A tinkerer's workshop", "A greenhouse home", "A music room"};
     /**
      * The ribbon gacha: its building, and its machine as it stands and as it is when it has
      * blown up; and a roll as it is shown: a capsule comes out and opens. How long ago it
@@ -433,11 +435,11 @@ final class RunGame {
     private Bitmap town;
     /** Its walls, the boards on top of them, and the light that lies over it. */
     private static final int[] LOOK_WALL = {0xFF3A2430, 0xFF2E2A22, 0xFF1F3A36, 0xFF3A2C24, 0xFF1C2440, 0xFF33241C, 0xFF241C3C, 0xFF35302C,
-            0xFF3A2A1E, 0xFF36261C, 0xFF3A2C22, 0xFF2E2420, 0xFF2A1C34, 0xFF4A2A36};
+            0xFF3A2A1E, 0xFF36261C, 0xFF3A2C22, 0xFF2E2420, 0xFF2A1C34, 0xFF4A2A36, 0xFF3A2A1E, 0xFF34261E, 0xFF2E2430, 0xFF33281E, 0xFF22362A, 0xFF36222A};
     private static final int[] LOOK_CAP = {0xFF9A6A52, 0xFF8A6A44, 0xFF5FA08A, 0xFFC09552, 0xFF5A78B8, 0xFFA8744A, 0xFF9A7AE0, 0xFFD0AC58,
-            0xFFC08A52, 0xFFB8784A, 0xFFC09A6A, 0xFF9A8478, 0xFF8A62B0, 0xFFE08AA0};
+            0xFFC08A52, 0xFFB8784A, 0xFFC09A6A, 0xFF9A8478, 0xFF8A62B0, 0xFFE08AA0, 0xFFC09A6A, 0xFFB8865A, 0xFFB09AC8, 0xFFB89060, 0xFF8AB878, 0xFFC08898};
     private static final int[] LOOK_LIGHT = {0x16FFB060, 0x0CFFE0A0, 0x2030C8A8, 0x18FFA070, 0x263050B0, 0x10FFC080, 0x24A070FF, 0x16FFD060,
-            0x08FFD090, 0x08FFD090, 0x08FFC890, 0x14FF9040, 0x1C9060E0, 0x0CFFC0D0};
+            0x08FFD090, 0x08FFD090, 0x08FFC890, 0x14FF9040, 0x1C9060E0, 0x0CFFC0D0, 0x0AFFC890, 0x0CFFB060, 0x0C9090FF, 0x0CFFB050, 0x0AA0FFA0, 0x0CFFA0C0};
     private Bitmap lookArt, props;
     private int lookOf = -1;
     private int seenKeys, seenLevers, seenPlates, seenShrines;
@@ -2319,6 +2321,101 @@ final class RunGame {
         text.setTextAlign(Paint.Align.LEFT);
     }
 
+    /** In homes: a loose floorboard, a little askew, glinting now and then; and a diary page, glowing softly where it lies. */
+    private Bitmap floorboard, diaryPage;
+
+    private void drawHomeSecret(Canvas canvas, int[] item) {
+        float x = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+        paint.setAlpha(255);
+        if (item[0] == PlusRun.LOOSE) {
+            if (floorboard == null) floorboard = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_floorboard);
+            float wide = tile * 1.4f, tall = tile * .26f;
+            target.set(x - wide / 2, feet - tall * .75f, x + wide / 2, feet + tall * .25f);
+            canvas.drawBitmap(floorboard, null, target, paint);
+            float glint = (clock * .6f + item[1] * .3f) % 2.5f;
+            if (glint < 1) glowAt(canvas, x - wide / 2 + wide * glint, feet - tall * .2f, tile * .25f, 0xFFFFE6A0, Math.round(190 * (float) Math.sin(glint * Math.PI)));
+        } else {
+            if (diaryPage == null) diaryPage = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_diary);
+            float bob = (float) Math.sin(clock * 2.6f + item[1]) * tile * .06f, size = tile * .8f;
+            glowAt(canvas, x, feet - tile * .5f + bob, tile * .7f, 0xFFFFF0C0, 120);
+            paint.setAlpha(255);
+            target.set(x - size / 2, feet - tile * .5f + bob - size / 2, x + size / 2, feet - tile * .5f + bob + size / 2);
+            canvas.drawBitmap(diaryPage, null, target, paint);
+        }
+        paint.setAlpha(255);
+    }
+
+    /** A diary page found: what is written on it, on a card of its own for a while; and which of them have been found, kept. */
+    private String diaryText;
+    private int diaryNumber, seenDiaries, seenLifted;
+    private float diaryAge = 99;
+    static final float DIARY_SHOWN = 9;
+
+    private void drawDiary(Canvas canvas) {
+        if (diaryText == null || diaryAge >= DIARY_SHOWN) return;
+        float shown = Math.min(1, Math.min(diaryAge / .3f, (DIARY_SHOWN - diaryAge) / .5f));
+        float wide = Math.min(safe.width() - dp(32), dp(380)), left = safe.centerX() - wide / 2;
+        text.setTextSize(dp(14));
+        List<String> lines = wrap(diaryText, wide - dp(36));
+        float top = safe.top + Math.max(dp(170), safe.height() * .24f), tall = dp(44) + lines.size() * dp(20) + dp(14);
+        canvas.saveLayerAlpha(left - dp(8), top - dp(8), left + wide + dp(8), top + tall + dp(8), Math.round(255 * shown));
+        box.set(left, top, left + wide, top + tall);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFFF6EBD2);
+        canvas.drawRoundRect(box, dp(10), dp(10), paint);
+        stroke.setColor(0xFFB98A56);
+        stroke.setStrokeWidth(dp(2));
+        canvas.drawRoundRect(box, dp(10), dp(10), stroke);
+        paint.setColor(Color.BLACK);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        text.setColor(0xFF8A5A33);
+        fitted(canvas, "A diary page  ·  " + Integer.bitCount(session.tally("run_diary")) + " of " + RunLevels.DIARY_PAGES + " found", left + dp(18), top + dp(28), dp(13), wide - dp(36));
+        text.setTypeface(Typeface.DEFAULT);
+        text.setColor(0xFF4A3420);
+        text.setTextSize(dp(14));
+        for (int index = 0; index < lines.size(); index++) canvas.drawText(lines.get(index), left + dp(18), top + dp(52) + index * dp(20), text);
+        canvas.restore();
+    }
+
+    /** Each chapter's village's landmark, and the arch at its entrance that carries its name. */
+    private static final int[] LANDMARKS = {R.drawable.run_landmark1, R.drawable.run_landmark2, R.drawable.run_landmark3, R.drawable.run_landmark4,
+            R.drawable.run_landmark5, R.drawable.run_landmark6, R.drawable.run_landmark7, R.drawable.run_landmark8, R.drawable.run_landmark9,
+            R.drawable.run_landmark10, R.drawable.run_landmark11, R.drawable.run_landmark12};
+    private Bitmap landmark, villageArch;
+    private int landmarkOf = -1;
+
+    private void drawVillagePiece(Canvas canvas, int[] decor, RunLevels.Level level) {
+        float x = (decor[1] + .5f - cameraX) * tile, feet = (decor[2] + 1 - cameraY) * tile;
+        paint.setAlpha(255);
+        if (decor[0] == 400) {
+            if (villageArch == null) villageArch = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_village_arch);
+            float wide = tile * 4.2f, tall = wide * villageArch.getHeight() / villageArch.getWidth();
+            target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
+            canvas.drawBitmap(villageArch, null, target, paint);
+            // Its name on its board, in letters burnt into the wood.
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setColor(0xFF4A2A12);
+            fitted(canvas, RunLevels.VILLAGES[Math.max(0, Math.min(RunLevels.VILLAGES.length - 1, level.chapter))], x, feet - tall * ARCH_BOARD, tile * .42f, wide * .62f);
+            text.setTypeface(Typeface.DEFAULT);
+            text.setTextAlign(Paint.Align.LEFT);
+            return;
+        }
+        int chapter = Math.max(0, Math.min(LANDMARKS.length - 1, decor[0] - 410));
+        if (landmarkOf != chapter) {
+            if (landmark != null) landmark.recycle();
+            landmark = BitmapFactory.decodeResource(context.getResources(), LANDMARKS[chapter]);
+            landmarkOf = chapter;
+        }
+        float tall = tile * 5.2f, wide = tall * landmark.getWidth() / landmark.getHeight();
+        target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
+        canvas.drawBitmap(landmark, null, target, paint);
+    }
+
+    /** Where the village arch's board is, down from its top, as a part of its height. */
+    static final float ARCH_BOARD = .79f;
+
     /** The furniture of the buildings, drawn with the rest of their pictures: Nabi's counter, Inju's desk, the board of hunts, and the anvil each smith works at. */
     private Bitmap counterPets, deskGuild, boardHunts, anvilSmith;
 
@@ -3206,6 +3303,9 @@ final class RunGame {
         prizeWon = RunLevels.NOTHING;
         saidRumour = false;
         seenLives = seenCasts = seenBraces = seenPaid = seenReminders = seenChests = 0;
+        seenDiaries = seenLifted = 0;
+        diaryAge = 99;
+        villageSaid = false;
         roomCardAge = roomResultAge = -1;
         tickedAt = 0;
         seenPhase = 0;
@@ -3296,7 +3396,17 @@ final class RunGame {
      * the lands open over the land: a gate she has found (of a land she has won) takes her to that gate, a land she has not won
      * yet to its start; she comes in a column of light. Shut without choosing, she comes back where she was.
      */
-    private boolean warping, arrivedAtGate;
+    private boolean warping, arrivedAtGate, villageSaid;
+
+    /** What a village has, in a few words. */
+    private String villageWords() {
+        StringBuilder words = new StringBuilder("Guild hall, pet shop, smithy");
+        for (int sort : RunLevels.townOf(number)) {
+            if (sort == RunLevels.GACHA) words.append(", ribbon gacha");
+            if (sort == RunLevels.MARKET) words.append(", black market");
+        }
+        return words.append(" · the arch is a portal").toString();
+    }
     /** The portal's pictures: eight of it lit and turning, and one dim. How tall it is drawn, and how far up from its foot its swirl's middle is, in squares. */
     private Bitmap portal;
     static final float PORTAL_TALL = 3.3f, PORTAL_MIDDLE = 1.37f;
@@ -3308,11 +3418,65 @@ final class RunGame {
     private float warpAge = 9, arriveAge = 9;
     private static final float WARP = .7f, ARRIVE = .8f;
 
+    /** Which part of the story it is, for what is said when someone is talked to: the first lands, the rest of the first volume, the second, the third. */
+    private int talkStage() {
+        int open = open();
+        return open <= 15 ? 0 : open <= RunLevels.COUNT ? 1 : open <= RunLevels.SECOND ? 2 : 3;
+    }
+
+    /** Who of those met stands at a thing in the land, or -1: someone holding something out, at a stall, at a desk, or Moru at her anvil. */
+    private static int talker(int[] item) {
+        if (item[0] == PlusRun.SPOT && item[4] == PlusRun.SMITH) return RunLevels.MORU;
+        return item[3] >= RunLevels.SOMI && item[3] <= RunLevels.NURI ? item[3] : -1;
+    }
+
+    /** Where in the lines of talk someone's are, or -1. */
+    private static int talkIndex(int who) { return who == RunLevels.NURI ? 9 : who >= RunLevels.SOMI && who <= RunLevels.ALTTEUL ? who - RunLevels.SOMI : -1; }
+
+    /** Whether someone has said what she has to say in this part of the story. */
+    private boolean heard(int who) {
+        int index = talkIndex(who);
+        return index < 0 || (session.tally("run_talk_" + talkStage()) >> index & 1) != 0;
+    }
+
+    /**
+     * A tap on someone who stands in the land (or in a building), near enough to her to be talking distance: she says her line for
+     * where the story is, and Halgakos answers after her. Whether it was a tap on someone.
+     */
+    private boolean talkTo(float x, float y) {
+        if (run == null) return false;
+        float herX = run.x() + PlusRun.WIDE / 2;
+        for (int[] item : run.level().items) {
+            int who = talker(item), index = talkIndex(who);
+            if (index < 0) continue;
+            float atX = item[1] + (item[0] == PlusRun.SPOT && item[4] == PlusRun.SMITH ? 2.3f : 1.55f);
+            if (Math.abs(atX - herX) > 7) continue;
+            float screenX = (atX - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+            if (x < screenX - tile * .75f || x > screenX + tile * .75f || y < feet - tile * 1.6f || y > feet + tile * .1f) continue;
+            // (Not where a button lies over them.)
+            if (stallButton.contains(x, y) || downButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y)) return false;
+            int stage = talkStage();
+            session.keep("run_talk_" + stage, session.tally("run_talk_" + stage) | 1 << index);
+            audio.play("tap", .5f);
+            // (What was being told of the land stops for her: she is listening to someone else now.)
+            talk.clear();
+            talking = false;
+            audio.hush();
+            captionLeft = personLeft = 0;
+            person(RunStory.TALK[stage][index]);
+            talk.add(RunStory.ANSWERS[stage][index]);
+            return true;
+        }
+        return false;
+    }
+
     /** Whether she stands at the gate of this land, past it: where the teleporter is. */
     private boolean atGate() {
-        if (run == null || run.room() >= 0 || !run.passed() || !onward() || warpAge < WARP) return false;
+        if (run == null || run.room() >= 0 || !onward() || warpAge < WARP || !run.onGround()) return false;
         float middle = run.x() + PlusRun.WIDE / 2;
-        return Math.abs(middle - (run.level().gate + .5f)) < 1.9f && run.onGround();
+        // (A village's arch is a way to the teleporter too, in a land she has won before or now.)
+        if (run.level().town >= 0 && Math.abs(middle - (run.level().town + 1.5f)) < 1.6f && (run.passed() || starsOf(number) > 0)) return true;
+        return run.passed() && Math.abs(middle - (run.level().gate + .5f)) < 1.9f;
     }
 
     /** She steps on the gate's light: she goes up in it, and then the lands are opened to choose from. */
@@ -3344,7 +3508,14 @@ final class RunGame {
         }
         boolean found = starsOf(land) > 0 && land < RunLevels.OPEN_TO;
         play(land);
-        if (found) run.atGate();
+        // (A land with its chapter's village: to the village, under its arch. Any other she has won: to its gate.)
+        if (found && run.level().town >= 0) {
+            int column = run.level().town + 1;
+            run.place(column + (1 - PlusRun.WIDE) / 2, Math.max(0, RunLevels.top(run.level(), column)) - PlusRun.TALL - .05f);
+            found = false;
+        } else if (found) {
+            run.atGate();
+        }
         arrivedAtGate = found;
         flash = .3f;
         cameraX = Math.max(0, Math.min(Math.max(0, run.level().main - width / tile), run.x() + PlusRun.WIDE / 2 - width / tile / 2));
@@ -4990,9 +5161,15 @@ final class RunGame {
         if (toastLeft > 0 && screen == PLAY) toastLeft -= seconds;
         if (screen == PLAY && video == null) {
             clearedAge += seconds;
+            diaryAge += seconds;
             crossAge += seconds;
             warpAge += seconds;
             arriveAge += seconds;
+            // Coming into a village, its name, once a land.
+            if (run != null && run.room() < 0 && run.level().town >= 0 && !villageSaid && run.x() > run.level().town + 1) {
+                villageSaid = true;
+                toast("Welcome to " + RunLevels.VILLAGES[Math.max(0, Math.min(RunLevels.VILLAGES.length - 1, run.level().chapter))], villageWords(), 0);
+            }
             if (warpAge >= WARP && warpAge - seconds < WARP) {
                 flash = .35f;
                 openWarp();
@@ -5960,6 +6137,23 @@ final class RunGame {
         // doing of the stash, and is told with that.
         // (In a build made for testing it can be slowed, to be looked at: run_slow is the hundredths of its pace.)
         chestAge += seconds * (BuildConfig.DEBUG && session.tally("run_slow") > 0 ? session.tally("run_slow") / 100f : 1);
+        // A diary page found is read: on a card, for a while, and kept as found.
+        if (run.diaries() != seenDiaries) {
+            seenDiaries = run.diaries();
+            int page = Math.max(0, Math.min(RunStory.DIARY.length - 1, run.lastDiary()));
+            session.keep("run_diary", session.tally("run_diary") | 1 << page);
+            diaryText = RunStory.DIARY[page];
+            diaryNumber = page;
+            diaryAge = 0;
+            audio.play("page", .8f);
+            buzz(false);
+        }
+        // A loose floorboard comes up: what was under it is there.
+        if (run.lifted() != seenLifted) {
+            seenLifted = run.lifted();
+            audio.play("unlock", .8f);
+            buzz(true);
+        }
         if (run.chests() != seenChests) {
             seenChests = run.chests();
             audio.play("unlock");
@@ -5969,7 +6163,7 @@ final class RunGame {
             chestY = run.tookY();
             flyTo((chestX - cameraX) * tile, (chestY - cameraY) * tile, false, 8);
             // (What it held: ten in a plain one; more in a cave's, and more again behind a false wall.)
-            pop(herX, herY - 1.6f, "+ " + Math.max(1, run.bonus() - seenBonus));
+            pop(herX, herY - 1.6f, "+ " + run.lastChest());
             seenBonus = run.bonus();
             for (int spark = 0; spark < 12; spark++) {
                 double way = random.nextFloat() * Math.PI * 2;
@@ -6424,6 +6618,11 @@ final class RunGame {
             }
             if (roomResultAge >= 0 && roomResultAge < 2.6f) {
                 if (action == MotionEvent.ACTION_DOWN && roomResultAge > .8f) roomResultAge = 2.6f;
+                return;
+            }
+            // Someone she has met, tapped where she stands: they talk.
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN)
+                    && talkTo(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
                 return;
             }
             if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && run.door() < 0 && !run.atStall() && run.spot() < 0 && atGate()
@@ -6981,6 +7180,7 @@ final class RunGame {
         } else {
             drawLand(canvas);
             drawWayOn(canvas);
+            drawDiary(canvas);
             // A moment in which something is won or handed over lies over the land, and under what is said and shown of how she stands.
             if (run.beam() > 0) drawBeam(canvas);
             if (blastAge < .45f) {
@@ -7752,6 +7952,10 @@ final class RunGame {
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
             // Over a hundred, it is something of the fourth sheet: a chest in a stash.
+            if (decor[0] >= 400) {
+                drawVillagePiece(canvas, decor, level);
+                continue;
+            }
             if (decor[0] == 306) {
                 // (The ribbon gacha: a picture of its own.)
                 if (gachaHouse == null) gachaHouse = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_gacha_house);
@@ -8032,6 +8236,9 @@ final class RunGame {
             } else if (level.quest != 0 && who == RunLevels.giverOf(level.quest) && run.quest() == PlusRun.DONE) {
                 // And whoever is owed a visit, because what she asked is done: in gold, and it hops.
                 mark(canvas, x, head - Math.abs((float) Math.sin(clock * 5)) * tile * .12f, "Done!", 0xFFE0A21A, false);
+            } else if (!heard(who) && talkIndex(who) >= 0) {
+                // And whoever has something new to say, when she is tapped: a little bubble with three dots.
+                mark(canvas, x, head - (float) Math.sin(clock * 3 + item[1]) * tile * .05f, "…", SPEAKER_COLOURS[speaker], false);
             }
         }
         // What lies about to help, in a ring of its own colour; what a friend holds out is in her hands already.
@@ -8047,6 +8254,10 @@ final class RunGame {
             }
             if (item[0] == PlusRun.PLEDGE) {
                 drawFriend(canvas, item);
+                continue;
+            }
+            if (item[0] == PlusRun.LOOSE || item[0] == PlusRun.DIARY) {
+                drawHomeSecret(canvas, item);
                 continue;
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
