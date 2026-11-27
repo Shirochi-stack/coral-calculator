@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = 'Halgakos Calculator'
 include ':app'
+include ':vanity'
