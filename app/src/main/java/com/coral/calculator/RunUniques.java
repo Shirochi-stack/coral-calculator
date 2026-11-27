@@ -9,27 +9,33 @@ final class RunUniques {
     private RunUniques() {}
 
     /** The first of their kinds, after Lucy; how many there are. */
-    static final int FIRST = RunLevels.LUCY + 1, COUNT = 24;
+    static final int FIRST = RunLevels.LUCY + 1, COUNT = 30;
+    /** Of them, the six hidden bosses: after the twenty-four, one for each two chapters, each in the hideouts of its lands. */
+    static final int HIDDEN_FIRST = FIRST + 24, HIDDEN_COUNT = 6;
 
     /** The ways of fighting. */
     static final int CHARGER = 0, SHIELDER = 1, MIMIC = 2, GHOST = 3, EXPLODER = 4, SNIPER = 5, BURROWER = 6, SUMMONER = 7, HEALER = 8, MINIBOSS = 9,
-            FORMATION = 10, SPLITTER = 11;
+            FORMATION = 10, SPLITTER = 11, HIDDEN = 12;
     static final String[] WAY_NAMES = {"charger", "shielder", "mimic", "wall-ghost", "exploder", "sniper", "burrower", "summoner", "healer", "mini-boss",
-            "formation flyer", "splitter"};
+            "formation flyer", "splitter", "hidden boss"};
 
     static final String[] NAMES = {"Dog-Ear", "Comma Snail", "Dust Jacket", "Shush", "Love Letter", "Cupid Quill", "Tab Goat", "Bracket Mole",
             "Epilogue Wraith", "Erratum", "Gilt Knight", "Seal Wax Golem", "Headline Hornet", "Press Roller", "Gap Shade", "Mirror Typo", "Margin Slug",
-            "Glue Bomb", "Index Spider", "Errata Hydra", "Dog-Eared Crab", "Message in a Bottle", "Ember Scribe", "Draftling"};
+            "Glue Bomb", "Index Spider", "Errata Hydra", "Dog-Eared Crab", "Message in a Bottle", "Ember Scribe", "Draftling",
+            "The Erasure Moth", "Madame Quillon", "The Last Line", "The Typeset Golem", "Marginalia", "The Unwritten"};
     /** Each one's chapter (two to a chapter, in order) and way of fighting. */
     static final int[] WAY = {CHARGER, SHIELDER, MIMIC, GHOST, EXPLODER, SNIPER, CHARGER, BURROWER, SUMMONER, HEALER, MINIBOSS, SHIELDER, FORMATION, CHARGER,
-            GHOST, MIMIC, SPLITTER, EXPLODER, SNIPER, MINIBOSS, SHIELDER, SUMMONER, HEALER, CHARGER};
+            GHOST, MIMIC, SPLITTER, EXPLODER, SNIPER, MINIBOSS, SHIELDER, SUMMONER, HEALER, CHARGER, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN};
     /** How many blows of health each has at the start of the game (it grows with the land), by way of fighting. */
-    private static final float[] HEALTH = {4, 6, 4, 3, 2, 3, 4, 5, 4, 24, 1.5f, 6};
+    private static final float[] HEALTH = {4, 6, 4, 3, 2, 3, 4, 5, 4, 24, 1.5f, 6, 70};
     /** How wide and tall each is, in squares. */
-    static final float[] WIDE = {.95f, .9f, 1.1f, .9f, .9f, .8f, 1.1f, .9f, .95f, .85f, 1.2f, 1.25f, .8f, 1.15f, .8f, .9f, 1.2f, .85f, .95f, 1.5f, 1.1f, .85f, .9f, 1.2f};
-    static final float[] TALL = {.8f, .85f, .7f, 1.15f, .75f, .85f, .95f, .95f, 1.25f, .75f, 1.5f, 1.35f, .7f, .8f, 1.2f, .85f, .75f, .9f, .75f, 1.45f, .8f, .85f, 1.05f, 1.05f};
+    static final float[] WIDE = {.95f, .9f, 1.1f, .9f, .9f, .8f, 1.1f, .9f, .95f, .85f, 1.2f, 1.25f, .8f, 1.15f, .8f, .9f, 1.2f, .85f, .95f, 1.5f, 1.1f, .85f, .9f, 1.2f,
+            2, 2, 2.4f, 2.2f, 1.8f, 1.6f};
+    static final float[] TALL = {.8f, .85f, .7f, 1.15f, .75f, .85f, .95f, .95f, 1.25f, .75f, 1.5f, 1.35f, .7f, .8f, 1.2f, .85f, .75f, .9f, .75f, 1.45f, .8f, .85f, 1.05f, 1.05f,
+            1.8f, 1.7f, 1.6f, 2.4f, 1.9f, 2.4f};
     /** How fast each walks, squares a second. */
-    static final float[] SPEED = {1.5f, .55f, 1.2f, .9f, 1.3f, .8f, 1.4f, 1.6f, .6f, .9f, 1.1f, .5f, 2.2f, 1.6f, 1, 1.4f, .8f, 1.2f, .9f, .9f, .7f, .7f, .9f, 1.7f};
+    static final float[] SPEED = {1.5f, .55f, 1.2f, .9f, 1.3f, .8f, 1.4f, 1.6f, .6f, .9f, 1.1f, .5f, 2.2f, 1.6f, 1, 1.4f, .8f, 1.2f, .9f, .9f, .7f, .7f, .9f, 1.7f,
+            1.3f, 1.2f, 1.4f, .8f, 1.5f, 1.3f};
 
     static boolean is(int kind) { return kind >= FIRST && kind < FIRST + COUNT; }
 
@@ -37,7 +43,32 @@ final class RunUniques {
 
     static int way(int kind) { return WAY[index(kind)]; }
 
-    static int chapter(int kind) { return index(kind) / 2; }
+    static int chapter(int kind) { return index(kind) < 24 ? index(kind) / 2 : (index(kind) - 24) * 2; }
+
+    /** Whether it is one of the hidden bosses; and the hidden boss of a chapter. */
+    static boolean hidden(int kind) { return is(kind) && way(kind) == HIDDEN; }
+
+    static int hiddenOf(int chapter) { return HIDDEN_FIRST + Math.max(0, Math.min(11, chapter)) / 2; }
+
+    /** What a hidden boss throws: the moth eraser crumbs, Quillon ink, the line full stops, the golem type, Marginalia doodles, the Unwritten pages. */
+    static int hiddenShot(int kind) {
+        switch (kind - HIDDEN_FIRST) {
+            case 0: return PlusRun.DOT;
+            case 1: return PlusRun.BLOT_SHOT;
+            case 2: return PlusRun.STOP;
+            case 3: return PlusRun.KNIFE;
+            case 4: return PlusRun.FEATHER;
+            default: return PlusRun.SCROLL;
+        }
+    }
+
+    /** Its own Halgakos Rose piece, the first time it is beaten: an accessory, a pen, an armour, a hammer, an accessory, a sword. */
+    static int signature(int kind) {
+        int boss = kind - HIDDEN_FIRST;
+        int[] types = {RunLoot.ACCESSORY, RunLoot.WEAPON, RunLoot.ARMOUR, RunLoot.WEAPON, RunLoot.ACCESSORY, RunLoot.WEAPON};
+        int[] bases = {7, 6, 24, 8, 21, 0};
+        return RunLoot.code(types[boss], Math.min(11, boss * 2 + 1), bases[boss], RunLoot.ROSE);
+    }
 
     static String name(int kind) { return NAMES[index(kind)]; }
 
@@ -50,7 +81,7 @@ final class RunUniques {
     }
 
     /** The halves of a heart more than a sign's its touch costs: none in the first two chapters, then one (two for a mini-boss), and one more every fifty lands. */
-    static int bite(int kind, int number) { return number <= 12 ? 0 : (way(kind) == MINIBOSS ? 2 : 1) + number / 50; }
+    static int bite(int kind, int number) { return way(kind) == HIDDEN ? 2 + number / 40 : number <= 12 ? 0 : (way(kind) == MINIBOSS ? 2 : 1) + number / 50; }
 
     /** Whether it flies (and so is in the air, not on the ground). */
     static boolean flies(int kind) { return is(kind) && way(kind) == FORMATION; }

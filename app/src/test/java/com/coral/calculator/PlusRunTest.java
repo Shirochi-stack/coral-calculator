@@ -4170,6 +4170,8 @@ public class PlusRunTest {
             assertTrue("land " + number + " has " + level.rooms.size(), level.rooms.size() >= (level.chapter >= 1 && number % 3 != 1 || level.chapter >= 2 ? 2 : 1));
             assertTrue(level.main > level.gate && level.main < level.columns);
             for (int[] one : level.rooms) {
+                // (A hideout has its own test: RunSecretsTest.)
+                if (one[0] == RunLevels.HIDEOUT) continue;
                 kinds[one[0]] = true;
                 if (one[7] != 0) hidden++;
                 // Its door is in the land proper, on the ground; the place itself is beyond the end of it.
@@ -4231,7 +4233,8 @@ public class PlusRunTest {
             // No sign of the land is in them but those that walk in its passages, and nothing of the land's to fight with.
             for (int[] foe : level.foes) {
                 boolean passing = false;
-                for (int[] one : level.rooms) passing |= one[0] <= RunLevels.PASSAGE && foe[1] >= one[3] && foe[1] <= one[4];
+                // (And a hideout's hidden boss.)
+                for (int[] one : level.rooms) passing |= (one[0] <= RunLevels.PASSAGE || one[0] == RunLevels.HIDEOUT) && foe[1] >= one[3] && foe[1] <= one[4];
                 assertTrue(foe[1] < level.main || passing);
             }
             for (int[] weapon : level.weapons) assertTrue(weapon[1] < level.main);
@@ -6404,7 +6407,7 @@ public class PlusRunTest {
         // Galpi's hidden room: gone into, it is found.
         run = asked(RunLevels.SHAPED_FROM, RunLevels.ROOM);
         int hidden = -1;
-        for (int index = 0; index < run.level().rooms.size(); index++) if (run.level().rooms.get(index)[7] != 0) hidden = index;
+        for (int index = 0; index < run.level().rooms.size(); index++) if (run.level().rooms.get(index)[7] != 0 && run.level().rooms.get(index)[0] != RunLevels.HIDEOUT) hidden = index;
         one = run.level().rooms.get(hidden);
         run.place(one[1] + (1 - PlusRun.WIDE) / 2, one[2] - PlusRun.TALL);
         run.step(STEP, false, false, false);
@@ -7612,7 +7615,7 @@ public class PlusRunTest {
         }
         assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length
                 // (The two lines about sloppy copies in the lands, her line with the game's name in it, and the keys.)
-                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length, lines);
+                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length + RunStory.SECRETS.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.

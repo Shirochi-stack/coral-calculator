@@ -15,10 +15,11 @@ public class RunUniquesTest {
     private static final int FLOOR = RunLevels.FLOOR;
 
     @Test public void twoToEachChapterAndEveryLandHasItsOwn() {
-        assertEquals(24, RunUniques.COUNT);
+        assertEquals(30, RunUniques.COUNT);
+        assertEquals(RunUniques.FIRST + 24, RunUniques.HIDDEN_FIRST);
         assertEquals(RunLevels.LUCY + 1, RunUniques.FIRST);
         Set<Integer> ways = new HashSet<>();
-        for (int index = 0; index < RunUniques.COUNT; index++) {
+        for (int index = 0; index < 24; index++) {
             int kind = RunUniques.FIRST + index;
             assertTrue(RunUniques.is(kind));
             assertEquals(index / 2, RunUniques.chapter(kind));
@@ -33,7 +34,7 @@ public class RunUniquesTest {
             RunLevels.Level level = RunLevels.level(number);
             int chapter = Math.min(11, RunLevels.chapterOf(number)), here = 0, bosses = 0;
             for (int[] foe : level.foes) {
-                if (!RunUniques.is(foe[0])) continue;
+                if (!RunUniques.is(foe[0]) || foe[1] >= level.main) continue;
                 here++;
                 assertTrue(RunLevels.uniqueSpec(foe));
                 assertEquals("land " + number, chapter, RunUniques.chapter(foe[0]));
