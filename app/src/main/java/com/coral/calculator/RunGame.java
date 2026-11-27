@@ -3289,7 +3289,15 @@ final class RunGame {
      * the lands open over the land: a gate she has found (of a land she has won) takes her to that gate, a land she has not won
      * yet to its start; she comes in a column of light. Shut without choosing, she comes back where she was.
      */
-    private boolean warping;
+    private boolean warping, arrivedAtGate;
+    /** The portal's pictures: eight of it lit and turning, and one dim. How tall it is drawn, and how far up from its foot its swirl's middle is, in squares. */
+    private Bitmap portal;
+    static final float PORTAL_TALL = 3.3f, PORTAL_MIDDLE = 1.37f;
+
+    /** Where on the screen the middle of this land's portal is. */
+    private float portalX() { return (run.level().gate + .5f - cameraX) * tile; }
+
+    private float portalY() { return (Math.max(0, RunLevels.top(run.level(), run.level().gate)) - cameraY) * tile - tile * PORTAL_MIDDLE; }
     private float warpAge = 9, arriveAge = 9;
     private static final float WARP = .7f, ARRIVE = .8f;
 
@@ -3323,11 +3331,15 @@ final class RunGame {
         if (land <= 0) {
             screen = PLAY;
             arriveAge = 0;
+            arrivedAtGate = true;
+            flash = .3f;
             return;
         }
         boolean found = starsOf(land) > 0 && land < RunLevels.OPEN_TO;
         play(land);
         if (found) run.atGate();
+        arrivedAtGate = found;
+        flash = .3f;
         cameraX = Math.max(0, Math.min(Math.max(0, run.level().main - width / tile), run.x() + PlusRun.WIDE / 2 - width / tile / 2));
         arriveAge = 0;
         audio.play("unlock", .7f);
@@ -3385,6 +3397,13 @@ final class RunGame {
      * Over the land: the dark of the way on as she goes into it and comes out in the next land; the column of light she goes up
      * in from a gate and comes down in; and the word at the top that a land is cleared.
      */
+    /** How far into the portal she has been drawn: going (to all the way, as she goes), or coming out (from all the way, as she comes). */
+    private float pull() {
+        if (warpAge < WARP) return Math.min(1, warpAge / WARP);
+        if (arriveAge < ARRIVE) return 1 - Math.min(1, arriveAge / ARRIVE);
+        return 0;
+    }
+
     private void drawWayOn(Canvas canvas) {
         if (run == null || finale != NO_FINALE) return;
         float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, feet = (run.y() + PlusRun.TALL - cameraY) * tile;
@@ -3395,15 +3414,12 @@ final class RunGame {
         }
         if (crossAge < .6f) dark = Math.max(dark, 1 - crossAge / .6f);
         if (dark > 0) canvas.drawColor(Color.argb(Math.round(225 * dark), 10, 6, 18));
-        float light = warpAge < WARP ? Math.min(1, warpAge / (WARP * .5f)) : arriveAge < ARRIVE ? 1 - Math.min(1, arriveAge / ARRIVE) : 0;
-        if (light > 0) {
-            if (fxColumn == null) fxColumn = fxOf(R.drawable.run_fx_lightcolumn);
-            paint.setAlpha(Math.round(255 * light));
-            target.set(herX - tile * 1.1f, feet - tile * 6, herX + tile * 1.1f, feet + tile * .2f);
-            canvas.drawBitmap(fxColumn, null, target, paint);
-            paint.setAlpha(255);
-            glowAt(canvas, herX, feet - tile * .2f, tile * (1.2f + .6f * light), 0xFFB9A6FF, Math.round(200 * light));
-            glowAt(canvas, herX, feet - tile * .8f, tile * .9f * light, 0xFFFFFFFF, Math.round(230 * light));
+        float pull = pull();
+        if (pull > 0) {
+            boolean atPortal = warpAge < WARP || arrivedAtGate;
+            float x = atPortal ? portalX() : herX, y = atPortal ? portalY() : feet - tile * .8f;
+            glowAt(canvas, x, y, tile * (.9f + 1.1f * pull), 0xFFC9B2FF, Math.round(190 * pull));
+            glowAt(canvas, x, y, tile * .7f * pull, 0xFFFFF4D8, Math.round(240 * pull));
             paint.setAlpha(255);
         }
         if (clearedAge < CLEARED) {
@@ -4970,7 +4986,10 @@ final class RunGame {
             crossAge += seconds;
             warpAge += seconds;
             arriveAge += seconds;
-            if (warpAge >= WARP && warpAge - seconds < WARP) openWarp();
+            if (warpAge >= WARP && warpAge - seconds < WARP) {
+                flash = .35f;
+                openWarp();
+            }
             int due = clearedAge > .5f ? Math.min(clearedStars, (int) ((clearedAge - .5f) / .3f) + 1) : 0;
             if (clearedAge < CLEARED && due > clearedShown) {
                 clearedShown = due;
@@ -7808,18 +7827,18 @@ final class RunGame {
                     artTall(canvas, FLAG_ART, left + tile / 2, y + tile, tile * 1.9f, false);
                     paint.setAlpha(255);
                 } else if (here == RunLevels.GATE && run.at(column, row + 1) == RunLevels.GATE) {
-                    // Faint while someone keeps it shut.
+                    // The gate is a portal: a golden arch with the equals sign in its keystone, and in it a swirl. Until she has passed it, it is
+                    // dim and still (and fainter while someone keeps it shut); passed, the swirl turns and glows, and a few motes drift off it.
+                    boolean lit = run.passed() && onward();
+                    if (portal == null) portal = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_portal);
                     paint.setAlpha(run.gateOpen() ? 255 : 110);
-                    artTall(canvas, GATE_ART, left + tile / 2, y + tile * 2, tile * 2.9f, false);
+                    cell(canvas, portal, lit ? (int) (clock * 9) % 8 : 8, 9, left + tile / 2, y + tile * 2 + tile * .04f, tile * PORTAL_TALL, false);
                     paint.setAlpha(255);
-                    if (run.passed() && onward()) {
-                        // Passed, it is a teleporter: a light of its own about its foot, beating, and motes going up in it.
-                        float beat = .5f + .5f * (float) Math.sin(clock * 3.4f);
-                        glowAt(canvas, left + tile / 2, y + tile * 1.75f, tile * (1.25f + .15f * beat), 0xFF9C7BFF, Math.round(120 + 70 * beat));
-                        for (int mote = 0; mote < 5; mote++) {
-                            float rise = (clock * .6f + mote * .2f) % 1;
-                            glowAt(canvas, left + tile / 2 + (float) Math.sin(mote * 2.3f + clock) * tile * .45f, y + tile * 1.9f - rise * tile * 2.4f, tile * .14f, 0xFFE6DCFF,
-                                    Math.round(220 * (1 - rise)));
+                    if (lit) {
+                        for (int mote = 0; mote < 4; mote++) {
+                            float out = (clock * .45f + mote * .25f) % 1, way = mote * 1.7f + 1;
+                            glowAt(canvas, left + tile / 2 + (float) Math.cos(way) * tile * (.4f + out * .9f), y + tile * 2 - tile * PORTAL_MIDDLE - (float) Math.sin(way) * tile * (.4f + out * .7f) - out * tile * .5f,
+                                    tile * .12f, 0xFFF1E4FF, Math.round(210 * (1 - out)));
                         }
                         paint.setAlpha(255);
                     }
@@ -8346,8 +8365,16 @@ final class RunGame {
         drawPetThings(canvas);
         drawPet(canvas);
         // (Going up in the teleporter's light she fades away; coming down in it, she comes back.)
-        float gone = warpAge < WARP ? Math.min(1, warpAge / WARP) : arriveAge < ARRIVE ? 1 - Math.min(1, arriveAge / ARRIVE) : 0;
-        if (gone > 0) canvas.saveLayerAlpha(0, 0, width, height, Math.round(255 * (1 - gone)));
+        float gone = pull(), eased = gone * gone * (3 - 2 * gone);
+        if (gone > 0) {
+            float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herY = (run.y() + PlusRun.TALL / 2 - cameraY) * tile;
+            boolean atPortal = warpAge < WARP || arrivedAtGate;
+            float toX = atPortal ? portalX() : herX, toY = atPortal ? portalY() : herY;
+            canvas.saveLayerAlpha(0, 0, width, height, Math.round(255 * (1 - gone * gone)));
+            canvas.translate((toX - herX) * eased, (toY - herY) * eased);
+            canvas.rotate(eased * 540, herX, herY);
+            canvas.scale(1 - eased * .85f, 1 - eased * .85f, herX, herY);
+        }
         drawHer(canvas);
         if (gone > 0) canvas.restore();
         // What has just been won, rising from where it was won.
@@ -10195,11 +10222,12 @@ final class RunGame {
 
     /** A ring of light that beats about a button: here is the thing that was just spoken of. */
     private void glow(Canvas canvas, RectF button) {
-        float beat = .5f + .5f * (float) Math.sin(clock * 6), round = Math.min(button.width(), button.height()) / 2;
-        stroke.setColor(0xFFFFD24A);
-        stroke.setAlpha(Math.round(120 + 135 * beat));
-        stroke.setStrokeWidth(dp(3) + dp(2) * beat);
-        canvas.drawCircle(button.centerX(), button.centerY(), round + dp(4) + dp(5) * beat, stroke);
+        // The button's own rim turns yellow, beating gently: inside its circle, so it never reaches the button beside it.
+        float beat = .5f + .5f * (float) Math.sin(clock * 5), round = Math.min(button.width(), button.height()) / 2, width = dp(3.5f) + dp(1) * beat;
+        stroke.setColor(0xFFFFC928);
+        stroke.setAlpha(Math.round(170 + 85 * beat));
+        stroke.setStrokeWidth(width);
+        canvas.drawCircle(button.centerX(), button.centerY(), round - width / 2 - dp(.5f), stroke);
         stroke.setAlpha(255);
     }
 
