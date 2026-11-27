@@ -2842,6 +2842,10 @@ final class RunGame {
             idle();
             return true;
         }
+        if (screen == MAP && warping) {
+            warpTo(0);
+            return true;
+        }
         if (screen == PLAY) {
             pause();
         } else if (screen == PAUSED) {
@@ -3158,7 +3162,7 @@ final class RunGame {
         }
         // For looking at a land's later parts in a build made for testing: she starts by its first flag, its second,
         // inside the place where someone waits, or, for a number over a thousand, at the column that many over it.
-        int from = BuildConfig.DEBUG && blackRung == 0 ? session.tally("run_from") : 0;
+        int from = BuildConfig.DEBUG && blackRung == 0 && !crossing ? session.tally("run_from") : 0;
         if (from > 0) {
             RunLevels.Level here = run.level();
             int column = from > 1000 ? Math.min(here.columns - 2, from - 1000) : from <= here.flags.size() ? here.flags.get(from - 1)
@@ -3271,6 +3275,183 @@ final class RunGame {
         }
     }
 
+    /** Whether the land runs on into the next: every land but the last, outside the black arena. */
+    private boolean onward() { return blackRung == 0 && number < RunLevels.OPEN_TO && finale == NO_FINALE; }
+
+    /** The word at the top that a land is cleared: its title, its stars, what was collected and kept. It does not stop her. */
+    private float clearedAge = 9;
+    private String clearedTitle = "", clearedWords = "";
+    private int clearedStars, clearedShown;
+    private static final float CLEARED = 4.2f;
+
+    /**
+     * The gate as a teleporter. Standing at the gate of a land she has passed, a button takes her away in a column of light, and
+     * the lands open over the land: a gate she has found (of a land she has won) takes her to that gate, a land she has not won
+     * yet to its start; she comes in a column of light. Shut without choosing, she comes back where she was.
+     */
+    private boolean warping;
+    private float warpAge = 9, arriveAge = 9;
+    private static final float WARP = .7f, ARRIVE = .8f;
+
+    /** Whether she stands at the gate of this land, past it: where the teleporter is. */
+    private boolean atGate() {
+        if (run == null || run.room() >= 0 || !run.passed() || !onward() || warpAge < WARP) return false;
+        float middle = run.x() + PlusRun.WIDE / 2;
+        return Math.abs(middle - (run.level().gate + .5f)) < 1.9f && run.onGround();
+    }
+
+    /** She steps on the gate's light: she goes up in it, and then the lands are opened to choose from. */
+    private void warp() {
+        audio.play("unlock", .7f);
+        buzz(true);
+        idle();
+        warpAge = 0;
+    }
+
+    private void openWarp() {
+        warping = true;
+        int volume = number > RunLevels.SECOND ? 2 : number > RunLevels.COUNT ? 1 : 0;
+        turnTo(Math.min(volumes() - 1, volume));
+        screen = MAP;
+        speak(RunStory.WARP[random.nextInt(RunStory.WARP.length)], false);
+    }
+
+    /** A land is chosen from the gate: its gate, if she has won it; its start, if not. Or none, and she is back where she was. */
+    private void warpTo(int land) {
+        warping = false;
+        clearedAge = CLEARED;
+        if (land <= 0) {
+            screen = PLAY;
+            arriveAge = 0;
+            return;
+        }
+        boolean found = starsOf(land) > 0 && land < RunLevels.OPEN_TO;
+        play(land);
+        if (found) run.atGate();
+        cameraX = Math.max(0, Math.min(Math.max(0, run.level().main - width / tile), run.x() + PlusRun.WIDE / 2 - width / tile / 2));
+        arriveAge = 0;
+        audio.play("unlock", .7f);
+    }
+
+    /** How far into the way on to the next land she is, as the view goes dark and light again about it; and the land she came from. */
+    private float crossAge = 9;
+    /** (While she goes on into the next land: where a build made for testing puts her in a land is not where she comes into it.) */
+    private boolean crossing;
+
+    /**
+     * She has passed the gate of a land: it is won, as it was with the card, but there is no card. What it gave is kept, the
+     * next land opens, and she says how it went; a word at the top says it is cleared, with its stars; and on she goes. Where
+     * the story has something to tell after it, or a film belongs to it, they come now, and then she goes on.
+     */
+    private void clearLand() {
+        won = true;
+        banked = run.purse() * (100 + RunGear.luck(gearOn()) + RunMarket.PAYS * hard()) / 100;
+        session.keep("run_bank", bank() + banked);
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "cleared " + number);
+        float share = run.total() == 0 ? 1 : run.collected() / (float) run.total();
+        stars = PlusRun.starsFor(share);
+        if (stars > starsOf(number)) session.keep("run_stars_" + number, stars);
+        session.keepBest("run_time_" + number, Math.max(1, Math.round(run.time())), true);
+        if (number >= open() && number < RunLevels.OPEN_TO) session.keep("run_open", number + 1);
+        if (number == 1) session.keepBest("run_best", Math.max(1, Math.round(run.time())), true);
+        audio.play("win");
+        int late = prize(number);
+        if (late != RunLevels.NOTHING) prizeWon = late;
+        session.keep("run_mobs", session.tally("run_mobs") + run.flattened());
+        session.keep("run_fliers", session.tally("run_fliers") + run.fliers());
+        session.keep("run_pet_kills", session.tally("run_pet_kills") + run.petKills());
+        news();
+        run.carryOn();
+        clearedTitle = landTitle();
+        clearedStars = stars;
+        clearedWords = "+ " + run.collected() + " of " + run.total() + "  ·  kept + " + banked + (questLine != null ? "  ·  " + questLine : "");
+        clearedAge = 0;
+        clearedShown = 0;
+        speak(RunStory.WON[stars - 1], true);
+        if (late != RunLevels.NOTHING) toast("Won to keep: " + prizeName(late), capital(prizeGives(late)), -late);
+        String[][] outro = RunStory.outro(number);
+        int film = RunFilms.due(number, true, session.tally("run_ending"), session.tally(RunFilms.SEEN));
+        Runnable back = () -> screen = PLAY;
+        Runnable then = film == RunFilms.NONE ? back : () -> {
+            screen = PLAY;
+            idle();
+            showFilm(film, stage, back);
+        };
+        if (outro != null && untold("run_outro2", number)) tell(outro, RunLevels.chapterOf(number), then);
+        else if (film != RunFilms.NONE) then.run();
+    }
+
+    /**
+     * Over the land: the dark of the way on as she goes into it and comes out in the next land; the column of light she goes up
+     * in from a gate and comes down in; and the word at the top that a land is cleared.
+     */
+    private void drawWayOn(Canvas canvas) {
+        if (run == null || finale != NO_FINALE) return;
+        float herX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, feet = (run.y() + PlusRun.TALL - cameraY) * tile;
+        float dark = 0;
+        if (run.passed() && run.room() < 0 && onward()) {
+            float left = run.level().main - PlusRun.THROUGH - (run.x() + PlusRun.WIDE / 2);
+            if (left < 1.8f) dark = 1 - Math.max(0, left) / 1.8f;
+        }
+        if (crossAge < .6f) dark = Math.max(dark, 1 - crossAge / .6f);
+        if (dark > 0) canvas.drawColor(Color.argb(Math.round(225 * dark), 10, 6, 18));
+        float light = warpAge < WARP ? Math.min(1, warpAge / (WARP * .5f)) : arriveAge < ARRIVE ? 1 - Math.min(1, arriveAge / ARRIVE) : 0;
+        if (light > 0) {
+            if (fxColumn == null) fxColumn = fxOf(R.drawable.run_fx_lightcolumn);
+            paint.setAlpha(Math.round(255 * light));
+            target.set(herX - tile * 1.1f, feet - tile * 6, herX + tile * 1.1f, feet + tile * .2f);
+            canvas.drawBitmap(fxColumn, null, target, paint);
+            paint.setAlpha(255);
+            glowAt(canvas, herX, feet - tile * .2f, tile * (1.2f + .6f * light), 0xFFB9A6FF, Math.round(200 * light));
+            glowAt(canvas, herX, feet - tile * .8f, tile * .9f * light, 0xFFFFFFFF, Math.round(230 * light));
+            paint.setAlpha(255);
+        }
+        if (clearedAge < CLEARED) {
+            float in = Math.min(1, clearedAge / .3f), out = Math.min(1, (CLEARED - clearedAge) / .5f), shown = Math.min(in, out);
+            float middle = safe.centerX(), top = safe.top + Math.max(dp(170), safe.height() * .27f) - (1 - in) * dp(18), star = dp(30);
+            int alpha = Math.round(255 * shown);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(Math.round(110 * shown), 20, 12, 30));
+            float half = Math.min(safe.width() / 2 - dp(12), dp(190));
+            canvas.drawRoundRect(middle - half, top - dp(30), middle + half, top + dp(70), dp(22), dp(22), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setColor(Color.argb(alpha, 255, 255, 255));
+            glow(true, dp(22));
+            fitted(canvas, clearedTitle, middle, top, dp(22), half * 2 - dp(24));
+            glow(false, 0);
+            text.setTypeface(Typeface.DEFAULT);
+            for (int index = 0; index < 3; index++) {
+                float since = clearedAge - .5f - index * .3f;
+                boolean earned = index < clearedStars && since > 0;
+                float size = star * (earned ? 1 + .4f * Math.max(0, 1 - since / .18f) : .85f);
+                paint.setAlpha(Math.round((earned ? 255 : 60) * shown));
+                art(canvas, STAR_ART, middle + (index - 1) * (star + dp(10)), top + dp(14) + star + (size - star) / 2, size, false);
+            }
+            paint.setAlpha(255);
+            text.setColor(Color.argb(Math.round(230 * shown), 255, 240, 214));
+            fitted(canvas, clearedWords, middle, top + dp(62), dp(12.5f), half * 2 - dp(24));
+            text.setTextAlign(Paint.Align.LEFT);
+        }
+    }
+
+
+    /**
+     * She has gone into the way on to the next land, past the gate of this one: she comes out of it in the next, as she went in,
+     * still running if she was, while the view goes dark about her for a moment and light again. Nothing waits.
+     */
+    private void cross() {
+        boolean left = goLeft, right = goRight, jump = goJump;
+        crossing = true;
+        play(number + 1);
+        crossing = false;
+        goLeft = left;
+        goRight = right;
+        goJump = jump;
+        crossAge = 0;
+    }
+
     private void finish(boolean reached) {
         if (blackRung > 0) {
             finishRung(reached);
@@ -3289,7 +3470,7 @@ final class RunGame {
         if (won) {
             if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "won " + number);
             float share = run.total() == 0 ? 1 : run.collected() / (float) run.total();
-            stars = 1 + (share >= .6f ? 1 : 0) + (share >= .9f ? 1 : 0);
+            stars = PlusRun.starsFor(share);
             if (stars > starsOf(number)) session.keep("run_stars_" + number, stars);
             session.keepBest("run_time_" + number, Math.max(1, Math.round(run.time())), true);
             if (number >= open() && number < RunLevels.OPEN_TO) session.keep("run_open", number + 1);
@@ -4784,6 +4965,18 @@ final class RunGame {
         if (personLeft > 0) personLeft -= seconds;
         // A card that says something was won is read while the land is on the screen: it does not run out behind a pause.
         if (toastLeft > 0 && screen == PLAY) toastLeft -= seconds;
+        if (screen == PLAY && video == null) {
+            clearedAge += seconds;
+            crossAge += seconds;
+            warpAge += seconds;
+            arriveAge += seconds;
+            if (warpAge >= WARP && warpAge - seconds < WARP) openWarp();
+            int due = clearedAge > .5f ? Math.min(clearedStars, (int) ((clearedAge - .5f) / .3f) + 1) : 0;
+            if (clearedAge < CLEARED && due > clearedShown) {
+                clearedShown = due;
+                audio.play("star", .55f);
+            }
+        }
         sinceAsked += seconds;
         sinceBump += seconds;
         sinceShut += seconds;
@@ -4818,6 +5011,10 @@ final class RunGame {
             finaleTick(seconds);
         } else if (screen == PLAY && prizeAge >= 0 && prizeAge < 2) {
             prizeAge += seconds;
+        } else if (screen == PLAY && warpAge < WARP) {
+            // Going up in the teleporter's light, the land waits.
+        } else if (screen == PLAY && video != null) {
+            // A film played over the land, after it was cleared: the land waits under it.
         } else if (screen == PLAY && (fanOpen || packOpen || huntsOpen || smithOpen || marketOpen)) {
             // The land waits while she chooses.
         } else if (screen == PLAY && roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
@@ -5788,7 +5985,7 @@ final class RunGame {
                 roomRank = rank;
                 for (int slot = 0; slot < RunHunts.SLOTS; slot++) if (RunHunts.countsCellar(hunt(slot), rank)) hunted(slot);
                 roomResult = won[10] != 0 ? "The Old Book is shut" : "Cellar cleared";
-                roomScore = PlayStage.clock(Math.max(1, Math.round(run.arenaTime()))) + "  ·  " + (run.arenaHurts() == 0 ? "not a hurt" : run.arenaHurts() + (run.arenaHurts() == 1 ? " hurt" : " hurts"))
+                roomScore = (run.arenaHurts() == 0 ? "not a hurt" : run.arenaHurts() + (run.arenaHurts() == 1 ? " hurt" : " hurts"))
                         + (run.arenaLives() > 0 ? "  ·  " + run.arenaLives() + (run.arenaLives() == 1 ? " life" : " lives") : "") + "  ·  + " + pays;
                 roomPicture = CELLAR_PICTURE;
                 if (first) {
@@ -5805,7 +6002,7 @@ final class RunGame {
                         roomGave += (roomGave.isEmpty() ? "" : ", ") + "+ " + more + " to keep";
                     }
                 }
-                if (rank < PlusRun.RANK_S) roomGave += (roomGave.isEmpty() ? "" : ". ") + "Rank S: two hurts at most, under " + PlayStage.clock(Math.round(PlusRun.PAR));
+                if (rank < PlusRun.RANK_S) roomGave += (roomGave.isEmpty() ? "" : ". ") + "Rank S: two hurts at most, and no life lost";
             } else if (kind == RunLevels.STASH) {
                 roomResult = "The chest is open";
                 roomScore = "+ 10 in it";
@@ -6101,7 +6298,10 @@ final class RunGame {
             return;
         }
         if (run.questsPaid() != seenPaid || handAge >= 0) return;
-        if (run.state() == PlusRun.WON) finish(true);
+        if (run.state() == PlusRun.WON) {
+            if (onward()) clearLand();
+            else finish(true);
+        } else if (run.through() && onward()) cross();
         else if (run.state() == PlusRun.LOST && knockAge < 0) finish(false);
         else if (run.state() == PlusRun.RISEN && finale == NO_FINALE) takeOff();
         else if (run.state() == PlusRun.UNMADE && finale == NO_FINALE) unmake();
@@ -6196,6 +6396,11 @@ final class RunGame {
                 if (action == MotionEvent.ACTION_DOWN && roomResultAge > .8f) roomResultAge = 2.6f;
                 return;
             }
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && run.door() < 0 && !run.atStall() && run.spot() < 0 && atGate()
+                    && stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                warp();
+                return;
+            }
             if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && run.door() < 0 && !run.atStall() && run.spot() >= 0
                     && stallButton.contains(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
                 // In a building: the counter, at the tab of whatever she stands at; a pet on show is the one looked at.
@@ -6278,6 +6483,22 @@ final class RunGame {
             } else {
                 speak(telling[line], false);
                 audio.play("page", .5f);
+            }
+        } else if (screen == MAP && warping) {
+            if (closeButton.contains(x, y)) {
+                audio.play("tap", .5f);
+                warpTo(0);
+            } else if (volumes() > 1 && (tabOf(0).contains(x, y) || tabOf(1).contains(x, y) || volumes() > 2 && tabOf(2).contains(x, y))) {
+                audio.play("page", .5f);
+                turnTo(tabOf(0).contains(x, y) ? 0 : tabOf(1).contains(x, y) ? 1 : 2);
+            } else {
+                for (int index = firstOf(page); index < lastOf(page); index++) {
+                    if (lands[index].contains(x, y) && index + 1 <= open()) {
+                        buzz(false);
+                        warpTo(index + 1);
+                        return;
+                    }
+                }
             }
         } else if (screen == MAP) {
             if (closeButton.contains(x, y)) {
@@ -6729,6 +6950,7 @@ final class RunGame {
             }
         } else {
             drawLand(canvas);
+            drawWayOn(canvas);
             // A moment in which something is won or handed over lies over the land, and under what is said and shown of how she stands.
             if (run.beam() > 0) drawBeam(canvas);
             if (blastAge < .45f) {
@@ -6802,6 +7024,12 @@ final class RunGame {
                 } else {
                     stallSign.setEmpty();
                     if (run.door() >= 0) doorControl(canvas);
+                    else if (atGate()) {
+                        button(canvas, stallButton, false, 0xFF5B4BC4);
+                        paint.setAlpha(255);
+                        artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
+                        label(canvas, stallButton, "Warp");
+                    }
                     else if (run.spot() >= 0) {
                         int what = run.spot();
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -7141,6 +7369,64 @@ final class RunGame {
      * paler for being further off. Where each stands, and which it is, comes from its place in the
      * wood, so the same wood is there each time she comes back to the same place.
      */
+    /** The ways on from one land to the next, one for each chapter: a bridge into a paper tree, a shelf that opens, a mine, a castle gate, a path behind a waterfall... */
+    private static final int[] WAYS = {R.drawable.run_way1, R.drawable.run_way2, R.drawable.run_way3, R.drawable.run_way4, R.drawable.run_way5, R.drawable.run_way6,
+            R.drawable.run_way7, R.drawable.run_way8, R.drawable.run_way9, R.drawable.run_way10, R.drawable.run_way11, R.drawable.run_way12};
+    private final Bitmap[] ways = new Bitmap[WAYS.length];
+
+    private Bitmap way(int chapter) {
+        int which = Math.max(0, Math.min(WAYS.length - 1, chapter));
+        if (ways[which] == null) {
+            // (Two at most are kept: the way out of this land, and the way it was come into by.)
+            for (int other = 0; other < ways.length; other++) {
+                if (other != which && ways[other] != null && other != RunLevels.chapterOf(Math.max(1, number - 1)) && other != RunLevels.chapterOf(number)) {
+                    ways[other].recycle();
+                    ways[other] = null;
+                }
+            }
+            ways[which] = BitmapFactory.decodeResource(context.getResources(), WAYS[which]);
+        }
+        return ways[which];
+    }
+
+    /** How tall a way on is drawn, in squares; and how wide it may be at most. */
+    static final float WAY_TALL = 5f, WAY_WIDE = 8.5f;
+
+    /** How wide a way on is drawn, so tall as it is drawn, or less where it is a long one. */
+    private float wayWide(Bitmap way) { return Math.min(tile * WAY_WIDE, tile * WAY_TALL * way.getWidth() / way.getHeight()); }
+
+    /**
+     * The way on at the end of the land, past its gate, that she walks into to come to the next: of the land's chapter; and at its
+     * start the way she came into it by, of the land before's, turned about, as she comes out of it. Behind her, standing on the ground.
+     */
+    private void drawJoins(Canvas canvas, RunLevels.Level level) {
+        if (blackRung > 0) return;
+        paint.setAlpha(255);
+        if (number < RunLevels.OPEN_TO) {
+            Bitmap out = way(level.chapter);
+            float wide = wayWide(out);
+            float x = (level.main - PlusRun.THROUGH - cameraX) * tile;
+            if (x > -wide && x < width + wide) {
+                int column = Math.max(0, Math.min(level.columns - 1, Math.round(level.main - PlusRun.THROUGH)));
+                float feet = (Math.max(0, RunLevels.top(level, column)) - cameraY) * tile, tall = wide * out.getHeight() / out.getWidth();
+                target.set(x - wide / 2, feet - tall + tile * .06f, x + wide / 2, feet + tile * .06f);
+                canvas.drawBitmap(out, null, target, paint);
+            }
+        }
+        if (number > 1) {
+            Bitmap in = way(RunLevels.chapterOf(number - 1));
+            float wide = wayWide(in), x = (1.2f - cameraX) * tile;
+            if (x < width + wide) {
+                float feet = (Math.max(0, RunLevels.top(level, 1)) - cameraY) * tile, tall = wide * in.getHeight() / in.getWidth();
+                canvas.save();
+                canvas.scale(-1, 1, x, 0);
+                target.set(x - wide / 2, feet - tall + tile * .06f, x + wide / 2, feet + tile * .06f);
+                canvas.drawBitmap(in, null, target, paint);
+                canvas.restore();
+            }
+        }
+    }
+
     private Bitmap meadow;
 
     private void drawPaperTrees(Canvas canvas, RunLevels.Level level) {
@@ -7354,6 +7640,7 @@ final class RunGame {
         else drawSky(canvas, chapter, cameraX * tile * .2f);
         // In the Contents Village, between the sky and the land, a wood of paper trees.
         if (run.room() < 0 && chapter == 0) drawPaperTrees(canvas, level);
+        if (run.room() < 0) drawJoins(canvas, level);
         float across = width / tile, down = height / tile;
         int first = Math.max(0, (int) cameraX), last = Math.min(run.columns() - 1, (int) (cameraX + across) + 1);
         int top = Math.max(0, (int) Math.floor(cameraY)), bottom = Math.min(level.land.length - 1, (int) (cameraY + down) + 1);
@@ -7525,6 +7812,17 @@ final class RunGame {
                     paint.setAlpha(run.gateOpen() ? 255 : 110);
                     artTall(canvas, GATE_ART, left + tile / 2, y + tile * 2, tile * 2.9f, false);
                     paint.setAlpha(255);
+                    if (run.passed() && onward()) {
+                        // Passed, it is a teleporter: a light of its own about its foot, beating, and motes going up in it.
+                        float beat = .5f + .5f * (float) Math.sin(clock * 3.4f);
+                        glowAt(canvas, left + tile / 2, y + tile * 1.75f, tile * (1.25f + .15f * beat), 0xFF9C7BFF, Math.round(120 + 70 * beat));
+                        for (int mote = 0; mote < 5; mote++) {
+                            float rise = (clock * .6f + mote * .2f) % 1;
+                            glowAt(canvas, left + tile / 2 + (float) Math.sin(mote * 2.3f + clock) * tile * .45f, y + tile * 1.9f - rise * tile * 2.4f, tile * .14f, 0xFFE6DCFF,
+                                    Math.round(220 * (1 - rise)));
+                        }
+                        paint.setAlpha(255);
+                    }
                 }
             }
         }
@@ -8047,7 +8345,11 @@ final class RunGame {
         drawPanel(canvas);
         drawPetThings(canvas);
         drawPet(canvas);
+        // (Going up in the teleporter's light she fades away; coming down in it, she comes back.)
+        float gone = warpAge < WARP ? Math.min(1, warpAge / WARP) : arriveAge < ARRIVE ? 1 - Math.min(1, arriveAge / ARRIVE) : 0;
+        if (gone > 0) canvas.saveLayerAlpha(0, 0, width, height, Math.round(255 * (1 - gone)));
         drawHer(canvas);
+        if (gone > 0) canvas.restore();
         // What has just been won, rising from where it was won.
         text.setTextAlign(Paint.Align.CENTER);
         text.setTextSize(tile * .42f);
@@ -10872,16 +11174,24 @@ final class RunGame {
             return;
         }
         float star = dp(46);
+        String title = landTitle();
+        float prizeTall = prizeWon != RunLevels.NOTHING ? dp(78) : 0;
+        float top = card(canvas, title, "+ " + run.collected() + " of " + run.total() + "  ·  " + kept, star + dp(10) + prizeTall);
+        drawResultRest(canvas, star, top);
+    }
+
+    /** What a land won is called: for one where someone waited, what became of her; otherwise its number, cleared. */
+    private String landTitle() {
         int boss = RunLevels.bossOf(number);
-        String title = boss == RunLevels.ZERO ? "Zero is flat!" : boss == RunLevels.ILLYA ? "Illya gives way" : boss == RunLevels.TSUBAKIEH ? "The bat is broken"
+        return boss == RunLevels.ZERO ? "Zero is flat!" : boss == RunLevels.ILLYA ? "Illya gives way" : boss == RunLevels.TSUBAKIEH ? "The bat is broken"
                 : boss == RunLevels.GOKHAE ? "Gokhae folds her fan" : boss == RunLevels.MIRI ? "The Gazette is corrected" : boss == RunLevels.YEOBAEK ? "Yeobaek naps"
                 : boss == RunLevels.KING ? "King Slime is a puddle" : boss == RunLevels.MAWANG ? "The Mawang comes home" : boss == RunLevels.GUARD ? "Exam passed"
                 : boss == RunLevels.BUTLER ? "The butler bows out" : boss == RunLevels.BYEORU ? "Written back in" : boss == RunLevels.JUPAN ? "The toll is refunded"
                 : boss == RunLevels.SUMBI ? "Sumbi comes up for air" : boss == RunLevels.PADS ? "The brakes are off" : boss == RunLevels.PARTY ? "Straight home they go"
                 : boss == RunLevels.LUCY ? (finale == RIDDEN ? "The Mother Tongue listens" : "Lucy is read, as written") : "Land " + number + " cleared";
-        float prizeTall = prizeWon != RunLevels.NOTHING ? dp(78) : 0;
-        float top = card(canvas, title, "+ " + run.collected() + " of " + run.total() + "  ·  " + PlayStage.clock(Math.max(1, Math.round(run.time())))
-                + "  ·  " + kept, star + dp(10) + prizeTall);
+    }
+
+    private void drawResultRest(Canvas canvas, float star, float top) {
         // The stars she earned, each popping up in its turn; the rest stay faint.
         for (int index = 0; index < 3; index++) {
             float since = resultClock - .35f - index * .32f;
@@ -11305,6 +11615,32 @@ final class RunGame {
     }
 
     private void drawMap(Canvas canvas) {
+        drawMapItself(canvas);
+        if (!warping) return;
+        // Over the lands opened from a gate: which of them have gates she has found, lit; and what choosing does.
+        for (int index = firstOf(page); index < lastOf(page); index++) {
+            if (starsOf(index + 1) <= 0 || index + 1 >= RunLevels.OPEN_TO) continue;
+            float beat = .5f + .5f * (float) Math.sin(clock * 3 + index * .4f);
+            stroke.setColor(0xFF8E6BFF);
+            stroke.setAlpha(Math.round(150 + 100 * beat));
+            stroke.setStrokeWidth(dp(2.5f));
+            canvas.drawRoundRect(lands[index].left - dp(3), lands[index].top - dp(3), lands[index].right + dp(3), lands[index].bottom + dp(3), dp(10), dp(10), stroke);
+            stroke.setAlpha(255);
+        }
+        float wide = Math.min(safe.width() - dp(24), dp(420));
+        box.set(safe.centerX() - wide / 2, safe.bottom - dp(84), safe.centerX() + wide / 2, safe.bottom - dp(16));
+        plate(canvas, box, dp(18), 250);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(0xFF5B4BC4);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        fitted(canvas, "The gate is a teleporter", box.centerX(), box.top + dp(26), dp(15), wide - dp(24));
+        text.setTypeface(Typeface.DEFAULT);
+        text.setColor(soft);
+        fitted(canvas, "A lit land: to its gate  ·  any other open land: to its start  ·  ✕ back", box.centerX(), box.top + dp(50), dp(12), wide - dp(24));
+        text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    private void drawMapItself(Canvas canvas) {
         int open = open();
         drawSky(canvas, RunLevels.chapterOf(open), clock * dp(5));
         canvas.drawColor(dark ? 0x99000000 : 0x66FFFFFF);

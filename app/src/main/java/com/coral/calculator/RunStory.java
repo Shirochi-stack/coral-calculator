@@ -416,6 +416,12 @@ final class RunStory {
             {"npet3", "The guild counter has a new pet. Go look. I'm not jealous Sloppy~♡", "H", PLAYER + "She tells the player a new pet is at the guild counter, and insists she is not jealous of it. Huffy, obviously a little jealous."},
     };
 
+    /** The gate of a land she has passed is a teleporter: she goes up in its light, and says where to. */
+    static final String[][] WARP = {
+            {"warp1", "Pick a gate. Any gate. I'll hold the light Sloppy~♡", "H", PLAYER + "She has stepped onto a glowing teleporter gate and a column of light lifts her; she tells the player to choose where to go. Breezy, showing off, a little dizzy."},
+            {"warp2", "Where to? The lit ones have gates I already found Sloppy~♡", "H", PLAYER + "Standing in the light of a teleporter, she explains to the player that the lit places on the map are gates she has already found. Brisk, helpful, smug."},
+    };
+
     /** At the counter where her pluses buy what she keeps. */
     static final String[][] SHOP = {
             {"shop1", "The guild counter. Spend my pluses wisely Sloppy~♡", "H", PLAYER + "She opens the upgrade shop. Businesslike, possessive of her coins, teasing."},
@@ -1038,6 +1044,7 @@ final class RunStory {
         groups.add(PROLOGUE);
         groups.add(GALLERY);
         groups.add(NEW_PET);
+        groups.add(WARP);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
             if (intro(land) != null) groups.add(intro(land));
             if (outro(land) != null) groups.add(outro(land));
