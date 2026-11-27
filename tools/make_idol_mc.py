@@ -4,6 +4,7 @@ the unit's MC. Every line is hers, talked and called on the beat; the crowd that
 her is her own voice too, many times over. Under her is the band alone.
 
     python tools/make_idol_mc.py [--again]
+    python tools/make_idol_mc.py --brisk      a second version, beside the first and never over it (halgakos-mc-brisk.wav)
 
 Each line is recorded with the call the game's lines are recorded with (her voice, asked
 how to say it), kept under a name made from its words in dist/cutscenes/idol/mc, and
@@ -12,8 +13,10 @@ is hurried a little with its pitch kept. The crowd's shouts are a dozen copies o
 shout, each a little off in time and pitch. The band is the newest band-only song in
 dist/cutscenes/idol/songs (made by make_song.py with --bare: the same parts and seconds as
 the sung version), held down a little while she speaks. Writes idol/songs/halgakos-mc.wav
-(and halgakos-mc-voice.wav, her voice alone). Needs numpy, soundfile, av, requests; the
-voice's key, by name.
+(and halgakos-mc-voice.wav, her voice alone). With --brisk, every line that had to be
+hurried by more than a tenth is recorded again, three times, asked to be said faster, and
+the shortest of them is used if it is shorter than the first: said quickly, not sped up.
+The words are the same. Needs numpy, soundfile, av, requests; the voice's key, by name.
 """
 import hashlib
 import importlib.util
@@ -28,6 +31,8 @@ OUT = ROOT / "dist" / "cutscenes" / "idol"
 RATE, SECONDS = 48000, 90
 SCENE = ("She is the centre of an idol group on stage in front of a cheering hall, hyping the crowd as the group's MC over fast, bouncy idol pop at 120 beats a minute. "
          "She does not sing: she talks and calls in rhythm, right on the beat, punchy and bright, smug and teasing, loud enough for a hall. Quick and rapid-fire, with no pauses between phrases.")
+BRISK = ("She is the centre of an idol group on stage in front of a cheering hall, the group's MC over very fast idol pop. She does not sing: she fires the line off at double speed, "
+         "right on the beat, clipped and tight, every word quick and crisp, smug and bright, loud enough for a hall. As fast as she can say it clearly, with no pauses at all.")
 SHOUT = "She is on stage and shouts one word to a cheering hall, as loud and bright and short as she can, like a concert call."
 # When (seconds), how long its place is, what she says, and how: hers alone ("solo"), or the crowd's (her own shout, many times over).
 LINES = [
@@ -109,6 +114,8 @@ def main():
             both[at:at + room, 1] += bent[:room] * pan * random.uniform(.5, 1)
         return both / (numpy.abs(both).max() + 1e-9)
 
+    brisk = "--brisk" in sys.argv
+    named = "halgakos-mc-brisk" if brisk else "halgakos-mc"
     track = numpy.zeros((SECONDS * RATE, 2))
     shouts = {}
     for at, room, words, how in LINES:
@@ -121,6 +128,15 @@ def main():
             continue
         wave = trimmed(said(words, SHOUT if how == "call" else SCENE))
         came = len(wave) / RATE
+        if brisk and how == "solo" and came / room > 1.1:
+            # Said again, faster, and not sped up: the shortest of three, if it is shorter than the first.
+            first = came
+            for take in range(3):
+                other = trimmed(said(words, BRISK, take))
+                if len(other) < len(wave):
+                    wave = other
+            came = len(wave) / RATE
+            print(f"        (first {first:4.1f} s, x{min(1.3, first / room):.2f}; said faster: {came:4.1f} s)")
         faster = min(1.3, max(1.0, came / room))
         wave = hurried(wave, RATE, faster)
         if len(wave) > int((room + .3) * RATE):
@@ -130,7 +146,7 @@ def main():
         wave = wave / (numpy.abs(wave).max() + 1e-9) * .85
         track[begins:begins + len(wave)] += numpy.stack([wave, wave], axis=1)[: len(track) - begins]
         print(f"{at:5.1f} s  {came:4.1f} s -> {len(wave) / RATE:4.1f} s  x{faster:.2f}  {words}".encode("ascii", "replace").decode(), flush=True)
-    soundfile.write(OUT / "songs" / "halgakos-mc-voice.wav", numpy.clip(track, -1, 1), RATE)
+    soundfile.write(OUT / "songs" / f"{named}-voice.wav", numpy.clip(track, -1, 1), RATE)
     bands = sorted((OUT / "songs").glob("*-band-*.mp3"), key=lambda path: path.stat().st_mtime)
     if not bands:
         print("no band-only song in", OUT / "songs", ": her voice alone was written")
@@ -148,8 +164,8 @@ def main():
     mix = track * .9 + under * (1 - .35 * numpy.clip(heard * 1.5, 0, 1))[:, None]
     mix[-RATE // 2:] *= numpy.linspace(1, 0, RATE // 2)[:, None]
     mix = mix / max(1, numpy.abs(mix).max() / .97)
-    soundfile.write(OUT / "songs" / "halgakos-mc.wav", mix, RATE)
-    print("saved", OUT / "songs" / "halgakos-mc.wav", "over", bands[-1].name)
+    soundfile.write(OUT / "songs" / f"{named}.wav", mix, RATE)
+    print("saved", OUT / "songs" / f"{named}.wav", "over", bands[-1].name)
 
 
 if __name__ == "__main__":
