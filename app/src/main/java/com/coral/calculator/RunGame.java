@@ -13409,40 +13409,6 @@ final class RunGame {
         text.setColor(soft);
         fitted(canvas, RunVanity.MODE_DOES[mode] + "  \u00B7  it never changes what she can do", left + dp(6), top + dp(52), dp(12), across - dp(12));
         float y = top + dp(62);
-        for (int outfit = 0; outfit < vanityRows.length; outfit++) {
-            if (vanityRows[outfit] == null) vanityRows[outfit] = new RectF();
-            RectF at = vanityRows[outfit];
-            if (!RunVanity.ready(outfit)) {
-                at.setEmpty();
-                continue;
-            }
-            at.set(left, y, left + across, y + dp(62));
-            y += dp(68);
-            boolean hers = RunVanity.owns(vanityKeep(), outfit), on = chosen == outfit, quest = RunVanity.QUEST[outfit] >= 0, can = !hers && !quest && bank >= RunVanity.PRICES[outfit];
-            plate(canvas, at, dp(16), 245);
-            RunVanity.Style style = RunVanity.STYLES[outfit];
-            int[] swatch = {style.dark, style.mid, style.light, style.trim != 0 ? style.trim : style.mid};
-            paint.setStyle(Paint.Style.FILL);
-            for (int dot = 0; dot < 4 && style.art == null; dot++) {
-                paint.setColor(swatch[dot]);
-                canvas.drawCircle(at.left + dp(22), at.top + dp(15) + dot * dp(10.5f) - (dot > 1 ? 0 : 0), dp(4.6f), paint);
-            }
-            paint.setColor(Color.BLACK);
-            float words = at.left + dp(42), price = dp(86), room = at.right - words - price - dp(18);
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setColor(ink);
-            fitted(canvas, RunVanity.NAMES[outfit], words, at.top + dp(25), dp(15.5f), room);
-            text.setColor(soft);
-            fitted(canvas, RunVanity.DOES[outfit], words, at.top + dp(45), dp(11.5f), room);
-            box.set(at.right - dp(12) - price, at.centerY() - dp(18), at.right - dp(12), at.centerY() + dp(18));
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(on ? CalculatorLayout.CORAL : hers ? (dark ? 0xFF2F3336 : 0xFFEDEEEE) : can ? CalculatorLayout.CORAL : dark ? 0xFF44292E : 0xFFFCE9EB);
-            canvas.drawRoundRect(box, dp(18), dp(18), paint);
-            paint.setColor(Color.BLACK);
-            text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(on || can ? Color.WHITE : hers ? soft : CalculatorLayout.CORAL);
-            fitted(canvas, on ? "Wearing" : hers ? "Wear" : quest ? "Quest" : "+ " + RunVanity.PRICES[outfit], box.centerX(), box.centerY() + dp(5.5f), dp(14), price - dp(14));
-        }
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(soft);
         for (int part = 0; part < 2; part++) {
@@ -13475,10 +13441,49 @@ final class RunGame {
         y += dp(44);
         text.setTextAlign(Paint.Align.LEFT);
         // How she looks in it now: in the air, hurt, and with the sword in hand.
-        float tall = dp(120), feet = y + dp(30) + tall;
+        float tall = dp(96), feet = y + tall;
         frame(canvas, herJump(), 1, JUMP_FRAMES, left + across * .2f, feet, tall, false);
         frame(canvas, herLose(0), HIT, LOSE_FRAMES, left + across * .5f, feet, tall, false);
         frame(canvas, herArmed(PlusRun.SWORD), 7, ARMED_FRAMES, left + across * .8f, feet, tall, false);
+        y = feet + dp(8);
+        for (int outfit = 0; outfit < vanityRows.length; outfit++) {
+            if (vanityRows[outfit] == null) vanityRows[outfit] = new RectF();
+            RectF at = vanityRows[outfit];
+            if (!RunVanity.ready(outfit)) {
+                at.setEmpty();
+                continue;
+            }
+            if (y + dp(56) > safe.bottom - dp(6)) {
+                at.setEmpty();
+                continue;
+            }
+            at.set(left, y, left + across, y + dp(50));
+            y += dp(56);
+            boolean hers = RunVanity.owns(vanityKeep(), outfit), on = chosen == outfit, quest = RunVanity.QUEST[outfit] >= 0, can = !hers && !quest && bank >= RunVanity.PRICES[outfit];
+            plate(canvas, at, dp(16), 245);
+            RunVanity.Style style = RunVanity.STYLES[outfit];
+            int[] swatch = {style.dark, style.mid, style.light, style.trim != 0 ? style.trim : style.mid};
+            paint.setStyle(Paint.Style.FILL);
+            for (int dot = 0; dot < 4 && style.art == null; dot++) {
+                paint.setColor(swatch[dot]);
+                canvas.drawCircle(at.left + dp(22), at.top + dp(10) + dot * dp(9.5f), dp(4f), paint);
+            }
+            paint.setColor(Color.BLACK);
+            float words = at.left + dp(42), price = dp(86), room = at.right - words - price - dp(18);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            fitted(canvas, RunVanity.NAMES[outfit], words, at.top + dp(21), dp(14.5f), room);
+            text.setColor(soft);
+            fitted(canvas, RunVanity.DOES[outfit], words, at.top + dp(39), dp(10.5f), room);
+            box.set(at.right - dp(12) - price, at.centerY() - dp(16), at.right - dp(12), at.centerY() + dp(16));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(on ? CalculatorLayout.CORAL : hers ? (dark ? 0xFF2F3336 : 0xFFEDEEEE) : can ? CalculatorLayout.CORAL : dark ? 0xFF44292E : 0xFFFCE9EB);
+            canvas.drawRoundRect(box, dp(18), dp(18), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(on || can ? Color.WHITE : hers ? soft : CalculatorLayout.CORAL);
+            fitted(canvas, on ? "Wearing" : hers ? "Wear" : quest ? "Quest" : "+ " + RunVanity.PRICES[outfit], box.centerX(), box.centerY() + dp(5.5f), dp(14), price - dp(14));
+        }
     }
 
     /**

@@ -50,6 +50,12 @@ final class VanityPictures {
         ALL.add(new Picture("gothic2", "Gothic Dress, mini", 1, 0, 0));
         ALL.add(new Picture("tabard2", "Knight's Tabard, sky", 2, 0, 0));
         ALL.add(new Picture("bunnyg", "Bunny Girl (Gacha)", 7, 0, 0));
+        ALL.add(new Picture("p_noears", "No ears", -1, 1, 0));
+        ALL.add(new Picture("p_fox", "Fox ears", -1, 2, 0));
+        ALL.add(new Picture("p_bunny", "Bunny ears", -1, 3, 0));
+        ALL.add(new Picture("p_apron", "Apron headband", -1, 4, 0));
+        ALL.add(new Picture("p_nohorns", "No horns", -1, 0, 1));
+        ALL.add(new Picture("p_elf", "Elf ears", -1, 0, 2));
     }
 
     static String key(Picture picture) { return "run_van_pic_" + picture.id; }

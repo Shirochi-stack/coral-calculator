@@ -30,7 +30,7 @@ final class RunVanity {
     static final int[] HORNS_PRICE = {0, 400, 700}, HORNS_TREATS = {0, 3, 5};
     static final String[] EARS_ART = {null, "noears", "fox", "bunny", "apron"}, HORNS_ART = {null, "nohorns", "elf"};
     /** Whether the pictures of the parts are in the app. */
-    static final boolean[] EARS_READY = {true, false, false, false, false}, HORNS_READY = {true, false, false};
+    static final boolean[] EARS_READY = {true, true, true, true, true}, HORNS_READY = {true, true, true};
 
     /**
      * How she is drawn: either a cloth (a ramp from its darkest to its lightest, a trim, a pattern and what is added on her,
