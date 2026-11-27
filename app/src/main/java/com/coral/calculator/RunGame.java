@@ -70,13 +70,16 @@ final class RunGame {
     private final Bitmap[] flierCast = new Bitmap[FLIER_CAST.length];
     /** The pets, as they are drawn: six pictures of each; and what each is called. */
     private static final int[] PET_CAST = {R.drawable.run_pet_jar, R.drawable.run_pet_cat, R.drawable.run_pet_dog, R.drawable.run_pet_duck, R.drawable.run_pet_monkey,
-            R.drawable.run_pet_chikuwa, R.drawable.run_pet_rune, R.drawable.run_pet_dark, R.drawable.run_pet_light, R.drawable.run_pet_mini};
+            R.drawable.run_pet_chikuwa, R.drawable.run_pet_rune, R.drawable.run_pet_dark, R.drawable.run_pet_light, R.drawable.run_pet_mini,
+            R.drawable.run_pet_tsubakieh, R.drawable.run_pet_illya, R.drawable.run_pet_mawang, R.drawable.run_pet_lucy};
     private static final String[] PET_NAMES = {"The ink jar", "The kitten", "The puppy", "The duckling", "The monkey",
-            "Mini Chikuwa", "Mini Rune", "Mini Halgakos, black wings", "Mini Halgakos, white wings", "Mini Halgakos"};
+            "Mini Chikuwa", "Mini Rune", "Mini Halgakos, black wings", "Mini Halgakos, white wings", "Mini Halgakos",
+            "Mini Tsubakieh", "Mini Illya", "Mini Mawang", "Mini Lucy"};
     private static final String[] PET_DOES = {"spits ink at what comes near", "pounces on what is close", "charges through them along the ground",
             "drops on what flies, and quacks", "throws nuts, and fetches", "throws bread rolls, and has one for her now and then",
             "cries ink that slows them, and flicks it", "swoops at the nearest, again and again", "sends rays of light, and turns one thing aside",
-            "does what she does, smaller"};
+            "does what she does, smaller", "swings her bat at the nearest, and knocks silly what is left standing", "throws a fan of sparkles from her quill",
+            "breathes a short dark flame at what is close", "squirts a quick jet of water from a long way off"};
     /** What one of the small stuffed ones says, written in a tiny bubble over it: they do not speak aloud. */
     private String petWord = "";
     private float petWordLeft, sincePetWord;
@@ -176,7 +179,7 @@ final class RunGame {
     private final boolean[] huntHere = new boolean[RunHunts.SLOTS];
     private final float[] huntFlash = new float[RunHunts.SLOTS];
     /** How many treats the pet shop takes for each pet, in place of pluses; and the colours of the badges of the guild's ranks. */
-    private static final int[] PET_TREATS = {2, 2, 2, 2, 3, 4, 4, 4, 4, 5};
+    private static final int[] PET_TREATS = {2, 2, 2, 2, 3, 4, 4, 4, 4, 5, 5, 5, 6, 6};
     private static final int[] BADGE_COLOURS = {0xFFCFC5AE, 0xFFD9B77E, 0xFF8A5A33, 0xFFE0A21A, 0xFF7A4BC8};
     private final RectF petTreat = new RectF();
     private int packFrom, packOn = PlusRun.UNARMED, swapFinger = -1;
@@ -230,7 +233,7 @@ final class RunGame {
     /** For her pets: more of her own beside her, more strays, brisker, stronger. */
     private static final int PET_PLACES = 10, STRAY_ROOM = 11, PET_BRISK = 12, PET_STRONG = 13;
     /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
-    private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800};
+    private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800, 950, 900, 1200, 1500};
     /** The counter's tabs, and what stands under each. */
     private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms"};
     private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}};
@@ -404,7 +407,7 @@ final class RunGame {
     private final RectF cringeButton = new RectF();
     private Bitmap cringe;
     private List<RunGallery.Item> gallery;
-    private boolean galleryNews, galleryChecked;
+    private boolean galleryNews, galleryChecked, petNews;
     private String[] galleryWords;
     private float galleryShown;
     private static final String[] BLOCK_WORDS = {"Mr.", "Miss", "Sir", "Madam"}, NAME_WORDS = {"Missy", "young lady", "little one", "dear girl", "Lulu"};
@@ -2182,8 +2185,8 @@ final class RunGame {
         int brings = RunHunts.brings(done);
         if (brings == RunHunts.A_PET) {
             int own = session.tally("run_pet_own"), kind = 0;
-            while (kind < PlusRun.PETS && (own >> kind & 1) != 0) kind++;
-            if (kind < PlusRun.PETS) {
+            while (kind < RunPets.FOUND && (own >> kind & 1) != 0) kind++;
+            if (kind < RunPets.FOUND) {
                 int with = session.tally("run_pet_with") & own;
                 session.keep("run_pet_own", own | 1 << kind);
                 session.keep("run_pets", session.tally("run_pets") | 1 << kind);
@@ -2916,6 +2919,13 @@ final class RunGame {
             session.keep(RunGallery.TOLD, open);
             galleryNews = true;
         }
+        // (And whether a pet of one she has beaten can be had now: the first ten are had from the first, and are not news.)
+        int pets = RunPets.open(session);
+        if (session.tally(RunPets.TOLD) == 0) session.keep(RunPets.TOLD, RunPets.FOUND);
+        if (pets > session.tally(RunPets.TOLD)) {
+            session.keep(RunPets.TOLD, pets);
+            petNews = true;
+        }
     }
 
     /**
@@ -2935,11 +2945,14 @@ final class RunGame {
             session.keep("run_film", 0);
             if (film <= RunFilms.CLIP) showFilm(film, stage, null);
         }
-        if (!galleryNews || video != null || shelf != null && !shelf.closed()) return;
+        if (!galleryNews && !petNews || video != null || shelf != null && !shelf.closed()) return;
         boolean free = screen == MAP || screen == PLAY && finale == NO_FINALE && !talking && captionLeft <= 0 && personLeft <= 0;
         if (!free || audio.speaking()) return;
-        galleryNews = false;
-        galleryWords = RunStory.GALLERY[random.nextInt(RunStory.GALLERY.length)];
+        // (A new pet first; the gallery's news waits for the next moment she can speak.)
+        String[][] lines = petNews ? RunStory.NEW_PET : RunStory.GALLERY;
+        if (petNews) petNews = false;
+        else galleryNews = false;
+        galleryWords = lines[random.nextInt(lines.length)];
         galleryShown = 8;
         if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "gallery news: " + galleryWords[0] + (screen == PLAY ? " in land " + number : " on the map"));
         speak(galleryWords, screen == PLAY);
@@ -4791,7 +4804,8 @@ final class RunGame {
             buzz(true);
             if (kind >= 0) {
                 toast(PET_NAMES[kind] + " goes with her", "A stray, for the whole of this land: it " + PET_DOES[kind], -(100 + kind));
-                if ((had & 1 << kind) == 0) {
+                // (Her word on one the first time it joins her: the strays have one each; those of the ones she has beaten never come as strays.)
+                if ((had & 1 << kind) == 0 && kind < RunStory.PETS.length) {
                     session.keep("run_pets", had | 1 << kind);
                     speak(RunStory.PETS[kind], true);
                 }
@@ -11129,7 +11143,8 @@ final class RunGame {
     }
 
     /**
-     * Her pets at the counter: the ten kinds in two rows of five. One she has is bright,
+     * Her pets at the counter: the kinds that can be had, in rows of five (those of the ones she has
+     * beaten are not there at all until she has). One she has is bright,
      * one that comes along with her is ringed, and one she has not got has its price under
      * it. Under them, the one that is looked at: what it is, what it does, and the button
      * that buys it, takes it along or leaves it at home.
@@ -11137,10 +11152,16 @@ final class RunGame {
     private void drawPetShop(Canvas canvas, float left, float top, float across, int bank) {
         int own = session.tally("run_pet_own"), with = session.tally("run_pet_with") & own, places = 1 + bought(PET_PLACES);
         float gap = dp(6), side = Math.min(dp(64), (across - gap * 4) / 5), high = side + dp(14);
+        int shown = 0;
         for (int kind = 0; kind < PlusRun.PETS; kind++) {
             if (petCells[kind] == null) petCells[kind] = new RectF();
             RectF at = petCells[kind];
-            float x = left + (across - (side * 5 + gap * 4)) / 2 + kind % 5 * (side + gap), y = top + kind / 5 * (high + gap);
+            if (!RunPets.open(kind, session)) {
+                at.setEmpty();
+                continue;
+            }
+            float x = left + (across - (side * 5 + gap * 4)) / 2 + shown % 5 * (side + gap), y = top + shown / 5 * (high + gap);
+            shown++;
             at.set(x, y, x + side, y + high);
             boolean hers = (own >> kind & 1) != 0, comes = (with >> kind & 1) != 0;
             plate(canvas, at, dp(14), 245);
@@ -11157,7 +11178,8 @@ final class RunGame {
             fitted(canvas, comes ? "with her" : hers ? "hers" : "+ " + PET_COSTS[kind], at.centerX(), at.bottom - dp(5), dp(11), side - dp(6));
         }
         // The one that is looked at.
-        float y = top + 2 * (high + gap) + dp(4);
+        if (!RunPets.open(petOn, session)) petOn = 0;
+        float y = top + (shown + 4) / 5 * (high + gap) + dp(4);
         boolean hers = (own >> petOn & 1) != 0, comes = (with >> petOn & 1) != 0, room = Integer.bitCount(with) < places;
         box.set(left, y, left + across, y + dp(118));
         plate(canvas, box, dp(16), 245);
