@@ -6,11 +6,11 @@ import android.view.KeyEvent;
  * Plus run with a keyboard, as on a computer: which keys do what, and which are held. A or D and the arrows move her; W, Up or Space
  * jumps (held, higher, as the button is); S or Down lets her down, or through a door; J or Enter strikes, and K holds a strike for her
  * special; Q or Tab changes what she holds; E is the button over the jump (a stall, a door, a gate, a pet); Esc is back and pause;
- * 1, 2 and 3 call on the actives in her slots.
+ * 1, 2 and 3 call on the actives in her slots; Shift or L dashes (in the air) or rolls (on the ground).
  * Several held at once all count, so she can run and jump together. Enter also says yes to a card.
  */
 final class RunKeys {
-    static final int LEFT = 1, RIGHT = 2, JUMP = 4, DOWN = 8, STRIKE = 16, SPECIAL = 32, SWAP = 64, EXTRA = 128, BACK = 256, CONFIRM = 512, SKILL_1 = 1024, SKILL_2 = 2048, SKILL_3 = 4096;
+    static final int LEFT = 1, RIGHT = 2, JUMP = 4, DOWN = 8, STRIKE = 16, SPECIAL = 32, SWAP = 64, EXTRA = 128, BACK = 256, CONFIRM = 512, SKILL_1 = 1024, SKILL_2 = 2048, SKILL_3 = 4096, DASH = 8192;
 
     /** What a key does, as the bits above; nothing for a key that does nothing here. */
     static int of(int keyCode) {
@@ -25,6 +25,7 @@ final class RunKeys {
             case KeyEvent.KEYCODE_Q: case KeyEvent.KEYCODE_TAB: return SWAP;
             case KeyEvent.KEYCODE_E: return EXTRA;
             case KeyEvent.KEYCODE_ESCAPE: return BACK;
+            case KeyEvent.KEYCODE_SHIFT_LEFT: case KeyEvent.KEYCODE_SHIFT_RIGHT: case KeyEvent.KEYCODE_L: return DASH;
             case KeyEvent.KEYCODE_1: case KeyEvent.KEYCODE_NUMPAD_1: return SKILL_1;
             case KeyEvent.KEYCODE_2: case KeyEvent.KEYCODE_NUMPAD_2: return SKILL_2;
             case KeyEvent.KEYCODE_3: case KeyEvent.KEYCODE_NUMPAD_3: return SKILL_3;

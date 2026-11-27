@@ -29,7 +29,11 @@ D = pathlib.Path(r"C:\Users\ADMIN\Documents\ChatGPT\Calculator APP\dist\cutscene
 RATE = 48000
 LIMITS = (.8, 1.4)  # how much a line may be slowed and sped
 # The shots of the storyboard (tools/cutscenes/idol.json: A1, A7, B3, C3, C7) where Halgakos alone is shown, her mouth moving: she is heard wherever it moves, said a little long or squeezed to x1.3 if need be.
-H_SHOTS = [(0.0, 4.0), (24.0, 30.3), (38.0, 42.0), (68.0, 72.0), (84.0, 90.0)]
+H_SHOTS = [(0.0, 4.0), (16.0, 20.0), (24.0, 30.3), (38.0, 42.0), (68.0, 72.0), (84.0, 90.0)]
+# The shots where all five sing together (A3-A4, A6, B1-B2, C1-C2, C4-C6 of the storyboard): her voice is the five in unison.
+G_SHOTS = [(8.0, 16.0), (20.0, 24.0), (30.0, 38.0), (60.0, 68.0), (72.0, 84.0)]
+G_FILL = [((8.0, 16.0), 6), ((20.0, 24.0), 9), ((30.0, 38.0), 16), ((60.0, 68.0), 35), ((72.0, 84.0), 39)]  # the line said again in a mouth of a group shot that has none
+UNISON = (("C", .5, .012), ("R", .4, .02), ("I", .5, .006), ("T", .45, .016))
 H_CAP = 1.3
 INTRO = 7.9  # before this second nobody sings: what is said there stays where it was said
 LANG_SUFFIX = {"en": "", "ja": "-ja", "ko": "-ko", "zh": "-zh"}
@@ -113,6 +117,10 @@ def shortest_fit(group_lengths, window, cap=1.15):
     return level, total(), total() <= cap * window
 
 
+def in_g(t):
+    return any(a <= t < b for a, b in G_SHOTS)
+
+
 def in_h(t):
     return any(a <= t < b for a, b in H_SHOTS)
 
@@ -191,14 +199,63 @@ def main():
     import idol_variants as iv
     order = sorted(iv.V)
     forms_of = {i: [45 + 2 * order.index(i), 45 + 2 * order.index(i) + 1] for i in order} if film == "idol" else {}
+    import idol_group as ig
+    W = {"en": [l[2] for l in spec["lines"]], **{k: spec["tongues"][k]["lines"] for k in ("ja", "ko", "zh")}}
+    starts_all = sorted(x[0] for x in times)
+
+    def load(path):
+        """A recorded voice at the film's rate, with the quiet at both ends taken off (a word is not given a long tail of breath)."""
+        x, r = soundfile.read(str(path))
+        x = x.mean(axis=1) if x.ndim > 1 else x
+        x = scipy.signal.resample_poly(x, RATE, r).astype("float32")
+        hop = RATE // 100
+        env = numpy.sqrt((x[: len(x) // hop * hop].reshape(-1, hop) ** 2).mean(axis=1))
+        loud = numpy.where(env > .07 * env.max())[0]
+        if len(loud):
+            x = x[max(0, (loud[0] - 1) * hop):(loud[-1] + 3) * hop]
+        return x
+
+    def edged(x, ms=6):
+        x = x.copy()
+        n = min(len(x) // 2, int(ms * RATE / 1000))
+        if n:
+            x[:n] *= numpy.linspace(0, 1, n)
+            x[-n:] *= numpy.linspace(1, 0, n)
+        return x
+
+    def crowd_piece(i):
+        """The crowd's answer: her own shout once, and her whisper of it softly under it, a little after: a deliberate double, not a voice laid over itself."""
+        text = W[lang][i]
+        n_path, w_path = ig.path_of("H", lang, text, "-n"), ig.path_of("H", lang, text, "-w")
+        if not (n_path.exists() and w_path.exists()):
+            return None
+        n, w = load(n_path), load(w_path)
+        n = n / (numpy.abs(n).max() + 1e-9) * .85
+        w = w / (numpy.abs(w).max() + 1e-9) * .85
+        off = int(.035 * RATE)
+        out = numpy.zeros(max(len(n), len(w) + off), dtype="float32")
+        out[:len(n)] += n
+        out[off:off + len(w)] += .5 * w
+        return edged(out)
+
+    def piece_of(i):
+        """A line of the recording, cut at its own ends: not into the next line's first sound, and faded at both ends so that nothing clicks."""
+        if film == "idol" and spec["lines"][i][3] == "crowd":
+            c = crowd_piece(i)
+            if c is not None:
+                return c
+        a0 = times[i][0] - .008
+        later = [s for s in starts_all if s > times[i][0] + .01]
+        room = (min(later) - times[i][1] - .02) if later else .3
+        tail = max(.02, min(.12 if spec["lines"][i][3] != "crowd" else .3, room))
+        return edged(voice[max(0, int(a0 * RATE)):int((times[i][1] + tail) * RATE)])
+
     cut = []
     for unit in units:
         a = min(times[i][0] for i in unit)
-        b = max(times[i][1] for i in unit) + (.12 if spec["lines"][unit[0]][3] != "crowd" else .35)
-        cut.append((a, b, voice[int(a * RATE):int(b * RATE)]))
+        cut.append((a, a, piece_of(unit[0])))
     phrases = phrases_of(vocals_path)
     lengths = [len(c[2]) / RATE for c in cut]
-    # English lengths decide which unit goes where, so that every language has the same places; only the squeeze differs.
     if lang != "en":
         eng = json.loads((songs / f"{stem}.times.json").read_text(encoding="utf-8")) if (songs / f"{stem}.times.json").exists() else times
         lengths_en = [max(eng[i][1] for i in u) - min(eng[i][0] for i in u) + .12 for u in units]
@@ -208,52 +265,139 @@ def main():
     starts_of = {k: times[units[k][0]][0] for k in movable}
     # Her call section (A7, 24-30 s: Squish! Sloppy~ Squish! Sloppy~ Louder, zaako!) is put on the mouths of that shot one to one, in order, before anything else.
     call_units, call_spans = [], []
+    merged = []
     if film == "idol":
         call_units = [k for k in movable if 23.5 <= starts_of[k] < 28.9]
         movable = [k for k in movable if k not in call_units]
         raw = [list(s) for s in sy.spans(sy.on_mask(sy.envelope(str(vocals_path))))]
-        merged = []
         for a, b in raw:
             if merged and a - merged[-1][1] < .18:
                 merged[-1][1] = b
             else:
                 merged.append([a, b])
         call_spans = [(a, b) for a, b in merged if 23.9 <= a < 30.3 and b - a >= .3]
-        while len(call_spans) > len(call_units):
-            shortest = min(range(len(call_spans)), key=lambda q: call_spans[q][1] - call_spans[q][0])
-            call_spans.pop(shortest)
         phrases = [ph for ph in phrases if not (23.9 <= ph[0] < 30.3)]
+
     def lengths_of(k):
         i = units[k][0]
-        base_len = times[i][1] - times[i][0] + (.12 if spec["lines"][i][3] != "crowd" else .35)
-        out = [base_len] + [times[j][1] - times[j][0] + .12 for j in forms_of.get(i, [])]
-        return out
+        base_len = len(cut[k][2]) / RATE
+        return [base_len] + [times[j][1] - times[j][0] + .12 for j in forms_of.get(i, [])]
 
-    hph = [in_h(a) for a, b in phrases] if film == "idol" else None
+    hph = [in_h((a + b) / 2) for a, b in phrases] if film == "idol" else None
     hunit = [in_h(starts_of[k]) for k in movable] if film == "idol" else None
     got = assign_forms([lengths_of(k) for k in movable], phrases, [starts_of[k] for k in movable], hph=hph, hunit=hunit)
     pick_of = {k: g for k, g in zip(movable, got)}
     pick = [pick_of[k] for k in movable]
     track = numpy.zeros(90 * RATE, dtype=numpy.float32)
-    rows, notes = [], []  # rows: (begins, ends, number of the unit)
-    W = {"en": [l[2] for l in spec["lines"]], **{k: spec["tongues"][k]["lines"] for k in ("ja", "ko", "zh")}}
+    rows, notes = [], []  # rows: (begins, ends, number of the line)
+    lane, shifted = [], []
 
     def words(language, u):
         return W[language][u] if film == "idol" and u >= 0 else " ".join(W[language][i] for i in units[u])
 
+    def unison(piece, i2, at):
+        """In a shot where the five sing together, the line is the five of them: her own voice with Chikuwa, Rune, Illya and Tsubakieh saying the same line, each in her own voice, to the same length."""
+        if film != "idol" or not in_g(at):
+            return piece
+        mixed, used = piece.astype("float32").copy(), 0
+        for letter, gain, off in UNISON:
+            path = ig.path_of(letter, lang, W[lang][i2])
+            if not path.exists():
+                continue
+            g = load(path)
+            g = cf.stretch(g, min(1.9, max(.6, len(g) / len(piece))), RATE)
+            g = edged(g[: len(piece)])
+            o = int(off * RATE)
+            g = g[: max(0, len(mixed) - o)]
+            mixed[o:o + len(g)] += gain * g
+            used += 1
+        if used:
+            peak = numpy.abs(mixed).max()
+            mixed *= max(numpy.abs(piece).max(), .3) / peak if peak > 0 else 1
+        return mixed
+
+    def put(piece, at, i2=None, wait=True, maxf=1.5, pin=False):
+        """
+        Lays a line in the track where it begins, never over another line of hers and never cutting one off. If another is still being said where it
+        begins, it waits for it (by up to 0.6 s); if the next begins before it ends, it is said faster to fit before it (by up to x1.5); if neither will do, it
+        is not laid (None). It is never cut off at the end of the film.
+        """
+        n = len(piece) / RATE
+        start = at
+        if pin:
+            # Her own mouth comes first: the line is laid on it, at its onset, never delayed and never left out.
+            if start + n > 89.97:
+                start = max(0.0, 89.97 - n)
+            s = int(start * RATE)
+            track[s:s + len(piece)] += piece[: len(track) - s]
+            lane.append((start, start + n))
+            if i2 is not None:
+                rows.append((start, start + n, i2))
+            return start
+        running = [e0 for s0, e0 in lane if s0 <= at + .02 < e0 - .02]
+        if running:
+            if not wait:
+                return None
+            start = max(running) + .03
+            if start - at > .6:
+                return None
+        later = [s0 for s0, e0 in lane if s0 > start + .02]
+        nxt = min(later) if later else 89.97
+        if start + n > nxt - .03:
+            avail = nxt - .03 - start
+            if avail <= .2 or n / avail > maxf or not wait:
+                return None
+            piece = cf.stretch(piece, n / avail, RATE)
+            n = len(piece) / RATE
+        if start + n > 89.97:
+            start = max(0.0, 89.97 - n)
+        if abs(start - at) > .005:
+            shifted.append((at, start))
+        s = int(start * RATE)
+        track[s:s + len(piece)] += piece[: len(track) - s]
+        lane.append((start, start + n))
+        if i2 is not None:
+            rows.append((start, start + n, i2))
+        return start
+
+    # Her call section (A7): every mouth of hers in the shot has a call on it, laid first and pinned: "Squish!" on each, and "Louder, zaako." on the last. The crowd's answers
+    # (her shout with her whisper) are not laid in this shot: the mouths run on without a gap for them.
+    if film == "idol" and call_units:
+        squish = next(k for k in call_units if spec["lines"][units[k][0]][2].startswith("Squish"))
+        louder = next(k for k in call_units if spec["lines"][units[k][0]][2].startswith("Louder"))
+        answer_text = next(W[lang][units[k][0]] for k in call_units if spec["lines"][units[k][0]][3] == "crowd")
+        answer_path = ig.path_of("H", lang, answer_text, "-n")
+        answer = edged(load(answer_path)) if answer_path.exists() else None
+        for n, (a, b) in enumerate(call_spans):
+            last = n == len(call_spans) - 1
+            k = louder if last else squish
+            i2 = units[k][0]
+            piece0 = cut[k][2]
+            if not last and answer is not None and b - a >= 1.1:
+                # a mouth long enough for the call and its answer has both, in her own voice: "Squish!" and "Sloppy~!", one after the other, to fill it
+                total = (len(piece0) + len(answer)) / RATE + .03
+                factor = max(total / max(b - a, total / 2.0), .8)
+                first, factor = stretch_to(piece0, len(piece0) / RATE / factor)
+                second = cf.stretch(answer, factor, RATE)
+                start = put(first, a, i2, pin=True)
+                put(second, start + len(first) / RATE + .03, units[call_units[1]][0], pin=True)
+                notes.append(f"{start:5.1f}-{start + total / factor:5.1f} s her call and its answer, pinned on her mouth {a:.1f}-{b:.1f}: x{factor:.2f}  {W[lang][i2]} {answer_text}")
+                continue
+            word = W[lang][i2]
+            if not last and answer is not None:
+                # a short mouth gets the word with the most voice in it (Sloppy~), which is heard where "Squish!" is mostly breath
+                piece0, i2, word = answer, units[call_units[1]][0], answer_text
+            share = min(max(b - a, len(piece0) / RATE / 2.0), len(piece0) / RATE / .6)
+            piece, factor = stretch_to(piece0, share)
+            start = put(piece, a, i2, pin=True)
+            notes.append(f"{start:5.1f}-{start + share:5.1f} s her call, pinned on her mouth {a:.1f}-{b:.1f}: x{factor:.2f}  {word}")
+        dropped = [W[lang][units[k][0]] for k in call_units if spec["lines"][units[k][0]][3] == "crowd"]
+        notes.append(f"the crowd's whispered double of the answers ({', '.join(dropped)}) is left out of this shot: her mouths leave no gap for it")
     # the intro stays where it was said
     for k, (a, b, piece) in enumerate(cut):
-        if k not in movable:
-            s = int(a * RATE)
-            track[s:s + len(piece)] += piece[: len(track) - s]
-            rows.append((a, b, k))
+        if k not in movable and k not in call_units:
+            put(piece, a, k)
             notes.append(f"{a:5.1f} s intro, left where it was said: nobody's mouth moves ({words(lang, k)})")
-    # Each line has its own length and, where there are shorter forms of it, theirs: forms[k] = [(index of the line in the spec, its piece)].
-    def piece_of(i):
-        a0 = times[i][0]
-        b0 = times[i][1] + (.12 if spec["lines"][i][3] != "crowd" else .35)
-        return voice[int(a0 * RATE):int(b0 * RATE)]
-
     forms = {k: [(units[k][0], cut[k][2])] + [(i2, piece_of(i2)) for i2 in forms_of.get(units[k][0], [])] for k in range(len(units))}
     cap = 1.15  # the most a line may be stretched: it is said at a natural pace
     byphrase = {}
@@ -261,12 +405,9 @@ def main():
         if ph is None:
             a0 = cut[u][0]
             if film == "idol":
-                # (No voice over a closed mouth: a line with no mouth to say it in is left out.)
                 notes.append(f"{a0:5.1f} s no mouth window for it within 4 s: LEFT OUT ({W[lang][units[u][0]]})")
                 continue
-            s0 = int(a0 * RATE)
-            track[s0:s0 + len(cut[u][2])] += cut[u][2][: len(track) - s0]
-            rows.append((a0, a0 + len(cut[u][2]) / RATE, units[u][0]))
+            put(cut[u][2], a0, units[u][0])
             notes.append(f"{a0:5.1f} s no mouth window within 4 s: left where it was said ({W[lang][units[u][0]]})")
         else:
             byphrase.setdefault(ph, []).append(u)
@@ -277,7 +418,13 @@ def main():
         level = {u: 0 for u in us}
         size = lambda u: len(forms[u][level[u]][1]) / RATE
         total = lambda: sum(size(u) for u in us) + .08 * (len(us) - 1)
-        hot = film == "idol" and in_h(a)
+        hot = film == "idol" and in_h((a + b) / 2)
+        if hot:
+            for u in [u for u in us if spec["lines"][units[u][0]][3] == "crowd"]:
+                notes.append(f"{a:5.1f}-{b:5.1f} s the crowd's answer ({W[lang][units[u][0]]}) is left out of her close-up: her mouth leaves no gap for it")
+                us.remove(u)
+            if not us:
+                continue
         cap = H_CAP if hot else 1.15
         while total() > cap * (b - a):
             candidates = [u for u in us if level[u] + 1 < len(forms[u])]
@@ -286,10 +433,8 @@ def main():
             level[max(candidates, key=size)] += 1
         for u in list(us):
             if not hot and total() > cap * (b - a) and size(u) > b - a and len(us) == 1 and b - a < .78:
-                # a mouth shorter than any word she has: left silent
                 notes.append(f"{a:5.1f}-{b:5.1f} s mouth too short for a word ({W[lang][units[u][0]]}): left silent")
                 us.remove(u)
-                over_count += 0
         if not us:
             continue
         stretch_all = max(.85, min(cap, total() / (b - a)))
@@ -299,59 +444,59 @@ def main():
             share = len(piece0) / RATE / stretch_all
             piece, factor = stretch_to(piece0, share)
             at = max(at, free)
-            s = int(at * RATE)
-            track[s:s + len(piece)] += piece[: len(track) - s]
-            rows.append((at, at + len(piece) / RATE, i2))
-            over = at + share - b
+            piece = unison(piece, i2, at)
+            start = put(piece, at, i2, pin=hot)
+            if start is None:
+                notes.append(f"{at:5.1f} s no room for it between the lines either side: LEFT OUT ({W[lang][i2]})")
+                continue
+            over = start + share - b
             bad = over > .12
             over_count += 1 if bad and not hot else 0
             if level[u]:
                 shortened.append(f"{W['en'][units[u][0]]} -> {W[lang][i2]}")
             flag = (f" <-- (her close-up: said {over:.1f} s long, so that she is heard)" if hot else f" <-- RUNS {over:.1f} s PAST ITS MOUTH even in its shortest form") if bad else ""
-            notes.append(f"{at:5.1f}-{at + share:5.1f} s phrase {a:.1f}-{b:.1f}: x{factor:.2f}  form {level[u]}  {W[lang][i2]}{flag}")
-            free = at + share + .08
-            at += share + .08
-    for n, k in enumerate(call_units):
-        a, b = call_spans[min(n, len(call_spans) - 1)]
-        i2, piece0 = forms[k][0]
-        share = min(max(b - a, len(piece0) / RATE / H_CAP), len(piece0) / RATE / .8)
-        if n >= len(call_spans):
-            a = max(a, free)
-        piece, factor = stretch_to(piece0, share)
-        s = int(a * RATE)
-        track[s:s + len(piece)] += piece[: len(track) - s]
-        rows.append((a, a + len(piece) / RATE, i2))
-        notes.append(f"{a:5.1f}-{a + share:5.1f} s her call, on the mouth {a:.1f}-{b:.1f} (her close-up): x{factor:.2f}  {W[lang][i2]}")
-    # A mouth that is left with no line (0.6 s or more) is given a call she already has, said again: "Squish!" for a short one, "Louder" for a longer.
+            tag = " [the five in unison]" if film == "idol" and in_g(at) and any(ig.path_of(l, lang, W[lang][i2]).exists() for l, _, _ in UNISON) else ""
+            notes.append(f"{start:5.1f}-{start + share:5.1f} s phrase {a:.1f}-{b:.1f}: x{factor:.2f}  form {level[u]}  {W[lang][i2]}{tag}{flag}")
+            free = start + share + .08
+            at = start + share + .08
+    # A mouth that is left with no line is given a line she already has, said again: in a shot where the five sing, the line of that shot, in unison; in her close-up,
+    # a call of hers; elsewhere "Squish!" for a short one and "Louder" for a longer.
     short_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Squish!") and spec["lines"][u[0]][3] == "call" and times[u[0]][0] >= INTRO)
     long_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Louder"))
     filled = []
-    for j, (a, b) in enumerate(phrases):
-        if j in byphrase or b - a < (.3 if film == "idol" and in_h(a) else .78):
-            continue
-        k = long_unit if b - a >= 1.5 else short_unit
-        piece, factor = stretch_to(cut[k][2], min(max(b - a, len(cut[k][2]) / RATE / cap), len(cut[k][2]) / RATE / .85))
-        s = int(a * RATE)
-        track[s:s + len(piece)] += piece[: len(track) - s]
-        rows.append((a, a + len(piece) / RATE, units[k][0]))
+
+    def fill(a, b, why):
+        if film == "idol" and in_g((a + b) / 2):
+            u = next(line for (x, y), line in G_FILL if x <= a < y)
+        else:
+            u = long_unit if (b - a >= (1.2 if film == "idol" and in_h((a + b) / 2) else 1.5)) else short_unit
+        # the longest form of the line that fits the mouth, or the shortest
+        fits = [f for f in forms[u] if len(f[1]) / RATE <= H_CAP * (b - a)]
+        i2, piece0 = fits[0] if fits else forms[u][-1]
+        piece, factor = stretch_to(piece0, min(max(b - a, len(piece0) / RATE / H_CAP), len(piece0) / RATE / .8))
+        piece = unison(piece, i2, a)
+        start = put(piece, a, i2, wait=False, maxf=2.0, pin=(film == "idol" and in_h((a + b) / 2)))
+        if start is None:
+            notes.append(f"{a:5.1f}-{b:5.1f} s {why}: not filled, another line of hers is being said there")
+            return
         filled.append(f"{a:.1f}-{b:.1f}")
-        notes.append(f"{a:5.1f}-{b:5.1f} s mouth with no line: filled with her call again, x{factor:.2f}  {W[lang][units[k][0]]}")
+        notes.append(f"{start:5.1f}-{b:5.1f} s {why}: filled with a line again, x{factor:.2f}  {W[lang][i2]}" + (" [the five in unison]" if film == "idol" and in_g(a) else ""))
+
+    for j, (a, b) in enumerate(phrases):
+        if j in byphrase or b - a < (.3 if film == "idol" and (in_h((a + b) / 2) or in_g((a + b) / 2)) else .78):
+            continue
+        fill(a, b, "mouth with no line")
     if film == "idol":
-        # (And any mouth of her close-ups, 0.3 s or more, that nothing covers yet, even one too short to have been a phrase.)
         for a, b in merged:
-            if b - a < .3 or not in_h(a):
+            if b - a < .3 or not (in_h((a + b) / 2) or in_g((a + b) / 2)):
                 continue
             covered = sum(max(0, min(b, r1) - max(a, r0)) for r0, r1, _ in rows) / (b - a)
             if covered >= .35:
                 continue
-            piece, factor = stretch_to(cut[short_unit][2], min(max(b - a, len(cut[short_unit][2]) / RATE / H_CAP), len(cut[short_unit][2]) / RATE / .8))
-            s = int(a * RATE)
-            track[s:s + len(piece)] += piece[: len(track) - s]
-            rows.append((a, a + len(piece) / RATE, units[short_unit][0]))
-            filled.append(f"{a:.1f}-{b:.1f}")
-            notes.append(f"{a:5.1f}-{b:5.1f} s her close-up, mouth with nothing on it: filled with her call again, x{factor:.2f}  {W[lang][units[short_unit][0]]}")
+            fill(a, b, "mouth with nothing on it")
     bare = [f"{a:.1f}-{b:.1f}" for j, (a, b) in enumerate(phrases) if j not in byphrase and f"{a:.1f}-{b:.1f}" not in filled]
     notes.append("mouths still with no voice (shorter than any word she has): " + (", ".join(bare) if bare else "none"))
+    notes.append(f"clips that had to wait for another so as not to cut it: {len(shifted)}" + ("".join(f" ({x:.2f} -> {y:.2f})" for x, y in shifted[:12])))
     notes.append(f"RESULT {shape} {lang}: lines over their mouth: {over_count}")
     peak = numpy.abs(track).max()
     track *= .9 / peak if peak > .9 else 1

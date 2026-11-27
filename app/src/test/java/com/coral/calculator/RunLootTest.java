@@ -19,14 +19,17 @@ public class RunLootTest {
             int level = RunLoot.levelAt(xp);
             table[number - 1] = level;
             RunLevels.Level land = RunLevels.level(number);
-            int tough = RunLevels.toughOf(number), creatures = 0;
+            int tough = RunLevels.toughOf(number), creatures = 0, swarmed = 0;
             boolean boss = false;
             for (int[] foe : land.foes) {
                 if (foe[0] == RunLevels.TARGET || foe[1] >= land.main) continue;
                 if (RunLevels.boss(foe[0]) && !RunLevels.rover(foe[0])) boss = true;
+                else if (RunLevels.swarmed(foe)) swarmed++;
+                else if (RunLevels.uniqueSpec(foe)) creatures += PlusRun.UNIQUE_XP;
                 else creatures++;
             }
-            xp += Math.round(creatures * .7 * RunLoot.xpFor(false, tough, number, level));
+            // (One of a swarm gives its share.)
+            xp += Math.round((creatures + swarmed / (double) PlusRun.SWARM_SHARE) * .7 * RunLoot.xpFor(false, tough, number, level));
             if (boss) xp += RunLoot.xpFor(true, tough, number, level);
         }
         return table;
@@ -125,7 +128,7 @@ public class RunLootTest {
         for (PlusRun.Foe foe : run.foes()) {
             if (RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET) continue;
             foe.flat = true;
-            creatures++;
+            if (!foe.swarm) creatures++;
         }
         run.step(STEP, false, false, false);
         assertTrue(run.scattered().size() >= creatures);
@@ -138,13 +141,15 @@ public class RunLootTest {
         for (float gone = 0; gone < 45; gone += STEP) run.step(STEP, false, false, false);
         assertEquals(0, run.scattered().size());
         // Over many lands' creatures, things to keep fall about as often as their chances say, and the rose not at all.
-        int dropped = 0, falls = 0;
+        int dropped = 0;
+        double falls = 0;
         for (int number = 1; number <= 40; number++) {
             PlusRun one = new PlusRun(RunLevels.level(number));
             for (PlusRun.Foe foe : one.foes()) {
                 if (RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET) continue;
                 foe.flat = true;
-                falls++;
+                // (One of a swarm counts for its share.)
+                falls += foe.swarm ? 1.0 / PlusRun.SWARM_SHARE : 1;
             }
             one.step(STEP, false, false, false);
             for (PlusRun.Drop drop : one.scattered()) {

@@ -1293,14 +1293,14 @@ public class PlusRunTest {
                 base = 0;
             }
             for (int[] foe : level.foes) {
-                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET) continue;
+                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET || RunLevels.uniqueSpec(foe)) continue;
                 if (!RunLevels.crowd(foe)) {
                     laid++;
                     kinds.add(foe[0]);
                 }
             }
             for (int[] foe : sorted) {
-                if (!RunLevels.crowd(foe) || RunLevels.flier(foe[0])) continue;
+                if (!RunLevels.crowd(foe) || RunLevels.flier(foe[0]) || RunLevels.swarmed(foe)) continue;
                 more++;
                 // Of a kind the land has already; standing on its ground or on a ledge, with room over it; clear of the start, of flags and of where the land ends.
                 assertTrue("land " + number + " kind " + foe[0], kinds.contains(foe[0]) || foe[0] == RunLevels.MINUS);
@@ -1330,7 +1330,7 @@ public class PlusRunTest {
                     if (foe[0] == RunLevels.TIMES && other[0] == RunLevels.TIMES) {
                         assertTrue("land " + number + " times at " + foe[1], Math.abs(other[1] + (RunLevels.crowd(other) && other[4] == 2 ? 1 : .5f) - middle) >= 5);
                     }
-                    if (!RunLevels.crowd(other)) continue;
+                    if (!RunLevels.crowd(other) || RunLevels.swarmed(other)) continue;
                     float apart = Math.abs(other[1] + (other[4] == 2 ? 1 : .5f) - middle);
                     assertTrue("land " + number + " at " + foe[1] + " apart " + apart, apart >= (foe[0] == RunLevels.TIMES || other[0] == RunLevels.TIMES ? 2 : 1.5f));
                     tightest = Math.min(tightest, apart - wide);
@@ -4872,6 +4872,11 @@ public class PlusRunTest {
                 PlusRun.Foe foe = run.foes().get(index);
                 assertEquals(spec[0], foe.kind);
                 if (RunLevels.boss(spec[0])) continue;
+                // (The unique creatures have health of their own: RunUniquesTest.)
+                if (RunUniques.is(spec[0])) {
+                    assertEquals(RunUniques.health(spec[0], number) * PlusRun.TIER_HEALTH[foe.tier] + run.tough() * PlusRun.BLOW, foe.left);
+                    continue;
+                }
                 boolean spared = spec[0] == RunLevels.TARGET || spec[0] == RunLevels.WISP || spec[0] == RunLevels.RIME;
                 assertEquals("land " + number, PlusRun.healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * PlusRun.TIER_HEALTH[foe.tier] + (spared ? 0 : run.tough()) * PlusRun.BLOW, foe.left);
                 if (!spared) tougher++;
@@ -6218,7 +6223,7 @@ public class PlusRunTest {
                     if (sort == RunHunts.OF_KIND) assertTrue(where, RunHunts.GROUP_FROM[what] <= open && many >= 3);
                     else if (sort == RunHunts.ROVER) assertTrue(where, RunHunts.ROVER_FROM[what] <= open && many == 1);
                     else if (sort == RunHunts.CELLAR) assertTrue(where, open >= RunHunts.CELLAR_FROM && many == 1 && what == (RunHunts.tier(hunt) >= 3 ? PlusRun.RANK_S : PlusRun.RANK_A));
-                    else assertTrue(where, what == RunHunts.LANDING || (owned >> what - 1 & 1) != 0);
+                    else assertTrue(where, what == RunHunts.LANDING || what == RunHunts.TREES && open >= RunLevels.TREES_FROM || what != RunHunts.TREES && (owned >> what - 1 & 1) != 0);
                     assertTrue(where, RunHunts.materials(hunt)[0] >= 1);
                     assertFalse(where, RunHunts.words(hunt).isEmpty() || RunHunts.brief(hunt).isEmpty());
                 }
@@ -7549,7 +7554,7 @@ public class PlusRunTest {
             assertEquals("land " + number, 2, stalls);
             assertTrue("land " + number, level.decor.size() >= 8);
             for (char[] row : level.land) for (char square : row) ground[square] = true;
-            for (int[] foe : level.foes) signs[foe[0]] = true;
+            for (int[] foe : level.foes) if (foe[0] < signs.length) signs[foe[0]] = true;
             movers += level.movers.size();
             doors += level.doors.size();
             // The ground is not all at one height.
@@ -7607,7 +7612,7 @@ public class PlusRunTest {
         }
         assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length
                 // (The two lines about sloppy copies in the lands, her line with the game's name in it, and the keys.)
-                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length, lines);
+                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.
@@ -7666,10 +7671,54 @@ public class PlusRunTest {
 
     /** Plays a plan out on a run: what the buttons do at each step of it. */
     private static void act(PlusRun run, int plan, int step) {
-        if (plan == WALK) run.step(STEP, false, true, false);
-        else if (plan == WAIT) run.step(STEP, false, false, false);
-        else if (plan == BACK) run.step(STEP, true, false, false);
-        else run.step(STEP, false, true, step < HOLDS[plan - 3]);
+        boolean strike = fighting && strikeNow(run);
+        if (plan == WALK) run.step(STEP, false, true, false, strike);
+        else if (plan == WAIT) run.step(STEP, false, false, false, strike);
+        else if (plan == BACK) run.step(STEP, true, false, false, strike);
+        else run.step(STEP, false, true, step < HOLDS[plan - 3], strike);
+    }
+
+    /** Whether the bot fights as it goes: a tap of what it holds, five times a second, while a creature is near. */
+    private static boolean fighting;
+
+    private static boolean strikeNow(PlusRun run) {
+        if ((int) (run.time() * 10) % 2 != 0) return false;
+        float middle = run.x() + PlusRun.WIDE / 2, feet = run.y() + PlusRun.TALL;
+        for (PlusRun.Foe foe : run.foes()) {
+            if (foe.flat || foe.unseen || RunLevels.boss(foe.kind)) continue;
+            if (Math.abs(foe.x + foe.wide() / 2 - middle) < 2.6f && Math.abs(foe.y + foe.tall() - feet) < 1.6f) return true;
+        }
+        return false;
+    }
+
+    /**
+     * A fair player: the crossing bot, striking too when a creature is near, at the level the land is for and with what she has from
+     * the start, crosses a land of every chapter with all its swarms and its unique creatures in it, and keeps a life. (Who waits at
+     * the end is left out, as for the other crossings: those fights have tests of their own.)
+     */
+    @Test public void aFairPlayerWhoFightsCrossesALandOfEveryChapterWithItsSwarmsAndUniques() {
+        StringBuilder lost = new StringBuilder();
+        int crossed = 0, beaten = 0;
+        fighting = true;
+        try {
+            for (int number : new int[]{3, 9, 15, 21, 27, 35, 45, 55, 65, 75, 85, 95}) {
+                RunLevels.Level level = RunLevels.level(number);
+                for (int index = level.foes.size() - 1; index >= 0; index--) if (RunLevels.boss(level.foes.get(index)[0])) level.foes.remove(index);
+                for (int index = level.items.size() - 1; index >= 0; index--) if (level.items.get(index)[0] >= PlusRun.PET) level.items.remove(index);
+                level.guarded = false;
+                PlusRun run = cross(level, number > RunLevels.COUNT ? 500 : 360);
+                lost.append(" ").append(number).append(":").append(run.livesLost()).append(run.state() == PlusRun.WON ? "" : run.state() == PlusRun.PLAYING ? " (stuck at " + (int) run.x() + " of " + run.columns() + ")" : " LOST");
+                // Never every life lost; and most of them crossed to the end. (One that is not was held up by the way, not beaten: the
+                // bot does not fight well from a ledge, or climb past creatures standing on it.)
+                if (run.state() == PlusRun.LOST) beaten++;
+                if (run.state() == PlusRun.WON) crossed++;
+            }
+        } finally {
+            fighting = false;
+        }
+        System.out.println("FAIR lives lost" + lost);
+        assertEquals("beaten:" + lost, 0, beaten);
+        assertTrue("crossed " + crossed + ":" + lost, crossed >= 8);
     }
 
     private static int length(int plan) { return plan == WALK ? 4 : plan == WAIT ? 12 : plan == BACK ? 14 : 6; }
@@ -7795,7 +7844,8 @@ public class PlusRunTest {
     private static RunLevels.Level unguarded(RunLevels.Level level) {
         for (int index = level.foes.size() - 1; index >= 0; index--) {
             // (Nor those put in to make up a land's numbers: what is proved is that the land itself can be crossed.)
-            if (RunLevels.boss(level.foes.get(index)[0]) || RunLevels.crowd(level.foes.get(index))) level.foes.remove(index);
+            // (Nor the unique creatures, which are put in after the land is made, like them: RunUniquesTest fights them.)
+            if (RunLevels.boss(level.foes.get(index)[0]) || RunLevels.crowd(level.foes.get(index)) || RunLevels.uniqueSpec(level.foes.get(index))) level.foes.remove(index);
         }
         // (Nor a pet that lies waiting: the land is crossed without one.)
         for (int index = level.items.size() - 1; index >= 0; index--) if (level.items.get(index)[0] >= PlusRun.PET) level.items.remove(index);
@@ -7808,7 +7858,9 @@ public class PlusRunTest {
             PlusRun run = cross(unguarded(RunLevels.level(number)), 240);
             assertEquals("land " + number + " stopped at " + run.x() + " of " + run.columns() + " with " + run.hearts() + " hearts" + around(run),
                     PlusRun.WON, run.state());
-            assertEquals("land " + number, run.maxHearts(), run.hearts());
+            // (With its swarms, from the thirteenth land on a bot that only jumps and stomps may lose a heart; never a life.)
+            // (With its swarms, from the thirteenth land on a bot that only jumps and stomps may lose a heart; never a life.)
+            assertTrue("land " + number + " with " + run.hearts(), run.hearts() >= run.maxHearts() - (number <= 12 ? 0 : 1) && run.livesLost() == 0);
         }
     }
 

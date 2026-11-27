@@ -313,21 +313,28 @@ final class RunLoot {
      * Never better than blue, weaker than the real thing, and plain. For each, the kind of weapon it is (by its place among the twelve), its name and its picture.
      */
     static final int PAPER = 13, SCYTHE = 11;
-    static final int[] PAPER_BASES = {SCYTHE};
-    static final String[] PAPER_NAMES = {"Folded Page Scythe"};
-    static final int PAPER_ICONS = 229;
+    /** Of the paper weapons, those that drop (the rest are folded at the smithy); and where each kind's picture is (the scythe's first, the rest after the katana blades). */
+    static final int[] PAPER_DROPS = {SCYTHE};
+    static final int PAPER_ICONS = 229, MORE_PAPER_ICONS = 243;
+
+    /**
+     * The Mother Tongue's Quill: the one weapon above all others, a quill from the page wing of the Mother Tongue herself, crafted at the
+     * very last at the smithy. A pen, of the rose, of a "chapter" of its own.
+     */
+    static final int MOTHER = 14, PEN = 6, QUILL_ICON = 254;
+    static final int QUILL = code(WEAPON, MOTHER, PEN, ROSE);
+
+    static boolean ultimate(int code) { return code == QUILL; }
 
     static boolean paper(int code) { return type(code) == WEAPON && theme(code) == PAPER; }
 
-    static int paperIndex(int code) {
-        for (int index = 0; index < PAPER_BASES.length; index++) if (PAPER_BASES[index] == base(code)) return index;
-        return 0;
-    }
+    static int paperIndex(int code) { return base(code) % WEAPONS.length; }
 
     /** What it is called: its rarity is said by its colour, not its name; the rose is named for her. */
     static String name(int code) {
         if (addition(code)) return "Book of Addition";
-        if (paper(code)) return PAPER_NAMES[paperIndex(code)];
+        if (paper(code)) return "Folded Page " + WEAPONS[paperIndex(code)];
+        if (ultimate(code)) return "The Mother Tongue's Quill";
         int type = type(code), base = base(code), theme = Math.min(THEMES.length - 1, theme(code));
         String what = type == WEAPON ? WEAPONS[base % WEAPONS.length] : type == ARMOUR ? ARMOURS[base % ARMOURS.length] : ACCESSORIES[base % ACCESSORIES.length];
         // (The rose's own accessory is named for her already.)
@@ -360,7 +367,7 @@ final class RunLoot {
         if (type == WEAPON && baseRoll % WEAPONS.length == BOOK && theme <= 1 && rarity <= BLUE && baseRoll % 3 == 0) return code(WEAPON, ADDITION, BOOK, rarity);
         // (And in the first three chapters, a white or blue weapon that has a paper version is that, half the time.)
         if (type == WEAPON && theme <= 2 && rarity <= BLUE && baseRoll / WEAPONS.length % 2 == 0) {
-            for (int paperBase : PAPER_BASES) if (baseRoll % WEAPONS.length == paperBase) return code(WEAPON, PAPER, paperBase, rarity);
+            for (int paperBase : PAPER_DROPS) if (baseRoll % WEAPONS.length == paperBase) return code(WEAPON, PAPER, paperBase, rarity);
         }
         int count = type == WEAPON ? WEAPONS.length : ARMOURS.length;
         // (The better armours come from the later chapters: of thirty, a chapter's run of them goes up with it.)
@@ -373,7 +380,8 @@ final class RunLoot {
 
     static int iconOf(int code) {
         if (addition(code)) return ADDITION_ICON;
-        if (paper(code)) return PAPER_ICONS + paperIndex(code);
+        if (paper(code)) return paperIndex(code) == SCYTHE ? PAPER_ICONS : MORE_PAPER_ICONS + paperIndex(code);
+        if (ultimate(code)) return QUILL_ICON;
         int type = type(code), base = base(code);
         if (type == WEAPON) return rarity(code) == ROSE ? ROSE_ICONS + base % 12 : base % 12 * 12 + Math.min(11, theme(code));
         return type == ARMOUR ? ARMOUR_ICONS + base % ARMOURS.length : ACCESSORY_ICONS + base % ACCESSORIES.length;
@@ -421,11 +429,11 @@ final class RunLoot {
     static int recommended(int number) { return RECOMMENDED[Math.max(1, Math.min(RECOMMENDED.length, number)) - 1]; }
 
     static final int[] RECOMMENDED = {
-            1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 7, 8, 9, 10, 11, 11, 12, 13, 14, 14,
-            15, 16, 17, 18, 19, 20, 22, 23, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 37,
-            37, 38, 39, 41, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54, 55, 57, 58,
-            58, 60, 61, 62, 63, 64, 65, 66, 67, 68, 68, 70, 71, 72, 73, 74, 75, 77, 78, 80,
-            81, 82, 84, 86, 87, 89, 91, 92, 94, 95, 97, 98, 100, 101, 103, 104, 106, 108, 109, 110};
+            1, 2, 3, 3, 4, 5, 6, 7, 7, 8, 9, 10, 10, 12, 12, 13, 14, 15, 16, 16,
+            17, 19, 20, 21, 21, 22, 24, 26, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 39, 41,
+            42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 54, 55, 56, 58, 59, 60, 62, 63, 64,
+            65, 67, 68, 69, 70, 71, 72, 73, 74, 76, 76, 78, 79, 80, 82, 82, 84, 86, 88, 89,
+            90, 92, 94, 95, 97, 99, 101, 103, 105, 106, 108, 109, 111, 113, 114, 116, 118, 120, 121, 123};
 
     /** How much harder her blows land, at a level: a part of a blow more for each level, gathered up. */
     static float power(int level) { return 1 + .03f * (level - 1); }

@@ -449,6 +449,118 @@ final class RunLevels {
     /** How many times as many of those that fly are put in as a land was laid with. */
     static int flocksOf(int number) { return 2 + (levelOf(number) - 1) / 5; }
 
+    /** The first land with paper trees in it; and how many a land has. */
+    static final int TREES_FROM = 2;
+
+    static int treesIn(int number) { return number < TREES_FROM ? 0 : 2 + number / 25; }
+
+    /**
+     * Paper trees: a few in every land from the second, on flat open ground clear of everything else, each of a grade by the land's
+     * chapter (plain, fine from the fourth chapter, golden from the eighth). Drawn from numbers of their own.
+     */
+    private static void plant(Level level) {
+        int number = level.number, want = treesIn(number), until = level.arena >= 0 ? level.arena - 10 : level.gate - 6, chapter = Math.min(11, chapterOf(number));
+        if (want == 0) return;
+        Random random = new Random(104729L * number + 7919);
+        List<Integer> free = new ArrayList<>();
+        for (int column = 14; column < until; column++) {
+            int floor = top(level, column);
+            boolean clear = floor > 5 && floor < level.land.length && top(level, column - 1) == floor && top(level, column + 1) == floor;
+            for (int row = floor - 4; row < floor && clear; row++) clear = row >= 0 && level.land[row][column] == AIR;
+            for (int flag : level.flags) clear &= Math.abs(flag - column) > 4;
+            for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 6;
+            for (int[] room : level.rooms) clear &= Math.abs(room[1] - column) > 3;
+            for (int[] item : level.items) clear &= item[1] >= level.main || Math.abs(item[1] - column) > 2;
+            for (int[] weapon : level.weapons) clear &= Math.abs(weapon[1] - column) > 2;
+            // (Those put in to make up the numbers may stand by a tree; nothing else does.)
+            for (int[] foe : level.foes) clear &= crowd(foe) || foe[1] >= level.main || Math.abs(foe[1] - column) > 1 || foe[2] < floor - 5;
+            if (clear) free.add(column);
+        }
+        for (int count = 0; count < want && !free.isEmpty(); count++) {
+            int column = free.get(random.nextInt(free.size()));
+            level.trees.add(new int[]{column, top(level, column) - 1, RunCraft.grade(chapter, random.nextInt(100))});
+            for (int index = free.size() - 1; index >= 0; index--) if (Math.abs(free.get(index) - column) < 14) free.remove(index);
+        }
+    }
+
+    /** Whether one was put in as one of a swarm (1), or is one of the unique creatures (2). */
+    static boolean swarmed(int[] foe) { return foe.length > 5 && foe[5] == 1; }
+
+    static boolean uniqueSpec(int[] foe) { return foe.length > 5 && foe[5] == 2; }
+
+    /** How many of its chapter's unique creatures a land has: four at first, sixteen in the last lands. */
+    static int uniquesIn(int number) { return 4 + number / 8; }
+
+    /**
+     * The unique creatures of a land's chapter: in small groups of one kind, on the ground along the land (the hornets in a line in the
+     * air over it), with room about each group; a mini-boss alone, once, two thirds of the way along. They keep clear of the start,
+     * flags, doors, villages and anything else that is a place of its own. Drawn from numbers of their own, so that the land is as it was.
+     */
+    private static void uniques(Level level) {
+        int number = level.number, chapter = Math.min(11, chapterOf(number)), until = level.arena >= 0 ? level.arena - 10 : level.gate - 6;
+        Random random = new Random(1299709L * number + 15485863);
+        List<int[]> spots = new ArrayList<>();
+        for (int column = 30; column < until; column++) {
+            boolean near = false;
+            for (int flag : level.flags) near |= Math.abs(flag - column) < 6;
+            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 8;
+            for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
+            for (int[] item : level.items) if (item[1] < level.main) near |= Math.abs(item[1] - column) < 4;
+            for (int[] weapon : level.weapons) near |= Math.abs(weapon[1] - column) < 2;
+            for (int[] foe : level.foes) if (rover(foe[0]) || uniqueSpec(foe)) near |= Math.abs(foe[1] - column) < (rover(foe[0]) ? 16 : 3);
+            if (near) continue;
+            int floor = top(level, column);
+            boolean flat = floor > 5 && floor < level.land.length && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR
+                    && level.land[floor - 3][column] == AIR && top(level, column + 1) == floor && top(level, column - 1) == floor;
+            if (flat) spots.add(new int[]{column, floor});
+        }
+        if (spots.isEmpty()) return;
+        int first = RunUniques.first(chapter), want = uniquesIn(number);
+        boolean bossy = RunUniques.way(first) == RunUniques.MINIBOSS || RunUniques.way(first + 1) == RunUniques.MINIBOSS;
+        // The mini-boss, alone, two thirds of the way along.
+        if (bossy) {
+            int kind = RunUniques.way(first) == RunUniques.MINIBOSS ? first : first + 1;
+            int[] spot = spots.get(Math.min(spots.size() - 1, spots.size() * 2 / 3));
+            level.foes.add(new int[]{kind, spot[0], spot[1] - 1, 1, 0, 2});
+            want--;
+        }
+        List<Integer> taken = new ArrayList<>();
+        for (int tries = 0; tries < 200 && want > 0; tries++) {
+            int[] spot = spots.get(random.nextInt(spots.size()));
+            boolean clear = true;
+            for (int column : taken) clear &= Math.abs(column - spot[0]) >= 9;
+            for (int[] foe : level.foes) if (uniqueSpec(foe)) clear &= Math.abs(foe[1] - spot[0]) >= 9;
+            if (!clear) continue;
+            int kind = first + random.nextInt(2);
+            if (RunUniques.way(kind) == RunUniques.MINIBOSS) kind = kind == first ? first + 1 : first;
+            taken.add(spot[0]);
+            if (RunUniques.flies(kind)) {
+                // A line of hornets in the air, three squares up.
+                int size = Math.min(want, 3 + random.nextInt(3)), put = 0;
+                for (int one = 0; one < size; one++) {
+                    boolean clearOfFlags = spot[0] + one < until;
+                    for (int flag : level.flags) clearOfFlags &= Math.abs(flag - spot[0] - one) >= 6;
+                    if (!clearOfFlags) break;
+                    level.foes.add(new int[]{kind, spot[0] + one, spot[1] - 4, 1, 0, 2});
+                    put++;
+                }
+                want -= Math.max(1, put);
+                continue;
+            }
+            int size = Math.min(want, 1 + random.nextInt(number < 12 ? 2 : 3));
+            for (int one = 0; one < size; one++) {
+                int column = spot[0] + one * 2;
+                boolean clearOfFlags = column < until;
+                for (int flag : level.flags) clearOfFlags &= Math.abs(flag - column) >= 6;
+                boolean flatThere = false;
+                for (int[] other : spots) flatThere |= other[0] == column && other[1] == spot[1];
+                if (!flatThere || !clearOfFlags) break;
+                level.foes.add(new int[]{kind, column, spot[1] - 1, 1, 0, 2});
+                want--;
+            }
+        }
+    }
+
     /** Whether something of a land was put in to make up its numbers. */
     static boolean crowd(int[] foe) { return foe.length > 4 && foe[4] != 0; }
 
@@ -545,6 +657,115 @@ final class RunLevels {
         int known = 0;
         for (int kind = DRIFTER; kind <= RIME; kind++) if (FLIES_FROM[kind - DRIFTER] <= number) known++;
         for (int more = 0; more < fliersIn(number) * flocksOf(number); more++) perch(level, DRIFTER + random.nextInt(known), 18 + random.nextInt(Math.max(1, until - 30)), until - 2, true);
+    }
+
+    /**
+     * How many times as many creatures as it was laid with a land has at last: twenty in the first three lands, and from there up to
+     * fifty in the last. (The packs that make up its numbers, {@link #crowd}, give two to ten times; the swarms give the rest.)
+     */
+    static int swarmOf(int number) { return number <= 3 ? 20 : Math.min(50, 20 + 30 * (number - 3) / (TOTAL - 3)); }
+
+    /** How many a swarm has: small in the first lands, a crowd in the last. */
+    static int swarmSize(int number, Random random) { return number <= 3 ? 4 + random.nextInt(3) : Math.min(30, 4 + number / 5 + random.nextInt(4)); }
+
+    /**
+     * Swarms: what a land is short of its count is made up of creatures gathered in a few places, not spread along it. Each swarm is
+     * round one place on the ground or on a ledge, and takes the squares near it on the ground and on every ledge over it, two to a
+     * square where it is thick: a crowd at the foot of a climb, a ledge stacked with them, a pack waiting where the way narrows. They
+     * keep clear of the start, of flags, villages, doors and of anything else that is a place of its own; there is a stretch with
+     * nobody in it between one swarm and the next, for her to get her breath back. They are of the kinds the land has (never a times,
+     * which cannot be landed on, and now and then one that throws or shoots), marked as put in to make up the numbers: they keep still
+     * until she is near. Drawn from numbers of their own, so that the land under them is the land it was.
+     */
+    private static void swarm(Level level) {
+        int number = level.number, until = level.arena >= 0 ? level.arena - 10 : level.gate - 6, base = 0, now = 0;
+        Random random = new Random(7919L * number + 104729);
+        List<Integer> walkers = new ArrayList<>(), shooters = new ArrayList<>();
+        for (int[] foe : level.foes) {
+            if (foe[1] >= level.main || boss(foe[0]) || flier(foe[0]) || foe[0] == TARGET || rover(foe[0])) continue;
+            now++;
+            if (!crowd(foe)) base++;
+            if (foe[0] == THROWER || foe[0] == GUNNER) shooters.add(foe[0]);
+            else if (foe[0] != WORD && foe[0] != DRAGON && foe[0] != ZERO && foe[0] != TIMES) walkers.add(foe[0]);
+        }
+        if (walkers.isEmpty()) walkers.add(MINUS);
+        int want = Math.max(1, base) * swarmOf(number) - now;
+        if (want <= 0) return;
+        // Where one could stand, as crowd() has it: the ground and the ledges, with room over them, clear of every place of its own.
+        List<int[]> spots = new ArrayList<>();
+        for (int column = 24; column < until; column++) {
+            boolean near = false;
+            for (int flag : level.flags) near |= Math.abs(flag - column) < 6;
+            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 8;
+            for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
+            for (int[] item : level.items) if (item[1] < level.main) near |= Math.abs(item[1] - column) < (item[3] != 0 || item[0] >= PlusRun.CHEST ? 6 : 3);
+            for (int[] weapon : level.weapons) near |= Math.abs(weapon[1] - column) < 2;
+            for (int[] foe : level.foes) if (rover(foe[0])) near |= Math.abs(foe[1] - column) < 16;
+            if (near) continue;
+            int floor = top(level, column);
+            // (On the ground, never by the edge of a pit, where a knock would send her in.)
+            boolean edge = false;
+            for (int beside = column - 3; beside <= column + 3; beside++) edge |= top(level, beside) < 0 || top(level, beside) > floor + 1;
+            if (!edge && floor > 4 && floor < level.land.length && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR) {
+                spots.add(new int[]{column, floor});
+            }
+            for (int row = 4; row < (floor > 0 ? floor - 2 : ROWS - 2); row++) {
+                if (level.land[row][column] == LEDGE && level.land[row - 1][column] == AIR && level.land[row - 2][column] == AIR) spots.add(new int[]{column, row});
+            }
+        }
+        if (spots.isEmpty()) return;
+        java.util.Set<Long> standable = new java.util.HashSet<>();
+        for (int[] spot : spots) standable.add(((long) spot[0] << 16) | spot[1]);
+        // How many are on each half square already.
+        java.util.Map<Long, Integer> on = new java.util.HashMap<>();
+        for (int[] foe : level.foes) {
+            long key = ((long) (foe[1] * 2 + (foe.length > 4 && foe[4] == 2 ? 1 : 0)) << 16) | (foe[2] + 1);
+            on.merge(key, 1, Integer::sum);
+        }
+        // The swarms, one at a time, each round a place no nearer than a gap to the last ones.
+        List<Integer> centres = new ArrayList<>();
+        int gap = number <= 3 ? 14 : 10, tries = 0, most = 2, blocked = 0;
+        while (want > 0 && tries++ < 1500) {
+            int[] middle = spots.get(random.nextInt(spots.size()));
+            boolean clear = true;
+            for (int centre : centres) clear &= Math.abs(centre - middle[0]) >= gap;
+            if (!clear) {
+                // Out of room for more so far apart: they come closer together, and then the swarms there grow thicker.
+                if (++blocked > 60) {
+                    blocked = 0;
+                    if (gap > 6) gap -= 2;
+                    else if (most < 3) most++;
+                    centres.clear();
+                }
+                continue;
+            }
+            centres.add(middle[0]);
+            int size = Math.min(want, swarmSize(number, random)), reach = 3 + size / 6;
+            // (Of walkers only: a swarm that threw or shot would fill the air.)
+            int kind = walkers.get(random.nextInt(walkers.size()));
+            // Its squares: those near its middle, on the ground and on the ledges over and under it, nearest first.
+            List<int[]> near = new ArrayList<>();
+            for (int[] spot : spots) if (Math.abs(spot[0] - middle[0]) <= reach && Math.abs(spot[1] - middle[1]) <= 7) near.add(spot);
+            near.sort((one, other) -> Math.abs(one[0] - middle[0]) * 3 + Math.abs(one[1] - middle[1]) - Math.abs(other[0] - middle[0]) * 3 - Math.abs(other[1] - middle[1]));
+            int put = 0;
+            for (int layer = 1; layer <= most && put < size; layer++) {
+                for (int[] spot : near) {
+                    for (int half = 0; half < 2 && put < size; half++) {
+                        // (Half a square over only where the square beyond is one to stand on too: never into a wall.)
+                        if (half == 1 && !standable.contains(((long) (spot[0] + 1) << 16) | spot[1])) continue;
+                        long key = ((long) (spot[0] * 2 + half) << 16) | spot[1];
+                        if (on.getOrDefault(key, 0) >= layer) continue;
+                        on.merge(key, 1, Integer::sum);
+                        // (A second kind now and then in a big swarm.)
+                        int one = size > 8 && put % 5 == 4 ? walkers.get(random.nextInt(walkers.size())) : kind;
+                        level.foes.add(new int[]{one, spot[0], spot[1] - 1, 1, half == 0 ? 1 : 2, 1});
+                        put++;
+                    }
+                    if (put >= size) break;
+                }
+            }
+            want -= put;
+        }
     }
 
     /**
@@ -885,6 +1106,8 @@ final class RunLevels {
         final List<int[]> doors = new ArrayList<>();
         /** What stands about in its villages to be looked at: which picture, the column and the row it stands in. */
         final List<int[]> decor = new ArrayList<>();
+        /** Its paper trees, to be cut down for paper: the column and row each stands on, and its grade (plain, fine, golden). */
+        final List<int[]> trees = new ArrayList<>();
         /**
          * The places off the land that its doors lead to: for each, its kind; the column and
          * the floor of its door in the land; the first and last columns of the place itself,
@@ -975,6 +1198,7 @@ final class RunLevels {
         level.movers.addAll(base.movers);
         level.doors.addAll(base.doors);
         level.decor.addAll(base.decor);
+        level.trees.addAll(base.trees);
         level.rooms.addAll(base.rooms);
         level.lodgers.addAll(base.lodgers);
         level.spawns.addAll(base.spawns);
@@ -1257,6 +1481,9 @@ final class RunLevels {
         arsenal(level);
         pots(level);
         friend(level);
+        swarm(level);
+        uniques(level);
+        plant(level);
         return level;
     }
 
@@ -1448,6 +1675,9 @@ final class RunLevels {
         arsenal(level);
         pots(level);
         friend(level);
+        swarm(level);
+        uniques(level);
+        plant(level);
         return level;
     }
 
