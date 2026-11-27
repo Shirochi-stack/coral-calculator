@@ -537,6 +537,10 @@ final class RunGame {
     /** Her skill tree's screen: open over everything, from where; the facts it shows, read again when they change; the button on the map and
      * on the pause; her active slots on the HUD; and how many times divine power has come in this land, as last seen. */
     private RunTree tree;
+    /** The shields creatures carry: their pictures; blows that rang off and shields broken, as last seen; and how long ago the last of each was. */
+    private Bitmap mobShields;
+    private int seenClangs, seenBroken;
+    private float clangAge = 9, shatterAge = 9;
     private boolean treeOpen;
     private int treeFrom, seenDivines;
     private final RunTree.Facts treeFacts = new RunTree.Facts();
@@ -5842,6 +5846,8 @@ final class RunGame {
         if (toastLeft > 0 && screen == PLAY) toastLeft -= seconds;
         wardFlash += seconds;
         gripChanged += seconds;
+        clangAge += seconds;
+        shatterAge += seconds;
         // The keys, said once the story told as the first land begins is over (said over it, it would not be heard).
         if (keysHintDue && screen == PLAY && !(talking && !told) && captionLeft <= 0) {
             keysHintDue = false;
@@ -6538,7 +6544,7 @@ final class RunGame {
         }
         if (run.shatters() != seenShatters) {
             // The last piece: it breaks, with a flash and a burst, and for a beat everything is slow.
-            seenShatters = run.shatters();
+            seenBroken = run.shieldsBroken();
             audio.play("crumble", 1f);
             audio.play("star", .8f);
             buzz(true);
@@ -8216,6 +8222,98 @@ final class RunGame {
         if (marketOpen) drawMarket(canvas);
         if (treeOpen) drawTree(canvas);
     }
+
+    // Creatures' shields
+
+    /**
+     * The shield a creature carries, held up on the side it faces, with a bar over it of how much of it is left; shaking as a blow
+     * meets it. A blow that rang off: a spark and the words "Too weak". A shield broken: a burst of ink where it was.
+     */
+    private void drawShields(Canvas canvas, int first, int last) {
+        if (run.clangs() != seenClangs) {
+            if (run.clangs() > seenClangs) {
+                clangAge = 0;
+                audio.play("clang", .7f);
+            }
+            seenClangs = run.clangs();
+        }
+        if (run.shieldsBroken() != seenBroken) {
+            if (run.shieldsBroken() > seenBroken) {
+                shatterAge = 0;
+                audio.play("crumble", .9f);
+                buzz(true);
+            }
+            seenBroken = run.shieldsBroken();
+        }
+        if (mobShields == null) mobShields = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_mob_shields);
+        for (PlusRun.Foe foe : run.foes()) {
+            if (foe.guard <= 0 || foe.flat || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
+            float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, feet = (foe.y + foe.tall() - cameraY) * tile, tall = Math.max(tile * .62f, foe.tall() * tile * .78f);
+            float shake = foe.guardMet < .2f ? (float) Math.sin(foe.guardMet * 90) * tile * .05f : 0;
+            float sx = middle + (foe.leftward ? -1 : 1) * foe.wide() * tile * .42f + shake, sy = feet - foe.tall() * tile * .45f;
+            if (mobShields != null) {
+                int cell = mobShields.getHeight();
+                source.set(foe.guardKind * cell, 0, (foe.guardKind + 1) * cell, cell);
+                target.set(sx - tall / 2, sy - tall / 2, sx + tall / 2, sy + tall / 2);
+                paint.setAlpha(255);
+                canvas.drawBitmap(mobShields, source, target, paint);
+            }
+            // How much of it is left: a pip for each strong blow it still takes.
+            float pip = tile * .1f, gap = tile * .04f, row = (foe.y - cameraY) * tile - tile * .42f, wide = foe.guardMost * pip + (foe.guardMost - 1) * gap;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xCC15171A);
+            canvas.drawRoundRect(middle - wide / 2 - tile * .04f, row - pip / 2 - tile * .04f, middle + wide / 2 + tile * .04f, row + pip / 2 + tile * .04f, pip, pip, paint);
+            for (int one = 0; one < foe.guardMost; one++) {
+                paint.setColor(one < foe.guard ? SHIELD_PIPS[foe.guardKind] : 0xFF4A4F54);
+                float px = middle - wide / 2 + one * (pip + gap);
+                canvas.drawRect(px, row - pip / 2, px + pip, row + pip / 2, paint);
+            }
+            paint.setColor(Color.BLACK);
+        }
+        // A blow too weak: a spark where it rang off, and the words.
+        if (clangAge < .7f) {
+            float x = (run.clangX() - cameraX) * tile, y = (run.clangY() - cameraY) * tile, through = clangAge / .7f;
+            glowAt(canvas, x, y, tile * (.5f + through * .4f), 0xFFFFE9A8, Math.round(230 * (1 - through)));
+            stroke.setColor(0xFFFFE9A8);
+            stroke.setAlpha(Math.round(255 * (1 - through)));
+            stroke.setStrokeWidth(tile * .04f);
+            for (int ray = 0; ray < 6; ray++) {
+                double angle = ray * Math.PI / 3 + clangAge * 2;
+                float from = tile * (.12f + through * .2f), to = tile * (.3f + through * .3f);
+                canvas.drawLine(x + (float) Math.cos(angle) * from, y + (float) Math.sin(angle) * from, x + (float) Math.cos(angle) * to, y + (float) Math.sin(angle) * to, stroke);
+            }
+            stroke.setAlpha(255);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setTextSize(tile * .34f);
+            text.setColor(0xFF1F2328);
+            text.setAlpha(Math.round(255 * (1 - through)));
+            canvas.drawText("Too weak!", x + tile * .03f, y - tile * (.55f + through * .5f) + tile * .03f, text);
+            text.setColor(0xFFFFE9A8);
+            text.setAlpha(Math.round(255 * (1 - through)));
+            canvas.drawText("Too weak!", x, y - tile * (.55f + through * .5f), text);
+            text.setAlpha(255);
+            text.setTypeface(Typeface.DEFAULT);
+        }
+        // A shield broken: ink bursting out from where it was.
+        if (shatterAge < .6f) {
+            float x = (run.clangX() - cameraX) * tile, y = (run.clangY() - cameraY) * tile, through = shatterAge / .6f;
+            glowAt(canvas, x, y, tile * (.6f + through), 0xFF2A1A40, Math.round(220 * (1 - through)));
+            paint.setStyle(Paint.Style.FILL);
+            for (int drop = 0; drop < 9; drop++) {
+                double angle = drop * Math.PI * 2 / 9 + 0.4;
+                float far = tile * (.15f + through * .9f), size = tile * .09f * (1 - through * .6f);
+                paint.setColor(drop % 3 == 0 ? 0xFF7A4FC0 : 0xFF1F1530);
+                paint.setAlpha(Math.round(255 * (1 - through)));
+                canvas.drawCircle(x + (float) Math.cos(angle) * far, y + (float) Math.sin(angle) * far + through * through * tile * .4f, size, paint);
+            }
+            paint.setAlpha(255);
+            paint.setColor(Color.BLACK);
+        }
+    }
+
+    /** The pips of a shield's bar, by which shield it is. */
+    private static final int[] SHIELD_PIPS = {0xFFC08A4A, 0xFFB9C2CC, 0xFFFFC433, 0xFF9A6AE8};
 
     // Her skill tree
 
@@ -9930,6 +10028,7 @@ final class RunGame {
             }
         }
         paint.setColorFilter(null);
+        drawShields(canvas, first, last);
         drawHits(canvas, first, last);
         // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
         for (PlusRun.Foe foe : run.foes()) {
