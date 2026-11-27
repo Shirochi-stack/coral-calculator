@@ -875,6 +875,54 @@ final class PlusRun {
         return NORMAL;
     }
 
+    /** How many of a swarm give what one of a land's own gives (experience, pluses, a chance of a drop); and what is gathered toward the next of it. */
+    static final int SWARM_SHARE = 25;
+    private float swarmXp;
+
+    // Shields
+
+    /**
+     * From the sixth land on some creatures carry a shield, more of them further on: a book cover, then steel, gold, and at the last
+     * black ink. Held up in front, it takes a blow that comes at it, and only a blow that counts for enough tells on it: her level,
+     * what she holds and how rare it is, and her attack all go into that. Weaker blows ring off it. Enough strong ones break it, and
+     * then it is a creature like any other. A blow from behind, or coming down on it from above, goes round it. Which ones carry one
+     * is the same every time for the same one in the same land.
+     */
+    static final int SHIELDS_FROM = 6;
+
+    static int shieldOdds(int number) { return number < SHIELDS_FROM ? 0 : Math.min(2600, 500 + number * 21); }
+
+    static boolean shielded(int number, int kind, int column, int row) {
+        if (number < SHIELDS_FROM || RunLevels.boss(kind) || RunLevels.flier(kind) || kind == RunLevels.TARGET || kind == RunLevels.ZERO || kind == RunLevels.WORD
+                || kind == RunLevels.DRAGON) return false;
+        long dice = number * 15485863L + column * 7919L + row * 104729L + kind * 1299709L;
+        dice = dice * 6364136223846793005L + 1442695040888963407L;
+        return (int) ((dice >>> 29) % 10000) < shieldOdds(number);
+    }
+
+    /** What a blow must count for (in tenths, as creatures' health is) to tell on a shield in a land: what the level the land is for gives, and more. */
+    static int shieldNeeds(int number) { return Math.round(BLOW * RunLoot.power(RunLoot.recommended(number)) * (1.5f + 2.5f * number / RunLevels.TOTAL)); }
+
+    /** How many strong blows break one. */
+    static int shieldHolds(int number) { return 3 + number / 20; }
+
+    static int shieldKind(int number) { return number < 25 ? 0 : number < 50 ? 1 : number < 80 ? 2 : 3; }
+
+    /** Blows that rang off a shield, shields broken, and where the last of either was. */
+    private int clangs, shieldsBroken;
+    private float clangX, clangY;
+
+    int clangs() { return clangs; }
+    int shieldsBroken() { return shieldsBroken; }
+    float clangX() { return clangX; }
+    float clangY() { return clangY; }
+
+    /** Whether a blow now comes at the front of a creature's shield: not from above, and from the side it faces. */
+    private boolean atShield(Foe foe) {
+        if (foe.guard <= 0 || with == LANDED || with == PLUNGED) return false;
+        return (x + WIDE / 2 < foe.x + foe.wide() / 2) == foe.leftward;
+    }
+
     /** What a blow of hers counts for against a creature, in tenths: her weapon's blows, made harder by her level. */
     private int dealt() {
         // (Attack and the tree's attack make every blow harder; intelligence, those of tomes, staffs and wands.)
@@ -1460,8 +1508,8 @@ final class PlusRun {
          */
         float shield, shieldMost, broken, forming;
         int taken;
-        /** Whether it was put into a land to make up its numbers: such a one keeps still while she is far off. */
-        boolean crowd;
+        /** Whether it was put into a land to make up its numbers: such a one keeps still while she is far off. And whether as one of a swarm. */
+        boolean crowd, swarm;
         /** For how much longer a key is stuck in it: the next blow on it that is not a key counts twice. */
         float unlocked;
         /**
@@ -1483,6 +1531,12 @@ final class PlusRun {
         /** Its colour of toughness (0 as it is drawn, then red, purple, gold, black ink); and how long since a blow last landed on it. */
         int tier;
         float struck = 9;
+        /**
+         * A shield it carries, if any: how many more strong blows it takes, how many it took whole, what a blow must count for to tell
+         * on it, which of the four it is (book cover, steel, gold, black ink), and how long since a blow last met it.
+         */
+        int guard, guardMost, guardNeeds, guardKind;
+        float guardMet = 9;
 
         Foe(int kind) {
             this.kind = kind;
@@ -1615,7 +1669,15 @@ final class PlusRun {
         if (foe.kind == RunLevels.TARGET) return;
         boolean boss = RunLevels.boss(foe.kind) && !foe.spawned, hard = level.chapter >= RunLevels.CHAPTERS * 2;
         int landLevel = RunLevels.levelOf(level.number);
-        xp += RunLoot.xpFor(boss, tough, level.number, perks.level) * TIER_XP[foe.tier];
+        // (One of a swarm gives a share of what one of the land's own gives, gathered up: her levels go on as the lands make them.)
+        if (foe.swarm) {
+            swarmXp += RunLoot.xpFor(boss, tough, level.number, perks.level) * TIER_XP[foe.tier] / (float) SWARM_SHARE;
+            xp += (int) swarmXp;
+            swarmXp -= (int) swarmXp;
+            if (lootRoll(SWARM_SHARE) != 0) return;
+        } else {
+            xp += RunLoot.xpFor(boss, tough, level.number, perks.level) * TIER_XP[foe.tier];
+        }
         float middle = foe.x + foe.wide() / 2, top = foe.y + foe.tall() * .4f;
         int coins = RunLoot.plusesFor(boss, tough), more = gear(RunLoot.PLUSES);
         if (more > 0) coins += (coins * more + lootRoll(100)) / 100;
@@ -1847,6 +1909,12 @@ final class PlusRun {
                     : healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW;
             foe.most = foe.left;
             foe.crowd = RunLevels.crowd(spec);
+            foe.swarm = RunLevels.swarmed(spec);
+            if (!waits && level.tiered && shielded(level.number, spec[0], spec[1], spec[2])) {
+                foe.guard = foe.guardMost = shieldHolds(level.number);
+                foe.guardNeeds = shieldNeeds(level.number);
+                foe.guardKind = shieldKind(level.number);
+            }
             if (spec[0] == RunLevels.WORD) foe.y = foe.ground - WORD_HANGS;
             // Each divide starts its hop at a different moment.
             foe.clock = spec[1] * .37f % HOP_EVERY;
@@ -4306,6 +4374,15 @@ final class PlusRun {
         // Against a creature a blow counts for as many as the smith has made what dealt it count for; against those who wait, for one.
         // (And her level makes a part of a blow more, gathered up into whole ones.)
         int dealt = geared(foe, waits ? 1 : dealt(), waits);
+        // A shield in the way: a blow too weak rings off it; a strong one takes a piece of it, and the last one breaks it.
+        if (!waits && atShield(foe)) {
+            foe.guardMet = 0;
+            clangX = foe.x + foe.wide() / 2 + (foe.leftward ? -.3f : .3f);
+            clangY = foe.y + foe.tall() * .45f;
+            if (dealt < foe.guardNeeds) clangs++;
+            else if (--foe.guard <= 0) shieldsBroken++;
+            return;
+        }
         foe.struck = 0;
         if (hits.size() < 24) hits.add(new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0});
         // A creature is knocked back a little, away from her, where there is room.
@@ -5544,6 +5621,7 @@ final class PlusRun {
         if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > WAKES)) return;
         if (!puddles.isEmpty() && mired(foe)) seconds *= PUDDLE_SLOWS;
         foe.clock += seconds;
+        foe.guardMet += seconds;
         if (foe.broken > 0 && !absent(foe)) {
             if ((foe.broken -= seconds) <= 0 || foe.taken >= 2 && foe.dazed <= seconds) {
                 foe.forming = forms(foe);
@@ -5599,6 +5677,7 @@ final class PlusRun {
             }
             return;
         }
+        if (foe.guard > 0 && away < 5 && Math.abs(y + TALL - foe.y - foe.tall()) < 1.5f) foe.leftward = toLeft;
         walk(foe, SPEED[foe.kind] * seconds, true);
     }
 

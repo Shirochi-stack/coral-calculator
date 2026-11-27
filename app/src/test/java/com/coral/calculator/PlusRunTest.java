@@ -1300,7 +1300,7 @@ public class PlusRunTest {
                 }
             }
             for (int[] foe : sorted) {
-                if (!RunLevels.crowd(foe) || RunLevels.flier(foe[0])) continue;
+                if (!RunLevels.crowd(foe) || RunLevels.flier(foe[0]) || RunLevels.swarmed(foe)) continue;
                 more++;
                 // Of a kind the land has already; standing on its ground or on a ledge, with room over it; clear of the start, of flags and of where the land ends.
                 assertTrue("land " + number + " kind " + foe[0], kinds.contains(foe[0]) || foe[0] == RunLevels.MINUS);
@@ -1330,7 +1330,7 @@ public class PlusRunTest {
                     if (foe[0] == RunLevels.TIMES && other[0] == RunLevels.TIMES) {
                         assertTrue("land " + number + " times at " + foe[1], Math.abs(other[1] + (RunLevels.crowd(other) && other[4] == 2 ? 1 : .5f) - middle) >= 5);
                     }
-                    if (!RunLevels.crowd(other)) continue;
+                    if (!RunLevels.crowd(other) || RunLevels.swarmed(other)) continue;
                     float apart = Math.abs(other[1] + (other[4] == 2 ? 1 : .5f) - middle);
                     assertTrue("land " + number + " at " + foe[1] + " apart " + apart, apart >= (foe[0] == RunLevels.TIMES || other[0] == RunLevels.TIMES ? 2 : 1.5f));
                     tightest = Math.min(tightest, apart - wide);
@@ -7808,7 +7808,8 @@ public class PlusRunTest {
             PlusRun run = cross(unguarded(RunLevels.level(number)), 240);
             assertEquals("land " + number + " stopped at " + run.x() + " of " + run.columns() + " with " + run.hearts() + " hearts" + around(run),
                     PlusRun.WON, run.state());
-            assertEquals("land " + number, run.maxHearts(), run.hearts());
+            // (With its swarms, from the thirteenth land on a bot that only jumps and stomps may lose a heart; never a life.)
+            assertTrue("land " + number + " with " + run.hearts(), run.hearts() >= run.maxHearts() - (number <= 12 ? 0 : 1) && run.livesLost() == 0);
         }
     }
 
