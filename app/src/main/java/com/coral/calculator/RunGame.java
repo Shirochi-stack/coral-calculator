@@ -7476,6 +7476,10 @@ final class RunGame {
             held(event);
             return;
         }
+        if (screen == SHOP) {
+            shopTouch(action, x, y);
+            return;
+        }
         if (action != MotionEvent.ACTION_DOWN) return;
         if (screen == STORY) {
             // A touch turns the page.
@@ -7544,43 +7548,6 @@ final class RunGame {
                         return;
                     }
                 }
-            }
-        } else if (screen == SHOP) {
-            if (closeButton.contains(x, y)) {
-                audio.play("tap", .5f);
-                if (counterFrom == STALL) {
-                    regrant();
-                    screen = STALL;
-                } else if (counterFrom == PLAY) {
-                    regrant();
-                    screen = PLAY;
-                } else {
-                    toMap();
-                }
-                return;
-            }
-            for (int tab = 0; tab < TAB_NAMES.length; tab++) {
-                if (counterTabs[tab] != null && counterTabs[tab].contains(x, y)) {
-                    counterTab = tab;
-                    audio.play("page", .5f);
-                    return;
-                }
-            }
-            for (int index = 0; index < shownWares; index++) if (wares[index].contains(x, y)) buy(TAB_WARES[counterTab][index]);
-            if (counterTab == PETS_TAB) {
-                for (int kind = 0; kind < PlusRun.PETS; kind++) {
-                    if (petCells[kind] != null && petCells[kind].contains(x, y)) {
-                        petOn = kind;
-                        audio.play("tap", .5f);
-                    }
-                }
-                if (!petAct.isEmpty() && petAct.contains(x, y)) petDeal();
-                else if (!petTreat.isEmpty() && petTreat.contains(x, y)) petTrade();
-            } else if (counterTab == ARMS_TAB && armsAct.contains(x, y)) {
-                audio.play("tap", .5f);
-                openPack(MAP);
-            } else if (counterTab == VANITY_TAB) {
-                vanityTouch(x, y);
             }
         } else if (screen == STALL) {
             for (int index = 0; index < stallWares.length; index++) {
@@ -8016,6 +7983,11 @@ final class RunGame {
     boolean wheel(float turned) {
         if (treeOpen && turned != 0) {
             tree().wheel(turned, width / 2f, height / 2f);
+            return true;
+        }
+        if (screen == SHOP && !packOpen && !bagOpen && turned != 0 && shopMax > 0) {
+            // At the counter, the wheel scrolls its list.
+            shopScroll = Math.max(0, Math.min(shopMax, shopScroll - turned * dp(64)));
             return true;
         }
         if (!bagOpen || turned == 0) return false;
@@ -14186,11 +14158,16 @@ final class RunGame {
         }
         int[] list = TAB_WARES[counterTab];
         shownWares = list.length;
+        // Everything under the tabs scrolls when it is taller than the screen (a phone on its side): it is drawn moved up by the scroll, and cut off under the tabs.
+        shopListTop = safe.top + dp(136);
+        float listed = safe.top + dp(142) - shopScroll;
+        canvas.save();
+        canvas.clipRect(0, shopListTop, width, height);
         // (With her pets under them, the four that are for her pets are lower rows.)
         float squeeze = counterTab == PETS_TAB ? Math.min(wares[0].height(), dp(52)) : wares[0].height();
         for (int row = 0; row < list.length; row++) {
             RectF where = wares[row];
-            where.set(where.left, safe.top + dp(142) + row * (squeeze + dp(6)), where.right, safe.top + dp(142) + row * (squeeze + dp(6)) + squeeze);
+            where.set(where.left, listed + row * (squeeze + dp(6)), where.right, listed + row * (squeeze + dp(6)) + squeeze);
             int index = list[row];
             float left = where.left, top = where.top, right = where.right, high = where.height(), middle = where.centerY();
             int has = bought(index), steps = UP_COSTS[index].length;
@@ -14233,13 +14210,14 @@ final class RunGame {
             text.setTextSize(dp(15));
             fitted(canvas, done ? "Owned" : locked != null ? "Locked" : "+ " + UP_COSTS[index][has], right - dp(12) - price / 2, middle + dp(5.5f), dp(15), price - dp(14));
         }
-        float under = safe.top + dp(142) + list.length * (squeeze + dp(6)) + dp(6), left = safe.centerX() - across / 2;
+        float under = listed + list.length * (squeeze + dp(6)) + dp(6), left = safe.centerX() - across / 2, end = under;
         petAct.setEmpty();
         petTreat.setEmpty();
         armsAct.setEmpty();
-        if (counterTab == PETS_TAB) drawPetShop(canvas, left, under, across, bank);
-        else if (counterTab == COLOURS_TAB) drawMixHints(canvas, left, under, across);
+        if (counterTab == PETS_TAB) end = drawPetShop(canvas, left, under, across, bank);
+        else if (counterTab == COLOURS_TAB) end = drawMixHints(canvas, left, under, across);
         else if (counterTab == ARMS_TAB) {
+            end = under + dp(116);
             // What she fights with is worked on by the smith, in the towns; here is the way to her backpack.
             box.set(left, under, left + across, under + dp(116));
             plate(canvas, box, dp(16), 245);
@@ -14258,13 +14236,88 @@ final class RunGame {
             text.setColor(Color.WHITE);
             fitted(canvas, "Open her backpack  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
         } else if (counterTab == VANITY_TAB) {
-            drawVanityTab(canvas, left, under, across, bank);
+            end = drawVanityTab(canvas, left, under, across, bank);
         } else if (counterTab == 1) {
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(soft);
             fitted(canvas, "Her wings are what there is to buy for how she moves, so far.", left + dp(6), under + dp(14), dp(12.5f), across - dp(12));
+            end = under + dp(20);
+        }
+        canvas.restore();
+        // How far it can scroll: as far as its end coming up to the bottom of the screen; and a thin bar at the side to show there is more.
+        shopMax = Math.max(0, end + shopScroll + dp(12) - safe.bottom);
+        shopScroll = Math.max(0, Math.min(shopMax, shopScroll));
+        if (shopMax > 0) {
+            float track = safe.bottom - dp(8) - (shopListTop + dp(6)), shown = track * track / (track + shopMax), at = shopListTop + dp(6) + (track - shown) * shopScroll / shopMax;
+            float x = Math.min(width - dp(6), left + across + dp(10));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(dark ? 0x66FFFFFF : 0x55000000);
+            box.set(x - dp(2), at, x + dp(2), at + shown);
+            canvas.drawRoundRect(box, dp(2), dp(2), paint);
+            paint.setColor(Color.BLACK);
         }
         text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /** The counter's scroll: how far down its list is moved, how far it can be, where its list begins, and a finger that may be dragging it. */
+    private float shopScroll, shopMax, shopListTop, shopDownX, shopDownY, shopDownScroll;
+    private boolean shopDragged;
+
+    /** A tap at the counter: its close button, a tab (which opens at its top), or what is under the tabs, if it is where the list shows. */
+    private void shopTap(float x, float y) {
+        if (closeButton.contains(x, y)) {
+            audio.play("tap", .5f);
+            if (counterFrom == STALL) {
+                regrant();
+                screen = STALL;
+            } else if (counterFrom == PLAY) {
+                regrant();
+                screen = PLAY;
+            } else {
+                toMap();
+            }
+            return;
+        }
+        for (int tab = 0; tab < TAB_NAMES.length; tab++) {
+            if (counterTabs[tab] != null && counterTabs[tab].contains(x, y)) {
+                counterTab = tab;
+                shopScroll = 0;
+                audio.play("page", .5f);
+                return;
+            }
+        }
+        if (y < shopListTop) return;
+        for (int index = 0; index < shownWares; index++) if (wares[index].contains(x, y)) buy(TAB_WARES[counterTab][index]);
+        if (counterTab == PETS_TAB) {
+            for (int kind = 0; kind < PlusRun.PETS; kind++) {
+                if (petCells[kind] != null && petCells[kind].contains(x, y)) {
+                    petOn = kind;
+                    audio.play("tap", .5f);
+                }
+            }
+            if (!petAct.isEmpty() && petAct.contains(x, y)) petDeal();
+            else if (!petTreat.isEmpty() && petTreat.contains(x, y)) petTrade();
+        } else if (counterTab == ARMS_TAB && armsAct.contains(x, y)) {
+            audio.play("tap", .5f);
+            openPack(MAP);
+        } else if (counterTab == VANITY_TAB) {
+            vanityTouch(x, y);
+        }
+    }
+
+    /** A touch at the counter: a finger dragged up or down scrolls it; one let go where it came down is a tap. */
+    private void shopTouch(int action, float x, float y) {
+        if (action == MotionEvent.ACTION_DOWN) {
+            shopDownX = x;
+            shopDownY = y;
+            shopDownScroll = shopScroll;
+            shopDragged = false;
+        } else if (action == MotionEvent.ACTION_MOVE) {
+            if (!shopDragged && Math.abs(y - shopDownY) > dp(10)) shopDragged = true;
+            if (shopDragged) shopScroll = Math.max(0, Math.min(shopMax, shopDownScroll - (y - shopDownY)));
+        } else if (action == MotionEvent.ACTION_UP && !shopDragged) {
+            shopTap(shopDownX, shopDownY);
+        }
     }
 
     /** Vanity at the counter: the toggle's three settings, and a row for each outfit. */
@@ -14352,7 +14405,7 @@ final class RunGame {
         }
     }
 
-    private void drawVanityTab(Canvas canvas, float left, float top, float across, int bank) {
+    private float drawVanityTab(Canvas canvas, float left, float top, float across, int bank) {
         int mode = RunVanity.mode(vanityKeep()), chosen = RunVanity.outfit(vanityKeep());
         float gap = dp(6), each = (across - gap * 2) / 3;
         for (int one = 0; one < 3; one++) {
@@ -14414,10 +14467,6 @@ final class RunGame {
                 at.setEmpty();
                 continue;
             }
-            if (y + dp(56) > safe.bottom - dp(6)) {
-                at.setEmpty();
-                continue;
-            }
             at.set(left, y, left + across, y + dp(50));
             y += dp(56);
             boolean hers = RunVanity.owns(vanityKeep(), outfit), on = chosen == outfit, quest = RunVanity.QUEST[outfit] >= 0, can = !hers && !quest && bank >= RunVanity.PRICES[outfit];
@@ -14445,6 +14494,7 @@ final class RunGame {
             text.setColor(on || can ? Color.WHITE : hers ? soft : CalculatorLayout.CORAL);
             fitted(canvas, on ? "Wearing" : hers ? "Wear" : quest ? "Quest" : "+ " + RunVanity.PRICES[outfit], box.centerX(), box.centerY() + dp(5.5f), dp(14), price - dp(14));
         }
+        return y;
     }
 
     /**
@@ -14454,7 +14504,7 @@ final class RunGame {
      * it. Under them, the one that is looked at: what it is, what it does, and the button
      * that buys it, takes it along or leaves it at home.
      */
-    private void drawPetShop(Canvas canvas, float left, float top, float across, int bank) {
+    private float drawPetShop(Canvas canvas, float left, float top, float across, int bank) {
         int own = session.tally("run_pet_own"), with = session.tally("run_pet_with") & own, places = 1 + bought(PET_PLACES);
         float gap = dp(6), side = Math.min(dp(64), (across - gap * 4) / 5), high = side + dp(14);
         int shown = 0;
@@ -14519,10 +14569,11 @@ final class RunGame {
         text.setColor(can ? (hers && comes ? CalculatorLayout.CORAL : Color.WHITE) : soft);
         fitted(canvas, !hers ? "Buy  + " + PET_COSTS[petOn] : comes ? "Leave at home" : room ? "Take along" : "No place free: buy one above", petAct.centerX(), petAct.centerY() + dp(5), dp(14.5f),
                 petAct.width() - dp(24));
+        return y + dp(118);
     }
 
     /** Under her colours: the mixes that have names. One she has made is named, with what it does; one she has not is hinted at: one of its colours, and a question mark. */
-    private void drawMixHints(Canvas canvas, float left, float top, float across) {
+    private float drawMixHints(Canvas canvas, float left, float top, float across) {
         int made = session.tally("run_mixes");
         box.set(left, top, left + across, top + dp(30) + MIX_NAMES.length * dp(19) + dp(8));
         plate(canvas, box, dp(16), 245);
@@ -14537,5 +14588,6 @@ final class RunGame {
             text.setColor(known ? ink : soft);
             fitted(canvas, words, left + dp(16), top + dp(46) + mix * dp(19), dp(12), across - dp(32));
         }
+        return top + dp(30) + MIX_NAMES.length * dp(19) + dp(8);
     }
 }
