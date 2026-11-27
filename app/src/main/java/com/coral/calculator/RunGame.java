@@ -6887,7 +6887,8 @@ final class RunGame {
         Bitmap bitmap = two.get();
         int side = bitmap.getWidth() / two.across, fromX = which % two.across * side, fromY = which / two.across * side;
         source.set(fromX + 1, fromY + 1, fromX + side - 1, fromY + side - 1);
-        target.set(left, y, left + tile + 1, y + tile + 1);
+        // (A pixel over on every side, so that one turned about its middle covers as much on the one side as on the other.)
+        target.set(left - 1, y - 1, left + tile + 1, y + tile + 1);
         canvas.save();
         canvas.scale(mirrored ? -1 : 1, upended ? -1 : 1, left + tile / 2, y + tile / 2);
         canvas.drawBitmap(bitmap, source, target, paint);
@@ -6999,7 +7000,7 @@ final class RunGame {
                         if (ground3 == null) ground3 = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_art5);
                         int square = ground3.getHeight(), which = (chapter - RunLevels.CHAPTERS * 2) * 2 + (capped ? 0 : 1);
                         source.set(which * square + 1, 1, which * square + square - 1, square - 1);
-                        target.set(left, y, left + tile + 1, y + tile + 1);
+                        target.set(left - 1, y - 1, left + tile + 1, y + tile + 1);
                         canvas.save();
                         canvas.scale(column % 2 == 0 ? 1 : -1, capped || row % 2 == 0 ? 1 : -1, left + tile / 2, y + tile / 2);
                         canvas.drawBitmap(ground3, source, target, paint);
@@ -7011,9 +7012,10 @@ final class RunGame {
                         continue;
                     }
                     int which = chapter * 2 + (capped ? 0 : 1);
-                    // Taken a hair inside its square, so the picture beside it does not show as a line between blocks.
+                    // Taken a hair inside its square, so the picture beside it does not show as a line between blocks; and drawn a pixel over on
+                    // every side, so that one turned about its middle (every other one is) still meets the next with no pixel between them half-covered.
                     source.set(which * side + 1, 0, which * side + side - 1, side);
-                    target.set(left, y, left + tile + 1, y + tile + 1);
+                    target.set(left - 1, y - 1, left + tile + 1, y + tile + 1);
                     canvas.save();
                     canvas.scale(column % 2 == 0 ? 1 : -1, capped || row % 2 == 0 ? 1 : -1, left + tile / 2, y + tile / 2);
                     canvas.drawBitmap(art, source, target, paint);
