@@ -908,18 +908,17 @@ final class RunGame {
         paint.setAlpha(255);
         if (friend <= 3) {
             int who = friend == 0 ? CHIKUWA : friend == 1 ? RUNE : friend == 2 ? ILLYA : TSUBAKIEH;
-            frame(canvas, cast(who), friend <= 1 && near ? 1 : 0, CAST_FRAMES[who], x, feet, size, false);
+            if (friend <= 1 && near) frame(canvas, cast(who), 1, CAST_FRAMES[who], x, feet, size, false);
+            else frame(canvas, idleSheet(IDLE_CAST[who]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, size, false);
         } else if (friend == 13) {
-            Bitmap queen = face(10);
-            float tall = tile * 1.7f, wide = tall * queen.getWidth() / queen.getHeight();
-            target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
-            canvas.drawBitmap(queen, null, target, paint);
+            cell(canvas, idleSheet(R.drawable.run_idle_nuri), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, tile * 1.7f, false);
         } else if (friend == 16) {
             Bitmap sheet = smith(0);
-            cell(canvas, sheet, near ? 3 : 0, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+            if (near) cell(canvas, sheet, 3, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+            else cell(canvas, idleSheet(IDLE_SMITHS[0]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
             head = feet - tile * 1.6f;
         } else if (friend >= 17) {
-            frame(canvas, villagers(), friend == 17 ? RunLevels.INJU - RunLevels.SOMI : 0, VILLAGERS, x, feet - (near ? Math.abs((float) Math.sin(clock * 6)) * tile * .08f : 0), size * .72f, false);
+            frame(canvas, idleSheet(IDLE_VILLAGERS[friend == 17 ? RunLevels.INJU - RunLevels.SOMI : 0]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, size * .72f, false);
             head = feet - tile * 1.55f;
         } else {
             int kind = friend == 4 ? RunLevels.GUARD : friend == 5 ? RunLevels.BUTLER : friend == 6 ? RunLevels.GOKHAE : friend == 7 ? RunLevels.BYEORU : friend == 8 ? RunLevels.MIRI
@@ -927,8 +926,9 @@ final class RunGame {
                     : RunLevels.PARTY;
             int which = kind - RunLevels.GOKHAE;
             // (The twins stand together.)
-            if (kind == RunLevels.MIRI) frame(canvas, later(which + 1), 0, LATER_FRAMES[which + 1], x + tile * .95f, feet, size, false);
-            frame(canvas, later(which), 0, LATER_FRAMES[which], x, feet, size, false);
+            if (kind == RunLevels.MIRI) frame(canvas, idleSheet(IDLE_LATER[which + 1]), idleFrame(5100 + friend), IDLE_FRAMES, x + tile * .95f, feet, size, false);
+            if (IDLE_LATER[which] != 0) frame(canvas, idleSheet(IDLE_LATER[which]), idleFrame(5000 + friend), IDLE_FRAMES, x, feet, size, false);
+            else frame(canvas, later(which), 0, LATER_FRAMES[which], x, feet, size, false);
         }
         if (pledged) {
             paint.setAlpha(255);
@@ -1894,7 +1894,8 @@ final class RunGame {
         boolean idle = (int) (clock * .45f + which * 1.7f) % 5 == 0;
         int frame = pleased ? 3 : making ? ((int) (hammered * 7) % 2 == 0 ? 1 : 2) : idle ? ((int) (clock * 3.2f) % 2 == 0 ? 1 : 2) : 0;
         Bitmap sheet = smith(which);
-        cell(canvas, sheet, frame, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+        if (frame == 0) cell(canvas, idleSheet(IDLE_SMITHS[which]), idleFrame(6000 + which), IDLE_FRAMES, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
+        else cell(canvas, sheet, frame, 4, x, feet, tile * 1.3f * sheet.getHeight() / 150f, false);
         boolean at = run.spot() == item[4];
         mark(canvas, x, feet - tile * (at ? 1.75f : 1.65f), which == 0 ? "Forge" : which == 1 ? "Armour" : "Trade", SPEAKER_COLOURS[which == 0 ? 18 : FIRST_SMITH + which - 1], false);
     }
@@ -3039,6 +3040,67 @@ final class RunGame {
     private Bitmap later(int who) {
         if (laterCast[who] == null) laterCast[who] = BitmapFactory.decodeResource(context.getResources(), LATER_CAST[who]);
         return laterCast[who];
+    }
+
+    // Idling
+
+    /**
+     * Six frames of idling for each of those who stand in the world: as they are drawn, a blink, a glance, two of a habit of their own, and
+     * a special thing they do now and then. The villagers, by their place in the sheet of them; the four friends; the three smiths; Nuri; and
+     * those of the black arena and the story who stand as friends in the third volume, by their place among the later cast (or none).
+     */
+    private static final int IDLE_FRAMES = 6;
+    private static final int[] IDLE_VILLAGERS = {R.drawable.run_idle_somi, R.drawable.run_idle_inju, R.drawable.run_idle_boksun, R.drawable.run_idle_ttosun,
+            R.drawable.run_idle_galpi, R.drawable.run_idle_yeseo, R.drawable.run_idle_nabi, R.drawable.run_idle_moru, R.drawable.run_idle_altteul};
+    private static final int[] IDLE_CAST = {R.drawable.run_idle_chikuwa, R.drawable.run_idle_rune, R.drawable.run_idle_illya, R.drawable.run_idle_tsubakieh};
+    private static final int[] IDLE_SMITHS = {R.drawable.run_idle_smith_moru, R.drawable.run_idle_smith_pulmu, R.drawable.run_idle_smith_sutdol};
+    private static final int[] IDLE_LATER = {R.drawable.run_idle_gokhae, R.drawable.run_idle_miri, R.drawable.run_idle_gari, R.drawable.run_idle_yeobaek, 0,
+            R.drawable.run_idle_mawang, R.drawable.run_idle_guard, R.drawable.run_idle_butler, R.drawable.run_idle_byeoru, R.drawable.run_idle_jupan,
+            R.drawable.run_idle_sumbi, R.drawable.run_idle_pads, R.drawable.run_idle_party, 0, 0, 0, 0, 0};
+    private final java.util.Map<Integer, Bitmap> idleSheets = new java.util.HashMap<>();
+    /** For each one idling: when the next thing begins, what is being done (or -1), when it began, and how many things have been done. */
+    private final java.util.Map<Integer, float[]> idling = new java.util.HashMap<>();
+
+    private Bitmap idleSheet(int drawable) {
+        Bitmap sheet = idleSheets.get(drawable);
+        if (sheet == null) {
+            sheet = BitmapFactory.decodeResource(context.getResources(), drawable);
+            idleSheets.put(drawable, sheet);
+        }
+        return sheet;
+    }
+
+    /** What things take: a blink, a glance, a habit, the special thing. */
+    private static final float[] IDLE_LASTS = {.14f, 1.2f, 1.6f, 1.8f};
+
+    /**
+     * The frame one of them is at, by who it is: as drawn most of the time; and, at moments of its own (never two of them together), a
+     * blink, a glance, its habit back and forth, or its special thing. Only the drawn frame changes; nothing is moved.
+     */
+    private int idleFrame(int id) {
+        float[] state = idling.get(id);
+        if (state == null) {
+            java.util.Random first = new java.util.Random(id * 7919L);
+            state = new float[]{clock + .5f + first.nextFloat() * 4, -1, 0, 0};
+            idling.put(id, state);
+        }
+        if (state[0] - clock > 60) state[0] = clock + 2;
+        if (state[1] < 0 && clock >= state[0]) {
+            java.util.Random dice = new java.util.Random(id * 104729L + (long) state[3]++);
+            int roll = dice.nextInt(100);
+            state[1] = roll < 50 ? 0 : roll < 65 ? 1 : roll < 90 ? 2 : 3;
+            state[2] = clock;
+        }
+        if (state[1] < 0) return 0;
+        int doing = (int) state[1];
+        float into = clock - state[2];
+        if (into >= IDLE_LASTS[doing] || into < 0) {
+            java.util.Random dice = new java.util.Random(id * 15485863L + (long) state[3]);
+            state[1] = -1;
+            state[0] = clock + 1.4f + dice.nextFloat() * 3.6f;
+            return 0;
+        }
+        return doing == 0 ? 1 : doing == 1 ? 2 : doing == 2 ? (into % .8f < .4f ? 3 : 4) : 5;
     }
 
     private Bitmap villagers() {
@@ -9282,21 +9344,22 @@ final class RunGame {
             float x = (item[1] + 1.55f - cameraX) * tile, y = (item[2] + 1 - cameraY) * tile;
             int who = item[3];
             paint.setAlpha(255);
+            int idleId = who * 1000 + item[1];
             if (who <= 2) {
-                frame(canvas, cast(who - 1), given ? 2 : near ? 1 : 0, CAST_FRAMES[who - 1], x, y, tile * 1.62f, false);
+                int pose = given ? 2 : near ? 1 : 0;
+                if (pose == 0) frame(canvas, idleSheet(IDLE_CAST[who - 1]), idleFrame(idleId), IDLE_FRAMES, x, y, tile * 1.62f, false);
+                else frame(canvas, cast(who - 1), pose, CAST_FRAMES[who - 1], x, y, tile * 1.62f, false);
             } else if (who == 3 || who == 4) {
-                frame(canvas, cast(who == 3 ? TSUBAKIEH : ILLYA), 0, CAST_FRAMES[who == 3 ? TSUBAKIEH : ILLYA], x, y, tile * 1.62f, false);
+                frame(canvas, idleSheet(IDLE_CAST[who == 3 ? TSUBAKIEH : ILLYA]), idleFrame(idleId), IDLE_FRAMES, x, y, tile * 1.62f, false);
             } else if (who == RunLevels.NURI) {
-                Bitmap queen = face(10);
-                float tall = tile * 1.7f, wide = tall * queen.getWidth() / queen.getHeight();
-                target.set(x - wide / 2, y - tall, x + wide / 2, y);
-                canvas.drawBitmap(queen, null, target, paint);
+                cell(canvas, idleSheet(R.drawable.run_idle_nuri), idleFrame(idleId), IDLE_FRAMES, x, y, tile * 1.7f, false);
             } else {
-                // A little hop when she comes near, and when it has been given.
-                float hop = near && !given ? Math.abs((float) Math.sin(clock * 6)) * tile * .08f : 0;
+                // (No hop: everyone stands still, and only idles.)
+                float hop = 0;
                 // Nabi by the pet shop's door looks into her shop, to the right, where her pets are; she and Inju each stand behind a counter of their own.
                 boolean keeps = item[0] == PlusRun.SPOT && (who == RunLevels.NABI || who == RunLevels.INJU);
-                frame(canvas, villagers(), who - RunLevels.SOMI, VILLAGERS, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f, keeps && who == RunLevels.NABI);
+                frame(canvas, idleSheet(IDLE_VILLAGERS[who - RunLevels.SOMI]), idleFrame(idleId), IDLE_FRAMES, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f,
+                        keeps && who == RunLevels.NABI);
                 if (keeps) {
                     furniture();
                     standing(canvas, who == RunLevels.NABI ? counterPets : deskGuild, x + (who == RunLevels.NABI ? tile * .25f : -tile * .1f), y + tile * .04f, tile * (who == RunLevels.NABI ? 1.6f : 1.8f));
