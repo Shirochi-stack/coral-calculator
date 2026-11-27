@@ -5,6 +5,7 @@
  "band": "idol/songs/eleven-idol-band-1.mp3",
  "seconds": 90,
  "beat": 0.5,
+ "mix": {"voice": 1.0, "crowd": 0.5, "band": 0.9, "under": -6.0, "down": 0.1, "up": 0.33, "presence": 2.5, "dip": -2.5},
  "scene": "She is the centre of an idol group on stage before a cheering hall, the group's MC over bouncy idol pop at 120 beats a minute. She does not sing: she talks on the beat in short dry phrases, smug, bratty and teasing, looking down her nose at the crowd, unhurried and pleased with herself, loud enough for a hall. Full stops are clipped: no long pauses. 'zah-ko' is her taunt (Japanese 'zako', small fry), said with a drawl.",
  "brisk": "She is the centre of an idol group on stage before a cheering hall, the group's MC over fast idol pop. She does not sing: she snaps the line out right on the beat, quick, crisp and dry, smug and teasing, loud enough for a hall. As brisk as she can say it clearly, with no pauses between the phrases. 'zah-ko' is her taunt (Japanese 'zako', small fry).",
  "shout": "She is on stage and shouts one word to a cheering hall, as loud and bright and short as she can, like a concert call.",

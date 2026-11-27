@@ -23,7 +23,13 @@ A line longer than its seconds is, in this order: said again by the voice itself
 pace (asked to be brisk, and at a higher speaking rate: the slowest of a few that fits is the
 one used); its pauses shortened (to a seventh of a second); and only then hurried afterwards
 with its pitch kept, by no more than a tenth. If it is still too long the next line waits for
-it, and that is said. The band is held down a little while she is heard.
+it, and that is said.
+
+The mix is the spec's "mix": how loud she and the crowd are, how loud the band is, how far the
+band is held down while she is heard (down in a tenth of a second, back up in a third, so the
+gaps between her lines are full), and a little more of her and less of the band where words are
+made out (2 to 4 kHz). It says how far above the band she sits while she speaks, in decibels,
+for this mix and for the first one (her at .9, the band held down by a third).
 Writes OUT.wav and OUT-voice.wav (her voice alone). Needs numpy, soundfile, av, requests; the
 voice's key, by name.
 """
@@ -40,6 +46,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHOTS = ROOT / "dist" / "cutscenes"
 RATE = 48000
 MOST_FASTER = 1.1
+# The mix, where the spec does not say: her voice, the crowd beside it, the band, how far the band goes down under her (decibels) and
+# how fast (seconds down, seconds up), and what is added to her and taken from the band around three kilohertz (decibels).
+MIX = {"voice": 1.0, "crowd": .5, "band": .9, "under": -8.0, "down": .1, "up": .33, "presence": 2.5, "dip": -2.5}
 # The speaking rates the voice is asked for, slowest first, when a line does not fit as it is first said.
 RATES = (1.12, 1.25, 1.4)
 
@@ -77,6 +86,49 @@ def tightened(wave, most=.14):
         index = ends
     out.append(wave[at:])
     return numpy.concatenate(out)
+
+
+def bell(wave, gain, middle=3000.0, width=.9):
+    """A sound with so many decibels more (or fewer) around a pitch: a bell, an octave or so wide."""
+    if abs(gain) < .05:
+        return wave
+    import scipy.signal
+
+    a = 10 ** (gain / 40)
+    w = 2 * numpy.pi * middle / RATE
+    alpha = numpy.sin(w) / (2 * width)
+    b = [1 + alpha * a, -2 * numpy.cos(w), 1 - alpha * a]
+    c = [1 + alpha / a, -2 * numpy.cos(w), 1 - alpha / a]
+    return scipy.signal.lfilter(numpy.array(b) / c[0], numpy.array(c) / c[0], wave, axis=0)
+
+
+def held_down(track, down, up):
+    """Where she or the crowd is heard, moment by moment, from 0 (not) to 1 (heard): quick to rise, slower to fall, and not falling between her words."""
+    step = RATE // 1000
+    loud = numpy.abs(track).max(axis=1)
+    frames = len(loud) // step
+    speaking = (loud[: frames * step].reshape(frames, step).max(axis=1) > .03).astype(float)
+    # (A gap between two words, up to a sixth of a second, is not a gap.)
+    hold = 160
+    kept = numpy.convolve(speaking, numpy.ones(hold), mode="full")[:frames] > 0
+    # (And it begins to go down a little before she speaks, not on her first sound.)
+    ahead = int(down * 1000 * .6)
+    kept = numpy.concatenate([kept[ahead:], numpy.zeros(ahead, bool)]) | kept
+    level, out = 0.0, numpy.zeros(frames)
+    rise, fall = 1 - numpy.exp(-3 / (down * 1000)), 1 - numpy.exp(-3 / (up * 1000))
+    for index in range(frames):
+        level += ((1.0 if kept[index] else 0.0) - level) * (rise if kept[index] else fall)
+        out[index] = level
+    return numpy.interp(numpy.arange(len(loud)), numpy.arange(frames) * step, out)
+
+
+def above(voice, band, alone):
+    """How many decibels her voice is above the band where she speaks (alone: where she, not the crowd, is heard)."""
+    if not alone.any():
+        return 0.0
+    hers = numpy.sqrt((voice[alone] ** 2).mean())
+    theirs = numpy.sqrt((band[alone] ** 2).mean())
+    return float(20 * numpy.log10((hers + 1e-9) / (theirs + 1e-9)))
 
 
 def main():
@@ -142,7 +194,9 @@ def main():
                 best = (tight, (note + ", " if note else "") + "pauses shortened")
         return best
 
-    track = numpy.zeros((seconds * RATE, 2))
+    mixed = dict(MIX, **spec.get("mix", {}))
+    # (Her lines and the crowd are kept apart until the mix: each has its own loudness there.)
+    track, answers = numpy.zeros((seconds * RATE, 2)), numpy.zeros((seconds * RATE, 2))
     shouts, free, sped, late, paced = {}, 0.0, [], [], []
     for line in spec["lines"]:
         at, room, words, how = line[:4]
@@ -150,9 +204,9 @@ def main():
         if how == "crowd":
             if words not in shouts:
                 shouts[words] = crowd(sent)
-            piece = shouts[words] * .55
+            piece = shouts[words]
             begins = int(at * RATE)
-            track[begins:begins + len(piece)] += piece[: len(track) - begins]
+            answers[begins:begins + len(piece)] += piece[: len(answers) - begins]
             continue
         pieces = [piece.strip() for piece in sent.split("\u2014") if piece.strip()]
         # How long each piece is when she says it her own way; its share of the line's seconds goes by that.
@@ -189,29 +243,45 @@ def main():
         over = ends - (at + room)
         print((f"{at:5.1f} s  place {room:3.1f}  her own way {came:4.1f} -> {ends - begins:4.1f} s" + (f" [{'; '.join(steps)}]" if steps else "") + (f" (a pause of {gap:.2f} s at its dash)" if len(waves) > 1 else "")
                + (f" BEGINS {begins - at:.2f} s LATE" if begins > at + .05 else "") + (f" runs {over:.2f} s past its place" if over > .1 else "") + f"  {words}").encode("ascii", "replace").decode(), flush=True)
+    alone = numpy.abs(track).max(axis=1) > .03
+    first = track * .9, answers * .55 * .9
+    voice = bell(track, mixed["presence"]) * mixed["voice"]
+    crowd = answers * mixed["crowd"]
+    track = voice + crowd
     soundfile.write(str(out) + "-voice.wav", numpy.clip(track, -1, 1), RATE)
     print("\nlines the voice said at a brisker pace:", "none" if not paced else "; ".join(f"{at:.0f} s at {pace}" for at, _, pace in paced))
     print("lines hurried afterwards:", "none" if not sped else "; ".join(f"{at:.0f} s x{faster:.2f}" for at, _, faster in sped))
     print("lines that begin late:", "none" if not late else "; ".join(f"{at:.0f} s by {by:.2f} s" for at, _, by in late))
-    band = SHOTS / spec["band"] if spec.get("band") else None
-    if band is None or not band.exists():
-        print("no band at", band, ": her voice alone was written")
+    source = SHOTS / spec["band"] if spec.get("band") else None
+    if source is None or not source.exists():
+        print("no band at", source, ": her voice alone was written")
         return
     import av
 
-    box = av.open(str(band))
+    box = av.open(str(source))
     resampler = av.AudioResampler(format="flt", layout="stereo", rate=RATE)
     sound = numpy.concatenate([made.to_ndarray().reshape(-1, 2) for frame in box.decode(audio=0) for made in resampler.resample(frame)])[: len(track)]
     under = numpy.zeros_like(track)
     under[: len(sound)] = sound
     under *= .5 / (numpy.sqrt((under ** 2).mean()) * 4 + 1e-9) if numpy.sqrt((under ** 2).mean()) > .125 else 1
-    # The band is held down a little wherever she or the crowd is heard.
-    heard = numpy.convolve((numpy.abs(track).max(axis=1) > .03).astype(float), numpy.ones(RATE // 5) / (RATE // 5), mode="same")
-    mix = track * .9 + under * (1 - .35 * numpy.clip(heard * 1.5, 0, 1))[:, None]
+    # The first mix, for the comparison only: the band held down by a third wherever she or the crowd was heard.
+    was = numpy.convolve((numpy.abs(first[0] + first[1]).max(axis=1) > .03).astype(float), numpy.ones(RATE // 5) / (RATE // 5), mode="same")
+    before = above(first[0], under * (1 - .35 * numpy.clip(was * 1.5, 0, 1))[:, None], alone)
+    # The band goes down under her, quickly, wherever she or the crowd is heard, and comes back up in the gaps, more slowly; and it
+    # gives up a little of the pitches her words are made out by.
+    heard = held_down(track, mixed["down"], mixed["up"])
+    band = bell(under, mixed["dip"]) * mixed["band"] * (10 ** (mixed["under"] / 20 * heard))[:, None]
+    mix = track + band
     mix[-RATE // 2:] *= numpy.linspace(1, 0, RATE // 2)[:, None]
-    mix = mix / max(1, numpy.abs(mix).max() / .97)
+    scale = max(1, numpy.abs(mix).max() / .97)
+    mix = mix / scale
+    gaps = heard < .05
+    print(f"\nher voice over the band while she speaks: {above(voice, band, alone):.1f} dB (the first mix: {before:.1f} dB)")
+    print(f"the band in the gaps between her lines: {20 * numpy.log10(numpy.sqrt((band[gaps] ** 2).mean()) / scale + 1e-9):.1f} dB of full; under her: {20 * numpy.log10(numpy.sqrt((band[alone] ** 2).mean()) / scale + 1e-9):.1f} dB;"
+          f" she: {20 * numpy.log10(numpy.sqrt((voice[alone] ** 2).mean()) / scale + 1e-9):.1f} dB" + (f"; the crowd where it answers: {20 * numpy.log10(numpy.sqrt((crowd[numpy.abs(crowd).max(axis=1) > .02] ** 2).mean()) / scale + 1e-9):.1f} dB" if numpy.abs(crowd).max() > 0 else ""))
+    print(f"peak before it was brought under full scale: {numpy.abs(mix).max() * scale:.2f}" + (f" (the whole mix was turned down by {20 * numpy.log10(scale):.1f} dB for it)" if scale > 1 else ""))
     soundfile.write(str(out) + ".wav", mix, RATE)
-    print("saved", str(out) + ".wav", "over", band.name)
+    print("saved", str(out) + ".wav", "over", source.name)
 
 
 if __name__ == "__main__":

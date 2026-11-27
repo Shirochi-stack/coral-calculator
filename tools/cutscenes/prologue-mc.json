@@ -5,6 +5,8 @@
  "band": "prologue/songs/eleven-band-1.mp3",
  "seconds": 90,
  "beat": 0.5,
+ "mix": {"voice": 0.9, "crowd": 0.5, "band": 1.0, "under": -3.7, "down": 0.1, "up": 0.2, "presence": 0.0, "dip": 0.0},
+ "mix_about": "The user heard the first mix of this track (her at .9, the band held down by a third under her) and found it fine: these settings are that mix. The file in use, dist/cutscenes/opening/prologue-halgakos.wav, is the very one the user heard.",
  "scene": "She talks over the opening theme of her own show, bouncy anime pop at 120 beats a minute, straight to the viewer who followed her on her day off. She does not sing: she talks on the beat in short dry phrases, smug, bratty and teasing, looking down her nose, unhurried and pleased with herself. Full stops are clipped: no long pauses. 'zah-ko' is her taunt (Japanese 'zako', small fry), said with a drawl. 'nim' and 'sshi' are Korean honorifics.",
  "brisk": "She talks over the fast opening theme of her own show, straight to the viewer. She does not sing: she snaps the line out right on the beat, quick, crisp and dry, smug and teasing. As brisk as she can say it clearly, with no pauses between the phrases. 'zah-ko' is her taunt (Japanese 'zako', small fry). 'nim' and 'sshi' are Korean honorifics.",
  "shout": "She calls one word out over the opening theme of her own show, as loud and bright and short as she can.",
