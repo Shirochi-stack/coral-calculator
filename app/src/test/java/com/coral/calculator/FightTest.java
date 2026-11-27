@@ -96,21 +96,21 @@ public class FightTest {
         assertEquals(hurt(Fight.CHIKUWA, Fight.HEAVY), lost(fight, 1), .01f);
     }
 
-    @Test public void aJumpGoesOverWhatIsThrownLow() {
+    @Test public void aFloodIsAWaveThatCatchesOneWhoJumpsIt() {
         Fight fight = apart(Fight.RUNE, Fight.TSUBAKIEH, 6);
         fight.fighters[0].meter = Fight.METER;
         Fight.Pad flood = new Fight.Pad(), other = new Fight.Pad();
         flood.ultimate = true;
         fight.step(STEP, flood, other);
         flood.ultimate = false;
-        // The flood rolls along the floor: she jumps as it reaches her and it passes under.
+        // She jumps as it reaches her: it is as high as a jump goes, and catches her all the same.
         for (int step = 0; step < 400; step++) {
             boolean near = false;
             for (Fight.Shot shot : fight.shots()) near |= Math.abs(shot.x - fight.fighters[1].x) < 2.5f;
             other.jump = near && fight.fighters[1].state != Fight.JUMP;
             fight.step(STEP, flood, other);
         }
-        assertEquals(0, lost(fight, 1), .01f);
+        assertTrue(lost(fight, 1) >= Fight.damageOf(Fight.FLOOD));
 
         Fight stood = apart(Fight.RUNE, Fight.TSUBAKIEH, 6);
         stood.fighters[0].meter = Fight.METER;
@@ -921,9 +921,9 @@ public class FightTest {
 
     @Test public void atNormalTheSideThatPlaysItselfPlaysExactlyAsItDidBefore() {
         // Recorded before there was any choice of how hard it is: the same seeds must give the same fights to the last hundredth.
-        String[] before = {"30/9/67/6/9/0/2/6500/0/4370", "36/3/50/6/1/1/2/0/4500/4728", "18/0/16/2/0/1/2/0/10000/5125",
-                "29/8/43/4/1/0/2/8280/0/5125", "32/2/48/6/1/1/2/0/5800/4815", "18/0/17/2/0/1/2/0/10000/4625",
-                "45/5/63/9/6/0/3/4820/0/5003", "26/0/34/5/0/1/2/0/7800/5207", "18/0/17/2/0/1/2/0/10000/4802"};
+        // Recorded again when an ultimate was made to hold the other still and the flood to rise as a wave, which changed every fight
+        // with an ultimate in it; the choice of how hard it is changes nothing here.
+        String[] before = {"50/8/77/10/7/0/3/4361/0/4735", "28/6/39/4/0/1/2/0/6700/5040", "18/0/16/2/0/1/2/0/10000/5125", "34/6/44/5/1/0/2/4095/0/4793", "32/2/47/6/1/1/2/0/5800/4815", "18/0/17/2/0/1/2/0/10000/4625", "33/5/46/6/3/0/2/1740/0/4387", "28/3/44/7/0/1/2/0/7800/4773", "18/0/17/2/0/1/2/0/10000/4802"};
         int index = 0;
         for (int seed = 1; seed <= 3; seed++) {
             assertEquals(before[index++], fingerprint(Fight.HALGAKOS, Fight.CHIKUWA, 2, 2, seed));
@@ -1124,6 +1124,168 @@ public class FightTest {
                 assertTrue(places.add(at[0] + " " + at[1] + " " + at[2]));
             }
         }
+    }
+
+    @Test public void theDashButtonDashesTheWayHeldOrTowardTheOtherOnTheGroundAndInTheAir() {
+        // On the ground with no arrow: toward the other, a dash. With the arrow away from her: a hop back.
+        Fight fight = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 6);
+        Fight.Pad pad = new Fight.Pad();
+        pad.dash = true;
+        fight.step(STEP, pad, null);
+        assertEquals(Fight.DASH, fight.fighters[0].state);
+        assertTrue(fight.fighters[0].across > 0);
+        pad.dash = false;
+        rest(fight, .5f);
+        pad.left = true;
+        pad.dash = true;
+        fight.step(STEP, pad, null);
+        assertEquals(Fight.BACKSTEP, fight.fighters[0].state);
+        // Held down, it is one dash, not many.
+        Fight once = apart(Fight.TSUBAKIEH, Fight.CHIKUWA, 6);
+        Fight.Pad held = new Fight.Pad();
+        held.dash = true;
+        hold(once, 1, held, null);
+        assertEquals(Fight.IDLE, once.fighters[0].state);
+        // In the air with no arrow: forward, toward the other; with the arrow away: back; heavy out of it: the smash.
+        for (int way = 1; way >= -1; way -= 2) {
+            Fight air = apart(Fight.HALGAKOS, Fight.CHIKUWA, 6);
+            Fight.Pad jump = new Fight.Pad();
+            jump.jump = true;
+            air.step(STEP, jump, null);
+            jump.jump = false;
+            hold(air, .25f, jump, null);
+            jump.left = way < 0;
+            jump.dash = true;
+            air.step(STEP, jump, null);
+            jump.dash = false;
+            jump.left = false;
+            assertEquals(Fight.AIRDASH, air.fighters[0].state);
+            assertEquals(1, air.airDashes());
+            assertEquals(way > 0 ? FightFrames.ADF1 : FightFrames.ADB1, FightPose.of(air, air.fighters[0], 0, 0));
+            hold(air, .08f, jump, null);
+            jump.heavy = true;
+            air.step(STEP, jump, null);
+            assertEquals(Fight.SMASH, air.fighters[0].move);
+        }
+        // And on the keys: Shift is the dash.
+        boolean[] none = new boolean[FightKeys.BUTTONS], keys = new boolean[FightKeys.BUTTONS];
+        keys[FightKeys.DASH] = true;
+        Fight.Pad byKey = new Fight.Pad();
+        FightKeys.fill(byKey, none, none, keys);
+        assertTrue(byKey.dash);
+    }
+
+    @Test public void anUltimateCatchesOneWhoJumpsWhenItIsBegunAndMissesOneTrulyOutOfReach() {
+        for (int kind = 0; kind < Fight.FIGHTERS; kind++) {
+            // Near enough for any of the five: she is in the air when the other's ultimate is begun, and jumps again when she can.
+            Fight fight = apart(kind, Fight.TSUBAKIEH, 2);
+            fight.fighters[0].meter = Fight.METER;
+            Fight.Pad one = new Fight.Pad(), two = new Fight.Pad();
+            two.jump = true;
+            hold(fight, .2f, one, two);
+            assertTrue(fight.fighters[1].y > .5f);
+            one.ultimate = true;
+            fight.step(STEP, one, two);
+            one.ultimate = false;
+            assertEquals(Fight.FLOURISH, fight.phase());
+            float high = fight.fighters[1].y;
+            // Through the flash and while it comes out she is held where she is.
+            hold(fight, Fight.FLOURISH_SECONDS + Fight.MOVES[kind][Fight.ULTIMATE].startup * .9f, one, two);
+            assertEquals(FightCast.NAMES[kind], high, fight.fighters[1].y, .001f);
+            for (int frame = 0; frame < 300; frame++) {
+                two.jump = frame % 20 < 10;
+                fight.step(STEP, one, two);
+            }
+            assertTrue(FightCast.NAMES[kind] + " took " + lost(fight, 1), lost(fight, 1) > 0);
+        }
+        // Across the whole stage Chikuwa's brick bread drop does not reach.
+        Fight far = apart(Fight.CHIKUWA, Fight.TSUBAKIEH, 9.5f);
+        far.fighters[0].meter = Fight.METER;
+        press(far, Fight.ULTIMATE, 4);
+        assertEquals(0, lost(far, 1), 0);
+    }
+
+    // A keyboard
+
+    @Test public void everyKeyStandsForTheButtonItShouldAndAKeyHeldIsTheSameAsAFingerOnIt() {
+        int[][] map = {
+                {android.view.KeyEvent.KEYCODE_A, FightKeys.LEFT}, {android.view.KeyEvent.KEYCODE_DPAD_LEFT, FightKeys.LEFT},
+                {android.view.KeyEvent.KEYCODE_D, FightKeys.RIGHT}, {android.view.KeyEvent.KEYCODE_DPAD_RIGHT, FightKeys.RIGHT},
+                {android.view.KeyEvent.KEYCODE_W, FightKeys.JUMP}, {android.view.KeyEvent.KEYCODE_DPAD_UP, FightKeys.JUMP},
+                {android.view.KeyEvent.KEYCODE_SPACE, FightKeys.JUMP}, {android.view.KeyEvent.KEYCODE_S, FightKeys.GUARD},
+                {android.view.KeyEvent.KEYCODE_DPAD_DOWN, FightKeys.GUARD}, {android.view.KeyEvent.KEYCODE_J, FightKeys.LIGHT},
+                {android.view.KeyEvent.KEYCODE_K, FightKeys.HEAVY}, {android.view.KeyEvent.KEYCODE_L, FightKeys.SPECIAL},
+                {android.view.KeyEvent.KEYCODE_SHIFT_LEFT, FightKeys.DASH}, {android.view.KeyEvent.KEYCODE_SHIFT_RIGHT, FightKeys.DASH},
+                {android.view.KeyEvent.KEYCODE_O, FightKeys.DODGE},
+                {android.view.KeyEvent.KEYCODE_I, FightKeys.ULT}, {android.view.KeyEvent.KEYCODE_U, FightKeys.ULT},
+                {android.view.KeyEvent.KEYCODE_Q, -1}, {android.view.KeyEvent.KEYCODE_ENTER, -1}, {android.view.KeyEvent.KEYCODE_ESCAPE, -1}};
+        for (int[] pair : map) assertEquals("key " + pair[0], pair[1], FightKeys.button(pair[0]));
+        assertEquals(FightKeys.CHOOSE, FightKeys.menu(android.view.KeyEvent.KEYCODE_ENTER));
+        assertEquals(FightKeys.NEXT, FightKeys.menu(android.view.KeyEvent.KEYCODE_D));
+        assertEquals(FightKeys.UP, FightKeys.menu(android.view.KeyEvent.KEYCODE_DPAD_UP));
+        assertEquals(FightKeys.NONE, FightKeys.menu(android.view.KeyEvent.KEYCODE_ESCAPE));
+        // Each button, held by a key, a finger, or tapped and let go: the fighter is asked the same.
+        for (int button = 0; button < FightKeys.BUTTONS; button++) {
+            boolean[] none = new boolean[FightKeys.BUTTONS], one = new boolean[FightKeys.BUTTONS];
+            one[button] = true;
+            Fight.Pad byKey = new Fight.Pad(), byFinger = new Fight.Pad(), byTap = new Fight.Pad();
+            FightKeys.fill(byKey, none, none, one);
+            FightKeys.fill(byFinger, one, none, none);
+            FightKeys.fill(byTap, none, one, none);
+            assertEquals(byFinger.bits(), byKey.bits());
+            assertTrue(byKey.bits() != 0);
+            if (button != FightKeys.GUARD) assertEquals(byFinger.bits(), byTap.bits());
+        }
+        // Several at once: right and heavy and jump held together.
+        boolean[] none = new boolean[FightKeys.BUTTONS], many = new boolean[FightKeys.BUTTONS];
+        many[FightKeys.RIGHT] = true;
+        many[FightKeys.HEAVY] = true;
+        many[FightKeys.JUMP] = true;
+        Fight.Pad pad = new Fight.Pad();
+        FightKeys.fill(pad, none, none, many);
+        assertTrue(pad.right && pad.heavy && pad.jump && !pad.left && !pad.light);
+    }
+
+    @Test public void aFightPlayedOnTheKeysAloneDashesInTheAirAndStrikes() {
+        Fight fight = apart(Fight.HALGAKOS, Fight.CHIKUWA, 8);
+        boolean[] none = new boolean[FightKeys.BUTTONS], keys = new boolean[FightKeys.BUTTONS], tapped = new boolean[FightKeys.BUTTONS];
+        Fight.Pad pad = new Fight.Pad();
+        // Space pressed and let go between frames: a jump.
+        tapped[FightKeys.JUMP] = true;
+        FightKeys.fill(pad, none, tapped, keys);
+        fight.step(STEP, pad, null);
+        java.util.Arrays.fill(tapped, false);
+        for (int frame = 0; frame < 15; frame++) {
+            FightKeys.fill(pad, none, tapped, keys);
+            fight.step(STEP, pad, null);
+        }
+        // D tapped twice, each let go before the next frame: a dash in the air.
+        for (int tap = 0; tap < 2; tap++) {
+            tapped[FightKeys.RIGHT] = true;
+            FightKeys.fill(pad, none, tapped, keys);
+            fight.step(STEP, pad, null);
+            java.util.Arrays.fill(tapped, false);
+            for (int frame = 0; frame < 3; frame++) {
+                FightKeys.fill(pad, none, tapped, keys);
+                fight.step(STEP, pad, null);
+            }
+        }
+        assertEquals(1, fight.airDashes());
+        rest(fight, 1.5f);
+        // D held to walk up to her, and J for the quick blow.
+        keys[FightKeys.RIGHT] = true;
+        for (int frame = 0; frame < 120 && Math.abs(fight.fighters[1].x - fight.fighters[0].x) > 1.3f; frame++) {
+            FightKeys.fill(pad, none, tapped, keys);
+            fight.step(STEP, pad, null);
+        }
+        keys[FightKeys.RIGHT] = false;
+        keys[FightKeys.LIGHT] = true;
+        FightKeys.fill(pad, none, tapped, keys);
+        fight.step(STEP, pad, null);
+        keys[FightKeys.LIGHT] = false;
+        FightKeys.fill(pad, none, tapped, keys);
+        rest(fight, .3f);
+        assertEquals(1, fight.hits());
     }
 
     // In the air
@@ -1630,13 +1792,14 @@ public class FightTest {
         Fight jumping = apart(Fight.CHIKUWA, Fight.HALGAKOS, 6);
         jumping.fighters[0].meter = Fight.METER;
         jumping.fighters[1].meter = Fight.METER;
+        two.jump = true;
+        hold(jumping, .15f, one, two);
+        two.jump = false;
+        assertEquals(Fight.JUMP, jumping.fighters[1].state);
         one.ultimate = true;
         jumping.step(STEP, one, two);
         one.ultimate = false;
         hold(jumping, Fight.FLOURISH_SECONDS, one, two);
-        two.jump = true;
-        hold(jumping, .15f, one, two);
-        two.jump = false;
         assertEquals(Fight.JUMP, jumping.fighters[1].state);
         two.ultimate = true;
         jumping.step(STEP, one, two);
@@ -1837,7 +2000,7 @@ public class FightTest {
     // Two players
 
     @Test public void whatIsHeldDownSurvivesBeingSentAsANumber() {
-        for (int bits = 0; bits < 512; bits++) {
+        for (int bits = 0; bits < 1024; bits++) {
             Fight.Pad pad = new Fight.Pad();
             pad.set(bits);
             assertEquals(bits, pad.bits());
@@ -1845,13 +2008,14 @@ public class FightTest {
             assertEquals((bits & 64) != 0, pad.special);
             assertEquals((bits & 128) != 0, pad.dodge);
             assertEquals((bits & 256) != 0, pad.ultimate);
+            assertEquals((bits & 512) != 0, pad.dash);
         }
         // It goes in two bytes, as the device that joins sends it.
         Fight.Pad all = new Fight.Pad();
-        all.set(511);
+        all.set(1023);
         Fight.Pad got = new Fight.Pad();
         got.set((all.bits() & 0xFF) | ((all.bits() >> 8) & 0xFF) << 8);
-        assertTrue(got.dodge && got.ultimate && got.left && got.special);
+        assertTrue(got.dodge && got.ultimate && got.left && got.special && got.dash);
     }
 
     @Test public void aFightWrittenDownAndReadBackIsTheSameFightToLookAt() throws Exception {
