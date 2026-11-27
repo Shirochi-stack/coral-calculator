@@ -235,9 +235,9 @@ final class RunGame {
     /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
     private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800, 950, 900, 1200, 1500};
     /** The counter's tabs, and what stands under each. */
-    private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms"};
-    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}};
-    private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2;
+    private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms", "Vanity"};
+    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
+    private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2, VANITY_TAB = 6;
     private final RectF[] counterTabs = new RectF[TAB_NAMES.length], petCells = new RectF[PlusRun.PETS];
     private final RectF petAct = new RectF(), armsAct = new RectF();
     private int counterTab, shownWares, petOn;
@@ -2893,10 +2893,10 @@ final class RunGame {
         int which = behind ? 1 : 0;
         if (whiteArt[which] == null) whiteArt[which] = BitmapFactory.decodeResource(context.getResources(), behind ? R.drawable.halgakos_back : R.drawable.halgakos_white);
         Bitmap[] set = looks.get(drawn());
-        if (set == null) return whiteArt[which];
+        if (set == null) return dressed(behind ? "back" : "white", whiteArt[which]);
         int slot = 3 + ARMED.length + which;
         if (set[slot] == null) set[slot] = dyed(whiteArt[which], drawn());
-        return set[slot];
+        return dressed(behind ? "back" : "white", set[slot]);
     }
 
     private Bitmap later(int who) {
@@ -3030,26 +3030,48 @@ final class RunGame {
 
     private Bitmap herPet() {
         Bitmap[] set = looks.get(drawn());
-        return set != null ? set[0] : pet;
+        return dressed("pet", set != null ? set[0] : pet);
     }
 
     private Bitmap herJump() {
         Bitmap[] set = looks.get(drawn());
-        return set != null ? set[1] : jump;
+        return dressed("jump", set != null ? set[1] : jump);
     }
 
     /** The sheet of her hurt, thrown and fallen, in a colour: so that she does not lose in pink what she was wearing in red. */
     private Bitmap herLose(int form) {
         Bitmap[] set = looks.get(form);
-        return set != null ? set[2] : lose;
+        return dressed("lose", set != null ? set[2] : lose);
     }
 
     private Bitmap herArmed(int weapon) {
         int form = drawn();
         Bitmap[] set = looks.get(form);
-        if (set == null) return armed(weapon);
+        if (set == null) return dressed("arm" + weapon, armed(weapon));
         if (set[3 + weapon] == null) set[3 + weapon] = dyedArm(armed(weapon), weapon, form);
-        return set[3 + weapon];
+        return dressed("arm" + weapon, set[3 + weapon]);
+    }
+
+    /** Vanity: what she is dressed in at the moment (her own look, her gear, or her chosen outfit), and a sheet of her in it. See {@link RunVanity}. */
+    private VanityArt vanityArt;
+    private RunVanity.Style vanityStyle;
+    private long vanityAt = -1000;
+
+    private RunVanity.Style vanityNow() {
+        long now = System.currentTimeMillis();
+        if (now - vanityAt > 250 || now < vanityAt) {
+            vanityAt = now;
+            RunVanity.Keep kept = RunVanity.on(session);
+            vanityStyle = RunVanity.styleFor(RunVanity.mode(kept), RunVanity.outfit(kept), RunVanity.mode(kept) == RunVanity.GEAR ? wornNow() : null);
+        }
+        return vanityStyle;
+    }
+
+    private Bitmap dressed(String sheet, Bitmap from) {
+        RunVanity.Style style = vanityNow();
+        if (style == null) return from;
+        if (vanityArt == null) vanityArt = new VanityArt(context);
+        return vanityArt.sheet(sheet, from, style);
     }
 
     /** Who waits at the end of a land, by her colour, her name, and where she is among those who speak (below nothing for Zero and King Slime, who do not). */
@@ -3368,6 +3390,13 @@ final class RunGame {
             int film = session.tally("run_film") - 1;
             session.keep("run_film", 0);
             if (film <= RunFilms.CLIP) showFilm(film, stage, null);
+        }
+        // (And the guild counter, at a tab, for looking at it.)
+        if (BuildConfig.DEBUG && screen == MAP && video == null && session.tally("run_counter") > 0) {
+            counterTab = Math.min(TAB_NAMES.length - 1, session.tally("run_counter") - 1);
+            session.keep("run_counter", 0);
+            counterFrom = MAP;
+            screen = SHOP;
         }
         if (!galleryNews && !petNews || video != null || shelf != null && !shelf.closed()) return;
         boolean free = screen == MAP || screen == PLAY && finale == NO_FINALE && !talking && captionLeft <= 0 && personLeft <= 0;
@@ -7138,6 +7167,8 @@ final class RunGame {
             } else if (counterTab == ARMS_TAB && armsAct.contains(x, y)) {
                 audio.play("tap", .5f);
                 openPack(MAP);
+            } else if (counterTab == VANITY_TAB) {
+                vanityTouch(x, y);
             }
         } else if (screen == STALL) {
             for (int index = 0; index < stallWares.length; index++) {
@@ -13000,12 +13031,105 @@ final class RunGame {
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(Color.WHITE);
             fitted(canvas, "Open her backpack  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
+        } else if (counterTab == VANITY_TAB) {
+            drawVanityTab(canvas, left, under, across, bank);
         } else if (counterTab == 1) {
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(soft);
             fitted(canvas, "Her wings are what there is to buy for how she moves, so far.", left + dp(6), under + dp(14), dp(12.5f), across - dp(12));
         }
         text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /** Vanity at the counter: the toggle's three settings, and a row for each outfit. */
+    private final RectF[] vanityModes = {new RectF(), new RectF(), new RectF()}, vanityRows = new RectF[RunVanity.count()];
+
+    private RunVanity.Keep vanityKeep() { return RunVanity.on(session); }
+
+    private void vanityTouch(float x, float y) {
+        for (int mode = 0; mode < vanityModes.length; mode++) {
+            if (vanityModes[mode].contains(x, y)) {
+                RunVanity.setMode(vanityKeep(), mode);
+                vanityAt = -1000;
+                audio.play("tap", .5f);
+                return;
+            }
+        }
+        for (int outfit = 0; outfit < vanityRows.length; outfit++) {
+            if (vanityRows[outfit] == null || !vanityRows[outfit].contains(x, y)) continue;
+            if (RunVanity.owns(vanityKeep(), outfit)) {
+                // Tapping the one she has on takes it off.
+                RunVanity.choose(vanityKeep(), RunVanity.outfit(vanityKeep()) == outfit ? -1 : outfit);
+                if (RunVanity.mode(vanityKeep()) == RunVanity.DEFAULT) RunVanity.setMode(vanityKeep(), RunVanity.VANITY);
+                audio.play("star", .6f);
+            } else if (RunVanity.buy(vanityKeep(), outfit)) {
+                RunVanity.setMode(vanityKeep(), RunVanity.VANITY);
+                audio.play("buy", .6f);
+                buzz(true);
+            } else {
+                audio.play("no", .5f);
+            }
+            vanityAt = -1000;
+            return;
+        }
+    }
+
+    private void drawVanityTab(Canvas canvas, float left, float top, float across, int bank) {
+        int mode = RunVanity.mode(vanityKeep()), chosen = RunVanity.outfit(vanityKeep());
+        float gap = dp(6), each = (across - gap * 2) / 3;
+        for (int one = 0; one < 3; one++) {
+            RectF at = vanityModes[one];
+            at.set(left + one * (each + gap), top, left + one * (each + gap) + each, top + dp(34));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(one == mode ? CalculatorLayout.CORAL : dark ? 0xFF2F3336 : 0xFFF1F3F4);
+            canvas.drawRoundRect(at, dp(17), dp(17), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(one == mode ? Color.WHITE : ink);
+            fitted(canvas, RunVanity.MODE_NAMES[one], at.centerX(), at.centerY() + dp(5), dp(13.5f), each - dp(10));
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        fitted(canvas, RunVanity.MODE_DOES[mode] + "  \u00B7  it never changes what she can do", left + dp(6), top + dp(52), dp(12), across - dp(12));
+        float y = top + dp(62);
+        for (int outfit = 0; outfit < vanityRows.length; outfit++) {
+            if (vanityRows[outfit] == null) vanityRows[outfit] = new RectF();
+            RectF at = vanityRows[outfit];
+            at.set(left, y, left + across, y + dp(62));
+            y += dp(68);
+            boolean hers = RunVanity.owns(vanityKeep(), outfit), on = chosen == outfit, can = !hers && bank >= RunVanity.PRICES[outfit];
+            plate(canvas, at, dp(16), 245);
+            RunVanity.Style style = RunVanity.STYLES[outfit];
+            int[] swatch = {style.dark, style.mid, style.light, style.trim != 0 ? style.trim : style.mid};
+            paint.setStyle(Paint.Style.FILL);
+            for (int dot = 0; dot < 4; dot++) {
+                paint.setColor(swatch[dot]);
+                canvas.drawCircle(at.left + dp(22), at.top + dp(15) + dot * dp(10.5f) - (dot > 1 ? 0 : 0), dp(4.6f), paint);
+            }
+            paint.setColor(Color.BLACK);
+            float words = at.left + dp(42), price = dp(86), room = at.right - words - price - dp(18);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            fitted(canvas, RunVanity.NAMES[outfit], words, at.top + dp(25), dp(15.5f), room);
+            text.setColor(soft);
+            fitted(canvas, RunVanity.DOES[outfit], words, at.top + dp(45), dp(11.5f), room);
+            box.set(at.right - dp(12) - price, at.centerY() - dp(18), at.right - dp(12), at.centerY() + dp(18));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(on ? CalculatorLayout.CORAL : hers ? (dark ? 0xFF2F3336 : 0xFFEDEEEE) : can ? CalculatorLayout.CORAL : dark ? 0xFF44292E : 0xFFFCE9EB);
+            canvas.drawRoundRect(box, dp(18), dp(18), paint);
+            paint.setColor(Color.BLACK);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(on || can ? Color.WHITE : hers ? soft : CalculatorLayout.CORAL);
+            fitted(canvas, on ? "Wearing" : hers ? "Wear" : "+ " + RunVanity.PRICES[outfit], box.centerX(), box.centerY() + dp(5.5f), dp(14), price - dp(14));
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        fitted(canvas, "Ears, horns and more outfits come to the vanity shop.", left + dp(6), y + dp(14), dp(12), across - dp(12));
+        // How she looks in it now: in the air, hurt, and with the sword in hand.
+        float tall = dp(120), feet = y + dp(30) + tall;
+        frame(canvas, herJump(), 1, JUMP_FRAMES, left + across * .2f, feet, tall, false);
+        frame(canvas, herLose(0), HIT, LOSE_FRAMES, left + across * .5f, feet, tall, false);
+        frame(canvas, herArmed(PlusRun.SWORD), 7, ARMED_FRAMES, left + across * .8f, feet, tall, false);
     }
 
     /**
