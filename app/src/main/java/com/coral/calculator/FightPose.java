@@ -28,6 +28,12 @@ final class FightPose {
                 if (fighter.backing) return BACK1 + (int) (clock / .12f) % 4;
                 return WALK1 + (int) (clock / .085f) % 6;
             }
+            case Fight.AIRDASH: {
+                // Toward the way she faces she darts forward; away from it she leans back and flips: the start, the burst, the end.
+                float part = clock / Fight.AIRDASH_SECONDS;
+                int at = part < .3f ? 0 : part < .75f ? 1 : 2;
+                return (fighter.across * (fighter.facingLeft ? -1 : 1) < 0 ? ADB1 : ADF1) + at;
+            }
             case Fight.DASH:
                 return clock < .05f ? DASH1 : clock > Fight.DASH_SECONDS - .06f ? SKID : (int) (clock / .07f) % 2 == 0 ? DASH2 : DASH3;
             case Fight.BACKSTEP:

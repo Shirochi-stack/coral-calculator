@@ -111,7 +111,11 @@ final class FightGame {
 
     // The fight as it is shown
     private float unit, groundY, cameraX, hold, shake;
-    private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase, seenQuakes, seenDodges, seenClashes;
+    private int seenHits, seenBlocks, seenThrows, seenFalls, seenMoves, seenRound, seenPhase, seenQuakes, seenDodges, seenClashes, seenAirDashes;
+    /** How hard the ladder is (one of Fight.EASY to Fight.BRUTAL), kept; and the four choices of it on the screen where a fighter is picked. */
+    private int difficulty = Fight.NORMAL;
+    private final RectF[] levels = {new RectF(), new RectF(), new RectF(), new RectF()};
+    private static final String[] LEVEL_NAMES = {"Easy", "Normal", "Hard", "Brutal"};
     /** How long her ultimate's button has been on show, for each side; how long ago the round ended; and where each was a moment ago, for what she leaves behind her as she dodges. */
     private float grandAge = 9, sinceOver, trailAge;
     /** Whether this device has little memory to spare; and, for testing, how long drawing has taken. */
@@ -163,6 +167,9 @@ final class FightGame {
         for (int index = 0; index < buttons.length; index++) buttons[index] = new RectF();
         for (int index = 0; index < tiles.length; index++) tiles[index] = new RectF();
         player = Math.max(0, Math.min(Fight.FIGHTERS - 1, session.tally("fight_last")));
+        // Kept one higher than it is, so that nothing kept is normal.
+        if (session.tally("fight_level") > 0) difficulty = Math.min(Fight.BRUTAL, session.tally("fight_level") - 1);
+        for (int index = 0; index < levels.length; index++) levels[index] = new RectF();
         sheet(player);
     }
 
@@ -238,6 +245,12 @@ final class FightGame {
         float each = (waysRight - waysLeft - dp(8)) / 2, pillTop = landscape ? fightButton.centerY() - dp(20) : fightButton.top - dp(10) - dp(40);
         hostButton.set(waysLeft, pillTop, waysLeft + each, pillTop + dp(40));
         joinButton.set(hostButton.right + dp(8), pillTop, waysRight, pillTop + dp(40));
+        // How hard the ladder is: four choices in a row, over the ways for two to play (on a wide screen, over the button).
+        float levelTop = (landscape ? fightButton.top : hostButton.top) - dp(10) - dp(36), levelEach = (fightButton.width() - dp(6) * 3) / 4;
+        for (int index = 0; index < levels.length; index++) {
+            float x = fightButton.left + index * (levelEach + dp(6));
+            levels[index].set(x, levelTop, x + levelEach, levelTop + dp(36));
+        }
     }
 
     /**
@@ -536,7 +549,14 @@ final class FightGame {
 
     private void begin() {
         // One player meets the next on the ladder; two meet each other, the host's fighter on the left on both devices.
-        if (mode == SOLO) fight = new Fight(player, ladder[rung], -1, Math.min(Fight.LEVELS - 1, rung), System.nanoTime());
+        if (mode == SOLO) {
+            // Normal climbs as it always did, the other side playing better at each step; easy stays at the bottom; hard and brutal at the top.
+            int skill = difficulty == Fight.EASY ? 0 : difficulty >= Fight.HARD ? Fight.LEVELS - 1 : Math.min(Fight.LEVELS - 1, rung);
+            // In a build made for testing, a number kept under this name has the other side stand still, to see the player's own moves.
+            boolean still = BuildConfig.DEBUG && session.tally("fight_still") > 0;
+            fight = new Fight(player, ladder[rung], -1, still ? -1 : skill, System.nanoTime());
+            fight.setStyle(1, difficulty);
+        }
         else if (mode == GUEST) fight = new Fight(second, player, -1, -1, 0);
         else fight = new Fight(player, second, -1, -1, System.nanoTime());
         arrange();
@@ -552,6 +572,7 @@ final class FightGame {
         seenQuakes = 0;
         seenDodges = 0;
         seenClashes = 0;
+        seenAirDashes = 0;
         grandAge = 9;
         tally.begin(fight, mode == GUEST ? 1 : 0);
         java.util.Arrays.fill(counted, 0);
@@ -625,6 +646,8 @@ final class FightGame {
             if (rung + 1 > session.tally("fight_best")) session.keep("fight_best", rung + 1);
             boolean last = rung + 1 >= ladder.length;
             if (last) session.keep("fight_cleared_" + player, session.tally("fight_cleared_" + player) + 1);
+            // The hardest the ladder has been topped at with her, one higher than it is.
+            if (last && difficulty + 1 > session.tally("fight_top_" + player)) session.keep("fight_top_" + player, difficulty + 1);
             audio.play("win");
             say(player, FightCast.WIN);
             if (last) pills("Fighters", TO_SELECT, "Again", AGAIN);
@@ -753,8 +776,9 @@ final class FightGame {
 
     /** What a player holds down: a button held, or pressed since the fight last moved on. */
     private void held(Fight.Pad into, boolean[] holding, boolean[] tapped) {
-        into.left = holding[LEFT];
-        into.right = holding[RIGHT];
+        // An arrow tapped and let go before the fight next moves on still counts, for a frame: two quick taps are a dash.
+        into.left = holding[LEFT] || tapped[LEFT];
+        into.right = holding[RIGHT] || tapped[RIGHT];
         into.block = holding[GUARD];
         into.jump = holding[JUMP] || tapped[JUMP];
         into.light = holding[LIGHT] || tapped[LIGHT];
@@ -837,7 +861,8 @@ final class FightGame {
             // A smash has come down: the ground shakes, and what she brought down with her bursts where she landed.
             seenQuakes = fight.quakes();
             int who = 0;
-            for (int side = 0; side < 2; side++) if (two[side].move == Fight.SMASH && Math.abs(two[side].x - fight.quakeX()) < .01f) who = side;
+            // Whoever has just come down from a smash: by her move, not by where she is, since landing on the other pushes her aside.
+            for (int side = 0; side < 2; side++) if (two[side].state == Fight.ATTACK && two[side].move == Fight.SMASH && two[side].landed != 0) who = side;
             audio.play("smash", .8f);
             sparks.add(new float[]{fight.quakeX(), 0, 0, 3, SMASH_FX[two[who].kind]});
             shake = .28f;
@@ -846,6 +871,10 @@ final class FightGame {
         if (fight.dodges() != seenDodges) {
             seenDodges = fight.dodges();
             audio.play("dodge", .5f);
+        }
+        if (fight.airDashes() != seenAirDashes) {
+            seenAirDashes = fight.airDashes();
+            audio.play("whoosh", .5f);
         }
         if (fight.clashes() != seenClashes) {
             seenClashes = fight.clashes();
@@ -937,6 +966,11 @@ final class FightGame {
                 audio.play("tap", .5f);
                 buzz(false);
                 climb();
+            } else if (levelAt(x, y) >= 0) {
+                difficulty = levelAt(x, y);
+                session.keep("fight_level", difficulty + 1);
+                audio.play("tap", .5f);
+                buzz(false);
             } else if (hostButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 buzz(false);
@@ -1210,7 +1244,7 @@ final class FightGame {
             float lunge = into > 0 && into < 1 ? unit * .18f * (float) Math.sin(Math.PI * into) * (fighter.facingLeft ? -1 : 1) : 0;
             // A hop back lifts her off the ground a little; a dodge, a dash or a hop leaves her likeness behind her where she was.
             if (fighter.state == Fight.BACKSTEP) y -= unit * .3f * (float) Math.sin(Math.PI * Math.min(1, fighter.clock / Fight.BACKSTEP_SECONDS));
-            if (fighter.state == Fight.DODGE || fighter.state == Fight.DASH || fighter.state == Fight.BACKSTEP) {
+            if (fighter.state == Fight.DODGE || fighter.state == Fight.DASH || fighter.state == Fight.BACKSTEP || fighter.state == Fight.AIRDASH) {
                 float[] was = trail[fighter.side];
                 for (int ghost = 2; ghost >= 1; ghost--) {
                     paint.setAlpha(ghost == 1 ? 110 : 55);
@@ -1880,6 +1914,12 @@ final class FightGame {
         }
     }
 
+    /** Which of the four choices of how hard the ladder is is at a point, or -1. */
+    private int levelAt(float x, float y) {
+        for (int index = 0; index < levels.length; index++) if (levels[index].contains(x, y)) return index;
+        return -1;
+    }
+
     private void drawSelect(Canvas canvas) {
         boolean landscape = width > height * 1.15f;
         drawBackdrop(canvas, 0, height * (landscape ? .86f : .62f), (float) Math.sin(clock * .2f) * .3f);
@@ -1900,12 +1940,18 @@ final class FightGame {
             RectF where = tiles[index];
             boolean chosen = index == player;
             face(canvas, index, where.centerX(), where.centerY(), where.width() * (chosen ? 1 : .86f), false, chosen);
-            if (session.tally("fight_cleared_" + index) > 0) {
-                // A gold mark on one the ladder has been topped with.
+            int top = Math.max(session.tally("fight_top_" + index), session.tally("fight_cleared_" + index) > 0 ? Fight.NORMAL + 1 : 0);
+            if (top > 0) {
+                // A gold mark on one the ladder has been topped with, with the first letter of the hardest it was topped at.
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(GOLD);
-                canvas.drawCircle(where.right - dp(8), where.top + dp(8), dp(6), paint);
+                canvas.drawCircle(where.right - dp(9), where.top + dp(9), dp(9), paint);
                 paint.setColor(Color.BLACK);
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(0xFF3A2A10);
+                text.setTextSize(dp(11));
+                canvas.drawText(LEVEL_NAMES[top - 1].substring(0, 1), where.right - dp(9), where.top + dp(13), text);
+                text.setTextAlign(Paint.Align.LEFT);
             }
         }
         // What there is to know about the one chosen, on a card; and her, standing, in whatever room is left.
@@ -1913,7 +1959,7 @@ final class FightGame {
         text.setTextSize(dp(13.5f));
         List<String> tip = wrap(FightCast.TIPS[player], cardRight - cardLeft - pad * 2);
         List<String> phrase = wrap("“" + shown(player, FightCast.line(player, FightCast.PICK)) + "”", cardRight - cardLeft - pad * 2);
-        float cardBottom = (landscape ? fightButton.top : hostButton.top) - dp(12);
+        float cardBottom = levels[0].top - dp(10);
         // On a short screen what there is no room for is left off the card: first the tip, then what she says.
         float most = landscape ? cardBottom - safe.top - dp(66) : Float.MAX_VALUE, fixed = pad + dp(30) + dp(20) + dp(8) + 4 * dp(19) + dp(8) + dp(6) + pad;
         if (fixed + (tip.size() + phrase.size()) * dp(18) > most) tip = new ArrayList<>();
@@ -1980,6 +2026,20 @@ final class FightGame {
         text.setTextSize(dp(18));
         text.setTextAlign(Paint.Align.CENTER);
         canvas.drawText("Fight", fightButton.centerX(), fightButton.centerY() + dp(6.5f), text);
+        // How hard the ladder is: the four choices, the one chosen filled.
+        for (int index = 0; index < levels.length; index++) {
+            RectF where = levels[index];
+            boolean chosen = index == difficulty;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(chosen ? CalculatorLayout.CORAL : dark ? 0xFF44292E : 0xFFFCE9EB);
+            canvas.drawRoundRect(where, dp(18), dp(18), paint);
+            paint.setColor(Color.BLACK);
+            text.setColor(chosen ? Color.WHITE : CalculatorLayout.CORAL);
+            text.setTextSize(dp(13.5f));
+            float room = where.width() - dp(10), wide = text.measureText(LEVEL_NAMES[index]);
+            if (wide > room) text.setTextSize(dp(13.5f) * room / wide);
+            canvas.drawText(LEVEL_NAMES[index], where.centerX(), where.centerY() + dp(5), text);
+        }
         // For two to play: a device each, over the same Wi-Fi.
         RectF[] ways = {hostButton, joinButton};
         String[] names = {"Host a game", "Join a game"};
@@ -2003,7 +2063,7 @@ final class FightGame {
         canvas.drawColor(0x66120A22);
         text.setTextAlign(Paint.Align.CENTER);
         text.setTextSize(dp(15));
-        outlined(canvas, "Fight " + (rung + 1) + " of " + ladder.length, safe.centerX(), safe.top + dp(40), Color.WHITE, 1);
+        outlined(canvas, "Fight " + (rung + 1) + " of " + ladder.length + "  ·  " + LEVEL_NAMES[difficulty], safe.centerX(), safe.top + dp(40), Color.WHITE, 1);
         float size = Math.min(dp(150), Math.min(safe.width() * .36f, safe.height() * .3f)), y = safe.top + dp(70) + size / 2;
         float apart = Math.min(safe.width() * .27f, size * .5f + dp(60));
         face(canvas, player, safe.centerX() - apart, y, size, false, true);
