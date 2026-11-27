@@ -124,7 +124,7 @@ final class RunVanity {
             new Style("bunnyi"), new Style("bunnyw"), new Style("maidp"), new Style("idolc"), new Style("swimf"), new Style("swims"), new Style("pajamac"),
             new Style("gothicm"), new Style("tabardsky"), new Style("mage"), new Style("yukata"), new Style("coat"), new Style("magical"), new Style("blazer")};
     /** Which outfits can be had now: those whose pictures are all there. */
-    static final boolean[] READY = {true, true, true, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false};
+    static final boolean[] READY = {true, true, true, true, true, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, false, false};
     /** Whether the Rosebound Armour's pictures (assets/vanity/rose) are all there. */
     static final boolean ROSE_READY = false;
 

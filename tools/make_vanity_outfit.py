@@ -30,6 +30,7 @@ SHEETS = layers.SHEETS
 SMALL = ["jump", "lose", "party", "white", "back"]
 ARMS = ["arm%d" % i for i in range(12)]
 LATER_ARMS = ["arm%d" % i for i in range(12, 18)]
+GRIPS = ["grip%d" % k for k in layers.GRIP]
 
 DESIGNS = {
     "bunny": ("the bunny girl suit", "a strapless glossy black satin bodysuit shaped like a ballet leotard, sheer black tights, a white detached collar with a red bow tie, white wrist cuffs and black high heels"),
@@ -50,7 +51,7 @@ CLEAR = (" The background must be fully transparent (a PNG with an alpha channel
 
 
 def sheet_image(name):
-    return Image.open(RES / ("halgakos_%s.webp" % name)).convert("RGBA")
+    return Image.open(layers.sheet_file(name)).convert("RGBA")
 
 
 def cells(name):
@@ -77,6 +78,9 @@ def groups():
     # The sheets that came later are their own grids, so that the grids drawn before are the same grids still.
     later = [(s, i) for s in LATER_ARMS for i, _ in cells(s)]
     out += [("g2x3", later[i:i + 6]) for i in range(0, len(later), 6)]
+    # And the weapon-free grips, last of all, for the same reason.
+    grips = [(s, i) for s in GRIPS for i, _ in cells(s)]
+    out += [("g2x3", grips[i:i + 6]) for i in range(0, len(grips), 6)]
     return out
 
 

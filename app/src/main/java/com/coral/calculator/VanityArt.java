@@ -45,6 +45,41 @@ final class VanityArt {
         return base;
     }
 
+    /**
+     * The hands that lie over a weapon in her grip: the layer is her hand and a little of her sleeve, which are those of her school uniform. In an outfit,
+     * wherever the layer has a pixel, what her dressed frame has there is the pixel (her hand, and the outfit's cuff or sleeve); until the dressed frame is
+     * made, and where it has nothing, the layer as it was.
+     */
+    Bitmap over(Bitmap dressedBody, Bitmap over, RunVanity.Style style) {
+        if (style == null || dressedBody == null || over == null) return over;
+        String key = "over|" + style.key() + "|" + System.identityHashCode(dressedBody) + "|" + System.identityHashCode(over);
+        Bitmap done = made.get(key);
+        if (done != null) return done;
+        if (dressedBody.getWidth() != over.getWidth() || dressedBody.getHeight() != over.getHeight()) return over;
+        if (making.add(key)) {
+            new Thread(() -> {
+                try {
+                    int w = over.getWidth(), h = over.getHeight();
+                    int[] hand = new int[w * h], body = new int[w * h];
+                    over.getPixels(hand, 0, w, 0, 0, w, h);
+                    dressedBody.getPixels(body, 0, w, 0, 0, w, h);
+                    for (int i = 0; i < hand.length; i++) {
+                        int oa = hand[i] >>> 24, ba = body[i] >>> 24;
+                        if (oa > 0 && ba > 200) hand[i] = oa << 24 | body[i] & 0xFFFFFF;
+                    }
+                    Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                    out.setPixels(hand, 0, w, 0, 0, w, h);
+                    made.put(key, out);
+                } catch (RuntimeException | OutOfMemoryError ignored) {
+                    // The layer stays as it is.
+                } finally {
+                    making.remove(key);
+                }
+            }).start();
+        }
+        return over;
+    }
+
     private VanityLayers.Anchors anchors() {
         if (anchors == null) {
             StringBuilder text = new StringBuilder();
@@ -71,11 +106,15 @@ final class VanityArt {
      */
     private Bitmap parts(String sheet, Bitmap from, RunVanity.Style style) {
         Bitmap out = from.copy(Bitmap.Config.ARGB_8888, true);
-        String[] names = {RunVanity.HORNS_ART[style.horns], RunVanity.EARS_ART[style.ears]};
+        // (The ears first, then the horns: what an ear's patch leaves of a horn's outline, the horn's own patch then takes off.)
+        String[] names = {RunVanity.EARS_ART[style.ears], RunVanity.HORNS_ART[style.horns]};
+        // Elf ears with no cat ears are drawn as one: two patches over each other leave the bits of one in the other.
+        boolean together = style.ears == RunVanity.EARS_NONE && style.horns == RunVanity.HORNS_ELF && has("vanity/heads/elfnoears/" + sheet + ".webp");
+        if (together) names = new String[]{null, "elfnoears"};
         int[] pixels = null, patch = null, mask = null;
         for (int which = 0; which < names.length; which++) {
             String name = names[which];
-            boolean hornPart = which == 0;
+            boolean hornPart = which == 1 && !together, loose = which == 1;
             if (name == null) continue;
             Bitmap picture = load("vanity/heads/" + name + "/" + sheet + ".webp"), where = load("vanity/heads/" + name + "/" + sheet + "_m.webp");
             if (picture == null || where == null || picture.getWidth() != out.getWidth() || picture.getHeight() != out.getHeight()
@@ -95,7 +134,7 @@ final class VanityArt {
                 int p = patch[i], o = pixels[i];
                 // The loose edge of a horn's place (a mask of 90): only what is left of the old horn goes, and nothing is put there.
                 if (m < 200) {
-                    if (hornPart && hornEdge(o)) pixels[i] = 0;
+                    if (loose && hornEdge(o)) pixels[i] = 0;
                     continue;
                 }
                 int pa = p >>> 24, oa = o >>> 24;
@@ -129,6 +168,14 @@ final class VanityArt {
     private static boolean horny(int pixel) {
         int r = pixel >> 16 & 255, g = pixel >> 8 & 255, b = pixel & 255;
         return r < 140 && g < 100 && b < 150 && b + 6 >= g;
+    }
+
+    private boolean has(String path) {
+        try (InputStream in = context.getAssets().open(path)) {
+            return in != null;
+        } catch (java.io.IOException missing) {
+            return false;
+        }
     }
 
     private Bitmap load(String path) {

@@ -29,6 +29,7 @@ COLS, ROWS = 4, 3
 WHAT = {
     "nohorns": "Remove both dark curled horns completely, so that her pink hair is smooth where they were; keep the pink cat ears, the hair, the face and everything else exactly as it is.",
     "elf": "Replace the two dark curled horns with two long pointed elf ears that stick out sideways from the sides of her head, horizontally, in her skin colour with a pale pink inside; no horns at all any more; keep the pink cat ears, the hair, the face and everything else exactly as it is.",
+    "elfnoears": "Replace the two dark curled horns with two long pointed elf ears that stick out sideways from the sides of her head, horizontally, in her skin colour with a pale pink inside, AND remove both pink cat ears completely, so that her pink hair is smooth and rounded on top of her head; no horns and no cat ears any more; keep the hair, the face and everything else exactly as it is.",
     "noears": "Remove both pink cat ears completely, so that her pink hair is smooth and rounded on top of her head where they were; keep the dark curled horns, the hair, the face and everything else exactly as it is.",
     "fox": "Replace the two pink cat ears with two pointed fox ears of the same size and in the same place, orange with cream-white fur inside and dark brown tips; no cat ears any more; keep the dark curled horns, the hair, the face and everything else exactly as it is.",
     "bunny": "Replace the two pink cat ears with two soft bunny ears of about the same height as the cat ears, white with a pink inside and the tips bent a little forward, in the same place; no cat ears any more; keep the dark curled horns, the hair, the face and everything else exactly as it is.",
@@ -54,26 +55,34 @@ def head_crop(img):
 
 
 LATER = ["arm%d" % i for i in range(12, 18)]
+GRIPS = ["grip%d" % k for k in outfit.layers.GRIP]
 
 
 def frames_list():
     """Every frame: those of the sheets she had first, then those of the sheets that came later (as grids of their own, so that the grids drawn before stay the same)."""
-    out, later = [], []
+    out, later, grips = [], [], []
     for name in SHEETS:
         for idx, c in cells(name):
-            (later if name in LATER else out).append((name, idx, c))
-    return out, later
+            (grips if name in GRIPS else later if name in LATER else out).append((name, idx, c))
+    return out, later, grips
 
 
-def make_jobs(variant):
+def make_jobs(variant, redo=False):
     work = WORK.parent / "heads" / variant
     (work / "grids").mkdir(parents=True, exist_ok=True)
     (work / "raw").mkdir(exist_ok=True)
     manifest = {}
     jobs = []
-    first, later = frames_list()
-    allf = first + later
-    groups = [first[i:i + COLS * ROWS] for i in range(0, len(first), COLS * ROWS)] + [later[i:i + COLS * ROWS] for i in range(0, len(later), COLS * ROWS)]
+    suffix, weak = "", set()
+    if redo:
+        weak = set(json.loads((work / "report.json").read_text())["weak_jobs"])
+        n = 1
+        while any((work / "raw" / ("%s_r%d.png" % (j, n))).exists() for j in weak):
+            n += 1
+        suffix = "_r%d" % n
+    first, later, grips = frames_list()
+    allf = first + later + grips
+    groups = [x[i:i + COLS * ROWS] for x in (first, later, grips) for i in range(0, len(x), COLS * ROWS)]
     cw, ch = CANVAS[0] // COLS, CANVAS[1] // ROWS
     for gnum, group in enumerate(groups):
         name = "%s_%02d" % (variant, gnum)
@@ -98,10 +107,12 @@ def make_jobs(variant):
             "and change only this: " + WHAT[variant] + " The change must look the same in every cell, drawn to fit that head's angle. "
             "Keep the same grid layout, one head per cell, none added, removed or left out, nothing crossing into another cell. "
             "Same cute chibi anime video game art, clean dark outlines, soft cel shading and line weight as the reference." + CLEAR)
-        jobs.append({"name": name, "background": "transparent", "size": "%dx%d" % CANVAS, "prompt": prompt, "refs": [str(work / "grids" / (name + ".png"))]})
+        if redo and name not in weak:
+            continue
+        jobs.append({"name": name + suffix, "background": "transparent", "size": "%dx%d" % CANVAS, "prompt": prompt, "refs": [str(work / "grids" / (name + ".png"))]})
     (work / "manifest.json").write_text(json.dumps(manifest))
     for s in range(3):
-        (work / ("jobs_%d.json" % s)).write_text(json.dumps(jobs[s::3]))
+        (work / ("jobs%s_%d.json" % (suffix, s))).write_text(json.dumps(jobs[s::3]))
     print(variant, "grids", len(manifest), "frames", len(allf))
 
 
@@ -121,7 +132,7 @@ def pack(variant):
     out = HEADS / variant
     out.mkdir(parents=True, exist_ok=True)
     patch, mask = {}, {}
-    seen, failed = 0, []
+    seen, failed, scores = 0, [], []
     for name, group in manifest.items():
         draws = [d for d in sorted((work / "raw").glob(name + "*.png")) if d.stem == name or d.stem.startswith(name + "_r")]
         if not draws:
@@ -148,11 +159,22 @@ def pack(variant):
                 big_ref.alpha_composite(ref_cell, (pad, pad))
                 # The silhouettes differ by the part, so the fit is judged on the part of the head that does not change.
                 fitted, v = register_part(cell, solid(big_ref))
-                if fitted is not None and v > best[0]:
-                    best = (v, fitted.crop((pad, pad, pad + w, pad + h)))
+                if fitted is None or v < 0.5:
+                    continue
+                crop_cell = fitted.crop((pad, pad, pad + w, pad + h))
+                # How much the redraw changed the head: where it differs from her own, plainly, in the upper part of it. A redraw that left the
+                # part on (the model does, now and then) changes almost nothing, and is the worst draw of the frame.
+                ra, rb = np.array(ref_cell).astype(int), np.array(crop_cell).astype(int)
+                ys_ = np.nonzero((ra[..., 3] > 128).any(axis=1))[0]
+                top_rows = slice(ys_[0], ys_[0] + max(8, int((ys_[-1] - ys_[0]) * 0.45))) if len(ys_) else slice(0, 0)
+                diffpx = (np.abs(ra[top_rows, :, 3] - rb[top_rows, :, 3]) > 90) | (((ra[top_rows, :, 3] > 128) & (rb[top_rows, :, 3] > 128)) & (np.abs(ra[top_rows, :, :3] - rb[top_rows, :, :3]).sum(axis=2) > 120))
+                score = int(diffpx.sum())
+                if score > best[0]:
+                    best = (score, crop_cell)
             if best[1] is None:
                 failed.append((name, sheet, idx))
                 continue
+            scores.append((name, sheet, idx, best[0]))
             seen += 1
             # Back to the frame's own pixels, in the crop box: the cell is cut down to the enlarged crop, then to the crop's size.
             region = best[1].crop((fr["at"][0] - x, fr["at"][1] - y, fr["at"][0] - x + big.size[0], fr["at"][1] - y + big.size[1]))
@@ -164,6 +186,10 @@ def pack(variant):
             # (her school collar is navy and white: a part is never that, and an outfit has a collar of its own)
             navy = (va[..., 2].astype(int) > va[..., 0].astype(int) + 12) & (va[..., 2] > 70)
             va[..., 3] = np.where(navy, 0, va[..., 3])
+            if variant not in ("nohorns", "elf", "elfnoears"):
+                # An ear never has a horn in it: the thin dark purple edges of the horns that are kept (the redraw's outline of them) are not part of the patch.
+                r_, g_, b_ = va[..., 0].astype(int), va[..., 1].astype(int), va[..., 2].astype(int)
+                va[..., 3] = np.where((r_ < 160) & (b_ >= r_ - 12) & (g_ < 130), 0, va[..., 3])
             solid_va = va[..., 3] > 0
             va[..., 3] = np.where(components(solid_va, 24), va[..., 3], 0)
             var = Image.fromarray(va)
@@ -173,14 +199,27 @@ def pack(variant):
             both = (o[..., 3] > 128) & (v[..., 3] > 128)
             colour_diff = both & (np.abs(o[..., :3] - v[..., :3]).sum(axis=2) > 110)
             ys_ = np.nonzero((o[..., 3] > 128).any(axis=1))[0]
-            if variant in ("nohorns", "elf"):
+            ear_diff = None
+            if variant == "elfnoears":
+                # Elf ears for horns and no cat ears, in one draw: the ears' part of it is found as an ear variant's is.
+                ear_diff = alpha_diff | (both & (np.abs(o[..., :3] - v[..., :3]).sum(axis=2) > 90))
+                ear_diff = cv2.morphologyEx(ear_diff.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
+                ear_diff = components(ear_diff, 20)
+                if len(ys_):
+                    ear_diff[ys_[0] + int((ys_[-1] - ys_[0]) * 0.34):] = False
+            if variant in ("nohorns", "elf", "elfnoears"):
                 # Only the horns' own place: every pixel that is a horn in her frame, and (for elf ears) what the redraw adds there. The rest of the head
                 # is drawn again by the model a little differently, and that drift is not a change.
                 r_, g_, b_ = o[..., 0], o[..., 1], o[..., 2]
                 horn = (o[..., 3] > 100) & (r_ < 140) & (g_ < 100) & (b_ < 150) & (b_ + 6 >= g_) & (r_ >= g_ + 8)
                 near = cv2.dilate(horn.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0
-                added = components(alpha_diff & near, 8)
+                added = components(alpha_diff & near, 40)
+                if variant in ("elf", "elfnoears") and len(ys_):
+                    # Elf ears come out at the sides of the head, level with the eyes: nothing the redraw changed up among the cat ears' own height is theirs.
+                    added[:ys_[0] + int((ys_[-1] - ys_[0]) * 0.27)] = False
                 diff = horn | added
+                if ear_diff is not None:
+                    diff = diff | ear_diff
             else:
                 # Ears: the top of the head; what the part changed in colour or in outline, from the strongest differences only.
                 diff = alpha_diff | (both & (np.abs(o[..., :3] - v[..., :3]).sum(axis=2) > 90))
@@ -196,7 +235,7 @@ def pack(variant):
             # Two regions: the tight one, where the part's own pixels go (a little wider than the part), and, for horns, a loose one round it,
             # where only the last dark pixels of the old horns are taken off (an outfit's frame has them a pixel or two off).
             tight = cv2.dilate(diff.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
-            loose = (cv2.dilate(diff.astype(np.uint8), np.ones((31, 31), np.uint8)) > 0) & ~tight if variant in ("nohorns", "elf") else np.zeros_like(tight)
+            loose = (cv2.dilate(diff.astype(np.uint8), np.ones((31, 31), np.uint8)) > 0) & ~tight if variant in ("nohorns", "elf", "elfnoears") else np.zeros_like(tight)
             diff = tight | loose
             code = np.where(tight, 255, np.where(loose, 90, 0)).astype(np.uint8)
             if not diff.any():
@@ -225,7 +264,12 @@ def pack(variant):
         mk[..., 3] = m
         Image.fromarray(mk, "RGBA").save(out / (sheet + "_m.webp"), lossless=True, quality=100, method=6, exact=True)
     size = sum(p.stat().st_size for p in out.glob("*.webp"))
-    report = {"variant": variant, "frames": seen, "failed": failed, "bytes": size}
+    # A frame whose redraw changed a good deal less than its sheet's usual: its grid is to be drawn again (jobs --redo).
+    by_sheet = {}
+    for name_, sheet_, idx_, sc in scores:
+        by_sheet.setdefault(sheet_, []).append(sc)
+    weak = sorted({name_ for name_, sheet_, idx_, sc in scores if sc < 0.3 * float(np.median(by_sheet[sheet_])) or sc < 40} | {f[0] for f in failed if len(f) > 2})
+    report = {"variant": variant, "frames": seen, "failed": failed, "bytes": size, "weak_jobs": weak}
     (work / "report.json").write_text(json.dumps(report))
     print(json.dumps(report))
 
@@ -312,5 +356,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("what", choices=["jobs", "pack", "offsets"])
     ap.add_argument("variant")
+    ap.add_argument("--redo", action="store_true")
     a = ap.parse_args()
-    {"jobs": lambda: make_jobs(a.variant), "pack": lambda: pack(a.variant), "offsets": lambda: offsets(a.variant)}[a.what]()
+    {"jobs": lambda: make_jobs(a.variant, a.redo), "pack": lambda: pack(a.variant), "offsets": lambda: offsets(a.variant)}[a.what]()

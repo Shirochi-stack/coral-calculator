@@ -3314,6 +3314,13 @@ final class RunGame {
         return vanityStyle;
     }
 
+    /** Her hands over a weapon she holds, in what she is dressed in: where the layer has her hand or her cuff, what her dressed frame has there. */
+    private Bitmap dressedOver(Bitmap dressedBody, Bitmap over) {
+        RunVanity.Style style = vanityNow();
+        if (style == null || vanityArt == null) return over;
+        return vanityArt.over(dressedBody, over, style);
+    }
+
     private Bitmap dressed(String sheet, Bitmap from) {
         RunVanity.Style style = vanityNow();
         if (style == null) return from;
@@ -11876,7 +11883,7 @@ final class RunGame {
             gripOvers[grip] = BitmapFactory.decodeResource(context.getResources(), over);
         }
         int frames = RunGrips.FRAMES[grip], form = drawn();
-        Bitmap body = dressed("grip" + weapon, form == 0 ? gripSheets[grip] : dyedGrip(grip, form)), over = gripOvers[grip];
+        Bitmap body = dressed("grip" + weapon, form == 0 ? gripSheets[grip] : dyedGrip(grip, form)), over = dressedOver(body, gripOvers[grip]);
         // Where a point of the cell is on the screen: as frame() places the cell.
         float scale = tall / (pet.getHeight() / (float) PetArt.FRAMES.length), cw = body.getWidth() / (float) frames, ch = body.getHeight();
         float down = grounded(body, ch * scale);
