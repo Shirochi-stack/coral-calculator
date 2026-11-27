@@ -4170,8 +4170,8 @@ public class PlusRunTest {
             assertTrue("land " + number + " has " + level.rooms.size(), level.rooms.size() >= (level.chapter >= 1 && number % 3 != 1 || level.chapter >= 2 ? 2 : 1));
             assertTrue(level.main > level.gate && level.main < level.columns);
             for (int[] one : level.rooms) {
-                // (A hideout has its own test: RunSecretsTest.)
-                if (one[0] == RunLevels.HIDEOUT) continue;
+                // (A hideout and a lagoon have tests of their own: RunSecretsTest, RunWaterTest.)
+                if (one[0] == RunLevels.HIDEOUT || one[0] == RunLevels.LAGOON) continue;
                 kinds[one[0]] = true;
                 if (one[7] != 0) hidden++;
                 // Its door is in the land proper, on the ground; the place itself is beyond the end of it.
@@ -4228,13 +4228,13 @@ public class PlusRunTest {
                 }
                 // (A home may have one behind a false wall of its own.)
                 if (one[0] == RunLevels.HOUSE && one[14] == RunLevels.HOME) assertTrue("land " + number, chests <= 1);
-                else assertEquals("land " + number, one[0] == RunLevels.STASH || one[0] == RunLevels.PASSAGE || one[0] == RunLevels.ARENA ? 1 : 0, chests);
+                else assertEquals("land " + number, one[0] == RunLevels.STASH || one[0] == RunLevels.PASSAGE || one[0] == RunLevels.ARENA || one[0] == RunLevels.LAGOON ? 1 : 0, chests);
             }
             // No sign of the land is in them but those that walk in its passages, and nothing of the land's to fight with.
             for (int[] foe : level.foes) {
                 boolean passing = false;
                 // (And a hideout's hidden boss.)
-                for (int[] one : level.rooms) passing |= (one[0] <= RunLevels.PASSAGE || one[0] == RunLevels.HIDEOUT) && foe[1] >= one[3] && foe[1] <= one[4];
+                for (int[] one : level.rooms) passing |= (one[0] <= RunLevels.PASSAGE || one[0] == RunLevels.HIDEOUT || one[0] == RunLevels.LAGOON) && foe[1] >= one[3] && foe[1] <= one[4];
                 assertTrue(foe[1] < level.main || passing);
             }
             for (int[] weapon : level.weapons) assertTrue(weapon[1] < level.main);
@@ -7615,7 +7615,7 @@ public class PlusRunTest {
         }
         assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length
                 // (The two lines about sloppy copies in the lands, her line with the game's name in it, and the keys.)
-                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length + RunStory.SECRETS.length, lines);
+                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length + RunStory.SECRETS.length + RunStory.WATER.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.

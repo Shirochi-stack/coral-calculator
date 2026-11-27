@@ -885,6 +885,27 @@ final class PlusRun {
     static final int SWARM_SHARE = 25;
     private float swarmXp;
 
+    // Water
+
+    /** How fast she swims; how long she can hold her breath; and how fast an ink bolt she shoots underwater goes. */
+    static final float SWIM = 3.6f, HOLD_BREATH = 8, INK_BOLT = 9;
+    private boolean inWater, swimming;
+    private float breath = HOLD_BREATH, breathTick, swum;
+    private int inkBolts;
+
+    boolean inWater() { return inWater; }
+    boolean swimming() { return swimming; }
+    float breath() { return breath; }
+    float swum() { return swum; }
+    int inkBolts() { return inkBolts; }
+
+    /** Underwater, a use of what she holds also sends a bolt of ink the way she faces. */
+    private void inkBolt() {
+        Shot shot = shoot(BLOT_SHOT, true, x + WIDE / 2 + (facingLeft ? -.4f : .4f), y + TALL * .5f, (facingLeft ? -1 : 1) * INK_BOLT, 0, .8f);
+        shot.by = PLAIN;
+        inkBolts++;
+    }
+
     // Hideouts
 
     /** Hidden bosses beaten in this land, and the last of them; strong cracks struck too weakly. */
@@ -1072,7 +1093,7 @@ final class PlusRun {
     /** How many times what a sign gives one of them gives: experience, and the chance of a drop. */
     static final int UNIQUE_XP = 3;
     /** How long each way of fighting winds up before it strikes; and how long its strike lasts. */
-    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f, .8f}, STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f, .45f};
+    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f, .8f, .7f}, STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f, .45f, .45f};
     /** Wind-ups begun, things they made (minions, shots, heals), and how many came apart. */
     private int windUps, uniqueShots, calledUp, heals, halves;
 
@@ -1256,6 +1277,23 @@ final class PlusRun {
                 }
                 break;
             }
+            case RunUniques.SWIMMER: {
+                // In the water only: toward her, and then each its own way. The eel winds up and darts; the squid keeps off and squirts ink;
+                // the puffer swells and bursts; the jelly drifts up and down after her, crackling.
+                int which = RunUniques.index(foe.kind) - (RunUniques.WATER_FIRST - RunUniques.FIRST);
+                float dx = x + WIDE / 2 - middle, dy = y + TALL / 2 - (foe.y + foe.tall() / 2), far = (float) Math.hypot(dx, dy);
+                if (far > 12) break;
+                foe.leftward = dx < 0;
+                float keep = which == 0 ? 5 : 0, pace = speed * (which == 3 ? .7f : 1);
+                float toward = far > keep ? 1 : -1;
+                if (which == 3) dy += (float) Math.sin(foe.clock * 2) * 1.2f;
+                swimBy(foe, toward * dx / Math.max(.3f, far) * pace, toward * dy / Math.max(.3f, far) * pace);
+                boolean ready = foe.wait <= 0;
+                if (which == 0 && far < 8 && ready) windUp(foe, way);
+                else if (which == 1 && far < 1.8f) windUp(foe, way);
+                else if (which == 2 && far < 6 && ready) windUp(foe, way);
+                break;
+            }
             case RunUniques.FORMATION:
                 // Over in a line, toward her, bobbing; over her, one at a time dives.
                 foe.leftward = toLeft;
@@ -1270,6 +1308,21 @@ final class PlusRun {
             default:
                 walk(foe, speed, true);
         }
+    }
+
+    /** One that swims goes so far, across and down, as far as the water lets it. */
+    private void swimBy(Foe foe, float across, float down) {
+        float nx = foe.x + across, ny = foe.y + down;
+        if (wet(nx, foe.y, foe)) foe.x = nx;
+        if (wet(foe.x, ny, foe)) foe.y = ny;
+        foe.ground = foe.y;
+    }
+
+    /** Whether every corner of one, at a place, is in water. */
+    private boolean wet(float fx, float fy, Foe foe) {
+        return at((int) Math.floor(fx + .05f), (int) Math.floor(fy + .05f)) == RunLevels.WATER && at((int) Math.floor(fx + foe.wide() - .05f), (int) Math.floor(fy + .05f)) == RunLevels.WATER
+                && at((int) Math.floor(fx + .05f), (int) Math.floor(fy + foe.tall() - .05f)) == RunLevels.WATER
+                && at((int) Math.floor(fx + foe.wide() - .05f), (int) Math.floor(fy + foe.tall() - .05f)) == RunLevels.WATER;
     }
 
     /** Which third of what it can take a creature has lost: 0, 1 or 2. */
@@ -1328,6 +1381,27 @@ final class PlusRun {
                     heals++;
                 }
                 break;
+            case RunUniques.SWIMMER: {
+                int which = RunUniques.index(foe.kind) - (RunUniques.WATER_FIRST - RunUniques.FIRST);
+                if (which == 0) {
+                    // The squid's ink: three blots at her, fanned.
+                    float toX = x + WIDE / 2 - middle, toY = y + TALL / 2 - cy, far = Math.max(.5f, (float) Math.hypot(toX, toY));
+                    for (int one = -1; one <= 1; one++) shoot(BLOT_SHOT, false, middle, cy, toX / far * 6 + one * toY / far * 1.5f, toY / far * 6 - one * toX / far * 1.5f, 1.6f);
+                    uniqueShots += 3;
+                } else if (which == 1) {
+                    // The puffer bursts, quills all round, and is gone.
+                    for (int drop = 0; drop < 8; drop++) {
+                        double angle = drop * Math.PI / 4;
+                        shoot(KNIFE, false, middle, cy, (float) Math.cos(angle) * 5, (float) Math.sin(angle) * 5, .4f);
+                    }
+                    uniqueShots += 8;
+                    foe.left = 0;
+                    foe.flat = true;
+                    foe.act = 0;
+                    flattened++;
+                }
+                break;
+            }
             case RunUniques.HIDDEN: {
                 // A hidden boss throws what is its own, more of it at each phase.
                 int many = 3 + phase3(foe) * 2;
@@ -1373,6 +1447,15 @@ final class PlusRun {
             case RunUniques.BURROWER: {
                 float through = 1 - foe.act / STRIKE[way];
                 foe.y = foe.ground - (float) Math.sin(through * Math.PI) * .7f;
+                break;
+            }
+            case RunUniques.SWIMMER: {
+                // The eel's dart.
+                int which = RunUniques.index(foe.kind) - (RunUniques.WATER_FIRST - RunUniques.FIRST);
+                if (which == 2) {
+                    float dx = x + WIDE / 2 - middle, dy = y + TALL / 2 - (foe.y + foe.tall() / 2), far = Math.max(.3f, (float) Math.hypot(dx, dy));
+                    swimBy(foe, dx / far * speed * 3.2f, dy / far * speed * 3.2f);
+                }
                 break;
             }
             case RunUniques.FORMATION:
@@ -2672,6 +2755,10 @@ final class PlusRun {
         for (int[] tree : other.trees) trees.add(tree.clone());
         System.arraycopy(other.paperCut, 0, paperCut, 0, paperCut.length);
         treesCut = other.treesCut;
+        inWater = other.inWater;
+        swimming = other.swimming;
+        breath = other.breath;
+        breathTick = other.breathTick;
         // (Her moves, as they are.)
         airDashLeft = other.airDashLeft;
         rollLeft = other.rollLeft;
@@ -2801,7 +2888,13 @@ final class PlusRun {
      * it and jumps up through it, and it holds her only when she comes down onto it.
      */
     private boolean firm(char square) {
-        return square != RunLevels.LEDGE && solid(square) || square == RunLevels.LAVA && has(RED) || square == RunLevels.WATER && has(BLUE);
+        // (Water holds her up, in blue, only at its top and only while she does not mean to go down into it.)
+        return square != RunLevels.LEDGE && solid(square) || square == RunLevels.LAVA && has(RED) || square == RunLevels.WATER && has(BLUE) && !down && !inWater;
+    }
+
+    /** What stops her from the side or from below: what is firm, but never water, which she swims into. */
+    private boolean wall(char square) {
+        return square != RunLevels.WATER && firm(square);
     }
 
     /** The pluses not yet collected: the column and row of each. */
@@ -4167,6 +4260,36 @@ final class PlusRun {
             climbing = false;
             if (jump) speedDown = Math.min(speedDown, -CLIMB * 2);
         }
+        // In water, in blue, she swims: up while the jump is held, down with the down button, along with the arrows; at the top, a jump
+        // takes her out. Without it she holds her breath, and when that is gone it costs her.
+        inWater = about == RunLevels.WATER;
+        swimming = inWater && has(BLUE);
+        if (swimming) {
+            float wantDown = jump ? -SWIM : down ? SWIM : .4f, wantAcross = left == right ? 0 : left ? -SWIM : SWIM;
+            speedDown += (wantDown - speedDown) * Math.min(1, seconds * 7);
+            speedAcross += (wantAcross - speedAcross) * Math.min(1, seconds * 7);
+            airJumps = 0;
+            sinceGround = 0;
+            int head = (int) Math.floor(y + TALL * .25f);
+            if (pressed && at((int) Math.floor(x + WIDE / 2), head) != RunLevels.WATER) {
+                speedDown = -LEAP * .9f;
+                swimming = false;
+            }
+            swum += seconds;
+        }
+        if (inWater && !has(BLUE)) {
+            breath -= seconds;
+            if (breath <= 0 && (breathTick -= seconds) <= 0) {
+                breathTick = 1;
+                if (safe <= 0) {
+                    cause = SANK;
+                    if (hurt(false)) return;
+                }
+            }
+        } else {
+            breath = Math.min(HOLD_BREATH, breath + seconds * 3);
+            breathTick = 0;
+        }
         // Water she cannot swim in lets her down slowly, and out through the bottom.
         if (about == RunLevels.WATER && !has(BLUE)) {
             speedDown = Math.min(speedDown, 3.5f);
@@ -5389,6 +5512,7 @@ final class PlusRun {
         sinceStrike = 0;
         strikes++;
         chop();
+        if (inWater) inkBolt();
         copied();
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
         // How fast it flies and how far it reaches are the table's; a find of something she has already makes it reach a third as far again.
@@ -5498,7 +5622,7 @@ final class PlusRun {
     private boolean clear(float across) {
         if (across < 0 || across + WIDE > columns) return false;
         for (int row = (int) Math.floor(y + .05f); row <= (int) Math.floor(y + TALL - .05f); row++) {
-            for (int column = (int) Math.floor(across + .02f); column <= (int) Math.floor(across + WIDE - .02f); column++) if (firm(at(column, row))) return false;
+            for (int column = (int) Math.floor(across + .02f); column <= (int) Math.floor(across + WIDE - .02f); column++) if (wall(at(column, row))) return false;
         }
         return true;
     }
@@ -6136,7 +6260,7 @@ final class PlusRun {
         if (by > 0) {
             int column = (int) Math.floor(x + WIDE);
             for (int row = top; row <= bottom; row++) {
-                if (firm(at(column, row))) {
+                if (wall(at(column, row))) {
                     x = column - WIDE - .001f;
                     speedAcross = 0;
                     break;
@@ -6145,7 +6269,7 @@ final class PlusRun {
         } else if (by < 0) {
             int column = (int) Math.floor(x);
             for (int row = top; row <= bottom; row++) {
-                if (firm(at(column, row))) {
+                if (wall(at(column, row))) {
                     x = column + 1 + .001f;
                     speedAcross = 0;
                     break;
@@ -6213,8 +6337,8 @@ final class PlusRun {
                     if (column == left && y + TALL - by <= row + .0001f) drops++;
                     continue;
                 }
-                // A ledge, of either kind, holds her only when she comes down onto it from above.
-                if (firm(here) || thin && y + TALL - by <= row + .02f) {
+                // A ledge, of either kind, holds her only when she comes down onto it from above; and so does water, in blue.
+                if (wall(here) || (thin || here == RunLevels.WATER && firm(here)) && y + TALL - by <= row + .02f) {
                     y = row - TALL;
                     speedDown = 0;
                     onGround = true;
@@ -6241,7 +6365,7 @@ final class PlusRun {
         } else if (by < 0) {
             int row = (int) Math.floor(y);
             for (int column = left; column <= right; column++) {
-                if (firm(at(column, row))) {
+                if (wall(at(column, row))) {
                     y = row + 1 + .001f;
                     speedDown = 0;
                     break;
