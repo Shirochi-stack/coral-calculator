@@ -1,52 +1,50 @@
-1.00	2.02	Squish!
-2.00	3.53	Sloppy~♡
-5.00	6.02	Squish!
-6.00	7.53	Sloppy~♡
-7.99	10.53	Lights up. You're staring. How cute.
-10.61	13.07	Five of us. Try to keep count.
-13.32	14.66	Sing.
-14.76	15.69	Loud.
+1.00	1.99	Squish!
+2.00	3.54	Sloppy~♡
+5.00	5.99	Squish!
+6.00	7.54	Sloppy~♡
+7.99	10.52	Lights up. You're staring. How cute.
+10.61	13.06	Five of us. Try to keep count.
+13.32	14.67	Sing.
+14.77	15.71	Loud.
 17.21	19.27	Hands up. Higher.
-20.22	23.62	Call my name. Slowly. Right.
-24.00	25.02	Squish!
-24.33	25.10	Squish!
-25.00	26.25	Sloppy~♡
-25.24	26.57	Sloppy~♡
-26.00	27.02	Squish!
-26.99	27.76	Squish!
-27.00	28.25	Sloppy~♡
-28.00	29.54	Louder, zaako.
-28.02	28.98	Sloppy~♡
-28.84	30.02	Louder, zaako.
+19.54	20.28	Squish!
+20.22	23.63	Call my name. Slowly. Right.
+24.33	25.11	Sloppy~♡
+25.24	25.74	Squish!
+25.77	26.58	Sloppy~♡
+26.99	27.77	Sloppy~♡
+28.02	28.80	Sloppy~♡
+28.84	29.94	Louder, zaako.
 30.68	31.90	Eyes up!
-32.56	33.74	Squish!
+32.56	33.97	Five colors!
 34.15	35.81	Miss the beat —
-36.13	37.31	Up!
-38.08	38.99	Pink.
-39.09	39.98	Halgakos!
-40.05	41.20	Sloppy~♡
-41.51	44.54	Red. Warm. Still not bread.
-44.64	45.84	Chikuwa!
-45.93	47.40	Chikuwa!
-50.05	51.58	Gold. Lead.
-51.81	52.60	Illya!
-52.70	53.79	Illya!
-54.04	55.21	Purple.
-55.32	56.60	Tsubakieh!
-58.07	58.93	Squish!
-59.15	60.45	Tsubakieh!
-60.56	63.61	Down the runway. Don't let go.
-64.07	65.50	Hold on.
-65.61	67.25	Not bad. For you.
+36.13	37.32	Up!
+38.08	40.21	Pink. Center. Obviously.
+40.31	41.17	Halgakos!
+41.51	44.43	Red. Warm. Still not bread.
+44.53	45.61	Chikuwa!
+45.71	46.94	Chikuwa!
+50.05	51.21	Rune!
+51.81	52.64	Rune!
+52.70	53.76	Gold.
+54.04	54.87	Illya!
+54.99	55.74	Illya!
+55.82	56.80	Purple.
+58.07	58.92	Squish!
+59.15	60.44	Tsubakieh!
+60.55	61.81	Tsubakieh!
+61.91	63.36	Down the runway.
+64.07	65.51	Hold on.
+65.62	67.27	Not bad. For you.
 68.10	69.56	Once more. Up.
-70.15	71.75	Louder, zaako.
-72.55	75.52	Squish, Sloppy~♡ — encore!
-76.06	77.20	Say it!
-77.30	79.33	Jump!
-80.50	81.48	Squish!
+70.15	71.74	Louder, zaako.
+72.55	75.53	Squish, Sloppy~♡ — encore!
+76.06	77.21	Say it!
+77.30	79.34	Jump!
+80.50	81.47	Say it!
 81.79	83.25	Don't stop!
-84.37	85.14	Squish!
-86.22	86.99	Squish!
-87.34	88.37	Welcome.
-88.47	89.36	Ice cream.
-89.45	90.20	Sloppy~♡
+84.37	85.11	Squish!
+86.22	86.96	Squish!
+87.34	88.38	Welcome.
+88.47	89.37	Ice cream.
+89.22	89.97	Sloppy~♡
