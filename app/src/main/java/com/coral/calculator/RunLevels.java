@@ -914,6 +914,8 @@ final class RunLevels {
         boolean guarded;
         /** Where its chapter's village begins, if it has it; or -1. */
         int town = -1;
+        /** Whether its creatures come in colours of toughness: every land made from its number does; one made by hand does not. */
+        boolean tiered;
         /** Where it has a lower layer: for each column of the land, whether there is a cave under it (a fall there lands in it); null if it has none. */
         boolean[] under;
         /** The hatches in its ground that drop into a cave, the vines up from one, and its high ledges' ways up: the column and row of each, and what it is (0 hatch, 1 vine foot, 2 hidden). */
@@ -961,6 +963,7 @@ final class RunLevels {
         level.gate = base.gate;
         level.guarded = base.guarded;
         level.town = base.town;
+        level.tiered = base.tiered;
         level.pluses.addAll(base.pluses);
         level.foes.addAll(base.foes);
         level.weapons.addAll(base.weapons);
@@ -1239,6 +1242,7 @@ final class RunLevels {
         level.arena = draft.arena;
         level.guarded = draft.guarded;
         level.town = draft.town;
+        level.tiered = true;
         armLater(level, new Random(seed * 104729 + number * 31L));
         level.foes.addAll(draft.lodgers);
         rove(level);
@@ -1254,6 +1258,24 @@ final class RunLevels {
     }
 
     /** The row of the top of the ground at a column: of what stands on the bottom of the land there, whatever floats over it. None, -1, over a pit. */
+    /** How far the land's usual ground must be from the wood's before the wood moves, and how much of the view's going up and down it follows. */
+    static final float WOOD_STILL = 1.6f, WOOD_FOLLOWS = .5f;
+
+    /** The land's usual ground about a column: the middle of the heights of the ground over twelve columns each way, leaving out where there is none. */
+    static float usualGround(RunLevels.Level level, int middle) {
+        int[] heights = new int[25];
+        int count = 0;
+        for (int column = middle - 12; column <= middle + 12; column++) {
+            if (column < 0 || column >= level.columns) continue;
+            int top = RunLevels.top(level, column);
+            if (top < 0 || top >= RunLevels.ROWS - 1) continue;
+            heights[count++] = top;
+        }
+        if (count == 0) return -1;
+        java.util.Arrays.sort(heights, 0, count);
+        return heights[count / 2];
+    }
+
     static int top(Level level, int column) {
         int row = ROWS;
         while (row > 0 && level.land[row - 1][column] == BLOCK) row--;
@@ -1410,6 +1432,7 @@ final class RunLevels {
         level.arena = draft.arena;
         level.guarded = draft.guarded;
         level.town = draft.town;
+        level.tiered = true;
         arm(level, new Random(seed * 104729 + number * 31L));
         // The signs that walk in the places off the land join the rest only now, so that what the land is given is what it was given without them.
         level.foes.addAll(draft.lodgers);

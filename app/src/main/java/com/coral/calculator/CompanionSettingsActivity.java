@@ -252,7 +252,7 @@ public final class CompanionSettingsActivity extends Activity {
         content.addView(tips);
 
         section(content, "Android's notification");
-        content.addView(text("While she is on screen, Android posts its own notification that Halgakos Calculator "
+        content.addView(text("While she is on screen, Android posts its own notification that Halgakos "
                 + "is displaying over other apps. It belongs to Android, so its icon and wording are not the "
                 + "calculator's to change, but you can switch it off.", 15, muted()));
         TextView notice = text("Turn off that notification  ›", 18, CalculatorLayout.CORAL);
@@ -265,7 +265,7 @@ public final class CompanionSettingsActivity extends Activity {
         content.addView(notice);
 
         // Which release this is, since one from before 1.2.0 can sit beside it looking the same.
-        TextView version = text("Halgakos Calculator " + BuildConfig.VERSION_NAME, 14, muted());
+        TextView version = text(getString(R.string.app_title) + " " + BuildConfig.VERSION_NAME, 14, muted());
         version.setPadding(0, dp(16), 0, 0);
         content.addView(version);
         if (OldCopy.installed(this)) {

@@ -87,7 +87,7 @@ final class RunShelf extends FrameLayout {
         setPadding(safe[0], safe[1], safe[2], safe[3]);
         // (A picture being looked at lies over its edges too.)
         setClipToPadding(false);
-        items = RunGallery.all(text(context, "gallery/pictures.tsv"));
+        items = RunGallery.all(text(context, "gallery/pictures.tsv"), text(context, "clips/clips.tsv"));
         try {
             String[] names = context.getAssets().list("films");
             if (names != null) java.util.Collections.addAll(written, names);
@@ -365,7 +365,7 @@ final class RunShelf extends FrameLayout {
         beside.setOrientation(LinearLayout.VERTICAL);
         beside.setPadding(px(12), 0, px(6), 0);
         beside.addView(words(open ? item.title : "Locked", 16, open ? ink : soft, true));
-        beside.addView(words(open ? item.film == RunFilms.CLIP ? "The scene from the last land" : "Ninety seconds" : item.hint, 12.5f, soft, false));
+        beside.addView(words(open ? item.film >= RunClips.BASE ? "A scene from the story" : item.film == RunFilms.CLIP ? "The scene from the last land" : "Ninety seconds" : item.hint, 12.5f, soft, false));
         top.addView(beside, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
         if (open) {
             TextView play = words("▶  Play", 14, Color.WHITE, true);
@@ -381,7 +381,7 @@ final class RunShelf extends FrameLayout {
             top.addView(play);
         }
         box.addView(top);
-        if (open && item.film != RunFilms.CLIP) {
+        if (open && item.film != RunFilms.CLIP && item.film < RunClips.BASE) {
             // Its sounds, of which one is chosen: those whose file is there.
             String[] names = RunFilms.SOUND_NAMES[item.film];
             int now = session.tally(RunFilms.SOUND + item.film);

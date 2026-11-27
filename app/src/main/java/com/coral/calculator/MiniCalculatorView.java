@@ -88,7 +88,7 @@ final class MiniCalculatorView extends LinearLayout {
         header.addView(title, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
         // Wider than they are tall: easier to hit than a square the height of the header.
         // They show no background until they are pressed.
-        header.addView(headerButton(CompanionIcon.OPEN, "Open in Halgakos Calculator", host::onOpenApp),
+        header.addView(headerButton(CompanionIcon.OPEN, "Open the calculator in the app", host::onOpenApp),
                 new LayoutParams(px(HEADER_BUTTON), px(HEADER)));
         LayoutParams closeParams = new LayoutParams(px(HEADER_BUTTON), px(HEADER));
         closeParams.leftMargin = px(GAP);

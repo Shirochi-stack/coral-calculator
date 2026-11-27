@@ -485,7 +485,7 @@ final class PlusRun {
         }
         boolean was = foe.flat;
         // (From stronger pets a blow on a big one counts twice.)
-        if (perks.petStrong >= 1 && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
+        if (perks.petStrong >= 1 && !RunLevels.boss(foe.kind) && foe.left > BLOW) foe.left -= BLOW;
         beat(foe, SURE);
         if (foe.flat && !was) petKills++;
         return true;
@@ -813,6 +813,69 @@ final class PlusRun {
         RunLoot.Worn worn = RunLoot.NOTHING;
     }
 
+    // How much creatures take
+
+    /** A blow of her first book at her first level, in the tenths creatures' health is counted in. */
+    static final int BLOW = 10;
+    /** Each kind's own health: the minus a blow, the times a little more, a mite less, the big ones more. (Those who wait count blows of their own.) */
+    private static final int[] HEALTH = new int[RunLevels.RIME + 1];
+
+    static {
+        java.util.Arrays.fill(HEALTH, BLOW);
+        HEALTH[RunLevels.DIVIDE] = 8;
+        HEALTH[RunLevels.THROWER] = 9;
+        HEALTH[RunLevels.SLIME] = 12;
+        HEALTH[RunLevels.DRAGON] = 18;
+        HEALTH[RunLevels.BAR] = 16;
+        HEALTH[RunLevels.FAN] = 9;
+        HEALTH[RunLevels.POGO] = 9;
+        HEALTH[RunLevels.DRIFTER] = 9;
+        HEALTH[RunLevels.SWOOPER] = 8;
+        HEALTH[RunLevels.BOMBER] = 12;
+        HEALTH[RunLevels.MITE] = 6;
+    }
+
+    static int healthOf(int kind) { return kind >= 0 && kind < HEALTH.length ? HEALTH[kind] : BLOW; }
+
+    /** The colours of toughness: their names, how many times the health each has, the halves of a heart more its touch costs, and how many times the experience and the chance of a drop. */
+    static final int NORMAL = 0, RED_TIER = 1, PURPLE_TIER = 2, GOLD_TIER = 3, INK_TIER = 4, TIERS = 5;
+    static final String[] TIER_NAMES = {"", "Red", "Purple", "Gold", "Black Ink"};
+    static final int[] TIER_HEALTH = {1, 3, 7, 15, 30}, TIER_BITE = {0, 0, 1, 1, 2}, TIER_XP = {1, 2, 4, 7, 12};
+    static final float[] TIER_DROPS = {1, 1.5f, 2.5f, 4, 6};
+
+    /** In ten thousand creatures of a land, how many are red, purple, gold and black ink: more, and tougher, the further on. */
+    static int[] tierOdds(int number) {
+        if (number <= 6) return new int[]{500, 0, 0, 0};
+        if (number <= 12) return new int[]{1000, 200, 0, 0};
+        if (number <= 18) return new int[]{1300, 400, 0, 0};
+        if (number <= 30) return new int[]{1500, 600, 0, 0};
+        if (number <= 50) return new int[]{1800, 800, number > 40 ? 150 : 0, 0};
+        if (number <= 80) return new int[]{2000, 1100, 400, 50};
+        return new int[]{2000, 1400, 800, 250};
+    }
+
+    /** A creature's colour, the same every time for the same one in the same land. */
+    static int tierOf(int number, int kind, int column, int row) {
+        if (RunLevels.boss(kind) || kind == RunLevels.TARGET || kind == RunLevels.WISP || kind == RunLevels.RIME) return NORMAL;
+        long dice = number * 7919L + column * 104729L + row * 1299709L + kind * 15485863L;
+        dice = dice * 6364136223846793005L + 1442695040888963407L;
+        int roll = (int) ((dice >>> 33) % 10000), sum = 0;
+        int[] odds = tierOdds(number);
+        for (int tier = odds.length; tier >= 1; tier--) {
+            sum += odds[tier - 1];
+            if (roll < sum) return tier;
+        }
+        return NORMAL;
+    }
+
+    /** What a blow of hers counts for against a creature, in tenths: her weapon's blows, made harder by her level. */
+    private int dealt() { return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level))); }
+
+    /** Blows that landed, for showing: where, how much, whether a great one, and how long ago. */
+    private final List<float[]> hits = new ArrayList<>();
+
+    List<float[]> hits() { return hits; }
+
     // What she wears, felt
 
     /** Energy, for her specials (what a held button does): how much she has at most, how fast it comes back, what a special costs, and what a blow gives. */
@@ -883,7 +946,9 @@ final class PlusRun {
         } else {
             regenClock = 0;
         }
+        for (int index = hits.size() - 1; index >= 0; index--) if ((hits.get(index)[4] += seconds) > .9f) hits.remove(index);
         for (Foe foe : foes) {
+            foe.struck += seconds;
             if (foe.flat || foe.away) {
                 foe.poisoned = foe.burning = foe.frozen = 0;
                 continue;
@@ -1260,6 +1325,9 @@ final class PlusRun {
         boolean dropped;
         /** For how much longer it is ink-poisoned, burning, frozen; and how long since it last took a blow of poison or of fire. */
         float poisoned, burning, frozen, poisonTick, burnTick;
+        /** Its colour of toughness (0 as it is drawn, then red, purple, gold, black ink); and how long since a blow last landed on it. */
+        int tier;
+        float struck = 9;
 
         Foe(int kind) {
             this.kind = kind;
@@ -1392,7 +1460,7 @@ final class PlusRun {
         if (foe.kind == RunLevels.TARGET) return;
         boolean boss = RunLevels.boss(foe.kind) && !foe.spawned, hard = level.chapter >= RunLevels.CHAPTERS * 2;
         int landLevel = RunLevels.levelOf(level.number);
-        xp += RunLoot.xpFor(boss, tough, level.number, perks.level);
+        xp += RunLoot.xpFor(boss, tough, level.number, perks.level) * TIER_XP[foe.tier];
         float middle = foe.x + foe.wide() / 2, top = foe.y + foe.tall() * .4f;
         int coins = RunLoot.plusesFor(boss, tough), more = gear(RunLoot.PLUSES);
         if (more > 0) coins += (coins * more + lootRoll(100)) / 100;
@@ -1400,7 +1468,9 @@ final class PlusRun {
             float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
             loose(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
         }
-        if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel)) {
+        // (Gold and black ink drop as the hardest do.)
+        hard |= foe.tier >= GOLD_TIER;
+        if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel) * TIER_DROPS[foe.tier]) {
             int rarity = RunLoot.rarityOf(boss ? RunLoot.BOSS : hard ? RunLoot.HARD : RunLoot.CREATURE, lootRoll(10000));
             int code = RunLoot.dropped(boss ? RunLoot.WAITS : hard ? RunLoot.HARDEST : RunLoot.ORDINARY, Math.min(RunLoot.THEMES.length - 1, level.chapter), rarity, lootRoll(10000), lootRoll(10000));
             loose(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, code));
@@ -1609,7 +1679,10 @@ final class PlusRun {
             foe.ground = spec[2] + 1 - foe.tall();
             foe.y = foe.ground;
             foe.home = foe.x;
-            foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black)) : (spec.length > 3 ? spec[3] : 1) + tougher(spec[0]);
+            foe.tier = waits || !level.tiered ? NORMAL : tierOf(level.number, spec[0], spec[1], spec[2]);
+            foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black))
+                    : healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW;
+            foe.most = foe.left;
             foe.crowd = RunLevels.crowd(spec);
             if (spec[0] == RunLevels.WORD) foe.y = foe.ground - WORD_HANGS;
             // Each divide starts its hop at a different moment.
@@ -1770,6 +1843,7 @@ final class PlusRun {
             foe.clock = from.clock;
             foe.dazed = from.dazed;
         foe.poisoned = from.poisoned;
+        foe.tier = from.tier;
         foe.burning = from.burning;
         foe.frozen = from.frozen;
             foe.left = from.left;
@@ -2224,7 +2298,8 @@ final class PlusRun {
             woken++;
         } else {
             // An outsized one is nearly twice the size, and takes six blows.
-            foe.left = (giant ? 6 : 1) + tougher(kind);
+            foe.left = healthOf(kind) * (giant ? 6 : 1) + tougher(kind) * BLOW;
+            foe.most = foe.left;
             if (giant) foe.size = 1.9f;
             foe.dazed = .5f;
         }
@@ -2375,7 +2450,8 @@ final class PlusRun {
                 dice = dice * 1103515245 + 12345;
                 Foe foe = new Foe(level.chapter >= 2 && (dice >>> 12) % 3 == 0 ? RunLevels.SLIME : RunLevels.MINUS);
                 foe.spawned = true;
-                foe.left = 1;
+                foe.left = healthOf(foe.kind);
+                foe.most = foe.left;
                 foe.x = one[3] + 3 + (dice >>> 16) % 1000 / 1000f * (one[4] - one[3] - 6);
                 // Not on top of her.
                 if (Math.abs(foe.x - x) < 2.5f) foe.x = x + (x < (one[3] + one[4]) / 2f ? 4 : -4);
@@ -3502,14 +3578,14 @@ final class PlusRun {
                 airJumps = 0;
                 // Whatever she has come down on, she is clear of it for a moment as she goes up again.
                 offIt = .3f;
-                if (plunged && !RunLevels.boss(foe.kind) && foe.left > 1) foe.left--;
+                if (plunged && !RunLevels.boss(foe.kind) && foe.left > BLOW) foe.left -= BLOW;
                 beat(foe, plunged ? PLUNGED : LANDED);
                 // One sign after another without touching the ground: each is worth one plus more than the last.
                 if (foe.flat && ++combo > 1) bonus += Math.min(4, combo - 1);
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
                 knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
-                if (hurt(false)) return;
+                if (hurt(false, 2 + TIER_BITE[foe.tier])) return;
             }
         }
         if (y > bottomAt((int) Math.floor(x + WIDE / 2)) + 1) {
@@ -4008,20 +4084,23 @@ final class PlusRun {
         foeY = foe.y + foe.tall();
         if (waits) blows++;
         // One with a key in it: the next blow that is not a key counts twice.
-        if (!waits && foe.unlocked > 0 && with != THROWN_KEY && foe.left > 1) {
-            foe.left--;
+        if (!waits && foe.unlocked > 0 && with != THROWN_KEY && foe.left > BLOW) {
+            foe.left -= BLOW;
             foe.unlocked = 0;
             doubled++;
         }
         // Against a creature a blow counts for as many as the smith has made what dealt it count for; against those who wait, for one.
         // (And her level makes a part of a blow more, gathered up into whole ones.)
-        int levelled = 0;
-        if (!waits) {
-            surplus += RunLoot.power(perks.level) - 1;
-            levelled = (int) surplus;
-            surplus -= levelled;
+        int dealt = geared(foe, waits ? 1 : dealt(), waits);
+        foe.struck = 0;
+        if (hits.size() < 24) hits.add(new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0});
+        // A creature is knocked back a little, away from her, where there is room.
+        if (!waits && foe.left > dealt && !RunLevels.flier(foe.kind)) {
+            float push = (foe.x + foe.wide() / 2 < x + WIDE / 2 ? -1 : 1) * .22f, to = foe.x + push;
+            int row = (int) Math.floor(foe.y + foe.tall() - .05f);
+            if (!solid(at((int) Math.floor(push < 0 ? to : to + foe.wide()), row))) foe.x = to;
         }
-        if ((foe.left -= geared(foe, waits ? 1 : power() + levelled, waits)) <= 0) {
+        if ((foe.left -= dealt) <= 0) {
             foe.left = 0;
             foe.flat = true;
             foe.y = foe.ground;
@@ -4197,7 +4276,8 @@ final class PlusRun {
         if (living >= 3) return;
         Foe foe = new Foe(kind);
         foe.spawned = true;
-        foe.left = 1;
+        foe.left = healthOf(kind);
+        foe.most = foe.left;
         float lo = level.arena >= 0 ? level.arena + 1.3f : 0, hi = (level.arena >= 0 ? level.gate - .3f : columns) - foe.wide();
         foe.x = Math.max(lo, Math.min(hi, middle - foe.wide() / 2));
         foe.ground = floor - foe.tall();
@@ -4706,7 +4786,8 @@ final class PlusRun {
                         // A slime drinks fire, and steam: it is not beaten by it but grows on it, half as big again, and takes two blows after.
                         shots.remove(index);
                         resize(foe, 1.5f);
-                        foe.left = 2;
+                        foe.left = 2 * BLOW;
+                        foe.most = Math.max(foe.most, foe.left);
                         drunk++;
                     } else if (foe.dazed <= 0) {
                         beat(foe, shot.by);

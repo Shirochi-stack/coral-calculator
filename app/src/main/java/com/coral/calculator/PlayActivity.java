@@ -130,12 +130,13 @@ public final class PlayActivity extends Activity {
         int margin = dp(16);
         float figureShape = art.getWidth() / (float) art.getHeight();
         int herLeft, herTop, herWidth, herHeight, cardLeft, cardTop, cardWidth, cardHeight;
+        // The menu is what the screen is for: her picture keeps a modest share, and the card has the rest.
         if (beside) {
-            int hers = hinge == FoldState.UPRIGHT_HINGE ? width / 2 : Math.min(width / 3, dp(260));
+            int hers = hinge == FoldState.UPRIGHT_HINGE ? Math.round(width * .3f) : Math.min(Math.round(width * .26f), dp(240));
             herLeft = 0; herTop = 0; herWidth = hers; herHeight = height;
             cardLeft = hers; cardTop = 0; cardWidth = width - hers; cardHeight = height;
         } else {
-            int hers = hinge == FoldState.LEVEL_HINGE ? height / 2 : Math.min(Math.round(height * .24f), dp(190));
+            int hers = hinge == FoldState.LEVEL_HINGE ? Math.round(height * .3f) : Math.min(Math.round(height * .15f), dp(140));
             herLeft = 0; herTop = 0; herWidth = width; herHeight = hers;
             cardLeft = 0; cardTop = hers; cardWidth = width; cardHeight = height - hers;
         }
@@ -149,7 +150,12 @@ public final class PlayActivity extends Activity {
                     (cardHeight - margin * 2) / (PlayView.HEIGHT_DP * density));
         }
         float unit = density * Math.max(.62f, Math.min(2.3f, scale));
-        int cardPixelsWide = Math.round(PlayView.WIDTH_DP * unit), cardPixelsHigh = Math.round(PlayView.HEIGHT_DP * unit);
+        // The card fills the room it is given, rather than keeping the mini calculator's shape and
+        // leaving the rest of an unfolded or tablet screen empty. Its tiles stretch with it; it only
+        // stops short of growing so wide that a row of two tiles becomes a strip.
+        int roomWide = cardWidth - margin * 2, roomHigh = cardHeight - margin * 2;
+        int cardPixelsHigh = Math.max(Math.round(PlayView.HEIGHT_DP * unit), roomHigh);
+        int cardPixelsWide = Math.max(Math.round(PlayView.WIDTH_DP * unit), Math.min(roomWide, Math.round(cardPixelsHigh * 1.35f)));
 
         if (card != null) root.removeView(card);
         if (figure != null) root.removeView(figure);
