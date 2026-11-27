@@ -329,7 +329,7 @@ final class RunGame {
     private final class Sheet {
         final int resource, across;
         Bitmap bitmap;
-        float[] wide, tall;
+        float[] wide, tall, low;
 
         Sheet(int resource, int across) {
             this.resource = resource;
@@ -342,21 +342,24 @@ final class RunGame {
             int side = bitmap.getWidth() / across, count = across * (bitmap.getHeight() / side);
             wide = new float[count];
             tall = new float[count];
+            low = new float[count];
             int[] pixels = new int[side * side];
             for (int which = 0; which < count; which++) {
                 bitmap.getPixels(pixels, 0, side, which % across * side, which / across * side, side, side);
-                int left = side, right = -1, top = side;
+                int left = side, right = -1, top = side, bottom = -1;
                 for (int y = 0; y < side; y++) {
                     for (int x = 0; x < side; x++) {
                         if (pixels[y * side + x] >>> 24 > 40) {
                             left = Math.min(left, x);
                             right = Math.max(right, x);
                             top = Math.min(top, y);
+                            bottom = Math.max(bottom, y);
                         }
                     }
                 }
                 wide[which] = right < left ? 1 : Math.min(1, 2 * Math.max(side / 2f - left, right + 1 - side / 2f) / side);
                 tall[which] = right < left ? 1 : (side - top) / (float) side;
+                low[which] = right < left ? 0 : (side - 1 - bottom) / (float) side;
             }
             return bitmap;
         }
@@ -477,6 +480,11 @@ final class RunGame {
     private PlusRun.Perks perks = new PlusRun.Perks();
     private float cameraX, cameraY;
     private boolean goLeft, goRight, goJump, goStrike;
+    /** The keys held, and what the fingers on the buttons hold, which together are what she does; and whether keys are what is being used. */
+    private final RunKeys keys = new RunKeys();
+    private boolean touchLeft, touchRight, touchJump, touchStrike, touchDown, keyed;
+    /** The keys have been used in the first land, and she has yet to say which are which. */
+    private boolean keysHintDue;
     /** A press of the jump or of the button for what she carries that has not been acted on yet: a tap may be over before the next moment of the game. */
     private boolean jumpPressed, strikePressed;
     private int seenJumps, seenLandings, seenCollected, seenFlattened, seenHurts, seenSprings, seenFlags, seenBlows;
@@ -2785,6 +2793,7 @@ final class RunGame {
         if (decor[0] == 400) {
             if (villageArch == null) villageArch = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_village_arch);
             float wide = tile * 4.2f, tall = wide * villageArch.getHeight() / villageArch.getWidth();
+            feet += grounded(villageArch, tall);
             target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
             canvas.drawBitmap(villageArch, null, target, paint);
             // Its name on its board, in letters burnt into the wood.
@@ -2803,6 +2812,7 @@ final class RunGame {
             landmarkOf = chapter;
         }
         float tall = tile * 5.2f, wide = tall * landmark.getWidth() / landmark.getHeight();
+        feet += grounded(landmark, tall);
         target.set(x - wide / 2, feet - tall, x + wide / 2, feet);
         canvas.drawBitmap(landmark, null, target, paint);
     }
@@ -2824,10 +2834,33 @@ final class RunGame {
     /** A piece of furniture standing on the floor at a place, its middle there, so wide. */
     private void standing(Canvas canvas, Bitmap picture, float x, float floor, float wide) {
         float tall = wide * picture.getHeight() / picture.getWidth();
+        floor += grounded(picture, tall);
         paint.setAlpha(255);
         target.set(x - wide / 2, floor - tall, x + wide / 2, floor);
         canvas.drawBitmap(picture, null, target, paint);
     }
+
+    /** For each picture, the part of its height at the bottom that is clear across all of it. */
+    private final java.util.Map<Bitmap, Float> clearBottoms = new java.util.IdentityHashMap<>();
+
+    private float clearBottom(Bitmap picture) {
+        Float known = clearBottoms.get(picture);
+        if (known != null) return known;
+        int wide = picture.getWidth(), tall = picture.getHeight(), from = tall * 2 / 3;
+        int[] pixels = new int[wide * (tall - from)];
+        float share = 0;
+        try {
+            picture.getPixels(pixels, 0, wide, 0, from, wide, tall - from);
+            share = Standing.clearRows(pixels, wide, tall - from) / (float) tall;
+        } catch (RuntimeException unreadable) {
+            // (A picture whose pixels cannot be read stands where it is drawn.)
+        }
+        clearBottoms.put(picture, share);
+        return share;
+    }
+
+    /** How much lower a picture drawn this tall stands, so that its lowest drawn row is on the ground (and a pixel into it). */
+    private float grounded(Bitmap picture, float tall) { return tall * clearBottom(picture) + dp(1); }
 
     /** The pet shop's pedestals, one for each pet, its cushion in that pet's colour, and its shelf. How far up a pedestal its cushion's top is, as a part of its width. */
     private Bitmap pedestals, petShelf;
@@ -3295,7 +3328,7 @@ final class RunGame {
         goButton.set(lands[from].left, under, lands[last].right, under + dp(48));
         text.setTextSize(dp(26));
         float from0 = safe.left + dp(18) + text.measureText("Plus run") + dp(12), to = soundButton.left - dp(8);
-        shopButton.set(Math.max(from0, to - dp(128)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
+        shopButton.set(Math.max(from0, to - dp(160)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
         // The way into the gallery: her cringing face with its name under it, at the foot of the map on the right, across from her
         // and clear of what she says. Where there is little room under the lands it is smaller, and loses its name before its face.
         float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
@@ -5672,6 +5705,17 @@ final class RunGame {
         // A card that says something was won is read while the land is on the screen: it does not run out behind a pause.
         if (toastLeft > 0 && screen == PLAY) toastLeft -= seconds;
         wardFlash += seconds;
+        // The keys, said once the story told as the first land begins is over (said over it, it would not be heard).
+        if (keysHintDue && screen == PLAY && !(talking && !told) && captionLeft <= 0) {
+            keysHintDue = false;
+            session.keep("run_keys_said", 1);
+            speak(RunStory.KEYS[0], true);
+        }
+        // The first time the map is open with nothing else to say: her line with the game's name in it.
+        if (screen == MAP && video == null && captionLeft <= 0 && personLeft <= 0 && session.tally("run_title_said") == 0 && clock > 1.5f) {
+            session.keep("run_title_said", 1);
+            speak(RunStory.TITLE_LINE[0], false);
+        }
         if (screen == PLAY && video == null) {
             clearedAge += seconds;
             diaryAge += seconds;
@@ -7127,6 +7171,7 @@ final class RunGame {
 
     void touch(MotionEvent event) {
         int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) keyed = false;
         float x = event.getX(), y = event.getY();
         if (packOpen) {
             if (action == MotionEvent.ACTION_DOWN) packTouch(x, y);
@@ -7682,14 +7727,121 @@ final class RunGame {
                 else up = true;
             }
         }
+        touchLeft = left;
+        touchRight = right;
+        touchJump = up;
+        touchStrike = strike;
+        touchDown = down;
+        goBreath = breath;
+        together();
+    }
+
+    /** What she does: what the fingers hold and what the keys hold, either; a jump or a strike begun by either is pressed. */
+    private void together() {
+        boolean up = touchJump || keys.held(RunKeys.JUMP), strike = touchStrike || keys.held(RunKeys.STRIKE | RunKeys.SPECIAL);
         if (up && !goJump) jumpPressed = true;
         if (strike && !goStrike) strikePressed = true;
-        goLeft = left;
-        goRight = right;
+        goLeft = touchLeft || keys.held(RunKeys.LEFT);
+        goRight = touchRight || keys.held(RunKeys.RIGHT);
         goJump = up;
         goStrike = strike;
-        goDown = down;
-        goBreath = breath;
+        goDown = touchDown || keys.held(RunKeys.DOWN);
+    }
+
+    /**
+     * A key, down or up. In a land: held keys are added to what the buttons hold; Q or Tab changes what she holds; E is the button over the
+     * jump; S or Down at a door goes through it. On a card: Enter, Space or J says yes to its first choice; on a story page, turns it. Esc
+     * is Back, which the stage gives as Back. Whether the key was one of the game's.
+     */
+    boolean key(int keyCode, boolean down) {
+        int does = RunKeys.of(keyCode);
+        if (does == 0 || does == RunKeys.BACK) return false;
+        int fresh = keys.press(keyCode, down);
+        if (down) keyed = true;
+        boolean sheet = packOpen || bagOpen || huntsOpen || smithOpen || marketOpen || fanOpen;
+        if (screen == PLAY && run != null && !sheet) {
+            // (Once the story being told as the land begins is over: said over it, it would not be heard.)
+            if (fresh != 0 && number == 1 && session.tally("run_keys_said") == 0) keysHintDue = true;
+            if ((fresh & RunKeys.SWAP) != 0 && run.nextUp() != PlusRun.UNARMED) {
+                run.swap();
+                buzz(false);
+            }
+            if ((fresh & RunKeys.EXTRA) != 0) overJump();
+            if ((fresh & RunKeys.DOWN) != 0 && !run.atStall() && run.door() >= 0) {
+                idle();
+                run.enter();
+            }
+            // (A card that holds the land, or something won rising, is sent on by a key as by a touch.)
+            if (fresh != 0) {
+                if (prizeAge >= 0 && prizeAge < 2 && prizeAge > .8f) prizeAge = 2;
+                if (roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds() && roomCardAge > .5f) roomCardAge = 3.1f;
+                if (roomResultAge >= 0 && roomResultAge < 2.6f && roomResultAge > .8f) roomResultAge = 2.6f;
+            }
+            together();
+            return true;
+        }
+        together();
+        if ((fresh & (RunKeys.CONFIRM | RunKeys.JUMP | RunKeys.STRIKE)) == 0 || sheet) return true;
+        if (screen == STORY) {
+            if (++line >= telling.length) {
+                endStory();
+            } else {
+                speak(telling[line], false);
+                audio.play("page", .5f);
+            }
+        } else if ((screen == PAUSED || screen == RESULT) && pillCount > 0 && (fresh & RunKeys.CONFIRM) != 0) {
+            act(pillActions[0]);
+        } else if (screen == STALL && pillCount > 0 && (fresh & RunKeys.CONFIRM) != 0) {
+            carryOut(pillActions[0]);
+        }
+        return true;
+    }
+
+    /** The button over the jump, used by its key: a gate's warp, a building's counter, a pet to swap, a door, a stall. */
+    private void overJump() {
+        if (run.door() < 0 && !run.atStall() && run.spot() < 0 && atGate()) {
+            warp();
+        } else if (run.door() < 0 && !run.atStall() && run.spot() >= 0) {
+            int what = run.spot();
+            audio.play("tap", .5f);
+            idle();
+            if (what == PlusRun.BOARD) openHunts();
+            else if (what == PlusRun.MACHINE) crank();
+            else if (what == PlusRun.DEALER) openMarket();
+            else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
+            else {
+                counterFrom = PLAY;
+                counterTab = what < 100 ? PETS_TAB : what - 100;
+                if (what < 100) petOn = what;
+                screen = SHOP;
+                speak(RunStory.SHOP[0], false);
+            }
+        } else if (run.door() < 0 && !run.atStall() && run.petOffer() >= 0) {
+            run.swapPet();
+            buzz(true);
+        } else if (!run.atStall() && run.door() >= 0) {
+            idle();
+            run.enter();
+        } else if (run.atStall()) {
+            audio.play("tap", .5f);
+            idle();
+            screen = STALL;
+            pills("Back to the land", RESUME, "Guild counter", COUNTER);
+        }
+    }
+
+    /** The mouse wheel: in her bag, the next page or the one before. */
+    boolean wheel(float turned) {
+        if (!bagOpen || turned == 0) return false;
+        bagPage = Math.max(0, bagPage + (turned < 0 ? 1 : -1));
+        audio.play("page", .4f);
+        return true;
+    }
+
+    /** Everything let go: the window has gone from the front, or the land is left. */
+    void letGo() {
+        keys.clear();
+        together();
     }
 
     // Drawing
@@ -7771,6 +7923,8 @@ final class RunGame {
             drawFlights(canvas, screen == PLAY ? 1 / 60f : 0);
             if (screen == PLAY && (roomCardAge >= 0 || roomResultAge >= 0)) drawRoomCards(canvas);
             if (screen == PLAY) {
+                // (While keys are used, the buttons are all but gone; a touch brings them back.)
+                if (keyed) canvas.saveLayerAlpha(0, 0, width, height, 60);
                 // Charmed, the arrows are the wrong way round, and show it.
                 boolean charmed = run.charmed() > 0;
                 control(canvas, leftButton, goLeft, 180, charmed);
@@ -7838,6 +7992,7 @@ final class RunGame {
                         label(canvas, stallButton, "Swap");
                     }
                 }
+                if (keyed) canvas.restore();
             } else if (screen == STALL) {
                 canvas.drawColor(0x8C000000);
                 drawStall(canvas);
@@ -8804,6 +8959,8 @@ final class RunGame {
         float across = sheet.wide[which], up = sheet.tall[which];
         source.set(Math.round(left + side * (1 - across) / 2), Math.round(top + side * (1 - up)), Math.round(left + side * (1 + across) / 2), top + side);
         if (across > .98f) source.inset(1, 0);
+        // (Its clear rows at the bottom are under the ground.)
+        bottom += wide * sheet.low[which] / across + dp(1);
         target.set(middle - wide / 2, bottom - wide * up / across, middle + wide / 2, bottom);
         canvas.save();
         if (turned) canvas.scale(-1, 1, middle, bottom);
@@ -11504,6 +11661,7 @@ final class RunGame {
     private void cell(Canvas canvas, Bitmap sheet, int index, int count, float feetX, float feetY, float tall, boolean turned) {
         int wide = sheet.getWidth() / count;
         float scale = tall / sheet.getHeight();
+        feetY += grounded(sheet, tall);
         source.set(index * wide, 0, index * wide + wide, sheet.getHeight());
         target.set(feetX - wide * scale / 2, feetY - tall, feetX + wide * scale / 2, feetY);
         canvas.save();
@@ -11609,6 +11767,7 @@ final class RunGame {
     private void frame(Canvas canvas, Bitmap sheet, int index, int count, float feetX, float feetY, float tall, boolean turned) {
         float scale = tall / (pet.getHeight() / (float) PetArt.FRAMES.length);
         int wide = sheet.getWidth() / count;
+        feetY += grounded(sheet, sheet.getHeight() * scale);
         source.set(index * wide, 0, index * wide + wide, sheet.getHeight());
         target.set(feetX - wide * scale / 2, feetY - sheet.getHeight() * scale, feetX + wide * scale / 2, feetY);
         canvas.save();
@@ -11705,7 +11864,7 @@ final class RunGame {
         text.setColor(run.lives() <= 1 ? 0xFFE0362F : ink);
         canvas.drawText(lives, livesAt + dp(26), plateMiddle + dp(5.5f), text);
         text.setColor(ink);
-        canvas.drawText(count, livesAt + livesWide, plateMiddle + dp(5.5f), text);
+        fitted(canvas, count, livesAt + livesWide, plateMiddle + dp(5.5f), dp(15), dp(400));
         plate(canvas, pauseButton, tall / 2, 235);
         paint.setColor(ink);
         canvas.drawRoundRect(pauseButton.centerX() - dp(7), pauseButton.centerY() - dp(8), pauseButton.centerX() - dp(2.5f), pauseButton.centerY() + dp(8), dp(1.5f), dp(1.5f), paint);
@@ -12180,7 +12339,7 @@ final class RunGame {
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(can ? Color.WHITE : CalculatorLayout.CORAL);
             text.setTextSize(dp(14));
-            canvas.drawText(gone ? "Gone" : "+ " + STALL_COSTS[index], box.centerX(), box.centerY() + dp(5), text);
+            fitted(canvas, gone ? "Gone" : "+ " + STALL_COSTS[index], box.centerX(), box.centerY() + dp(5), text.getTextSize(), box.width() - dp(8));
         }
     }
 
@@ -12392,10 +12551,60 @@ final class RunGame {
 
     /** Writes a line no wider than there is room for: smaller, if that is what it takes. */
     private void fitted(Canvas canvas, String words, float x, float y, float size, float room) {
+        if (words.contains("+ ") && PLUS_AMOUNT.matcher(words).find()) {
+            plusFitted(canvas, words, x, y, size, room);
+            return;
+        }
         text.setTextSize(size);
         float wide = text.measureText(words);
         if (wide > room) text.setTextSize(size * room / wide);
         canvas.drawText(words, x, y, text);
+    }
+
+    /** An amount of pluses, as it is written: a "+" before a number. */
+    private static final java.util.regex.Pattern PLUS_AMOUNT = java.util.regex.Pattern.compile("\\+ (?=\\d)");
+    /** Her plus: the glossy one, and the plain bold one for small sizes. */
+    private Bitmap plusCoin;
+
+    private void plusIcon(Canvas canvas, float x, float y, float size, int alpha) {
+        if (plusCoin == null) plusCoin = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_plus_coin);
+        int which = size < dp(22) ? 1 : 0, side = plusCoin.getHeight();
+        source.set(which * side, 0, which * side + side, side);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        int was = paint.getAlpha();
+        paint.setAlpha(alpha);
+        canvas.drawBitmap(plusCoin, source, target, paint);
+        paint.setAlpha(was);
+    }
+
+    /** Words with amounts of pluses in them: each "+" drawn as her plus, the whole fitted to the room and placed as the text is aligned. */
+    private void plusFitted(Canvas canvas, String words, float x, float y, float size, float room) {
+        String[] parts = PLUS_AMOUNT.split(words, -1);
+        text.setTextSize(size);
+        float wide = plusWide(parts, size);
+        if (wide > room) {
+            size *= room / wide;
+            text.setTextSize(size);
+            wide = plusWide(parts, size);
+        }
+        Paint.Align align = text.getTextAlign();
+        float at = align == Paint.Align.LEFT ? x : align == Paint.Align.CENTER ? x - wide / 2 : x - wide, icon = size * 1.12f;
+        text.setTextAlign(Paint.Align.LEFT);
+        for (int index = 0; index < parts.length; index++) {
+            canvas.drawText(parts[index], at, y, text);
+            at += text.measureText(parts[index]);
+            if (index < parts.length - 1) {
+                plusIcon(canvas, at + icon / 2, y - size * .36f, icon, text.getAlpha());
+                at += icon + size * .14f;
+            }
+        }
+        text.setTextAlign(align);
+    }
+
+    private float plusWide(String[] parts, float size) {
+        float wide = 0;
+        for (String part : parts) wide += text.measureText(part);
+        return wide + (parts.length - 1) * (size * 1.12f + size * .14f);
     }
 
     /**
@@ -12907,6 +13116,16 @@ final class RunGame {
     }
 
     /** The heading of the map and of the counter: a name, a line under it, and the round button that leaves. */
+    /** The guild counter's picture: Halgakos sitting in a shopping cart, as she was drawn, in a square about a place. */
+    private Bitmap cartArt;
+
+    private void cart(Canvas canvas, float x, float y, float size) {
+        if (cartArt == null) cartArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_cart);
+        paint.setAlpha(255);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        canvas.drawBitmap(cartArt, null, target, paint);
+    }
+
     private void heading(Canvas canvas, String title, String under) {
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(ink);
@@ -13087,11 +13306,14 @@ final class RunGame {
             if (bought(which) < UP_COSTS[which].length && locked(which) == null && bank() >= UP_COSTS[which][bought(which)]) enough = true;
         }
         plate(canvas, shopButton, shopButton.height() / 2, 235);
+        // Its own picture: Halgakos in her cart, at its start; its words beside her.
+        float cartSize = shopButton.height() * .9f, wordsAt = shopButton.left + cartSize + dp(4), wordsRoom = shopButton.right - dp(10) - wordsAt;
+        cart(canvas, shopButton.left + dp(4) + cartSize / 2, shopButton.centerY(), cartSize);
         text.setTextAlign(Paint.Align.CENTER);
         text.setColor(ink);
-        fitted(canvas, shopButton.width() < dp(96) ? "Counter" : "Guild counter", shopButton.centerX(), shopButton.top + dp(15.5f), dp(12), shopButton.width() - dp(20));
+        fitted(canvas, wordsRoom < dp(86) ? "Counter" : "Guild counter", wordsAt + wordsRoom / 2, shopButton.top + dp(15.5f), dp(12), wordsRoom);
         text.setColor(CalculatorLayout.CORAL);
-        fitted(canvas, "+ " + bank() + "  ›", shopButton.centerX(), shopButton.bottom - dp(6.5f), dp(13), shopButton.width() - dp(20));
+        fitted(canvas, "+ " + bank() + "  ›", wordsAt + wordsRoom / 2, shopButton.bottom - dp(6.5f), dp(13), wordsRoom);
         if (enough) {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(CalculatorLayout.CORAL);
@@ -13178,6 +13400,9 @@ final class RunGame {
         canvas.drawColor(dark ? 0xAA000000 : 0x77FFFFFF);
         int bank = bank();
         heading(canvas, "Guild counter", "What she buys here she keeps in every land  \u00B7  + " + bank + " to spend");
+        // Its picture beside its name: Halgakos in her cart.
+        text.setTextSize(dp(26));
+        cart(canvas, safe.left + dp(18) + text.measureText("Guild counter") + dp(28), safe.top + dp(29), dp(44));
         // The tabs: one row; the open one is filled.
         // (The row is shared out by the length of their words, so that every word is the same size.)
         float across = Math.min(safe.width() - dp(28), dp(460)), from = safe.centerX() - across / 2, worded = 0, lettered = dp(12.5f);
