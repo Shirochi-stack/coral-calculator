@@ -67,6 +67,8 @@ final class RunStory {
                             "A sunny baker girl is wailing over a loaf of bread that has turned to stone, and over her own name being mistranslated. Loud comic crying, sniffling."},
                     {"in03b", "Names stay names. That's the basics. There. Fixed Sloppy~♡", "H",
                             "She has just fixed a crying baker's mistranslated name with one tap of her book. Smug, casual, showing off, kind underneath."},
+                    {"in03s", "Your name got copied by someone who never read it. That's a sloppy copy. Lettera's full of them now, and I can't stand a single one Sloppy~♡", "H",
+                            "She explains to the baker what went wrong with her name: a careless, unread copy of a word. Then it turns personal: a translator's real distaste, firm and a little fierce, then her playful sign-off."},
                     {"in03c", "Thank you, Halgakos-ssi! I'll wait by the first flag with fresh bread!", "C",
                             "The baker, tears gone the moment she is helped, promises bread in thanks. Bright, bubbly, overjoyed, bouncing."}};
             case 7: return new String[][]{
@@ -200,7 +202,9 @@ final class RunStory {
                             PLAYER + "She looks up at a vast ruined library and guesses who lives there. Quiet, uneasy, serious for once."}};
             case 100: return new String[][]{
                     {"in100a", "The last land. The Dragon of Lost Words is at the end of it. Everyone with me Sloppy~♡", "H",
-                            PLAYER + "She stands before the final level with all her friends behind her. Steady, proud, a little nervous." + FAST}};
+                            PLAYER + "She stands before the final level with all her friends behind her. Steady, proud, a little nervous." + FAST},
+                    {"in100s", "Every sloppy copy began with someone who wouldn't listen. I'm listening. All the way to the last word Sloppy~♡", "H",
+                            PLAYER + "Before the final level she says what all the careless, unread copies in this world came from, and what she will do instead. Quiet, sincere, steady, then a small brave smile."}};
             default: return null;
         }
     }
@@ -447,7 +451,7 @@ final class RunStory {
                     {"tkb1", "That bat girl came by for soup. Tsubakieh. She said you broke her bat. Then she had seconds.", "B", "The grandmother says a girl whose bat the hero broke came by for soup and stayed for seconds. Amused, motherly."},
                     {"tko1", "They say the Mawang wants to come home. Even demon kings get homesick, huh? I'd race her home!", "O", "The ice-cream girl muses that even the demon king gets homesick, and offers to race her home. Upbeat, sympathetic."},
                     {"tkp1", "The last page of this volume is near. The wind is quieter there. Listen, when you reach it.", "P", "The mysterious girl tells the hero the last page of the first volume is close, and the wind is quiet there. Hushed, foreboding."},
-                    {"tke1", "Footnote three: a demon king who wants to go home is still a king. Be kind, but be quick.", "E", "The footnote girl advises the hero about the homesick demon king. Earnest, gentle."},
+                    {"tke1s", "Footnote three: a sloppy copy is a page copied by someone who never read it. They're spreading. Don't believe every page you find.", "E", "The footnote girl warns the hero about careless, unread copies of pages that are spreading through the land. Earnest, careful, a little worried."},
                     {"tka1", "Mini pets! The guild counter has little ones of the girls you beat. I want the bat one, nya!", "A", "The cat girl gushes about tiny pet versions of defeated rivals sold at the guild counter. Excited, greedy."},
                     {"tkw1", "Two sisters of mine. Pulmu does armour. Sutdol trades. Don't haggle with Sutdol.", "W", "The gruff blacksmith mentions her two sisters and warns the hero never to haggle with one of them. Short, fond, a little afraid."},
                     {"tkl1", "The black market moved in down the road. Competition! I lowered nothing. My prices are perfect.", "L", "The merchant complains that a black market opened nearby, but refuses to lower her prices. Huffy, proud."},
@@ -462,7 +466,7 @@ final class RunStory {
                     {"tke2", "Footnote forty: Gokhae's fan blows the words right off the page. Hold on to yours.", "E", "The footnote girl warns that a rival named Gokhae blows words off pages with her fan. Wry, cautioning."},
                     {"tka2", "A slime king lives in the margins. He's squishy and he smells like jam, nya. I want him as a pet.", "A", "The cat girl describes a slime king who smells like jam and says she wants him as a pet. Dreamy, silly."},
                     {"tkw2", "Weapons get better if you hit them enough. So do people. Come back when you've been hit.", "W", "The gruff smith offers blunt wisdom about weapons and people getting stronger from being hit. Deadpan, kind underneath."},
-                    {"tkl2", "Jupan charges a toll on the bridge. A toll! On a bridge I sell snacks on! Unthinkable!", "L", "The merchant is outraged that a rival charges a toll on the bridge where she sells snacks. Scandalised, theatrical."},
+                    {"tkl2s", "Somebody's selling sloppy copies of my price tags! Half price! Written by nobody! My prices are perfect, not copied!", "L", "The merchant is outraged that careless fake copies of her price tags are going round at half price. Scandalised, theatrical, proud."},
                     {"tkn2", "Our words are being rewritten in Our own palace. We do not ask, Translator-nim. We are asking.", "N", "The proud queen, whose words are being rewritten, swallows her pride and asks the translator for help. Strained, dignified."},
             },
             {
@@ -499,7 +503,7 @@ final class RunStory {
                     {"tah1b", "She had seconds? Then she forgives me Sloppy~♡", "H", PLAYER + "She hears that a rival she beat came for soup and had seconds. Relieved, amused."},
                     {"tah1o", "Homesick demon king. Fine. I'll walk her to the door Sloppy~♡", "H", PLAYER + "She answers a girl saying the demon king wants to go home. Softening, kind."},
                     {"tah1p", "Quiet wind, last page. Got it. I'll bring a scarf Sloppy~♡", "H", PLAYER + "She answers a cryptic warning about the last page. Light, hiding nerves."},
-                    {"tah1e", "Kind and quick. My two settings Sloppy~♡", "H", PLAYER + "She answers advice to be kind but quick with the demon king. Confident."},
+                    {"tah1es", "Copied, never read. That's the worst thing a page can be Sloppy~♡", "H", PLAYER + "She answers a warning about careless copies of pages. Disgusted, then quietly serious, a translator's pride."},
                     {"tah1a", "A tiny Tsubakieh with a tiny bat. Okay, that's adorable Sloppy~♡", "H", PLAYER + "She imagines a mini pet version of a rival with a little bat. Charmed despite herself."},
                     {"tah1w", "Noted. I will never, ever haggle with Sutdol Sloppy~♡", "H", PLAYER + "She solemnly promises never to haggle with the smith's scary sister. Mock-serious."},
                     {"tah1l", "Perfect prices, she says. With a straight face Sloppy~♡", "H", PLAYER + "She marvels at a merchant who claims her prices are perfect. Teasing."},
@@ -514,7 +518,7 @@ final class RunStory {
                     {"tah2e", "Hold on to my words. I'm a translator. They're all I have Sloppy~♡", "H", PLAYER + "She answers a warning about a fan that blows words away. Sincere for a moment."},
                     {"tah2a", "A jam-scented slime king is not a pet, Nabi. ...Is he? Sloppy~♡", "H", PLAYER + "She answers a cat girl wanting a slime king as a pet. Exasperated, then tempted."},
                     {"tah2w", "Come back when I've been hit. That's the plan anyway Sloppy~♡", "H", PLAYER + "She answers blunt wisdom from the smith. Wry, fond."},
-                    {"tah2l", "A toll on your snack bridge. The villainy has no limit Sloppy~♡", "H", PLAYER + "She mock-sympathises with a merchant outraged by a bridge toll. Theatrical."},
+                    {"tah2ls", "Sloppy copies of price tags. Truly the darkest magic Sloppy~♡", "H", PLAYER + "She mock-sympathises with a merchant whose price tags are being copied carelessly. Theatrical, laughing."},
                     {"tah2n", "You're asking. I heard. Your words stay yours, Majesty Sloppy~♡", "H", PLAYER + "She answers a proud queen who has finally asked for help. Gentle, steady."},
             },
             {
@@ -546,11 +550,21 @@ final class RunStory {
             "The Gazette says the hero is a villain. My aunt cut it into paper boats. They sailed better than the news.",
             "I went between the lines today. There is a whole country there, quiet and blue, where the words go to rest between readings.",
             "Slimes in the margins again. They smell of jam. I am not eating jam anymore. I am not eating anything green.",
-            "Found an old footnote in the attic: \"See appendix.\" I went to the appendix. It said \"See footnote.\" I have been going round for a week.",
+            "A man came through town selling cheap books. Every page was there and not one of them was right. Mother called it a sloppy copy and put it in the stove. It complained the whole time.",
             "The tide brought in a boat folded out of a letter. Inside was one line: we are still reading. I do not know who \"we\" is.",
             "There is a dragon in the library. She reads faster than she burns. Nobody has ever finished a book before her.",
             "Moru's sisters went into the library to fix a broken word. That was last spring. Their hammers sing at night, Moru says. Far away.",
             "If you are reading this, translator: the first word is not angry. She is only lonely. Read her aloud. That is all she ever wanted.",
+    };
+
+    /** Her line with the game's name in it: the first time the map is opened, and now and then as a land begins. */
+    static final String[][] TITLE_LINE = {
+            {"title1", "A sloppy copy? Not on my page Sloppy~♡", "H", PLAYER + "Her signature line, the game's own name in it: a translator who will not stand for careless copies. Confident, punchy, proud, a playful wink at the end."},
+    };
+
+    /** The first time a key is pressed in the first land: she says which keys. */
+    static final String[][] KEYS = {
+            {"keys1", "Keyboard? Fancy. A and D to run, Space to jump Sloppy~♡", "H", PLAYER + "She notices the player is using a keyboard and quickly tells them the keys. Teasing, impressed despite herself, brisk."},
     };
 
     /** A new level: she says so, glowing. */
@@ -1184,6 +1198,8 @@ final class RunStory {
         groups.add(NEW_PET);
         groups.add(WARP);
         groups.add(LEVEL);
+        groups.add(TITLE_LINE);
+        groups.add(KEYS);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
