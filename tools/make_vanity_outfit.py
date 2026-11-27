@@ -35,6 +35,7 @@ DESIGNS = {
     "maid": ("the maid dress", "a short black dress with puffed short sleeves, a white frilled apron with a bow, a white ruffled collar with a small pink ribbon, white frilled thigh-high stockings with black ribbon garters and black strap shoes"),
     "idol": ("the Sloppy Stage idol outfit", "a black off-shoulder frilly stage dress with detached puffed sleeves, a pink ribbon corset lacing and a white bow at the waist, a layered black and pink ruffled skirt, black tights and black shoes with white bows"),
     "swim1": ("the seaside swimsuit", "a sporty one-piece swimsuit with a white sailor-style collar, aqua and white horizontal stripes, a small frilled skirt hem, short sleeves, a tiny red ribbon at the chest and white strap sandals"),
+    "bunnyg": ("the gacha bunny girl suit", "a glossy red satin bodysuit with gold buckle details, a short black cropped tailcoat jacket with red lining and gold buttons worn over it, opaque black tights, a white detached collar with a black bow tie, white wrist cuffs, red high heels and a small fluffy white pom-pom tail at the back of her waist"),
 }
 CANVAS = (1536, 1024)
 CLEAR = (" The background must be fully transparent (a PNG with an alpha channel): no backdrop colour, no checkerboard, no ground, no shadows, no text, no borders, "

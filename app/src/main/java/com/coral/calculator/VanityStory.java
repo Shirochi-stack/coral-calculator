@@ -49,17 +49,37 @@ final class VanityStory {
             null,
             {"vsb3", "The bunny suit! Collar, cuffs and bow tie, all pressed. Hop along now.", "g", SHOP + "She hands over a bunny girl costume, playful and cheerful."},
             {"vsb4", "The maid dress! Frills pressed and ribbons tied. Is there anything else I can do for you?", "g", SHOP + "She hands over a maid dress, prim and playful."},
-            null, null};
+            null, null,
+            {"vsb7", "The gacha bunny suit! Red satin, a little tailcoat and a pom tail. Do try to look innocent.", "g", SHOP + "She hands over a flashy red and black bunny girl costume, delighted and teasing."}};
     static final String[][] HAL_BOUGHT = {
             {"vshb0", "It fits perfectly! Thank you, Tulle Sloppy~♡", "H", "Halgakos thanks the seamstress happily after getting a new outfit. She is a catgirl who ends her sentences with Sloppy."},
             {"vshb1", "So cute! I am never taking it off Sloppy~♡", "H", "Halgakos squeals happily about her new outfit. She is a catgirl who ends her sentences with Sloppy."}};
+
+    /** What she says as ears and horns are bought, by their place in {@link RunVanity#EARS} and {@link RunVanity#HORNS} (null for her own). */
+    static final String[][] EARS_BOUGHT = {
+            null,
+            {"vshe1", "No ears at all? Smooth and tidy on top. Very elegant.", "g", SHOP + "She hands over a tidy hair arrangement with no ears, pleased and polite."},
+            {"vshe2", "Fox ears! Russet, tipped in brown, and ever so soft. Very clever of you.", "g", SHOP + "She hands over a pair of fox ears, delighted and playful."},
+            {"vshe3", "Bunny ears, white as a clean page. Try not to twitch them.", "g", SHOP + "She hands over a pair of bunny ears with a teasing smile."},
+            {"vshe4", "A frilled headband, starched and pressed. Perfectly proper.", "g", SHOP + "She hands over a white frilled headband, prim and proud."}};
+    static final String[][] HORNS_BOUGHT = {
+            null,
+            {"vshh1", "Smooth hair where the horns were. I will keep them safe for you, in case.", "g", SHOP + "She hands over a smooth hair arrangement with no horns, gentle and reassuring."},
+            {"vshh2", "Pointed ears! Long, fine and ever so graceful. You look like an elf from a storybook.", "g", SHOP + "She hands over a pair of long pointed elf ears, thrilled."}};
+
+    /** What she says when a picture of her in what she has just got is opened, and Halgakos's answer: the same two lines for every picture. */
+    static final String[] PICTURE = {"vspic0", "And I painted you in it too, a full portrait! It is in your gallery now.", "g",
+            SHOP + "She unveils a finished portrait of the hero in her new outfit, proud and excited."};
 
     static String[] line(String name) {
         for (String[] one : GREET) if (one[0].equals(name)) return one;
         if (BOUGHT[0].equals(name)) return BOUGHT;
         if (BROKE[0].equals(name)) return BROKE;
+        if (PICTURE[0].equals(name)) return PICTURE;
         for (String[] one : BOUGHT_FOR) if (one != null && one[0].equals(name)) return one;
         for (String[] one : HAL_BOUGHT) if (one[0].equals(name)) return one;
+        for (String[] one : EARS_BOUGHT) if (one != null && one[0].equals(name)) return one;
+        for (String[] one : HORNS_BOUGHT) if (one != null && one[0].equals(name)) return one;
         for (String[][] quest : QUESTS) for (String[] one : quest) if (one[0].equals(name)) return one;
         return null;
     }

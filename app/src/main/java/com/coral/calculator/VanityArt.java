@@ -32,7 +32,8 @@ final class VanityArt {
         if (making.add(key)) {
             new Thread(() -> {
                 try {
-                    Bitmap dressed = style.art != null ? drawn(sheet, base, style.art) : dress(sheet, base, style);
+                    Bitmap dressed = style.art != null ? drawn(sheet, base, style.art) : style.mid != 0 ? dress(sheet, base, style) : null;
+                    if (style.ears != 0 || style.horns != 0) dressed = parts(sheet, dressed != null ? dressed : base, style);
                     if (dressed != null) made.put(key, dressed);
                 } catch (RuntimeException | OutOfMemoryError ignored) {
                     // A sheet that cannot be dressed stays as she is.
@@ -62,6 +63,57 @@ final class VanityArt {
             anchors = VanityLayers.parse(text.toString());
         }
         return anchors;
+    }
+
+    /**
+     * The horns and the ears over a sheet: for each part, its pictures of the sheet (the new pixels) and where they go (a mask),
+     * made by tools/make_vanity_heads.py. Where the mask is, the sheet shows the part's pixels and not its own.
+     */
+    private Bitmap parts(String sheet, Bitmap from, RunVanity.Style style) {
+        Bitmap out = from.copy(Bitmap.Config.ARGB_8888, true);
+        String[] names = {RunVanity.HORNS_ART[style.horns], RunVanity.EARS_ART[style.ears]};
+        int[] pixels = null, patch = null, mask = null;
+        for (String name : names) {
+            if (name == null) continue;
+            Bitmap picture = load("vanity/heads/" + name + "/" + sheet + ".webp"), where = load("vanity/heads/" + name + "/" + sheet + "_m.webp");
+            if (picture == null || where == null || picture.getWidth() != out.getWidth() || picture.getHeight() != out.getHeight()
+                    || where.getWidth() != out.getWidth() || where.getHeight() != out.getHeight()) continue;
+            int n = out.getWidth() * out.getHeight();
+            if (pixels == null) {
+                pixels = new int[n];
+                out.getPixels(pixels, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+            }
+            patch = new int[n];
+            mask = new int[n];
+            picture.getPixels(patch, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+            where.getPixels(mask, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+            for (int i = 0; i < n; i++) {
+                int m = mask[i] >>> 24;
+                if (m == 0) continue;
+                int p = patch[i], o = pixels[i], pa = p >>> 24, oa = o >>> 24;
+                int alpha = oa + (pa - oa) * m / 255;
+                int rgb = o & 0xFFFFFF;
+                if (pa > 0) {
+                    int r = (o >> 16 & 255) + ((p >> 16 & 255) - (o >> 16 & 255)) * m / 255, g = (o >> 8 & 255) + ((p >> 8 & 255) - (o >> 8 & 255)) * m / 255,
+                            b = (o & 255) + ((p & 255) - (o & 255)) * m / 255;
+                    rgb = oa == 0 ? p & 0xFFFFFF : r << 16 | g << 8 | b;
+                }
+                pixels[i] = alpha << 24 | rgb;
+            }
+            picture.recycle();
+            where.recycle();
+        }
+        if (pixels == null) return from;
+        out.setPixels(pixels, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+        return out;
+    }
+
+    private Bitmap load(String path) {
+        try (InputStream in = context.getAssets().open(path)) {
+            return BitmapFactory.decodeStream(in);
+        } catch (java.io.IOException missing) {
+            return null;
+        }
     }
 
     /** An outfit that was drawn whole: its picture of this sheet, if it is in the app and is the sheet's size. */
