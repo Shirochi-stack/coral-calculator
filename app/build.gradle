@@ -18,8 +18,16 @@ android {
         applicationId 'com.halgakos.calculator'
         minSdk 26
         targetSdk 36
-        versionCode 105
-        versionName '3.33.0'
+        versionCode 106
+        versionName '3.34.0'
+    }
+
+    // The outfits are an install-time asset pack, kept out of the base module; the debug APK carries them in the app itself.
+    assetPacks = [':vanity']
+    sourceSets {
+        debug {
+            assets.srcDirs += ['../vanity/src/main/assets']
+        }
     }
 
     buildFeatures {

@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class VanityArt {
     private final Context context;
-    private final Map<String, Bitmap> made = new ConcurrentHashMap<>(), asked = new ConcurrentHashMap<>();
+    private final Map<String, Bitmap> made = new ConcurrentHashMap<>();
     private final java.util.Set<String> making = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     private volatile VanityLayers.Anchors anchors;
 
@@ -28,11 +28,11 @@ final class VanityArt {
         String key = sheet + "|" + style.key() + "|" + System.identityHashCode(base);
         Bitmap done = made.get(key);
         if (done != null) return done;
-        if (made.size() > 40) made.clear();
+        if (made.size() > 20) made.clear();
         if (making.add(key)) {
             new Thread(() -> {
                 try {
-                    Bitmap dressed = dress(sheet, base, style);
+                    Bitmap dressed = style.art != null ? drawn(sheet, base, style.art) : dress(sheet, base, style);
                     if (dressed != null) made.put(key, dressed);
                 } catch (RuntimeException | OutOfMemoryError ignored) {
                     // A sheet that cannot be dressed stays as she is.
@@ -62,6 +62,17 @@ final class VanityArt {
             anchors = VanityLayers.parse(text.toString());
         }
         return anchors;
+    }
+
+    /** An outfit that was drawn whole: its picture of this sheet, if it is in the app and is the sheet's size. */
+    private Bitmap drawn(String sheet, Bitmap base, String outfit) {
+        try (InputStream in = context.getAssets().open("vanity/" + outfit + "/" + sheet + ".webp")) {
+            Bitmap picture = BitmapFactory.decodeStream(in);
+            if (picture == null || picture.getWidth() != base.getWidth() || picture.getHeight() != base.getHeight()) return null;
+            return picture;
+        } catch (java.io.IOException missing) {
+            return null;
+        }
     }
 
     private Bitmap dress(String sheet, Bitmap base, RunVanity.Style style) {
