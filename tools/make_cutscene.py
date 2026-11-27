@@ -792,6 +792,7 @@ def paced(wave, rate, speed):
     import fractions
 
     import av
+    import numpy
 
     graph = av.filter.Graph()
     source = graph.add_abuffer(sample_rate=rate, format="flt", layout="stereo", time_base=fractions.Fraction(1, rate))
