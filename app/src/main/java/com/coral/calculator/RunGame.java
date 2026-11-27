@@ -6721,6 +6721,45 @@ final class RunGame {
     }
 
     /** The sky of a chapter over the whole screen, drifting by at a fifth of the land's pace. */
+    /** The paper trees: four drawings, in a strip; and the line on which the wood behind the land stands, as it was last drawn. */
+    private Bitmap paperTrees;
+    private float woodLine = -1;
+    private static final float WOOD_PACE = .45f, WOOD_EVERY = 4.6f;
+
+    /**
+     * Behind a land of the Contents Village, a wood of paper trees: some way off, so it goes by at
+     * a little under half her pace; on a line a little below where the ground under her is, and
+     * following it slowly as the land climbs and drops; larger and smaller by turns, some a little
+     * paler for being further off. Where each stands, and which it is, comes from its place in the
+     * wood, so the same wood is there each time she comes back to the same place.
+     */
+    private void drawPaperTrees(Canvas canvas, RunLevels.Level level) {
+        if (paperTrees == null) paperTrees = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_paper_trees);
+        if (paperTrees == null) return;
+        int middle = Math.max(0, Math.min(run.columns() - 1, (int) (cameraX + width / tile / 2)));
+        int ground = RunLevels.top(level, middle);
+        float line = ground < 0 ? woodLine : (ground - cameraY) * tile + tile * .35f;
+        woodLine = woodLine < 0 ? line : woodLine + (line - woodLine) * .06f;
+        int kinds = 4, cellWide = paperTrees.getWidth() / kinds, cellTall = paperTrees.getHeight();
+        float back = cameraX * WOOD_PACE;
+        int first = (int) Math.floor(back / WOOD_EVERY) - 2, last = (int) Math.ceil((back + width / tile) / WOOD_EVERY) + 2;
+        paint.setFilterBitmap(true);
+        for (int slot = first; slot <= last; slot++) {
+            // (Its own small chance, the same every time: which tree, how far off, how large.)
+            int seed = slot * 7919 + level.number * 104729;
+            int which = Math.floorMod(seed >> 3, kinds);
+            float offset = Math.floorMod(seed >> 7, 100) / 100f, far = Math.floorMod(seed >> 11, 3) / 2f;
+            float tall = tile * (4.2f - far * 1.4f);
+            float x = (slot * WOOD_EVERY + offset * WOOD_EVERY * .6f - back) * tile;
+            float wide = tall * cellWide / cellTall;
+            source.set(which * cellWide, 0, (which + 1) * cellWide, cellTall);
+            target.set(x - wide / 2, woodLine - tall - far * tile * .5f, x + wide / 2, woodLine - far * tile * .5f);
+            paint.setAlpha(Math.round(210 - far * 60));
+            canvas.drawBitmap(paperTrees, source, target, paint);
+        }
+        paint.setAlpha(255);
+    }
+
     private void drawSky(Canvas canvas, int chapter, float drift) {
         if (skyOf != chapter) {
             sky = BitmapFactory.decodeResource(context.getResources(), SKIES[chapter]);
@@ -6877,6 +6916,8 @@ final class RunGame {
         int chapter = level.chapter;
         if (run.room() >= 0) drawInside(canvas);
         else drawSky(canvas, chapter, cameraX * tile * .2f);
+        // In the Contents Village, between the sky and the land, a wood of paper trees.
+        if (run.room() < 0 && chapter == 0) drawPaperTrees(canvas, level);
         float across = width / tile, down = height / tile;
         int first = Math.max(0, (int) cameraX), last = Math.min(run.columns() - 1, (int) (cameraX + across) + 1);
         int top = Math.max(0, (int) Math.floor(cameraY)), bottom = Math.min(level.land.length - 1, (int) (cameraY + down) + 1);
