@@ -449,8 +449,83 @@ final class RunLevels {
     /** How many times as many of those that fly are put in as a land was laid with. */
     static int flocksOf(int number) { return 2 + (levelOf(number) - 1) / 5; }
 
-    /** Whether one was put in as one of a swarm. */
-    static boolean swarmed(int[] foe) { return foe.length > 5 && foe[5] != 0; }
+    /** Whether one was put in as one of a swarm (1), or is one of the unique creatures (2). */
+    static boolean swarmed(int[] foe) { return foe.length > 5 && foe[5] == 1; }
+
+    static boolean uniqueSpec(int[] foe) { return foe.length > 5 && foe[5] == 2; }
+
+    /** How many of its chapter's unique creatures a land has: four at first, sixteen in the last lands. */
+    static int uniquesIn(int number) { return 4 + number / 8; }
+
+    /**
+     * The unique creatures of a land's chapter: in small groups of one kind, on the ground along the land (the hornets in a line in the
+     * air over it), with room about each group; a mini-boss alone, once, two thirds of the way along. They keep clear of the start,
+     * flags, doors, villages and anything else that is a place of its own. Drawn from numbers of their own, so that the land is as it was.
+     */
+    private static void uniques(Level level) {
+        int number = level.number, chapter = Math.min(11, chapterOf(number)), until = level.arena >= 0 ? level.arena - 10 : level.gate - 6;
+        Random random = new Random(1299709L * number + 15485863);
+        List<int[]> spots = new ArrayList<>();
+        for (int column = 30; column < until; column++) {
+            boolean near = false;
+            for (int flag : level.flags) near |= Math.abs(flag - column) < 6;
+            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 8;
+            for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
+            for (int[] item : level.items) if (item[1] < level.main) near |= Math.abs(item[1] - column) < 4;
+            for (int[] weapon : level.weapons) near |= Math.abs(weapon[1] - column) < 2;
+            for (int[] foe : level.foes) if (rover(foe[0]) || uniqueSpec(foe)) near |= Math.abs(foe[1] - column) < (rover(foe[0]) ? 16 : 3);
+            if (near) continue;
+            int floor = top(level, column);
+            boolean flat = floor > 5 && floor < level.land.length && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR
+                    && level.land[floor - 3][column] == AIR && top(level, column + 1) == floor && top(level, column - 1) == floor;
+            if (flat) spots.add(new int[]{column, floor});
+        }
+        if (spots.isEmpty()) return;
+        int first = RunUniques.first(chapter), want = uniquesIn(number);
+        boolean bossy = RunUniques.way(first) == RunUniques.MINIBOSS || RunUniques.way(first + 1) == RunUniques.MINIBOSS;
+        // The mini-boss, alone, two thirds of the way along.
+        if (bossy) {
+            int kind = RunUniques.way(first) == RunUniques.MINIBOSS ? first : first + 1;
+            int[] spot = spots.get(Math.min(spots.size() - 1, spots.size() * 2 / 3));
+            level.foes.add(new int[]{kind, spot[0], spot[1] - 1, 1, 0, 2});
+            want--;
+        }
+        List<Integer> taken = new ArrayList<>();
+        for (int tries = 0; tries < 200 && want > 0; tries++) {
+            int[] spot = spots.get(random.nextInt(spots.size()));
+            boolean clear = true;
+            for (int column : taken) clear &= Math.abs(column - spot[0]) >= 9;
+            for (int[] foe : level.foes) if (uniqueSpec(foe)) clear &= Math.abs(foe[1] - spot[0]) >= 9;
+            if (!clear) continue;
+            int kind = first + random.nextInt(2);
+            if (RunUniques.way(kind) == RunUniques.MINIBOSS) kind = kind == first ? first + 1 : first;
+            taken.add(spot[0]);
+            if (RunUniques.flies(kind)) {
+                // A line of hornets in the air, three squares up.
+                int size = Math.min(want, 3 + random.nextInt(3)), put = 0;
+                for (int one = 0; one < size; one++) {
+                    boolean clearOfFlags = spot[0] + one < until;
+                    for (int flag : level.flags) clearOfFlags &= Math.abs(flag - spot[0] - one) >= 6;
+                    if (!clearOfFlags) break;
+                    level.foes.add(new int[]{kind, spot[0] + one, spot[1] - 4, 1, 0, 2});
+                    put++;
+                }
+                want -= Math.max(1, put);
+                continue;
+            }
+            int size = Math.min(want, 1 + random.nextInt(number < 12 ? 2 : 3));
+            for (int one = 0; one < size; one++) {
+                int column = spot[0] + one * 2;
+                boolean clearOfFlags = column < until;
+                for (int flag : level.flags) clearOfFlags &= Math.abs(flag - column) >= 6;
+                boolean flatThere = false;
+                for (int[] other : spots) flatThere |= other[0] == column && other[1] == spot[1];
+                if (!flatThere || !clearOfFlags) break;
+                level.foes.add(new int[]{kind, column, spot[1] - 1, 1, 0, 2});
+                want--;
+            }
+        }
+    }
 
     /** Whether something of a land was put in to make up its numbers. */
     static boolean crowd(int[] foe) { return foe.length > 4 && foe[4] != 0; }
@@ -1366,6 +1441,7 @@ final class RunLevels {
         pots(level);
         friend(level);
         swarm(level);
+        uniques(level);
         return level;
     }
 
@@ -1558,6 +1634,7 @@ final class RunLevels {
         pots(level);
         friend(level);
         swarm(level);
+        uniques(level);
         return level;
     }
 

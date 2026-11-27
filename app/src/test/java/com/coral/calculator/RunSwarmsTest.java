@@ -20,7 +20,8 @@ public class RunSwarmsTest {
             RunLevels.Level level = RunLevels.level(number);
             int laid = 0, all = 0, swarmed = 0, grouped = 0;
             for (int[] foe : level.foes) {
-                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET || RunLevels.rover(foe[0])) continue;
+                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET || RunLevels.rover(foe[0])
+                        || RunLevels.uniqueSpec(foe)) continue;
                 all++;
                 if (!RunLevels.crowd(foe)) laid++;
                 if (!RunLevels.swarmed(foe)) continue;
@@ -76,7 +77,7 @@ public class RunSwarmsTest {
             for (PlusRun.Foe foe : run.foes()) {
                 if (RunLevels.boss(foe.kind) || RunLevels.flier(foe.kind)) continue;
                 all++;
-                if (foe.guard > 0) {
+                if (foe.guard > 0 && !RunUniques.is(foe.kind)) {
                     shielded++;
                     assertEquals(PlusRun.shieldNeeds(number), foe.guardNeeds);
                     assertEquals(PlusRun.shieldKind(number), foe.guardKind);

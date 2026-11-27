@@ -1293,7 +1293,7 @@ public class PlusRunTest {
                 base = 0;
             }
             for (int[] foe : level.foes) {
-                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET) continue;
+                if (foe[1] >= level.main || RunLevels.boss(foe[0]) || RunLevels.flier(foe[0]) || foe[0] == RunLevels.TARGET || RunLevels.uniqueSpec(foe)) continue;
                 if (!RunLevels.crowd(foe)) {
                     laid++;
                     kinds.add(foe[0]);
@@ -4872,6 +4872,11 @@ public class PlusRunTest {
                 PlusRun.Foe foe = run.foes().get(index);
                 assertEquals(spec[0], foe.kind);
                 if (RunLevels.boss(spec[0])) continue;
+                // (The unique creatures have health of their own: RunUniquesTest.)
+                if (RunUniques.is(spec[0])) {
+                    assertEquals(RunUniques.health(spec[0], number) * PlusRun.TIER_HEALTH[foe.tier] + run.tough() * PlusRun.BLOW, foe.left);
+                    continue;
+                }
                 boolean spared = spec[0] == RunLevels.TARGET || spec[0] == RunLevels.WISP || spec[0] == RunLevels.RIME;
                 assertEquals("land " + number, PlusRun.healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * PlusRun.TIER_HEALTH[foe.tier] + (spared ? 0 : run.tough()) * PlusRun.BLOW, foe.left);
                 if (!spared) tougher++;
@@ -7549,7 +7554,7 @@ public class PlusRunTest {
             assertEquals("land " + number, 2, stalls);
             assertTrue("land " + number, level.decor.size() >= 8);
             for (char[] row : level.land) for (char square : row) ground[square] = true;
-            for (int[] foe : level.foes) signs[foe[0]] = true;
+            for (int[] foe : level.foes) if (foe[0] < signs.length) signs[foe[0]] = true;
             movers += level.movers.size();
             doors += level.doors.size();
             // The ground is not all at one height.
@@ -7795,7 +7800,8 @@ public class PlusRunTest {
     private static RunLevels.Level unguarded(RunLevels.Level level) {
         for (int index = level.foes.size() - 1; index >= 0; index--) {
             // (Nor those put in to make up a land's numbers: what is proved is that the land itself can be crossed.)
-            if (RunLevels.boss(level.foes.get(index)[0]) || RunLevels.crowd(level.foes.get(index))) level.foes.remove(index);
+            // (Nor the unique creatures, which are put in after the land is made, like them: RunUniquesTest fights them.)
+            if (RunLevels.boss(level.foes.get(index)[0]) || RunLevels.crowd(level.foes.get(index)) || RunLevels.uniqueSpec(level.foes.get(index))) level.foes.remove(index);
         }
         // (Nor a pet that lies waiting: the land is crossed without one.)
         for (int index = level.items.size() - 1; index >= 0; index--) if (level.items.get(index)[0] >= PlusRun.PET) level.items.remove(index);
@@ -7808,6 +7814,7 @@ public class PlusRunTest {
             PlusRun run = cross(unguarded(RunLevels.level(number)), 240);
             assertEquals("land " + number + " stopped at " + run.x() + " of " + run.columns() + " with " + run.hearts() + " hearts" + around(run),
                     PlusRun.WON, run.state());
+            // (With its swarms, from the thirteenth land on a bot that only jumps and stomps may lose a heart; never a life.)
             // (With its swarms, from the thirteenth land on a bot that only jumps and stomps may lose a heart; never a life.)
             assertTrue("land " + number + " with " + run.hearts(), run.hearts() >= run.maxHearts() - (number <= 12 ? 0 : 1) && run.livesLost() == 0);
         }

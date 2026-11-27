@@ -538,7 +538,9 @@ final class RunGame {
      * on the pause; her active slots on the HUD; and how many times divine power has come in this land, as last seen. */
     private RunTree tree;
     /** The shields creatures carry: their pictures; blows that rang off and shields broken, as last seen; and how long ago the last of each was. */
-    private Bitmap mobShields;
+    private Bitmap mobShields, uniqueSheet;
+    private int seenHeals;
+    private float healAge = 9;
     private int seenClangs, seenBroken;
     private float clangAge = 9, shatterAge = 9;
     private boolean treeOpen;
@@ -5847,6 +5849,7 @@ final class RunGame {
         wardFlash += seconds;
         gripChanged += seconds;
         clangAge += seconds;
+        healAge += seconds;
         shatterAge += seconds;
         // The keys, said once the story told as the first land begins is over (said over it, it would not be heard).
         if (keysHintDue && screen == PLAY && !(talking && !told) && captionLeft <= 0) {
@@ -8251,7 +8254,7 @@ final class RunGame {
             float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, feet = (foe.y + foe.tall() - cameraY) * tile, tall = Math.max(tile * .62f, foe.tall() * tile * .78f);
             float shake = foe.guardMet < .2f ? (float) Math.sin(foe.guardMet * 90) * tile * .05f : 0;
             float sx = middle + (foe.leftward ? -1 : 1) * foe.wide() * tile * .42f + shake, sy = feet - foe.tall() * tile * .45f;
-            if (mobShields != null) {
+            if (mobShields != null && foe.guardKind >= 0) {
                 int cell = mobShields.getHeight();
                 source.set(foe.guardKind * cell, 0, (foe.guardKind + 1) * cell, cell);
                 target.set(sx - tall / 2, sy - tall / 2, sx + tall / 2, sy + tall / 2);
@@ -8264,7 +8267,7 @@ final class RunGame {
             paint.setColor(0xCC15171A);
             canvas.drawRoundRect(middle - wide / 2 - tile * .04f, row - pip / 2 - tile * .04f, middle + wide / 2 + tile * .04f, row + pip / 2 + tile * .04f, pip, pip, paint);
             for (int one = 0; one < foe.guardMost; one++) {
-                paint.setColor(one < foe.guard ? SHIELD_PIPS[foe.guardKind] : 0xFF4A4F54);
+                paint.setColor(one < foe.guard ? (foe.guardKind >= 0 ? SHIELD_PIPS[foe.guardKind] : 0xFFE8C77A) : 0xFF4A4F54);
                 float px = middle - wide / 2 + one * (pip + gap);
                 canvas.drawRect(px, row - pip / 2, px + pip, row + pip / 2, paint);
             }
@@ -8310,6 +8313,57 @@ final class RunGame {
             paint.setAlpha(255);
             paint.setColor(Color.BLACK);
         }
+    }
+
+    /**
+     * A unique creature: walking (two pictures by turns), winding up (lit red-gold and pulsing, so that it is seen coming), striking,
+     * hurt, and beaten (its last picture, fading). A mimic lies still as its first picture until it springs; a burrower under the
+     * ground is a mound; a wall-ghost faded is a faint shape. A healer's mending is a ring of green light about it.
+     */
+    private void drawUnique(Canvas canvas, PlusRun.Foe foe, float middle, float feet, boolean turned) {
+        if (uniqueSheet == null) uniqueSheet = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_uniques);
+        if (uniqueSheet == null) return;
+        int way = RunUniques.way(foe.kind);
+        if (foe.flat && foe.act > 1.1f) return;
+        if (run.heals() != seenHeals) {
+            if (run.heals() > seenHeals) healAge = 0;
+            seenHeals = run.heals();
+        }
+        int frame = foe.flat ? 5 : foe.mode == 1 ? 2 : foe.mode == 2 ? 3 : foe.struck < .2f ? 4
+                : way == RunUniques.MIMIC && foe.turn == 0 ? 0 : (int) (clock * 5 + foe.x) % 2;
+        float tall = Math.max(foe.tall(), foe.wide() * .9f) * tile * 1.4f;
+        if (way == RunUniques.BURROWER && foe.unseen && !foe.flat) {
+            // Under the ground: a mound of earth moving along.
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFF5A4630);
+            canvas.drawOval(middle - tile * .4f, feet - tile * .18f, middle + tile * .4f, feet + tile * .05f, paint);
+            paint.setColor(0xFF7A6240);
+            canvas.drawOval(middle - tile * .25f, feet - tile * .26f, middle + tile * .2f, feet - tile * .08f, paint);
+            paint.setColor(Color.BLACK);
+            return;
+        }
+        if (foe.mode == 1 && !foe.flat) {
+            float pulse = .5f + .5f * (float) Math.sin(clock * 22);
+            glowAt(canvas, middle, feet - tall * .4f, tall * (.7f + .15f * pulse), 0xFFFF6A3A, Math.round(140 + 100 * pulse));
+        }
+        if (way == RunUniques.HEALER && healAge < .8f && foe.mode >= 2) {
+            float through = healAge / .8f;
+            stroke.setColor(0xFF6AF09A);
+            stroke.setAlpha(Math.round(220 * (1 - through)));
+            stroke.setStrokeWidth(tile * .08f);
+            canvas.drawCircle(middle, feet - tall * .3f, tile * 4.5f * (.3f + .7f * through), stroke);
+            stroke.setAlpha(255);
+        }
+        paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
+                : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
+        int cell = uniqueSheet.getHeight() / RunUniques.COUNT, row = RunUniques.index(foe.kind);
+        source.set(frame * cell, row * cell, (frame + 1) * cell, (row + 1) * cell);
+        canvas.save();
+        if (turned) canvas.scale(-1, 1, middle, feet);
+        target.set(middle - tall / 2, feet - tall + tile * .04f, middle + tall / 2, feet + tile * .04f);
+        canvas.drawBitmap(uniqueSheet, source, target, paint);
+        canvas.restore();
+        paint.setAlpha(255);
     }
 
     /** The pips of a shield's bar, by which shield it is. */
@@ -9975,6 +10029,8 @@ final class RunGame {
                 stroke.setAlpha(255);
             } else if (RunLevels.flier(foe.kind)) {
                 drawFlier(canvas, foe, middle, feet, second, turned);
+            } else if (RunUniques.is(foe.kind)) {
+                drawUnique(canvas, foe, middle, feet, turned);
             } else if (foe.kind >= RunLevels.SLIME) {
                 // The signs of the second volume: two pictures of each about its business, and two of its going, after which it fades.
                 int which = SIGN_ART + (foe.kind - RunLevels.SLIME) * 4 + (foe.flat ? (foe.act < .22f ? 2 : 3) : second ? 1 : 0);

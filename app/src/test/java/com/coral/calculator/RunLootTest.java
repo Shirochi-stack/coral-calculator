@@ -25,6 +25,7 @@ public class RunLootTest {
                 if (foe[0] == RunLevels.TARGET || foe[1] >= land.main) continue;
                 if (RunLevels.boss(foe[0]) && !RunLevels.rover(foe[0])) boss = true;
                 else if (RunLevels.swarmed(foe)) swarmed++;
+                else if (RunLevels.uniqueSpec(foe)) creatures += PlusRun.UNIQUE_XP;
                 else creatures++;
             }
             // (One of a swarm gives its share.)

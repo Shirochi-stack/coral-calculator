@@ -879,6 +879,332 @@ final class PlusRun {
     static final int SWARM_SHARE = 25;
     private float swarmXp;
 
+    // The unique creatures
+
+    /** How many times what a sign gives one of them gives: experience, and the chance of a drop. */
+    static final int UNIQUE_XP = 3;
+    /** How long each way of fighting winds up before it strikes; and how long its strike lasts. */
+    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f}, STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f};
+    /** Wind-ups begun, things they made (minions, shots, heals), and how many came apart. */
+    private int windUps, uniqueShots, calledUp, heals, halves;
+
+    int windUps() { return windUps; }
+    int uniqueShots() { return uniqueShots; }
+    int calledUp() { return calledUp; }
+    int heals() { return heals; }
+    int halvings() { return halves; }
+
+    /**
+     * What a unique creature does: about its business ({@link Foe#mode} 0), winding up (1), striking (2), or getting its breath back (3),
+     * with {@link Foe#act} how much longer. Every strike has its wind-up first, long enough to be seen: a crouch, a glow, a swell.
+     * A charger runs at her; a shielder comes on behind its shield and shoves; a mimic lies still as what it looks like until she is near,
+     * then springs; a wall-ghost drifts through walls, fades now and then, and lunges; an exploder swells and bursts in ink; a sniper keeps
+     * its distance and shoots; a burrower goes under, comes up beneath her, and is open a moment after; a summoner calls up minus signs; a
+     * healer mends whoever is hurt near it; a mini-boss fights in three phases, faster and fiercer at each; formation flyers come over in a
+     * line and dive one at a time; a splitter comes apart into two smaller ones.
+     */
+    private void unique(Foe foe, float seconds, float middle, float away, boolean toLeft) {
+        int way = RunUniques.way(foe.kind);
+        float speed = SPEED[foe.kind] * seconds, feet = y + TALL, down = feet - foe.y - foe.tall(), level_ = Math.abs(down);
+        boolean near = away < 9 && level_ < 3;
+        foe.wait -= seconds;
+        if (way == RunUniques.FORMATION || way == RunUniques.GHOST) foe.ground = foe.y;
+        if (foe.mode == 1) {
+            foe.act -= seconds;
+            if (foe.act <= 0) {
+                foe.mode = 2;
+                foe.act = STRIKE[way];
+                strikes(foe, way, middle, toLeft);
+            }
+            return;
+        }
+        if (foe.mode == 2) {
+            striking(foe, way, seconds, speed, middle, toLeft);
+            foe.act -= seconds;
+            if (foe.act <= 0) {
+                foe.mode = 3;
+                foe.act = way == RunUniques.BURROWER ? 1.6f : way == RunUniques.MINIBOSS ? .6f - .15f * phase3(foe) : .8f;
+                foe.wait = way == RunUniques.SUMMONER ? 6 : way == RunUniques.HEALER ? 4 : way == RunUniques.SNIPER ? 2.2f : way == RunUniques.MINIBOSS ? 1.4f - .4f * phase3(foe) : 1.6f;
+            }
+            return;
+        }
+        if (foe.mode == 3) {
+            foe.act -= seconds;
+            // (A formation flyer climbs back to its line.)
+            if (way == RunUniques.FORMATION) foe.y += Math.max(-speed, Math.min(speed, foe.home - foe.y));
+            if (foe.act <= 0) {
+                foe.mode = 0;
+                if (way == RunUniques.BURROWER) foe.unseen = true;
+            }
+            return;
+        }
+        switch (way) {
+            case RunUniques.CHARGER:
+            case RunUniques.SPLITTER:
+                if (near && level_ < 1.3f) {
+                    foe.leftward = toLeft;
+                    if (way == RunUniques.CHARGER && away < 6 && foe.wait <= 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.SHIELDER:
+                if (near && level_ < 1.3f) {
+                    foe.leftward = toLeft;
+                    if (away < 1.9f && foe.wait <= 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.MIMIC:
+                // Still as what it looks like, until she is near; then it is a creature.
+                if (foe.turn == 0) {
+                    if (away < 2.6f && level_ < 1.5f) {
+                        foe.turn = 1;
+                        foe.leftward = toLeft;
+                        windUp(foe, way);
+                    }
+                } else if (near && level_ < 1.3f) {
+                    foe.leftward = toLeft;
+                    if (away < 3 && foe.wait <= 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                }
+                break;
+            case RunUniques.GHOST: {
+                // Through walls, toward her; and every few seconds it fades a while, where nothing touches it.
+                foe.clock %= 6;
+                foe.unseen = foe.clock > 4.5f;
+                if (!near && away > 14) break;
+                foe.leftward = toLeft;
+                foe.x += (toLeft ? -1 : 1) * Math.min(speed, Math.max(0, away - .5f));
+                foe.y += Math.max(-speed, Math.min(speed, y + TALL * .3f - foe.y));
+                if (!foe.unseen && away < 2.3f && level_ < 1.8f && foe.wait <= 0) windUp(foe, way);
+                break;
+            }
+            case RunUniques.EXPLODER:
+                if (near && level_ < 1.3f) {
+                    foe.leftward = toLeft;
+                    if (away < 1.7f) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.SNIPER:
+                foe.leftward = toLeft;
+                if (near && away < 3.5f) {
+                    // (Backs off, keeping its distance.)
+                    foe.leftward = !toLeft;
+                    walk(foe, speed, false);
+                    foe.leftward = toLeft;
+                } else if (away < 10 && level_ < 2.5f && foe.wait <= 0) {
+                    windUp(foe, way);
+                }
+                break;
+            case RunUniques.BURROWER:
+                // Under the ground it comes after her, unseen; beneath her, it comes up.
+                if (!near) {
+                    foe.unseen = false;
+                    walk(foe, speed * .5f, true);
+                    break;
+                }
+                foe.unseen = true;
+                foe.leftward = toLeft;
+                if (away < .7f && level_ < 1.3f && foe.wait <= 0) {
+                    foe.unseen = false;
+                    windUp(foe, way);
+                } else {
+                    walk(foe, Math.min(speed * 1.3f, away), false);
+                }
+                break;
+            case RunUniques.SUMMONER:
+                foe.leftward = toLeft;
+                if (near && away < 4.5f) {
+                    foe.leftward = !toLeft;
+                    walk(foe, speed, false);
+                    foe.leftward = toLeft;
+                } else if (near && foe.wait <= 0 && foe.did < 4) {
+                    windUp(foe, way);
+                }
+                break;
+            case RunUniques.HEALER: {
+                // To whoever near it is hurt, and mends them.
+                Foe hurt = null;
+                float best = 8;
+                for (Foe other : foes) {
+                    if (other == foe || other.flat || other.left >= other.most || RunLevels.boss(other.kind) || absent(other)) continue;
+                    float far = Math.abs(other.x - foe.x);
+                    if (far < best && Math.abs(other.y - foe.y) < 3) {
+                        best = far;
+                        hurt = other;
+                    }
+                }
+                if (hurt == null) {
+                    if (near && level_ < 1.3f) {
+                        foe.leftward = !toLeft;
+                        walk(foe, speed * .6f, false);
+                    } else {
+                        walk(foe, speed * .4f, true);
+                    }
+                } else {
+                    foe.leftward = hurt.x < foe.x;
+                    if (best < 4 && foe.wait <= 0) windUp(foe, way);
+                    else if (best > 1.5f) walk(foe, speed, false);
+                }
+                break;
+            }
+            case RunUniques.MINIBOSS: {
+                int phase = phase3(foe);
+                if (near && level_ < 2) {
+                    foe.leftward = toLeft;
+                    if (away < 2.5f && foe.wait <= 0 || phase >= 1 && away < 8 && foe.wait < -2.5f) windUp(foe, way);
+                    else walk(foe, speed * (1 + .4f * phase), false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            }
+            case RunUniques.FORMATION:
+                // Over in a line, toward her, bobbing; over her, one at a time dives.
+                foe.leftward = toLeft;
+                if (away < 16) foe.x += (toLeft ? -1 : 1) * Math.min(speed, Math.max(0, away - .3f));
+                foe.y = foe.home + (float) Math.sin(foe.clock * 3 + foe.home) * .2f;
+                if (away < 1.4f && down > 0 && foe.wait <= 0) {
+                    boolean diving = false;
+                    for (Foe other : foes) diving |= other != foe && other.kind == foe.kind && other.mode == 2 && Math.abs(other.x - foe.x) < 8;
+                    if (!diving) windUp(foe, way);
+                }
+                break;
+            default:
+                walk(foe, speed, true);
+        }
+    }
+
+    /** Which third of what it can take a creature has lost: 0, 1 or 2. */
+    private static int phase3(Foe foe) { return foe.most <= 0 ? 0 : Math.min(2, (foe.most - Math.max(0, foe.left)) * 3 / foe.most); }
+
+    private void windUp(Foe foe, int way) {
+        foe.mode = 1;
+        foe.act = way == RunUniques.MINIBOSS ? WIND_UP[way] - .15f * phase3(foe) : WIND_UP[way];
+        windUps++;
+    }
+
+    /** The moment a strike begins: a shot, a burst, minions, a heal. */
+    private void strikes(Foe foe, int way, float middle, boolean toLeft) {
+        float cy = foe.y + foe.tall() * .5f;
+        switch (way) {
+            case RunUniques.EXPLODER:
+                // It bursts in ink all round: whatever of that meets her hurts; and it is gone.
+                for (int drop = 0; drop < 8; drop++) {
+                    double angle = drop * Math.PI / 4;
+                    shoot(BLOT_SHOT, false, middle, cy, (float) Math.cos(angle) * 5, (float) Math.sin(angle) * 5 - 1, .35f);
+                }
+                uniqueShots += 8;
+                foe.left = 0;
+                foe.flat = true;
+                foe.act = 0;
+                flattened++;
+                break;
+            case RunUniques.SNIPER: {
+                float toX = x + WIDE / 2 - middle, toY = y + TALL * .45f - cy, far = Math.max(.5f, (float) Math.hypot(toX, toY)), fast = 7;
+                shoot(RunUniques.index(foe.kind) == 5 ? FEATHER : DOT, false, middle, cy, toX / far * fast, toY / far * fast, 2.2f);
+                uniqueShots++;
+                break;
+            }
+            case RunUniques.SUMMONER:
+                for (int one = 0; one < 2 && foe.did < 4; one++) {
+                    Foe minion = new Foe(RunLevels.MINUS);
+                    minion.left = minion.most = healthOf(RunLevels.MINUS);
+                    float at = middle + (one == 0 ? -1 : 1) * .9f;
+                    int column = (int) Math.floor(at), row = (int) Math.floor(foe.ground + foe.tall() - .001f);
+                    if (solid(at(column, row)) || !solid(at(column, row + 1))) at = middle;
+                    minion.x = at - minion.wide() / 2;
+                    minion.ground = foe.ground + foe.tall() - minion.tall();
+                    minion.y = minion.ground;
+                    minion.home = minion.x;
+                    minion.leftward = toLeft;
+                    minion.dazed = .5f;
+                    born.add(minion);
+                    foe.did++;
+                    calledUp++;
+                }
+                break;
+            case RunUniques.HEALER:
+                for (Foe other : foes) {
+                    if (other.flat || RunLevels.boss(other.kind) || other.left >= other.most || Math.abs(other.x - foe.x) > 4.5f || Math.abs(other.y - foe.y) > 3) continue;
+                    other.left = Math.min(other.most, other.left + Math.max(BLOW, other.most * 3 / 10));
+                    heals++;
+                }
+                break;
+            case RunUniques.MINIBOSS:
+                // From its second phase on, three knives as well, fanned.
+                if (phase3(foe) >= 1) {
+                    for (int one = -1; one <= 1; one++) shoot(KNIFE, false, middle, cy, (toLeft ? -1 : 1) * 7, one * 1.6f, 1.6f);
+                    uniqueShots += 3;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    /** The strike as it goes on: a run, a shove, a spring, a lunge, a dive. */
+    private void striking(Foe foe, int way, float seconds, float speed, float middle, boolean toLeft) {
+        switch (way) {
+            case RunUniques.CHARGER:
+                if (!walk(foe, speed * 3.4f, false)) foe.act = 0;
+                break;
+            case RunUniques.SHIELDER:
+            case RunUniques.MINIBOSS:
+                walk(foe, speed * (way == RunUniques.MINIBOSS ? 4.5f + phase3(foe) : 5), false);
+                break;
+            case RunUniques.MIMIC: {
+                walk(foe, speed * 4, false);
+                float through = 1 - foe.act / STRIKE[way];
+                foe.y = foe.ground - (float) Math.sin(through * Math.PI) * .9f;
+                break;
+            }
+            case RunUniques.GHOST:
+                foe.x += (toLeft ? -1 : 1) * speed * 4;
+                break;
+            case RunUniques.BURROWER: {
+                float through = 1 - foe.act / STRIKE[way];
+                foe.y = foe.ground - (float) Math.sin(through * Math.PI) * .7f;
+                break;
+            }
+            case RunUniques.FORMATION:
+                foe.y += speed * 5;
+                if (foe.y + foe.tall() > y + TALL) foe.y = y + TALL - foe.tall();
+                break;
+            default:
+                break;
+        }
+        if (way == RunUniques.MIMIC || way == RunUniques.BURROWER) {
+            if (foe.act - seconds <= 0) foe.y = foe.ground;
+        }
+    }
+
+    /** A splitter beaten: it comes apart into two smaller ones, each a third of what it could take, once. */
+    private void halve(Foe foe) {
+        for (int one = 0; one < 2; one++) {
+            Foe half = new Foe(foe.kind);
+            half.size = foe.size * .7f;
+            half.did = 1;
+            half.left = half.most = Math.max(BLOW, foe.most / 3);
+            half.tier = foe.tier;
+            half.x = foe.x + foe.wide() / 2 - half.wide() / 2 + (one == 0 ? -.45f : .45f);
+            half.ground = foe.ground + foe.tall() - half.tall();
+            half.y = half.ground;
+            half.home = half.x;
+            half.leftward = one == 0;
+            half.dazed = .4f;
+            born.add(half);
+        }
+        halves++;
+    }
+
     // Shields
 
     /**
@@ -1415,12 +1741,21 @@ final class PlusRun {
     private static final float LATE = .08f, EARLY = .1f;
     private static final float SAFE = 1.2f, STEP = 1 / 60f;
     /** How fast each sign walks, how wide and tall it is, and how high a divide hops. */
-    private static final float[] SPEED = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
+    private static final float[] SPEED_SIGNS = {1.6f, 1.3f, 0, 1.9f, 0, 0, 0, 2.4f, 1.6f, 2.2f, 1, 2.7f, 0, 2.4f, 0, 0, 1.5f, 0, 3.6f, 3,
             1.6f, 2, 1.4f, 2, 2.4f, 2, 2.2f, 1.2f, 0, 6.5f, 1.2f, 3, 1.8f, 2, 2.6f, 2.2f, 3, 1.3f, 1.3f, 2.4f};
-    private static final float[] FOE_WIDE = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
+    private static final float[] FOE_WIDE_SIGNS = {.8f, .85f, .8f, 1.8f, .8f, .8f, .9f, .8f, .8f, .9f, 1.3f, .7f, 1, .7f, .9f, .8f, .8f, .8f, 2.2f, .9f,
             .9f, .8f, .8f, .9f, .9f, 1.6f, 2, 1.6f, .9f, 2.6f, 1.5f, 1.9f, .9f, 1, 1.2f, .9f, .5f, .8f, .9f, .8f};
-    private static final float[] FOE_TALL = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
+    private static final float[] FOE_TALL_SIGNS = {.55f, .85f, .8f, 2.2f, .55f, .8f, 1.5f, 1.3f, .7f, .7f, .45f, 1.2f, .9f, 1.2f, 1.5f, 1.3f, 1.3f, 1.4f, 1.9f, 1.5f,
             1.4f, 1.4f, 1.3f, 1.3f, 1.3f, 1.3f, 1.5f, 1.7f, .9f, 1.5f, 1.2f, .8f, .7f, .8f, .8f, .9f, .45f, .9f, .9f, 1.15f};
+    /** And the unique creatures' after them. */
+    private static final float[] SPEED = grown(SPEED_SIGNS, RunUniques.SPEED), FOE_WIDE = grown(FOE_WIDE_SIGNS, RunUniques.WIDE), FOE_TALL = grown(FOE_TALL_SIGNS, RunUniques.TALL);
+
+    private static float[] grown(float[] signs, float[] uniques) {
+        float[] all = java.util.Arrays.copyOf(signs, RunUniques.FIRST + RunUniques.COUNT);
+        System.arraycopy(uniques, 0, all, RunUniques.FIRST, RunUniques.COUNT);
+        return all;
+    }
+
     /** Tsubakieh: how near she comes before she raises her bat, how long she holds it up, how far it reaches, and how long she is open after. */
     private static final float BAT_NEAR = 1.7f, BAT_RAISED = .55f, BAT_REACH = 1.5f, BAT_SPENT = .8f;
     /** Illya: how far off she keeps, how fast she drifts to keep it, and how far back from where she began she will go. */
@@ -1472,7 +1807,7 @@ final class PlusRun {
     /** How near she must come before one put in to make up a land's numbers is about its business: until then it keeps still. */
     static final float WAKES = 16;
 
-    static boolean little(int kind) { return !RunLevels.boss(kind) && kind != RunLevels.TARGET && kind != RunLevels.WORD; }
+    static boolean little(int kind) { return !RunLevels.boss(kind) && kind != RunLevels.TARGET && kind != RunLevels.WORD && !RunUniques.is(kind); }
 
     /**
      * How much further than it reaches what she throws or swings takes a small one: as far
@@ -1676,7 +2011,7 @@ final class PlusRun {
             swarmXp -= (int) swarmXp;
             if (lootRoll(SWARM_SHARE) != 0) return;
         } else {
-            xp += RunLoot.xpFor(boss, tough, level.number, perks.level) * TIER_XP[foe.tier];
+            xp += RunLoot.xpFor(boss, tough, level.number, perks.level) * TIER_XP[foe.tier] * (RunUniques.is(foe.kind) ? UNIQUE_XP : 1);
         }
         float middle = foe.x + foe.wide() / 2, top = foe.y + foe.tall() * .4f;
         int coins = RunLoot.plusesFor(boss, tough), more = gear(RunLoot.PLUSES);
@@ -1687,7 +2022,7 @@ final class PlusRun {
         }
         // (Gold and black ink drop as the hardest do.)
         hard |= foe.tier >= GOLD_TIER;
-        if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel) * TIER_DROPS[foe.tier]) {
+        if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel) * TIER_DROPS[foe.tier] * (RunUniques.is(foe.kind) ? UNIQUE_XP : 1)) {
             int rarity = RunLoot.rarityOf(boss ? RunLoot.BOSS : hard ? RunLoot.HARD : RunLoot.CREATURE, lootRoll(10000));
             int code = RunLoot.dropped(boss ? RunLoot.WAITS : hard ? RunLoot.HARDEST : RunLoot.ORDINARY, Math.min(RunLoot.THEMES.length - 1, level.chapter), rarity, lootRoll(10000), lootRoll(10000));
             loose(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, code));
@@ -1906,11 +2241,19 @@ final class PlusRun {
             foe.home = foe.x;
             foe.tier = waits || !level.tiered ? NORMAL : tierOf(level.number, spec[0], spec[1], spec[2]);
             foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black))
+                    : RunUniques.is(spec[0]) ? RunUniques.health(spec[0], level.number) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW
                     : healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW;
             foe.most = foe.left;
             foe.crowd = RunLevels.crowd(spec);
             foe.swarm = RunLevels.swarmed(spec);
-            if (!waits && level.tiered && shielded(level.number, spec[0], spec[1], spec[2])) {
+            if (RunUniques.is(spec[0]) && RunUniques.way(spec[0]) == RunUniques.SHIELDER) {
+                // (One that fights with its own shield: its shell, its claw, its stamp.)
+                foe.guard = foe.guardMost = shieldHolds(level.number) + 2;
+                foe.guardNeeds = level.number < SHIELDS_FROM ? BLOW : Math.round(shieldNeeds(level.number) * .8f);
+                foe.guardKind = -1;
+            } else if (RunUniques.flies(spec[0])) {
+                foe.home = foe.y;
+            } else if (!waits && level.tiered && shielded(level.number, spec[0], spec[1], spec[2])) {
                 foe.guard = foe.guardMost = shieldHolds(level.number);
                 foe.guardNeeds = shieldNeeds(level.number);
                 foe.guardKind = shieldKind(level.number);
@@ -3835,7 +4178,7 @@ final class PlusRun {
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
                 knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
-                if (hurt(false, 2 + TIER_BITE[foe.tier])) return;
+                if (hurt(false, 2 + TIER_BITE[foe.tier] + (RunUniques.is(foe.kind) ? RunUniques.bite(foe.kind, level.number) : 0))) return;
             }
         }
         if (y > bottomAt((int) Math.floor(x + WIDE / 2)) + 1) {
@@ -4408,6 +4751,7 @@ final class PlusRun {
                 bonus++;
             }
             if (foe.kind == RunLevels.BLOT) split(foe);
+            if (RunUniques.is(foe.kind) && RunUniques.way(foe.kind) == RunUniques.SPLITTER && foe.did == 0) halve(foe);
             if (RunLevels.rover(foe.kind)) {
                 for (Shot shot : shots) if (!shot.hers) shot.left = 0;
                 return;
@@ -5619,6 +5963,7 @@ final class PlusRun {
         }
         if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
         if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > WAKES)) return;
+        if (RunUniques.is(foe.kind) && (room >= 0 && !foe.spawned || Math.abs(foe.x - x) > WAKES)) return;
         if (!puddles.isEmpty() && mired(foe)) seconds *= PUDDLE_SLOWS;
         foe.clock += seconds;
         foe.guardMet += seconds;
@@ -5648,6 +5993,10 @@ final class PlusRun {
         }
         if (RunLevels.boss(foe.kind)) {
             waits(foe, seconds, middle, away, toLeft);
+            return;
+        }
+        if (RunUniques.is(foe.kind)) {
+            unique(foe, seconds, middle, away, toLeft);
             return;
         }
         if (foe.kind >= RunLevels.SLIME) {
