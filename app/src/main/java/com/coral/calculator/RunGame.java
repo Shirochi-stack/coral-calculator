@@ -214,7 +214,7 @@ final class RunGame {
      */
     private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings: a second jump", "Glossary magnet", "Longer treats", "Bigger ink tank",
             "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons", "A place by her side", "Room for a stray", "Kennel: brisker pets",
-            "Kennel: stronger pets"};
+            "Kennel: stronger pets", "Triple jump", "Air dash", "Thorns", "Ground pound", "Dodge roll", "Wall jump", "Glide", "Second wind"};
     private static final String[][] UP_GIVES = {
             {"A fourth heart in every land", "A fifth heart in every land"},
             {"A second jump in the air: press jump again"},
@@ -229,16 +229,26 @@ final class RunGame {
             {"Two pets of her own come into every land", "Three pets of her own come into every land"},
             {"Two pets found in a land may follow her", "Three pets found in a land may follow her"},
             {"Her pets wait a fifth less between one thing and the next", "Her pets wait two fifths less"},
-            {"A pet's blow counts twice on a big one", "And a pet takes a whole piece off a shield"}};
+            {"A pet's blow counts twice on a big one", "And a pet takes a whole piece off a shield"},
+            {"A third jump in the air, a flip: press jump again"},
+            {"In the air, double-tap a way (or Shift): a dash that way", "And the dash strikes whatever it goes through"},
+            {"Whatever hurts her takes a blow of thorns", "Two blows of thorns", "Three blows of thorns"},
+            {"Hold down in the air: landing, she strikes all round her"},
+            {"On the ground, double-tap a way (or Shift): a roll nothing hurts"},
+            {"Against a wall in the air she clings: jump to kick off it"},
+            {"Hold jump as she falls: she glides down slowly"},
+            {"Once a land, what would end her leaves half a heart"}};
     private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}, {200, 350, 500, 900},
-            {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}};
+            {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}, {350}, {300, 650}, {250, 500, 900}, {280}, {260}, {320}, {300}, {600}};
+    /** The moves bought at the counter, by their places in those lists. */
+    private static final int TRIPLE = 14, AIR_DASH = 15, THORNS = 16, POUND = 17, ROLL = 18, WALL_JUMP = 19, GLIDE = 20, SECOND_WIND = 21;
     /** For her pets: more of her own beside her, more strays, brisker, stronger. */
     private static final int PET_PLACES = 10, STRAY_ROOM = 11, PET_BRISK = 12, PET_STRONG = 13;
     /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
     private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800, 950, 900, 1200, 1500};
     /** The counter's tabs, and what stands under each. */
     private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms", "Vanity"};
-    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
+    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1, 14, 15, 18, 19, 17, 20, 16, 21}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
     private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2, VANITY_TAB = 6;
     private final RectF[] counterTabs = new RectF[TAB_NAMES.length], petCells = new RectF[PlusRun.PETS];
     private final RectF petAct = new RectF(), armsAct = new RectF();
@@ -253,10 +263,14 @@ final class RunGame {
             "she comes down slowly, and water goes both ways", "what is sent back goes on through a row", "she rises much faster",
             "what she knocks over flies off burning", "whatever lands on her lands by half", "every colour's power for a while: a glow, not yet a light"};
     /** The order they stand in at the counter: lives under hearts. And the picture that stands for her own face. */
-    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13};
+    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 14, 15, 18, 19, 17, 20, 16, 21, 2, 3, 4, 5, 6, 10, 11, 12, 13};
     private static final int HER_FACE = -2;
+    /** A ware whose picture is her in one of her moves: below nothing, so that it is never taken for one of the other pictures. */
+    private static final int MOVE_ART = -100;
     private static final int[] UP_ART = {BUFF_ART + PlusRun.BREAD, -1, BUFF_ART + PlusRun.MAGNET, BUFF_ART + PlusRun.ICE, WEAPON_ART + PlusRun.GUN,
-            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART};
+            FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART,
+            MOVE_ART + PlusRun.MOVE_FLIP + 1, MOVE_ART + PlusRun.MOVE_DASH, STAR_ART, MOVE_ART + PlusRun.MOVE_POUND, MOVE_ART + PlusRun.MOVE_ROLL, MOVE_ART + PlusRun.MOVE_WALL,
+            MOVE_ART + PlusRun.MOVE_GLIDE, HER_FACE};
     /** How long the ice cream, the magnet and the notes last before anything is bought, as {@link PlusRun} has them. */
     private static final float[] BUFF_LASTS = {0, 8, 0, 10, 6};
 
@@ -539,7 +553,7 @@ final class RunGame {
     private RunTree tree;
     /** The shields creatures carry: their pictures; blows that rang off and shields broken, as last seen; and how long ago the last of each was. */
     private Bitmap mobShields, uniqueSheet;
-    private int seenHeals;
+    private int seenHeals, seenWinds;
     private float healAge = 9;
     private int seenClangs, seenBroken;
     private float clangAge = 9, shatterAge = 9;
@@ -770,6 +784,15 @@ final class RunGame {
         kept.together = bought(PRISM) >= PRISM_NEEDS.length ? 7 : 2 + bought(PRISM);
         kept.recharge -= bought(QUICK);
         kept.wings = bought(1) > 0;
+        kept.triple = bought(TRIPLE) > 0;
+        kept.airDash = bought(AIR_DASH) > 0;
+        kept.dashStrikes = bought(AIR_DASH) > 1;
+        kept.thorns = bought(THORNS);
+        kept.pound = bought(POUND) > 0;
+        kept.roll = bought(ROLL) > 0;
+        kept.wallJump = bought(WALL_JUMP) > 0;
+        kept.glide = bought(GLIDE) > 0;
+        kept.secondWind = bought(SECOND_WIND) > 0;
         kept.reach = bought(2) == 0 ? 0 : bought(2) == 1 ? 1.6f : 2.6f;
         kept.lasting = 1 + .5f * bought(3);
         kept.shots = PlusRun.GUN_SHOTS + 8 * bought(4);
@@ -5868,6 +5891,14 @@ final class RunGame {
             session.keep("run_skills_said", 1);
             speak(RunStory.SKILLS[0], false);
         }
+        // Her second wind: she says so.
+        if (run != null && run.secondWinds() != seenWinds) {
+            if (run.secondWinds() > seenWinds && screen == PLAY) {
+                speak(RunStory.MOVES[0], true);
+                audio.play("heart", .8f);
+            }
+            seenWinds = run.secondWinds();
+        }
         // Divine power, the first time it comes in a land.
         if (run != null && run.divines() != seenDivines) {
             if (seenDivines == 0 && run.divines() == 1 && screen == PLAY) speak(RunStory.SKILLS[1], true);
@@ -7476,6 +7507,7 @@ final class RunGame {
                 pills("Back to the land", RESUME, "Guild counter", COUNTER);
                 return;
             }
+            doubleTap(event, action);
             held(event);
             return;
         }
@@ -7630,6 +7662,7 @@ final class RunGame {
     /** What must be so before the next step of something is for sale, in a few words; or null, if it is. */
     private String locked(int which) {
         int has = bought(which);
+        if (which == TRIPLE && bought(1) == 0) return "Needs her wings first";
         if (which != PRISM || has >= PRISM_NEEDS.length) return null;
         int owned = Integer.bitCount(colours() & 127);
         return owned >= PRISM_NEEDS[has] ? null : PRISM_NEEDS[has] == 7 ? "Needs all seven colours: " + owned + " of 7 won" : "Needs " + PRISM_NEEDS[has] + " colours won: "
@@ -7875,6 +7908,26 @@ final class RunGame {
         buzz(false);
     }
 
+    /** The way last tapped (-1 left, 1 right) and when: a second tap of the same way soon after is a dash in the air, or a roll on the ground. */
+    private int tappedWay;
+    private float tappedAt = -9;
+
+    private void doubleTap(MotionEvent event, int action) {
+        if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_POINTER_DOWN || run == null) return;
+        float x = event.getX(event.getActionIndex()), y = event.getY(event.getActionIndex());
+        if (y < height * .45f) return;
+        float between = (leftButton.right + rightButton.left) / 2, arrows = Math.min(rightButton.right + dp(26), (rightButton.right + strikeButton.left) / 2);
+        int way = x < between ? -1 : x < arrows ? 1 : 0;
+        if (way == 0) return;
+        if (way == tappedWay && clock - tappedAt < .3f) {
+            tappedAt = -9;
+            if (run.dash()) audio.play("jump", .5f);
+            return;
+        }
+        tappedWay = way;
+        tappedAt = clock;
+    }
+
     /** Which buttons are held, by however many fingers are down: one may hold an arrow while another jumps. */
     private void held(MotionEvent event) {
         int action = event.getActionMasked();
@@ -7950,6 +8003,7 @@ final class RunGame {
                 buzz(false);
             }
             if ((fresh & RunKeys.EXTRA) != 0) overJump();
+            if ((fresh & RunKeys.DASH) != 0 && run.dash()) audio.play("jump", .5f);
             for (int slot = 0; slot < PlusRun.SLOTS; slot++) if ((fresh & RunKeys.SKILL_1 << slot) != 0) callSlot(slot);
             if ((fresh & RunKeys.DOWN) != 0 && !run.atStall() && run.door() >= 0) {
                 idle();
@@ -11966,6 +12020,13 @@ final class RunGame {
             return;
         }
         if (beaming) weapon = PlusRun.TABLET;
+        // In the middle of one of her moves, it is drawn, whatever she holds.
+        int move = run.moveShown();
+        if (move != PlusRun.NO_MOVE) {
+            drawMove(canvas, move, feetX, feetY, tall, leftward, alpha);
+            paint.setAlpha(255);
+            return;
+        }
         if (weapon == PlusRun.KATANA) {
             // The katana: the dash's cut, and standing after it; the dash gathered while the button is held; the cut downward; and a draw:
             // out, across, and back in its sheath.
@@ -11995,6 +12056,42 @@ final class RunGame {
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
         }
         paint.setAlpha(255);
+    }
+
+    // Her moves
+
+    private Bitmap moves;
+
+    private Bitmap movesSheet() {
+        if (moves == null) moves = BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_moves);
+        return dressed("moves", moves);
+    }
+
+    /**
+     * One of her moves: the three pictures of a flip, a dash with two fading copies of her behind it, the drop of a ground pound (and the
+     * ring it sends out as she lands), a roll turning over, clinging to a wall (facing it), and gliding under her book.
+     */
+    private void drawMove(Canvas canvas, int move, float feetX, float feetY, float tall, boolean leftward, int alpha) {
+        Bitmap sheet = movesSheet();
+        int count = PlusRun.MOVE_GLIDE + 1;
+        if (move == PlusRun.MOVE_DASH) {
+            float back = leftward ? 1 : -1;
+            for (int ghost = 2; ghost >= 1; ghost--) {
+                paint.setAlpha(Math.round(alpha * (ghost == 2 ? .22f : .45f)));
+                frame(canvas, sheet, move, count, feetX + back * ghost * tile * .45f, feetY, tall, leftward);
+            }
+            paint.setAlpha(alpha);
+            frame(canvas, sheet, move, count, feetX, feetY, tall, leftward);
+        } else if (move == PlusRun.MOVE_ROLL) {
+            canvas.save();
+            canvas.rotate((leftward ? -1 : 1) * 360 * run.rollThrough(), feetX, feetY - tall * .3f);
+            frame(canvas, sheet, move, count, feetX, feetY, tall, leftward);
+            canvas.restore();
+        } else if (move == PlusRun.MOVE_WALL) {
+            frame(canvas, sheet, move, count, feetX, feetY, tall, run.wallSide() < 0);
+        } else {
+            frame(canvas, sheet, move, count, feetX, feetY, tall, leftward);
+        }
     }
 
     // Her hands, for a weapon found
@@ -14244,6 +14341,8 @@ final class RunGame {
         shownWares = list.length;
         // (With her pets under them, the four that are for her pets are lower rows.)
         float squeeze = counterTab == PETS_TAB ? Math.min(wares[0].height(), dp(52)) : wares[0].height();
+        // (A long list, as her moves are, is made to fit under the tabs.)
+        squeeze = Math.max(dp(40), Math.min(squeeze, (safe.bottom - safe.top - dp(150)) / list.length - dp(6)));
         for (int row = 0; row < list.length; row++) {
             RectF where = wares[row];
             where.set(where.left, safe.top + dp(142) + row * (squeeze + dp(6)), where.right, safe.top + dp(142) + row * (squeeze + dp(6)) + squeeze);
@@ -14258,6 +14357,7 @@ final class RunGame {
             paint.setAlpha(255);
             if (UP_ART[index] >= 0) artIn(canvas, UP_ART[index], left + dp(14) + icon / 2, middle, icon);
             else if (UP_ART[index] == HER_FACE) round(canvas, 0, left + dp(14) + icon / 2, middle, icon * .46f);
+            else if (UP_ART[index] >= MOVE_ART && UP_ART[index] <= MOVE_ART + PlusRun.MOVE_GLIDE) frame(canvas, movesSheet(), UP_ART[index] - MOVE_ART, PlusRun.MOVE_GLIDE + 1, left + dp(14) + icon / 2, middle + icon / 2, icon * .95f, false);
             else frame(canvas, jump, TOP, JUMP_FRAMES, left + dp(14) + icon / 2, middle + icon / 2, icon * .95f, false);
             float words = left + dp(24) + icon, price = dp(86), room = right - words - price - dp(18);
             text.setTextAlign(Paint.Align.LEFT);
@@ -14315,10 +14415,6 @@ final class RunGame {
             fitted(canvas, "Open her backpack  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
         } else if (counterTab == VANITY_TAB) {
             drawVanityTab(canvas, left, under, across, bank);
-        } else if (counterTab == 1) {
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setColor(soft);
-            fitted(canvas, "Her wings are what there is to buy for how she moves, so far.", left + dp(6), under + dp(14), dp(12.5f), across - dp(12));
         }
         text.setTextAlign(Paint.Align.LEFT);
     }

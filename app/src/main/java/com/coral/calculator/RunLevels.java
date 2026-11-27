@@ -632,7 +632,7 @@ final class RunLevels {
     static int swarmOf(int number) { return number <= 3 ? 20 : Math.min(50, 20 + 30 * (number - 3) / (TOTAL - 3)); }
 
     /** How many a swarm has: small in the first lands, a crowd in the last. */
-    static int swarmSize(int number, Random random) { return number <= 3 ? 4 + random.nextInt(3) : Math.min(40, 6 + number / 4 + random.nextInt(6)); }
+    static int swarmSize(int number, Random random) { return number <= 3 ? 4 + random.nextInt(3) : Math.min(30, 4 + number / 5 + random.nextInt(4)); }
 
     /**
      * Swarms: what a land is short of its count is made up of creatures gathered in a few places, not spread along it. Each swarm is
@@ -669,7 +669,10 @@ final class RunLevels {
             for (int[] foe : level.foes) if (rover(foe[0])) near |= Math.abs(foe[1] - column) < 16;
             if (near) continue;
             int floor = top(level, column);
-            if (floor > 4 && floor < level.land.length && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR) {
+            // (On the ground, never by the edge of a pit, where a knock would send her in.)
+            boolean edge = false;
+            for (int beside = column - 3; beside <= column + 3; beside++) edge |= top(level, beside) < 0 || top(level, beside) > floor + 1;
+            if (!edge && floor > 4 && floor < level.land.length && level.land[floor][column] == BLOCK && level.land[floor - 1][column] == AIR && level.land[floor - 2][column] == AIR) {
                 spots.add(new int[]{column, floor});
             }
             for (int row = 4; row < (floor > 0 ? floor - 2 : ROWS - 2); row++) {
@@ -697,14 +700,15 @@ final class RunLevels {
                 if (++blocked > 60) {
                     blocked = 0;
                     if (gap > 6) gap -= 2;
-                    else if (most < 4) most++;
+                    else if (most < 3) most++;
                     centres.clear();
                 }
                 continue;
             }
             centres.add(middle[0]);
             int size = Math.min(want, swarmSize(number, random)), reach = 3 + size / 6;
-            int kind = !shooters.isEmpty() && random.nextInt(6) == 0 ? shooters.get(random.nextInt(shooters.size())) : walkers.get(random.nextInt(walkers.size()));
+            // (Of walkers only: a swarm that threw or shot would fill the air.)
+            int kind = walkers.get(random.nextInt(walkers.size()));
             // Its squares: those near its middle, on the ground and on the ledges over and under it, nearest first.
             List<int[]> near = new ArrayList<>();
             for (int[] spot : spots) if (Math.abs(spot[0] - middle[0]) <= reach && Math.abs(spot[1] - middle[1]) <= 7) near.add(spot);

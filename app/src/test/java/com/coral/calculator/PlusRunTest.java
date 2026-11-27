@@ -7612,7 +7612,7 @@ public class PlusRunTest {
         }
         assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length
                 // (The two lines about sloppy copies in the lands, her line with the game's name in it, and the keys.)
-                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length, lines);
+                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.
@@ -7671,10 +7671,54 @@ public class PlusRunTest {
 
     /** Plays a plan out on a run: what the buttons do at each step of it. */
     private static void act(PlusRun run, int plan, int step) {
-        if (plan == WALK) run.step(STEP, false, true, false);
-        else if (plan == WAIT) run.step(STEP, false, false, false);
-        else if (plan == BACK) run.step(STEP, true, false, false);
-        else run.step(STEP, false, true, step < HOLDS[plan - 3]);
+        boolean strike = fighting && strikeNow(run);
+        if (plan == WALK) run.step(STEP, false, true, false, strike);
+        else if (plan == WAIT) run.step(STEP, false, false, false, strike);
+        else if (plan == BACK) run.step(STEP, true, false, false, strike);
+        else run.step(STEP, false, true, step < HOLDS[plan - 3], strike);
+    }
+
+    /** Whether the bot fights as it goes: a tap of what it holds, five times a second, while a creature is near. */
+    private static boolean fighting;
+
+    private static boolean strikeNow(PlusRun run) {
+        if ((int) (run.time() * 10) % 2 != 0) return false;
+        float middle = run.x() + PlusRun.WIDE / 2, feet = run.y() + PlusRun.TALL;
+        for (PlusRun.Foe foe : run.foes()) {
+            if (foe.flat || foe.unseen || RunLevels.boss(foe.kind)) continue;
+            if (Math.abs(foe.x + foe.wide() / 2 - middle) < 2.6f && Math.abs(foe.y + foe.tall() - feet) < 1.6f) return true;
+        }
+        return false;
+    }
+
+    /**
+     * A fair player: the crossing bot, striking too when a creature is near, at the level the land is for and with what she has from
+     * the start, crosses a land of every chapter with all its swarms and its unique creatures in it, and keeps a life. (Who waits at
+     * the end is left out, as for the other crossings: those fights have tests of their own.)
+     */
+    @Test public void aFairPlayerWhoFightsCrossesALandOfEveryChapterWithItsSwarmsAndUniques() {
+        StringBuilder lost = new StringBuilder();
+        int crossed = 0, beaten = 0;
+        fighting = true;
+        try {
+            for (int number : new int[]{3, 9, 15, 21, 27, 35, 45, 55, 65, 75, 85, 95}) {
+                RunLevels.Level level = RunLevels.level(number);
+                for (int index = level.foes.size() - 1; index >= 0; index--) if (RunLevels.boss(level.foes.get(index)[0])) level.foes.remove(index);
+                for (int index = level.items.size() - 1; index >= 0; index--) if (level.items.get(index)[0] >= PlusRun.PET) level.items.remove(index);
+                level.guarded = false;
+                PlusRun run = cross(level, number > RunLevels.COUNT ? 500 : 360);
+                lost.append(" ").append(number).append(":").append(run.livesLost()).append(run.state() == PlusRun.WON ? "" : run.state() == PlusRun.PLAYING ? " (stuck at " + (int) run.x() + " of " + run.columns() + ")" : " LOST");
+                // Never every life lost; and most of them crossed to the end. (One that is not was held up by the way, not beaten: the
+                // bot does not fight well from a ledge, or climb past creatures standing on it.)
+                if (run.state() == PlusRun.LOST) beaten++;
+                if (run.state() == PlusRun.WON) crossed++;
+            }
+        } finally {
+            fighting = false;
+        }
+        System.out.println("FAIR lives lost" + lost);
+        assertEquals("beaten:" + lost, 0, beaten);
+        assertTrue("crossed " + crossed + ":" + lost, crossed >= 8);
     }
 
     private static int length(int plan) { return plan == WALK ? 4 : plan == WAIT ? 12 : plan == BACK ? 14 : 6; }

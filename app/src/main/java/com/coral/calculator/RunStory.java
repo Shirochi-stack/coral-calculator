@@ -574,6 +574,11 @@ final class RunStory {
             {"skill3", "All of it back? Fine. Choose better this time Sloppy~♡", "H", PLAYER + "The player has just taken back every point of her skill tree to spend them again. Mock exasperated, teasing, but secretly glad of the fresh start."},
     };
 
+    /** Her moves from the counter: the second wind, which leaves her half a heart once a land. */
+    static final String[][] MOVES = {
+            {"wind1", "Not yet! Second wind Sloppy~♡", "H", PLAYER + "She was about to be knocked out but her second wind kicks in and leaves her standing on half a heart. Gritty, defiant, catching her breath, then a cheeky grin."},
+    };
+
     /** A new level: she says so, glowing. */
     static final String[][] LEVEL = {
             {"lvl1", "Level up! Feel that? That's me getting stronger Sloppy~♡", "H", PLAYER + "She has just gone up a level in a game and glows with new power. Thrilled, smug, flexing."},
@@ -1208,6 +1213,7 @@ final class RunStory {
         groups.add(TITLE_LINE);
         groups.add(KEYS);
         groups.add(SKILLS);
+        groups.add(MOVES);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {

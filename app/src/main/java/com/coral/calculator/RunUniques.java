@@ -49,8 +49,8 @@ final class RunUniques {
         return Math.round(PlusRun.BLOW * HEALTH[way(kind)] * RunLoot.power(RunLoot.recommended(number)) * (1 + number / 100f));
     }
 
-    /** The halves of a heart more than a sign's its touch costs: none in the first two chapters, then one (two for a mini-boss), and one more every forty lands. */
-    static int bite(int kind, int number) { return number <= 12 ? 0 : (way(kind) == MINIBOSS ? 2 : 1) + number / 40; }
+    /** The halves of a heart more than a sign's its touch costs: none in the first two chapters, then one (two for a mini-boss), and one more every fifty lands. */
+    static int bite(int kind, int number) { return number <= 12 ? 0 : (way(kind) == MINIBOSS ? 2 : 1) + number / 50; }
 
     /** Whether it flies (and so is in the air, not on the ground). */
     static boolean flies(int kind) { return is(kind) && way(kind) == FORMATION; }

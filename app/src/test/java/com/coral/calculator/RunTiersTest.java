@@ -79,6 +79,11 @@ public class RunTiersTest {
             PlusRun run = new PlusRun(RunLevels.level(number));
             for (PlusRun.Foe foe : run.foes()) {
                 if (RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET) continue;
+                // (One of a swarm is never coloured.)
+                if (foe.swarm) {
+                    assertEquals(PlusRun.NORMAL, foe.tier);
+                    continue;
+                }
                 counts[number][foe.tier]++;
                 // Health as its kind and colour make it, and never colour on those that only water or fire deal with.
                 if (foe.kind == RunLevels.WISP || foe.kind == RunLevels.RIME) assertEquals(PlusRun.NORMAL, foe.tier);

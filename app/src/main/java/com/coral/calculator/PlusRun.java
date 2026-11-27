@@ -818,6 +818,12 @@ final class PlusRun {
         List<RunSkills.Notable> slotted = new ArrayList<>();
         /** What she wears of what she has found: an armour and two accessories, added up. */
         RunLoot.Worn worn = RunLoot.NOTHING;
+        /**
+         * Moves bought at the guild counter: a third jump, an air dash (and whether it strikes what it goes through), a ground pound, a
+         * dodge roll, a wall jump, a glide, a second wind once a land; and blows of thorns for whatever hurts her.
+         */
+        boolean triple, airDash, dashStrikes, pound, roll, wallJump, glide, secondWind;
+        int thorns;
     }
 
     // How much creatures take
@@ -878,6 +884,116 @@ final class PlusRun {
     /** How many of a swarm give what one of a land's own gives (experience, pluses, a chance of a drop); and what is gathered toward the next of it. */
     static final int SWARM_SHARE = 25;
     private float swarmXp;
+
+    // Moves bought at the counter
+
+    /** How fast and how long an air dash and a dodge roll go; how slowly she slides down a wall and glides; how far a ground pound reaches. */
+    static final float DASH_SPEED = 12, DASH_LASTS = .22f, ROLL_SPEED = 8.5f, ROLL_LASTS = .38f, WALL_SLIDE = 2, GLIDE_FALL = 1.5f, POUND_REACH = 2.4f, FLIP_LASTS = .45f;
+    private float airDashLeft, rollLeft, flipAge = 9, poundAge = 9;
+    private boolean dashUsed, windUsed, clinging, gliding, poundNow;
+    private int wallSide, flips, airDashes, rolls, pounds, wallJumps, secondWinds, dashStruck;
+    private final java.util.Set<Foe> dashHit = new java.util.HashSet<>();
+
+    int flips() { return flips; }
+    int airDashes() { return airDashes; }
+    int rolls() { return rolls; }
+    int pounds() { return pounds; }
+    int wallJumps() { return wallJumps; }
+    int secondWinds() { return secondWinds; }
+    int dashStruck() { return dashStruck; }
+    boolean clinging() { return clinging; }
+    boolean gliding() { return gliding; }
+    float poundAge() { return poundAge; }
+    float rollThrough() { return rollLeft > 0 ? 1 - rollLeft / ROLL_LASTS : 0; }
+
+    /** The picture of a move she is in the middle of, in her sheet of moves (flip 0 to 2, dash, pound, roll, wall, glide), or -1. */
+    static final int NO_MOVE = -1, MOVE_FLIP = 0, MOVE_DASH = 3, MOVE_POUND = 4, MOVE_ROLL = 5, MOVE_WALL = 6, MOVE_GLIDE = 7;
+
+    int moveShown() {
+        if (rollLeft > 0) return MOVE_ROLL;
+        if (airDashLeft > 0) return MOVE_DASH;
+        if (onGround) return NO_MOVE;
+        if (flipAge < FLIP_LASTS) return MOVE_FLIP + Math.min(2, (int) (flipAge / (FLIP_LASTS / 3)));
+        if (clinging) return MOVE_WALL;
+        if (plunged) return MOVE_POUND;
+        if (gliding) return MOVE_GLIDE;
+        return NO_MOVE;
+    }
+
+    /** Which side the wall she clings to is on: -1 left, 1 right. */
+    int wallSide() { return wallSide; }
+
+    /**
+     * A dash: in the air, once until she lands, a burst the way she faces with no falling; on the ground, a dodge roll, a moment in
+     * which nothing hurts her. Whether she did.
+     */
+    boolean dash() {
+        if (state != PLAYING) return false;
+        float way = facingLeft ? -1 : 1;
+        if (onGround && perks.roll && rollLeft <= 0) {
+            rollLeft = ROLL_LASTS;
+            speedAcross = way * ROLL_SPEED;
+            safe = Math.max(safe, ROLL_LASTS + .1f);
+            rolls++;
+            return true;
+        }
+        if (!onGround && perks.airDash && !dashUsed && !climbing) {
+            dashUsed = true;
+            airDashLeft = DASH_LASTS;
+            speedAcross = way * DASH_SPEED;
+            speedDown = 0;
+            dashHit.clear();
+            airDashes++;
+            return true;
+        }
+        return false;
+    }
+
+    /** The moves as time goes: a dash and a roll carry her; with the strike, a dash beats what it goes through. */
+    private void moves(float seconds) {
+        flipAge += seconds;
+        poundAge += seconds;
+        if (onGround) dashUsed = false;
+        if (rollLeft > 0) {
+            rollLeft -= seconds;
+            speedAcross = (facingLeft ? -1 : 1) * ROLL_SPEED;
+        }
+        if (airDashLeft > 0) {
+            airDashLeft -= seconds;
+            speedAcross = (facingLeft ? -1 : 1) * DASH_SPEED;
+            speedDown = 0;
+            if (perks.dashStrikes) {
+                for (Foe foe : foes) {
+                    if (foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || dashHit.contains(foe)) continue;
+                    if (x >= foe.x + foe.wide() || x + WIDE <= foe.x || y >= foe.y + foe.tall() || y + TALL <= foe.y) continue;
+                    dashHit.add(foe);
+                    dashStruck++;
+                    beat(foe, LANDED);
+                }
+            }
+        }
+    }
+
+    /** A ground pound landed: what stands on the ground near her is struck, as if landed on. */
+    private void poundWave() {
+        poundNow = false;
+        pounds++;
+        poundAge = 0;
+        float middle = x + WIDE / 2, feet = y + TALL;
+        for (Foe foe : foes) {
+            if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || RunLevels.flier(foe.kind)) continue;
+            if (Math.abs(foe.x + foe.wide() / 2 - middle) > POUND_REACH || Math.abs(foe.y + foe.tall() - feet) > 1.1f) continue;
+            beat(foe, LANDED);
+        }
+    }
+
+    /** Whether a wall is beside her, on a side (-1 left, 1 right), the height of her. */
+    private boolean wallBeside(int side) {
+        float edge = side < 0 ? x - .06f : x + WIDE + .06f;
+        int column = (int) Math.floor(edge);
+        for (float at = y + .15f; at < y + TALL - .1f; at += .4f) if (!solid(at(column, (int) Math.floor(at)))) return false;
+        return true;
+    }
 
     // The unique creatures
 
@@ -1292,7 +1408,7 @@ final class PlusRun {
     private float critX, critY;
 
     /** How much of an effect what she wears gives her, with what is in her hands. */
-    int gear(int effect) { return perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect); }
+    int gear(int effect) { return perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect) + (effect == RunLoot.THORNS ? perks.thorns : 0); }
 
     /** What her skill tree adds to one of the effects gear has: its passives, and the actives called on just now. */
     private int skill(int effect) {
@@ -2239,7 +2355,8 @@ final class PlusRun {
             foe.ground = spec[2] + 1 - foe.tall();
             foe.y = foe.ground;
             foe.home = foe.x;
-            foe.tier = waits || !level.tiered ? NORMAL : tierOf(level.number, spec[0], spec[1], spec[2]);
+            // (One of a swarm is never of a colour of toughness: a swarm is many, not tough.)
+            foe.tier = waits || !level.tiered || RunLevels.swarmed(spec) ? NORMAL : tierOf(level.number, spec[0], spec[1], spec[2]);
             foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black))
                     : RunUniques.is(spec[0]) ? RunUniques.health(spec[0], level.number) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW
                     : healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW;
@@ -2445,8 +2562,25 @@ final class PlusRun {
             foe.broken = from.broken;
             foe.forming = from.forming;
             foe.taken = from.taken;
+            foe.swarm = from.swarm;
+            foe.guard = from.guard;
+            foe.guardMost = from.guardMost;
+            foe.guardNeeds = from.guardNeeds;
+            foe.guardKind = from.guardKind;
+            foe.guardMet = from.guardMet;
+            foe.struck = from.struck;
             foes.add(foe);
         }
+        // (Her moves, as they are.)
+        airDashLeft = other.airDashLeft;
+        rollLeft = other.rollLeft;
+        flipAge = other.flipAge;
+        poundAge = other.poundAge;
+        dashUsed = other.dashUsed;
+        windUsed = other.windUsed;
+        clinging = other.clinging;
+        gliding = other.gliding;
+        wallSide = other.wallSide;
         arms.addAll(other.arms);
         for (Shot from : other.shots) {
             Shot shot = new Shot(from.kind);
@@ -3271,6 +3405,15 @@ final class PlusRun {
         perks.hearts = now.hearts;
         perks.lives = now.lives;
         perks.wings = now.wings;
+        perks.triple = now.triple;
+        perks.airDash = now.airDash;
+        perks.dashStrikes = now.dashStrikes;
+        perks.pound = now.pound;
+        perks.roll = now.roll;
+        perks.wallJump = now.wallJump;
+        perks.glide = now.glide;
+        perks.secondWind = now.secondWind;
+        perks.thorns = now.thorns;
         perks.reach = now.reach;
         perks.lasting = now.lasting;
         perks.shots = now.shots;
@@ -3846,7 +3989,22 @@ final class PlusRun {
             sinceGround = 1;
             onGround = false;
             jumps++;
-        } else if (pressed && !onGround && airJumps < (perks.wings ? 1 : 0) + (named(STEAMS) ? 1 : 0) + gear(RunLoot.AIR)) {
+        } else if (pressed && !onGround && clinging) {
+            // Off the wall she clings to, up and away from it.
+            speedDown = -LEAP * .92f;
+            speedAcross = -wallSide * RUN * 1.3f;
+            facingLeft = wallSide > 0;
+            flinch = .16f;
+            sinceJump = 1;
+            clinging = false;
+            airJumps = 0;
+            wallJumps++;
+        } else if (pressed && !onGround && airJumps < (perks.wings ? 1 : 0) + (perks.wings && perks.triple ? 1 : 0) + (named(STEAMS) ? 1 : 0) + gear(RunLoot.AIR)) {
+            // (The third jump in the air, with the third jump bought, is a flip.)
+            if (perks.triple && perks.wings && airJumps == 1) {
+                flipAge = 0;
+                flips++;
+            }
             // With her wings, one more jump in the air; and in steam, which lifts her, another.
             // With her wings, one more jump in the air.
             speedDown = -LEAP * .88f;
@@ -3862,6 +4020,8 @@ final class PlusRun {
         boolean plunging = down && !onGround;
         speedDown = Math.min(plunging ? PLUNGE : FALL, speedDown + GRAVITY * (plunging ? 1.8f : 1) * seconds);
         if (plunging && speedDown > FALL) plunged = true;
+        // (In an air dash she does not fall.)
+        if (airDashLeft > 0) speedDown = 0;
         char about = at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL * .6f));
         // A draught lifts her; and with the wind in her hair she flies for as long as the jump is held.
         if (about == RunLevels.DRAUGHT) speedDown = Math.max(-5, speedDown - (GRAVITY + 24) * seconds);
@@ -3870,6 +4030,19 @@ final class PlusRun {
         else if (named(TIDE) && !onGround && !down) speedDown = Math.min(speedDown, 2.6f);
         // On a vine (or a ladder) she climbs: up while the jump is held, down with the down button, and holds on otherwise; off the top of it,
         // still climbing, she is given a little lift, onto whatever it leads up to.
+        // Against a wall in the air, pushing toward it, she clings and slides down it slowly; and holding the jump as she falls, she glides.
+        clinging = false;
+        if (perks.wallJump && !onGround && speedDown > 0 && (left != right)) {
+            int side = left ? -1 : 1;
+            if (wallBeside(side)) {
+                clinging = true;
+                wallSide = side;
+                speedDown = Math.min(speedDown, WALL_SLIDE);
+                airJumps = 0;
+            }
+        }
+        gliding = perks.glide && !onGround && !clinging && jump && !down && speedDown > GLIDE_FALL && airDashLeft <= 0 && sinceJump > .25f;
+        if (gliding) speedDown = GLIDE_FALL;
         boolean onVine = about == RunLevels.VINE || at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL - .05f)) == RunLevels.VINE;
         if (onVine && (jump || down || climbing)) {
             climbing = !(onGround && !jump && !down);
@@ -4138,6 +4311,8 @@ final class PlusRun {
         if (swing > 0) swung();
         linger(seconds);
         if (fly(seconds)) return;
+        moves(seconds);
+        if (poundNow) poundWave();
         for (Foe foe : foes) {
             // Whoever is arriving, changing or out of sight is not there to be touched.
             // (Coming down onto a small one she may be a hair to one side of it: what is forgiven is the landing, never a touch.)
@@ -4178,7 +4353,8 @@ final class PlusRun {
             } else if (safe <= 0 && offIt <= 0 && foe.dazed <= 0) {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
                 knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
-                if (hurt(false, 2 + TIER_BITE[foe.tier] + (RunUniques.is(foe.kind) ? RunUniques.bite(foe.kind, level.number) : 0))) return;
+                // (One of a swarm, small as it is, bites for half a heart; one of the unique creatures harder.)
+                if (hurt(false, (foe.swarm ? 1 : 2) + TIER_BITE[foe.tier] + (RunUniques.is(foe.kind) ? RunUniques.bite(foe.kind, level.number) : 0))) return;
             }
         }
         if (y > bottomAt((int) Math.floor(x + WIDE / 2)) + 1) {
@@ -5742,6 +5918,13 @@ final class PlusRun {
             lastLost = lost;
         }
         safe = SAFE * perks.mercy;
+        // Once a land, the second wind: what would have been the end of her leaves her half a heart.
+        if (hp <= 0 && !fell && perks.secondWind && !windUsed) {
+            hp = HALF;
+            windUsed = true;
+            secondWinds++;
+            safe = SAFE * perks.mercy * 2;
+        }
         if (hp <= 0) {
             hp = 0;
             if (--lives <= 0) {
@@ -5918,6 +6101,7 @@ final class PlusRun {
                     y = row - TALL;
                     speedDown = 0;
                     onGround = true;
+                    if (plunged && perks.pound) poundNow = true;
                     plunged = false;
                     sprung = false;
                     wet = false;
@@ -5955,7 +6139,18 @@ final class PlusRun {
      * throws knives along the ground at her, to be jumped. A divide that shoots fires one of
      * its dots from the top of every other hop, over her head if she keeps to the ground.
      */
+    /** How far from where it was put one of a swarm goes after her: it keeps to its place, and does not follow her along the land. */
+    static final float LEASH = 6;
+
     private void move(Foe foe, float seconds) {
+        moveFoe(foe, seconds);
+        if (foe.swarm && !foe.flat && Math.abs(foe.x - foe.home) > LEASH) {
+            foe.x = foe.home + Math.signum(foe.x - foe.home) * LEASH;
+            foe.leftward = foe.x > foe.home;
+        }
+    }
+
+    private void moveFoe(Foe foe, float seconds) {
         if (foe.flat) {
             // How long it has been down, for whoever shows it going.
             foe.act += seconds;
