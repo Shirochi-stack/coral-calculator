@@ -1829,33 +1829,10 @@ final class RunGame {
      */
     private void drawSmith(Canvas canvas, int[] item) {
         int which = Math.max(0, Math.min(2, item[4] - PlusRun.SMITH));
-        float x = (item[1] + 2.3f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .55f, anvil = x - tile * .95f;
-        // She and her anvil stand on a step of planks, clear of what lies over the floor of the screen.
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF7A5230);
-        canvas.drawRect(anvil - tile * .75f, feet, x + tile * .8f, floor, paint);
-        paint.setColor(0xFF9A6B3F);
-        canvas.drawRect(anvil - tile * .8f, feet, x + tile * .85f, feet + tile * .12f, paint);
-        paint.setColor(Color.BLACK);
-        // Her anvil, on its block, in front of her.
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF6B4426);
-        canvas.drawRect(anvil - tile * .2f, feet - tile * .3f, anvil + tile * .2f, feet, paint);
-        paint.setColor(0xFF4A4F57);
-        path.reset();
-        path.moveTo(anvil - tile * .42f, feet - tile * .62f);
-        path.lineTo(anvil + tile * .3f, feet - tile * .62f);
-        path.lineTo(anvil + tile * .3f, feet - tile * .5f);
-        path.lineTo(anvil + tile * .14f, feet - tile * .44f);
-        path.lineTo(anvil + tile * .24f, feet - tile * .3f);
-        path.lineTo(anvil - tile * .24f, feet - tile * .3f);
-        path.lineTo(anvil - tile * .14f, feet - tile * .44f);
-        path.lineTo(anvil - tile * .22f, feet - tile * .5f);
-        path.close();
-        canvas.drawPath(path, paint);
-        paint.setColor(0xFF7C838C);
-        canvas.drawRect(anvil - tile * .4f, feet - tile * .62f, anvil + tile * .3f, feet - tile * .57f, paint);
-        paint.setColor(Color.BLACK);
+        float x = (item[1] + 2.3f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile, anvil = x - tile * 1.05f;
+        // Her anvil on its stump, with its brazier and its bucket, in front of her: on the floor, which inside a building is kept clear of the buttons.
+        furniture();
+        standing(canvas, anvilSmith, anvil, feet + tile * .03f, tile * 1.45f);
         // What she is at: making something, pleased with it, or now and then a few blows by herself.
         boolean making = hammerer == which && hammered < 1.6f, pleased = hammerer == which && hammered >= 1.6f && hammered < 3.2f;
         boolean idle = (int) (clock * .45f + which * 1.7f) % 5 == 0;
@@ -2342,39 +2319,63 @@ final class RunGame {
         text.setTextAlign(Paint.Align.LEFT);
     }
 
-    /** The board of hunts as it stands in the guild hall: on two posts, with what is on it pinned up; and over it its name, or, when a hunt of hers is done, that it can be handed in. */
+    /** The furniture of the buildings, drawn with the rest of their pictures: Nabi's counter, Inju's desk, the board of hunts, and the anvil each smith works at. */
+    private Bitmap counterPets, deskGuild, boardHunts, anvilSmith;
+
+    private void furniture() {
+        if (counterPets != null) return;
+        counterPets = fxOf(R.drawable.run_counter_pets);
+        deskGuild = fxOf(R.drawable.run_desk_guild);
+        boardHunts = fxOf(R.drawable.run_board_hunts);
+        anvilSmith = fxOf(R.drawable.run_anvil_smith);
+    }
+
+    /** A piece of furniture standing on the floor at a place, its middle there, so wide. */
+    private void standing(Canvas canvas, Bitmap picture, float x, float floor, float wide) {
+        float tall = wide * picture.getHeight() / picture.getWidth();
+        paint.setAlpha(255);
+        target.set(x - wide / 2, floor - tall, x + wide / 2, floor);
+        canvas.drawBitmap(picture, null, target, paint);
+    }
+
+    /** Where the three notices of the board lie on its picture, as parts of it across and down. */
+    private static final float[] NOTICES = {.272f, .499f, .724f};
+    private static final float NOTICE_WIDE = .177f, NOTICE_TOP = .306f, NOTICE_BOTTOM = .570f;
+
+    /** The board of hunts as it stands in the guild hall, with what is on it written on its notices; and over it its name, or, when a hunt of hers is done, that it can be handed in. */
     private void drawBoard(Canvas canvas, int[] item) {
-        float x = (item[1] + 1 - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF6B4426);
-        canvas.drawRect(x - tile * .95f, feet - tile * 1.9f, x - tile * .82f, feet, paint);
-        canvas.drawRect(x + tile * .82f, feet - tile * 1.9f, x + tile * .95f, feet, paint);
-        box.set(x - tile * 1.15f, feet - tile * 2.05f, x + tile * 1.15f, feet - tile * .7f);
-        canvas.drawRoundRect(box, tile * .08f, tile * .08f, paint);
-        paint.setColor(0xFFB98A56);
-        box.inset(tile * .09f, tile * .09f);
-        canvas.drawRoundRect(box, tile * .05f, tile * .05f, paint);
+        furniture();
+        float x = (item[1] + 1 - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile, wide = tile * 3.3f, tall = wide * boardHunts.getHeight() / boardHunts.getWidth();
+        standing(canvas, boardHunts, x, feet, wide);
+        float left = x - wide / 2, top = feet - tall;
         boolean any = false;
-        for (int slot = 0; slot < RunHunts.SLOTS; slot++) {
+        paint.setStyle(Paint.Style.FILL);
+        for (int slot = 0; slot < Math.min(RunHunts.SLOTS, NOTICES.length); slot++) {
             int hunt = hunt(slot), at = huntAt(slot);
             boolean taken = at > 0, finished = hunt != 0 && at > RunHunts.many(hunt);
             any |= finished;
-            float px = x + (slot - 1) * tile * .66f, py = feet - tile * (1.4f + slot % 2 * .08f);
-            canvas.save();
-            canvas.rotate((slot - 1) * 4, px, py);
-            paint.setColor(finished ? 0xFFDDF2E4 : taken ? 0xFFFCE0E4 : 0xFFFFF7E6);
-            canvas.drawRect(px - tile * .25f, py - tile * .34f, px + tile * .25f, py + tile * .34f, paint);
-            paint.setColor(0x55000000);
-            for (int line = 0; line < 3; line++) {
-                canvas.drawRect(px - tile * .17f, py - tile * .14f + line * tile * .13f, px + tile * (line == 2 ? .04f : .17f), py - tile * .1f + line * tile * .13f, paint);
+            float px = left + NOTICES[slot] * wide, half = NOTICE_WIDE * wide / 2, from = top + NOTICE_TOP * tall, to = top + NOTICE_BOTTOM * tall;
+            // Taken, the notice is a little pink; done, a little green; and on each, its lines in ink.
+            if (taken || finished) {
+                paint.setColor(finished ? 0x4D3FBF7A : 0x40F0607A);
+                canvas.drawRect(px - half * .86f, from + (to - from) * .06f, px + half * .86f, to - (to - from) * .04f, paint);
             }
-            paint.setColor(CalculatorLayout.CORAL);
-            canvas.drawCircle(px, py - tile * .27f, tile * .05f, paint);
-            canvas.restore();
+            paint.setColor(0x6B4A2A12);
+            for (int line = 0; line < 4; line++) {
+                float y = from + (to - from) * (.3f + line * .15f);
+                canvas.drawRect(px - half * .6f, y, px + half * (line == 3 ? .1f : .6f), y + (to - from) * .045f, paint);
+            }
+            // Done: a green seal stamped in its corner.
+            if (finished) {
+                paint.setColor(0xFF2E9E6E);
+                canvas.drawCircle(px + half * .45f, to - (to - from) * .2f, half * .34f, paint);
+                paint.setColor(0xFFDDF2E4);
+                canvas.drawCircle(px + half * .45f, to - (to - from) * .2f, half * .16f, paint);
+            }
         }
         paint.setColor(Color.BLACK);
-        if (any) mark(canvas, x, feet - tile * 2.3f - Math.abs((float) Math.sin(clock * 5)) * tile * .12f, "Hand in!", 0xFFE0A21A, false);
-        else mark(canvas, x, feet - tile * 2.3f, "Hunts", 0xFF8A5A33, false);
+        if (any) mark(canvas, x, top - tile * .25f - Math.abs((float) Math.sin(clock * 5)) * tile * .12f, "Hand in!", 0xFFE0A21A, false);
+        else mark(canvas, x, top - tile * .25f, "Hunts", 0xFF8A5A33, false);
     }
 
     /** The ribbons a place off this land gives are tied on, there and then: one colour in the first volume, two after; never white. What they are, in words. */
@@ -4892,6 +4893,12 @@ final class RunGame {
             // A place off the land has a floor and a ceiling of its own: an arena's are far apart, and the view follows her between them.
             int[] in = run.level().rooms.get(run.room());
             float ceiling = in[12] - 2, ground = in[11] + 3;
+            // Inside a building, the floor and what stands on it, with its prices, are kept above the buttons over the arrows and the jump,
+            // as far as the screen is tall enough to show the whole of the room as well (in a wide screen the buttons are at its sides instead).
+            if (in[0] == RunLevels.HOUSE) {
+                float buttons = Math.min(Math.min(stallButton.top, downButton.top), swapButton.top) - dp(8);
+                ground = Math.max(ground, Math.min(in[11] + .5f + (height - buttons) / tile, in[12] - .5f + down));
+            }
             level = ground - ceiling <= down ? ground - down : Math.max(ceiling, Math.min(ground - down, run.y() + PlusRun.TALL - down * .6f));
             if (run.entered() != seenEntered) cameraY = level;
         } else if (run.entered() != seenEntered) {
@@ -6779,7 +6786,7 @@ final class RunGame {
                         else if (what == PlusRun.SMITH + 1) gearIcon(canvas, RunGear.HELM, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .36f, SET_COLOURS[2]);
                         else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
-                        label(canvas, stallButton, what < 100 ? "Look" : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
+                        label(canvas, stallButton, what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
                                 : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.DEALER ? "Market" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
@@ -7348,6 +7355,17 @@ final class RunGame {
                     // showing: a pillar, a tower, a wall with a door in it; not the dark that lies round the place.)
                     boolean within = look >= 0 && row >= in[12] && row < in[11] && column >= in[3] && column <= in[4];
                     paint.setStyle(Paint.Style.FILL);
+                    // (In a building of a village, under the board of its floor, its picture's own floor shows, as far down as the screen goes.)
+                    if (in[0] == RunLevels.HOUSE && look >= 0 && row >= in[11] && column >= in[3] && column <= in[4]) {
+                        if (capped) {
+                            paint.setColor(LOOK_CAP[look]);
+                            canvas.drawRect(left, y, left + tile + 1, y + tile * .1f, paint);
+                            paint.setColor(0x33000000);
+                            canvas.drawRect(left, y + tile * .1f, left + tile + 1, y + tile * .22f, paint);
+                        }
+                        paint.setColor(Color.BLACK);
+                        continue;
+                    }
                     paint.setColor(look < 0 ? 0xFF2A1D1A : within ? mixed(LOOK_WALL[look], LOOK_CAP[look], .42f) : LOOK_WALL[look]);
                     canvas.drawRect(left, y, left + tile + 1, y + tile + 1, paint);
                     if (within) {
@@ -7504,7 +7522,13 @@ final class RunGame {
             } else {
                 // A little hop when she comes near, and when it has been given.
                 float hop = near && !given ? Math.abs((float) Math.sin(clock * 6)) * tile * .08f : 0;
-                frame(canvas, villagers(), who - RunLevels.SOMI, VILLAGERS, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f, false);
+                // Nabi by the pet shop's door looks into her shop, to the right, where her pets are; she and Inju each stand behind a counter of their own.
+                boolean keeps = item[0] == PlusRun.SPOT && (who == RunLevels.NABI || who == RunLevels.INJU);
+                frame(canvas, villagers(), who - RunLevels.SOMI, VILLAGERS, x + (who == RunLevels.ALTTEUL ? tile * .5f : 0), y - hop, tile * 1.62f * .72f, keeps && who == RunLevels.NABI);
+                if (keeps) {
+                    furniture();
+                    standing(canvas, who == RunLevels.NABI ? counterPets : deskGuild, x + (who == RunLevels.NABI ? tile * .25f : -tile * .1f), y + tile * .04f, tile * (who == RunLevels.NABI ? 1.6f : 1.8f));
+                }
             }
             // What she holds out, over her hands, until it is taken.
             if (!given && item[0] != PlusRun.STALL && item[0] != PlusRun.DROPOFF && item[0] != PlusRun.SPOT && who >= 3) {
@@ -7572,11 +7596,19 @@ final class RunGame {
                 paint.setColor(Color.BLACK);
                 float hop = hers && (int) (clock * 1.3f + kind) % 4 == 0 ? Math.abs((float) Math.sin(clock * 6)) * tile * .12f : 0;
                 cell(canvas, petArt(kind), hop > 0 ? 5 : 0, 6, px, feet - tile * .08f - hop, tile * .95f * 170 / 100 * (at ? 1.12f : 1), false);
+                // Its price on a little dark tag: under the ones on the floor, and over the heads of the ones on the shelf, where the shelf can never hide it.
+                String price = hers ? "hers" : "+ " + PET_COSTS[kind];
                 text.setTextAlign(Paint.Align.CENTER);
-                text.setTextSize(tile * .24f);
-                text.setColor(hers ? 0xFF2E9E6E : Color.WHITE);
+                text.setTextSize(tile * .26f);
                 text.setTypeface(Typeface.DEFAULT_BOLD);
-                canvas.drawText(hers ? "hers" : "+ " + PET_COSTS[kind], px, feet + tile * .32f, text);
+                boolean shelf = item[2] < RunLevels.FLOOR - 1;
+                float tagY = shelf ? feet - tile * 1.32f - hop : feet + tile * .34f, half = text.measureText(price) / 2 + tile * .12f;
+                box.set(px - half, tagY - tile * .26f, px + half, tagY + tile * .09f);
+                paint.setColor(hers ? 0xD91C4A38 : 0xD93A2414);
+                canvas.drawRoundRect(box, tile * .15f, tile * .15f, paint);
+                paint.setColor(Color.BLACK);
+                text.setColor(hers ? 0xFF9BF0C4 : 0xFFFFE7A8);
+                canvas.drawText(price, px, tagY, text);
                 text.setTypeface(Typeface.DEFAULT);
                 continue;
             }

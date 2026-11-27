@@ -1373,9 +1373,10 @@ final class RunLevels {
             wall(2);
             level.land[FLOOR - 1][from + 1] = ENTRY;
             if (sort == PET_SHOP) {
-                ledge(from + 4, FLOOR - 2, 10);
-                for (int pet = 0; pet < RunPets.FOUND; pet++) level.items.add(new int[]{PlusRun.SPOT, from + 4 + pet % 5 * 2, pet < 5 ? FLOOR - 1 : FLOOR - 3, 0, pet});
-                level.items.add(new int[]{PlusRun.SPOT, from + 15, FLOOR - 1, NABI, 100 + 4});
+                // Nabi at her counter by the door, looking into the shop; and her pets past her, along the floor and on the shelf.
+                ledge(from + 7, FLOOR - 2, 10);
+                for (int pet = 0; pet < RunPets.FOUND; pet++) level.items.add(new int[]{PlusRun.SPOT, from + 7 + pet % 5 * 2, pet < 5 ? FLOOR - 1 : FLOOR - 3, 0, pet});
+                level.items.add(new int[]{PlusRun.SPOT, from + 2, FLOOR - 1, NABI, 100 + 4});
             } else if (sort == GUILD_HALL) {
                 level.items.add(new int[]{PlusRun.SPOT, from + 11, FLOOR - 1, INJU, 100});
                 // And her board of hunts, between the door and her desk.
