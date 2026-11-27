@@ -25,6 +25,17 @@ import android.widget.TextView;
  * in its file, and is heard or not as the game's sound is on or off. What is said in it may
  * be shown under it in words.
  *
+ * A film is a longer one, of another make: its picture is a file without sound, and its sound
+ * a file of its own, so that one picture can be had with several sounds. The two are made
+ * ready apart and begun together, when both can begin; while they play the sound is kept to
+ * the picture, and set back to it if it is ever more than a tenth of a second away. A film
+ * whose sound cannot be played is shown without it. What is heard in a film may be written
+ * under it line by line, each line at its own time: in the black under the picture where
+ * there is black enough, and if not, low on the picture, clear of what the picture itself
+ * has written on it. And a film is shown whole unless next to nothing would be lost by its
+ * filling the screen: it has names written at its edge, and five people side by side, which
+ * a clip of one face has not.
+ *
  * A tap ends it, and so does the Back key. So does its own end; and so does anything going wrong, at any point,
  * which is told apart from the other two: whoever started it is told once, and only once,
  * whether it was played (to its end, or until it was tapped away) or could not be. It never
@@ -45,6 +56,17 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
     private final boolean sound;
     private final Ends ends;
     private final TextureView picture;
+    /** A film's sound, a file of its own (or none); what is written under it, line by line (or nothing); and where that is shown. */
+    private final int voiceResource;
+    private final boolean film;
+    private final java.util.List<RunFilms.Line> lines;
+    private TextView caption;
+    private MediaPlayer voice;
+    private boolean pictureReady, voiceReady, voiceGone;
+    /** How many times it has looked at itself; how long its sound takes to go on after being set to a moment, as far as that has been seen; and whether it was set at the last look. */
+    private int ticks, lead;
+    private boolean set;
+    private final Runnable ticker = this::tick;
     private MediaPlayer player;
     private Surface surface;
     private WindowManager window;
@@ -52,13 +74,22 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
     private int wide, tall;
     /** How much of the picture may be lost at two of its edges, all told, for it to fill the screen: beyond that it is shown whole. */
     private static final float LOST = .26f;
+    /** And how much of a film's: next to nothing. */
+    static final float FILM_LOST = .08f;
 
     /** A clip from the raw resources, with its sound or without, and words to show under it or none. */
     RunVideo(Context context, int resource, boolean sound, String words, Ends ends) {
+        this(context, resource, sound, words, false, 0, null, ends);
+    }
+
+    private RunVideo(Context context, int resource, boolean sound, String words, boolean film, int voiceResource, java.util.List<RunFilms.Line> lines, Ends ends) {
         super(context);
         this.resource = resource;
         this.sound = sound;
         this.ends = ends;
+        this.film = film;
+        this.voiceResource = voiceResource;
+        this.lines = lines;
         setBackgroundColor(Color.BLACK);
         setClickable(true);
         picture = new TextureView(context);
@@ -78,6 +109,19 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
             under.bottomMargin = pad * 3;
             addView(said, under);
         }
+        if (lines != null && !lines.isEmpty()) {
+            // What is heard, written under it: put where it belongs once the picture's size is known.
+            caption = new TextView(context);
+            caption.setTextColor(Color.WHITE);
+            caption.setGravity(Gravity.CENTER);
+            caption.setMaxLines(2);
+            caption.setShadowLayer(5, 0, 1, Color.BLACK);
+            int pad = Math.round(10 * context.getResources().getDisplayMetrics().density);
+            caption.setPadding(pad, pad / 3, pad, pad / 3);
+            caption.setBackgroundColor(0x73000000);
+            caption.setVisibility(INVISIBLE);
+            addView(caption, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        }
         // A tap is enough of it.
         setOnClickListener(view -> finish(true, "tapped"));
         // And one that has not begun within a few seconds is not going to.
@@ -88,8 +132,21 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
 
     /** Lays a clip over a view, if that view has somewhere for it to be laid; if not, it could not be played. */
     static RunVideo over(android.view.View under, int resource, boolean sound, String words, Ends ends) {
+        return laid(under, ends, () -> new RunVideo(under.getContext(), resource, sound, words, ends));
+    }
+
+    /** Lays a film over a view: its picture, its sound (0 for none), and what is written under it (or nothing). */
+    static RunVideo film(android.view.View under, int picture, int voice, java.util.List<RunFilms.Line> lines, Ends ends) {
+        return laid(under, ends, () -> new RunVideo(under.getContext(), picture, false, null, true, voice, lines, ends));
+    }
+
+    private interface Maker {
+        RunVideo made();
+    }
+
+    private static RunVideo laid(android.view.View under, Ends ends, Maker maker) {
         try {
-            RunVideo video = new RunVideo(under.getContext(), resource, sound, words, ends);
+            RunVideo video = maker.made();
             if (under.getParent() instanceof ViewGroup) {
                 // (Over it in height as well as in order: a view that is raised is drawn, and touched, above one added after it that is not.)
                 video.setZ(under.getZ() + 1);
@@ -133,6 +190,11 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
             });
             player.setOnPreparedListener(which -> {
                 if (over) return;
+                if (film) {
+                    pictureReady = true;
+                    begin();
+                    return;
+                }
                 started = true;
                 which.start();
                 if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "clip begins");
@@ -145,7 +207,101 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
             player.prepareAsync();
         } catch (Exception failed) {
             finish(false, "could not be opened: " + failed);
+            return;
         }
+        if (film && voiceResource != 0) readyVoice();
+    }
+
+    /** A film's sound is made ready beside its picture. If it cannot be, the film is shown without it. */
+    private void readyVoice() {
+        try {
+            voice = new MediaPlayer();
+            voice.setAudioAttributes(new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_GAME)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build());
+            try (AssetFileDescriptor file = getResources().openRawResourceFd(voiceResource)) {
+                voice.setDataSource(file.getFileDescriptor(), file.getStartOffset(), file.getLength());
+            }
+            voice.setOnPreparedListener(which -> {
+                voiceReady = true;
+                begin();
+            });
+            voice.setOnErrorListener((which, what, extra) -> {
+                silent("the sound's error " + what + " " + extra);
+                return true;
+            });
+            voice.prepareAsync();
+        } catch (Exception failed) {
+            silent("the sound could not be opened: " + failed);
+        }
+    }
+
+    /** A film's sound is given up, and the film goes on, or begins, without it. */
+    private void silent(String why) {
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "film without its sound: " + why);
+        voiceGone = true;
+        MediaPlayer old = voice;
+        voice = null;
+        try {
+            if (old != null) old.release();
+        } catch (RuntimeException ignored) {
+            // Already gone.
+        }
+        begin();
+    }
+
+    /** A film begins when its picture can, and its sound can or never will: both at once. */
+    private void begin() {
+        if (over || started || !pictureReady || voice != null && !voiceReady) return;
+        started = true;
+        try {
+            player.start();
+            if (voice != null) voice.start();
+        } catch (RuntimeException failed) {
+            finish(false, "could not be begun: " + failed);
+            return;
+        }
+        if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "film begins" + (voice != null ? ", with its sound" : ", silent") + (caption != null ? ", " + lines.size() + " lines under it" : ""));
+        postDelayed(ticker, TICK);
+    }
+
+    /** How often a film looks at itself, in thousandths of a second; and how far its sound may be from its picture before it is set back. */
+    private static final int TICK = 100, APART = 100;
+
+    /** While a film plays: what is written under it is kept to the moment, and now and then its sound is kept to its picture. */
+    private void tick() {
+        if (over || player == null) return;
+        try {
+            int now = player.getCurrentPosition();
+            if (caption != null) {
+                String words = RunFilms.at(lines, now / 1000f);
+                if (words == null) {
+                    caption.setVisibility(INVISIBLE);
+                } else {
+                    if (!words.contentEquals(caption.getText())) caption.setText(words);
+                    caption.setVisibility(VISIBLE);
+                }
+            }
+            // (Its sound is looked at twice a second while it is new, when it is most likely to be off, and once a second after.)
+            if (voice != null && ++ticks % (ticks < 40 ? 5 : 10) == 0 && voice.isPlaying()) {
+                int apart = voice.getCurrentPosition() - player.getCurrentPosition();
+                // A sound set to a moment takes a while to go on from it, and is behind by that much: how much is learned from what
+                // is seen just after it was set, and allowed for the next time.
+                if (set && apart < 0 && apart > -500) lead += -apart;
+                set = false;
+                boolean far = Math.abs(apart) > APART;
+                if (BuildConfig.DEBUG && (far || ticks == 5 || ticks == 40 || ticks % 300 == 0)) {
+                    android.util.Log.i("RunFinale", "film at " + now / 1000 + " s: its sound " + apart + " ms from its picture" + (far ? ", set to it" + (lead > 0 ? " and " + lead + " ms on" : "") : ""));
+                }
+                if (far) {
+                    int to = Math.max(0, player.getCurrentPosition() + lead);
+                    voice.seekTo(to, MediaPlayer.SEEK_CLOSEST);
+                    set = true;
+                }
+            }
+        } catch (RuntimeException gone) {
+            // A player that has just been let go: the film is ending.
+        }
+        postDelayed(ticker, TICK);
     }
 
     @Override public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) { fit(); }
@@ -167,21 +323,51 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
     }
 
     /** The scale at which a picture is shown in a space: filling it, if little is lost by that; if not, whole. */
-    static float scale(int wide, int tall, int width, int height) {
+    static float scale(int wide, int tall, int width, int height) { return scale(wide, tall, width, height, LOST); }
+
+    /** The same, for a picture of which no more than so much may be lost. */
+    static float scale(int wide, int tall, int width, int height, float lost) {
         float across = width / (float) wide, down = height / (float) tall;
         float whole = Math.min(across, down), filling = Math.max(across, down);
-        return 1 - whole / filling <= LOST ? filling : whole;
+        return 1 - whole / filling <= lost ? filling : whole;
     }
 
     /** The picture in the middle of the view with its proportions kept, filling it or whole. */
     private void fit() {
         int width = picture.getWidth(), height = picture.getHeight();
         if (wide <= 0 || tall <= 0 || width <= 0 || height <= 0) return;
-        float scale = scale(wide, tall, width, height);
+        float scale = scale(wide, tall, width, height, film ? FILM_LOST : LOST);
         Matrix matrix = new Matrix();
         // (The view stretches the picture to itself: that is undone, and then it is made the size it should be.)
         matrix.setScale(wide * scale / width, tall * scale / height, width / 2f, height / 2f);
         picture.setTransform(matrix);
+        if (caption != null) place(scale, width, height);
+    }
+
+    /**
+     * Where what is written under a film goes: in the black under the picture, close to it, if there is black enough for two
+     * lines; if not, on the picture, as low as the picture's own writing allows, and never in the strip at the foot of the screen
+     * that belongs to the phone.
+     */
+    private void place(float scale, int width, int height) {
+        float density = getResources().getDisplayMetrics().density, scaled = getResources().getDisplayMetrics().scaledDensity;
+        float shownWide = wide * scale, shownTall = tall * scale, top = (height - shownTall) / 2, bottom = top + shownTall;
+        boolean tallPicture = tall > wide;
+        float size = RunFilms.size(Math.min(shownWide, width), tallPicture, 14 * scaled);
+        caption.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
+        caption.setMaxWidth(Math.round(Math.min(shownWide, width) - 24 * density));
+        LayoutParams where = (LayoutParams) caption.getLayoutParams();
+        float under = height - bottom;
+        if (under >= size * 3.4f + 24 * density) {
+            where.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            where.topMargin = Math.round(bottom + size * .5f);
+            where.bottomMargin = 0;
+        } else {
+            where.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+            where.topMargin = 0;
+            where.bottomMargin = Math.round(Math.max(28 * density, height - (top + shownTall * RunFilms.foot(tallPicture))));
+        }
+        caption.setLayoutParams(where);
     }
 
     /**
@@ -192,6 +378,18 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
         if (over) return;
         over = true;
         if (BuildConfig.DEBUG) android.util.Log.i("RunFinale", "clip over: " + why + (played ? "" : " (not played)"));
+        removeCallbacks(ticker);
+        MediaPlayer sounding = voice;
+        voice = null;
+        try {
+            if (sounding != null) {
+                sounding.setOnPreparedListener(null);
+                sounding.setOnErrorListener(null);
+                sounding.release();
+            }
+        } catch (RuntimeException ignored) {
+            // It is being put away.
+        }
         MediaPlayer old = player;
         player = null;
         try {
