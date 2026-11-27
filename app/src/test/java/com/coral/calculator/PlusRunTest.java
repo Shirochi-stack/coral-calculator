@@ -7467,6 +7467,12 @@ public class PlusRunTest {
         }
         assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4, lines);
         assertEquals(14, RunStory.REVEAL.length);
+        // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.
+        assertEquals("rev7", RunStory.REVEAL[RunStory.CUT_AT][0]);
+        assertEquals("H", RunStory.REVEAL[RunStory.CUT_AT][2]);
+        assertTrue(RunStory.REVEAL[RunStory.CUT_AT][1].contains("great evil"));
+        assertTrue(RunStory.CUT_SAYS.endsWith(" " + Chatter.SLOPPY));
+        assertTrue(RunStory.CUT_AT > 0 && RunStory.CUT_AT + 1 < RunStory.REVEAL.length);
         assertEquals(4, RunStory.READ.length);
         assertEquals("f", RunStory.READ[0][2]);
         assertEquals(12, RunStory.LUCY.length);
@@ -7849,5 +7855,17 @@ public class PlusRunTest {
         }
         System.out.println("SEEDS:\n" + found);
         throw new AssertionError("SEEDS:\n" + found);
+    }
+
+    @Test public void aClipFillsAScreenNearlyItsShapeAndIsShownWholeOnAnother() {
+        // An upright clip on an upright phone a little taller than it: it fills the height, and loses a little at its sides.
+        assertEquals(1960 / 1280f, RunVideo.scale(720, 1280, 864, 1960), 1e-4f);
+        // On a screen of its own shape nothing is lost either way.
+        assertEquals(1.5f, RunVideo.scale(720, 1280, 1080, 1920), 1e-4f);
+        // One wider than tall on an upright phone is shown whole, with black above and below; and so is an upright one on a screen lying down.
+        assertEquals(864 / 1280f, RunVideo.scale(1280, 720, 864, 1960), 1e-4f);
+        assertEquals(864 / 1280f, RunVideo.scale(720, 1280, 1960, 864), 1e-4f);
+        // Wider than tall on a screen lying down, a little wider than it: it fills.
+        assertEquals(1960 / 1280f, RunVideo.scale(1280, 720, 1960, 864), 1e-4f);
     }
 }
