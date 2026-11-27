@@ -84,13 +84,16 @@ public class RunBoutiqueTest {
     }
 
     @Test public void everyLineIsSaidAndRecorded() {
-        String[][] all = new String[1 + VanityStory.GREET.length + 1 + VanityStory.QUESTS.length * 5 + VanityStory.BOUGHT_FOR.length + VanityStory.HAL_BOUGHT.length][];
+        String[][] all = new String[1 + 1 + VanityStory.GREET.length + 1 + VanityStory.QUESTS.length * 5 + VanityStory.BOUGHT_FOR.length + VanityStory.HAL_BOUGHT.length + VanityStory.EARS_BOUGHT.length + VanityStory.HORNS_BOUGHT.length][];
         int n = 0;
         for (String[] one : VanityStory.GREET) all[n++] = one;
+        all[n++] = VanityStory.PICTURE;
         all[n++] = VanityStory.BOUGHT;
         all[n++] = VanityStory.BROKE;
         for (String[] one : VanityStory.BOUGHT_FOR) all[n++] = one;
         for (String[] one : VanityStory.HAL_BOUGHT) all[n++] = one;
+        for (String[] one : VanityStory.EARS_BOUGHT) all[n++] = one;
+        for (String[] one : VanityStory.HORNS_BOUGHT) all[n++] = one;
         for (String[][] quest : VanityStory.QUESTS) {
             assertEquals(5, quest.length);
             for (String[] one : quest) all[n++] = one;
@@ -146,6 +149,130 @@ public class RunBoutiqueTest {
             }
         }
         assertTrue(checked >= 0);
+    }
+
+    @Test public void headPartsCombineWithEveryOutfitAndSettingAndNeverChangeAStat() {
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (int outfit = -1; outfit < RunVanity.count(); outfit++) {
+            for (int ears = 0; ears < RunVanity.EARS.length; ears++) {
+                for (int horns = 0; horns < RunVanity.HORNS.length; horns++) {
+                    RunVanity.Style style = RunVanity.styleFor(RunVanity.VANITY, outfit, null, ears, horns);
+                    if (outfit < 0 && ears == 0 && horns == 0) {
+                        assertEquals(null, style);
+                        continue;
+                    }
+                    assertNotNull(style);
+                    assertEquals(ears, style.ears);
+                    assertEquals(horns, style.horns);
+                    assertTrue("every combination is its own look", keys.add(outfit + ":" + style.key()));
+                    // Default and Show gear never show them.
+                    RunVanity.Style gear = RunVanity.styleFor(RunVanity.GEAR, outfit, new RunLoot.Worn(RunLoot.code(RunLoot.ARMOUR, 0, 5, RunLoot.BLUE), 0, 0), ears, horns);
+                    assertEquals(0, gear.ears);
+                    assertEquals(0, gear.horns);
+                    assertEquals(null, RunVanity.styleFor(RunVanity.DEFAULT, outfit, null, ears, horns));
+                }
+            }
+        }
+    }
+
+    @Test public void partsAreBoughtAndWornOnlyOnceTheirPicturesAreIn() {
+        for (int ears = 1; ears < RunVanity.EARS.length; ears++) {
+            Save save = new Save();
+            save.keep("run_bank", 99999);
+            save.keep("run_treats", 99);
+            boolean ready = RunVanity.earsReady(ears);
+            assertEquals(ready, RunVanity.buyPart(save, true, ears, false));
+            assertEquals(ready ? ears : 0, RunVanity.ears(save));
+            if (ready) {
+                assertEquals(99999 - RunVanity.EARS_PRICE[ears], save.tally("run_bank"));
+                assertFalse("not twice", RunVanity.buyPart(save, true, ears, true));
+            }
+            // One she does not have cannot be put on; her own always can.
+            assertEquals(ready, RunVanity.wearPart(save, true, ears));
+            assertTrue(RunVanity.wearPart(save, true, 0));
+            assertEquals(0, RunVanity.ears(save));
+            assertNotNull(VanityStory.EARS_BOUGHT[ears]);
+            assertTrue(new File("src/main/res/raw/run_v_" + VanityStory.EARS_BOUGHT[ears][0] + ".ogg").length() > 2000);
+        }
+        for (int horns = 1; horns < RunVanity.HORNS.length; horns++) {
+            Save save = new Save();
+            save.keep("run_treats", 99);
+            boolean ready = RunVanity.hornsReady(horns);
+            assertEquals(ready, RunVanity.buyPart(save, false, horns, true));
+            assertEquals(ready ? horns : 0, RunVanity.horns(save));
+            assertNotNull(VanityStory.HORNS_BOUGHT[horns]);
+            assertTrue(new File("src/main/res/raw/run_v_" + VanityStory.HORNS_BOUGHT[horns][0] + ".ogg").length() > 2000);
+        }
+        // A forged save of a part she does not own shows her own.
+        Save forged = new Save();
+        forged.keep(RunVanity.EARS_KEY, 2);
+        forged.keep(RunVanity.HORNS_KEY, 1);
+        assertEquals(0, RunVanity.ears(forged));
+        assertEquals(0, RunVanity.horns(forged));
+    }
+
+    @Test public void everyPartOnSaleHasEveryFrameOfEverySheet() throws Exception {
+        for (int pass = 0; pass < 2; pass++) {
+            String[] names = pass == 0 ? RunVanity.EARS_ART : RunVanity.HORNS_ART;
+            for (int one = 1; one < names.length; one++) {
+                if (!(pass == 0 ? RunVanity.earsReady(one) : RunVanity.hornsReady(one))) continue;
+                for (Object[] sheet : VanityLayers.SHEETS) {
+                    for (String suffix : new String[]{".webp", "_m.webp"}) {
+                        File file = new File("../vanity/src/main/assets/vanity/heads/" + names[one] + "/" + sheet[0] + suffix);
+                        assertTrue(file.getPath(), file.exists());
+                        int[] got = size(file);
+                        assertNotNull(file.getPath(), got);
+                        assertEquals(file.getPath(), (Integer) sheet[1] * (Integer) sheet[3], got[0]);
+                        assertEquals(file.getPath(), (Integer) sheet[2] * (Integer) sheet[4], got[1]);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test public void everyOutfitAndPartHasItsPicturesAndTheyOpenWhenItIsHers() {
+        // Every outfit has at least one picture, every picture's file is in the pack, and each opens with its outfit (and not before).
+        for (int outfit = 0; outfit < RunVanity.count(); outfit++) {
+            int pictures = 0;
+            for (VanityPictures.Picture picture : VanityPictures.ALL) if (picture.outfit == outfit) pictures++;
+            assertTrue(RunVanity.NAMES[outfit] + " has a picture", pictures >= 1);
+        }
+        for (VanityPictures.Picture picture : VanityPictures.ALL) {
+            assertTrue(picture.id, new File("../vanity/src/main/assets/vanity/pictures/" + picture.id + ".webp").length() > 50000);
+            Save save = new Save();
+            assertFalse(VanityPictures.open(save, picture));
+        }
+        for (int outfit = 0; outfit < RunVanity.count(); outfit++) {
+            Save save = new Save();
+            RunVanity.give(save, outfit);
+            for (VanityPictures.Picture picture : VanityPictures.ALL) assertEquals(picture.outfit == outfit, VanityPictures.open(save, picture));
+            // Once opened, they stay open: a second time opens nothing new.
+            assertEquals(0, VanityPictures.unlockOutfit(save, outfit));
+        }
+        // Bought, not given: the same.
+        Save bought = new Save();
+        bought.keep("run_bank", 99999);
+        assertTrue(RunVanity.buy(bought, 3));
+        int open = 0;
+        for (VanityPictures.Picture picture : VanityPictures.ALL) if (VanityPictures.open(bought, picture)) open++;
+        assertEquals(2, open);
+        // The Cringe gallery lists them under Vanity, and a row reads.
+        for (RunGallery.Item item : VanityPictures.items()) {
+            assertEquals(RunGallery.VANITY, item.shelf);
+            assertTrue(item.rule, RunGallery.valid(item.rule));
+        }
+        // A quest's end opens the picture of its outfit.
+        Save quest = new Save();
+        quest.keep("run_mobs", 0);
+        assertTrue(VanityQuests.take(quest, 2));
+        for (int step = 0; step < VanityQuests.STEPS[2].length; step++) {
+            VanityQuests.Step now = VanityQuests.STEPS[2][step];
+            if (now.kind == VanityQuests.LAND) quest.keep("run_stars_" + now.amount, 1);
+            if (now.kind == VanityQuests.GIVE) quest.keep("run_mat_" + now.which, now.amount);
+            if (now.kind == VanityQuests.HUNTS) quest.keep("run_hunts", quest.tally("run_hunts") + now.amount);
+            VanityQuests.hand(quest, 2);
+        }
+        assertTrue(VanityPictures.open(quest, VanityPictures.ALL.get(2)));
     }
 
     @Test public void theBoutiqueOpensFromTheGuildCounter() throws Exception {

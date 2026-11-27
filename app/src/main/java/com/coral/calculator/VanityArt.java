@@ -32,7 +32,8 @@ final class VanityArt {
         if (making.add(key)) {
             new Thread(() -> {
                 try {
-                    Bitmap dressed = style.art != null ? drawn(sheet, base, style.art) : dress(sheet, base, style);
+                    Bitmap dressed = style.art != null ? drawn(sheet, base, style.art) : style.mid != 0 ? dress(sheet, base, style) : null;
+                    if (style.ears != 0 || style.horns != 0) dressed = parts(sheet, dressed != null ? dressed : base, style);
                     if (dressed != null) made.put(key, dressed);
                 } catch (RuntimeException | OutOfMemoryError ignored) {
                     // A sheet that cannot be dressed stays as she is.
@@ -62,6 +63,80 @@ final class VanityArt {
             anchors = VanityLayers.parse(text.toString());
         }
         return anchors;
+    }
+
+    /**
+     * The horns and the ears over a sheet: for each part, its pictures of the sheet (the new pixels) and where they go (a mask),
+     * made by tools/make_vanity_heads.py. Where the mask is, the sheet shows the part's pixels and not its own.
+     */
+    private Bitmap parts(String sheet, Bitmap from, RunVanity.Style style) {
+        Bitmap out = from.copy(Bitmap.Config.ARGB_8888, true);
+        String[] names = {RunVanity.HORNS_ART[style.horns], RunVanity.EARS_ART[style.ears]};
+        int[] pixels = null, patch = null, mask = null;
+        for (int which = 0; which < names.length; which++) {
+            String name = names[which];
+            boolean hornPart = which == 0;
+            if (name == null) continue;
+            Bitmap picture = load("vanity/heads/" + name + "/" + sheet + ".webp"), where = load("vanity/heads/" + name + "/" + sheet + "_m.webp");
+            if (picture == null || where == null || picture.getWidth() != out.getWidth() || picture.getHeight() != out.getHeight()
+                    || where.getWidth() != out.getWidth() || where.getHeight() != out.getHeight()) continue;
+            int n = out.getWidth() * out.getHeight();
+            if (pixels == null) {
+                pixels = new int[n];
+                out.getPixels(pixels, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+            }
+            patch = new int[n];
+            mask = new int[n];
+            picture.getPixels(patch, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+            where.getPixels(mask, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+            for (int i = 0; i < n; i++) {
+                int m = mask[i] >>> 24;
+                if (m == 0) continue;
+                int p = patch[i], o = pixels[i];
+                // The loose edge of a horn's place (a mask of 90): only what is left of the old horn goes, and nothing is put there.
+                if (m < 200) {
+                    if (hornPart && hornEdge(o)) pixels[i] = 0;
+                    continue;
+                }
+                int pa = p >>> 24, oa = o >>> 24;
+                // Where a part leaves nothing, a horn's last pixels (an outfit's frame has them a pixel off) go, and her hair's edge stays.
+                if (hornPart && pa < 20) {
+                    if (hornEdge(o)) pixels[i] = 0;
+                    continue;
+                }
+                int alpha = pa;
+                int rgb = pa > 0 ? p & 0xFFFFFF : o & 0xFFFFFF;
+                pixels[i] = alpha << 24 | rgb;
+            }
+            picture.recycle();
+            where.recycle();
+        }
+        if (pixels == null) return from;
+        out.setPixels(pixels, 0, out.getWidth(), 0, 0, out.getWidth(), out.getHeight());
+        return out;
+    }
+
+    /** Whether a pixel is anywhere on a horn, its soft edge included (a little pinker and lighter than the horn itself). */
+    private static boolean hornEdge(int pixel) {
+        if (pixel >>> 24 == 0) return false;
+        // (A faint pixel is the soft edge of a line: in the ring round a horn's place it is what is left of the horn's outline.)
+        if (pixel >>> 24 < 200) return true;
+        int r = pixel >> 16 & 255, g = pixel >> 8 & 255, b = pixel & 255;
+        return r < 190 && g < 130 && b < 180 && r - g < 110 && b + 12 >= g;
+    }
+
+    /** Whether a pixel is the dark purple of her horns (and not the pink of her hair). */
+    private static boolean horny(int pixel) {
+        int r = pixel >> 16 & 255, g = pixel >> 8 & 255, b = pixel & 255;
+        return r < 140 && g < 100 && b < 150 && b + 6 >= g;
+    }
+
+    private Bitmap load(String path) {
+        try (InputStream in = context.getAssets().open(path)) {
+            return BitmapFactory.decodeStream(in);
+        } catch (java.io.IOException missing) {
+            return null;
+        }
     }
 
     /** An outfit that was drawn whole: its picture of this sheet, if it is in the app and is the sheet's size. */
