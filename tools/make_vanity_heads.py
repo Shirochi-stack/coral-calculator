@@ -60,11 +60,11 @@ GRIPS = ["grip%d" % k for k in outfit.layers.GRIP]
 
 def frames_list():
     """Every frame: those of the sheets she had first, then those of the sheets that came later (as grids of their own, so that the grids drawn before stay the same)."""
-    out, later, grips = [], [], []
+    out, later, grips, moves = [], [], [], []
     for name in SHEETS:
         for idx, c in cells(name):
-            (grips if name in GRIPS else later if name in LATER else out).append((name, idx, c))
-    return out, later, grips
+            (moves if name == "moves" else grips if name in GRIPS else later if name in LATER else out).append((name, idx, c))
+    return out, later, grips, moves
 
 
 def make_jobs(variant, redo=False):
@@ -80,9 +80,9 @@ def make_jobs(variant, redo=False):
         while any((work / "raw" / ("%s_r%d.png" % (j, n))).exists() for j in weak):
             n += 1
         suffix = "_r%d" % n
-    first, later, grips = frames_list()
-    allf = first + later + grips
-    groups = [x[i:i + COLS * ROWS] for x in (first, later, grips) for i in range(0, len(x), COLS * ROWS)]
+    first, later, grips, moves = frames_list()
+    allf = first + later + grips + moves
+    groups = [x[i:i + COLS * ROWS] for x in (first, later, grips, moves) for i in range(0, len(x), COLS * ROWS)]
     cw, ch = CANVAS[0] // COLS, CANVAS[1] // ROWS
     for gnum, group in enumerate(groups):
         name = "%s_%02d" % (variant, gnum)

@@ -81,6 +81,9 @@ def groups():
     # And the weapon-free grips, last of all, for the same reason.
     grips = [(s, i) for s in GRIPS for i, _ in cells(s)]
     out += [("g2x3", grips[i:i + 6]) for i in range(0, len(grips), 6)]
+    # And the moves, after them.
+    moves = [(s, i) for s in ("moves",) if s in SHEETS for i, _ in cells(s)]
+    out += [("g3x2", moves[i:i + 6]) for i in range(0, len(moves), 6)]
     return out
 
 

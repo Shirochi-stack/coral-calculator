@@ -39,6 +39,10 @@ GRIP = {2: ("book", 8, 304), 12: ("greatsword", 12, 500), 5: ("gun", 8, 304), 15
 for kind, (gname, frames, wide) in GRIP.items():
     SHEETS["grip%d" % kind] = (frames, 1, wide, 248)
 
+# The moves (flips, air dash, ground pound, roll, cling, glide): one sheet of eight, once it is in the game.
+if (RES / "halgakos_moves.webp").exists():
+    SHEETS["moves"] = (8, 1, 256, 208)
+
 
 def sheet_file(name):
     """Where a sheet of her is: her own sheets by their name, the weapon-free grips under their weapon's."""
