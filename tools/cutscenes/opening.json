@@ -30,6 +30,11 @@
  "bar": 2.0,
  "song": "opening-song.wav",
  "words": "song.json",
+ "sound": {
+  "on": true,
+  "music": "upbeat, bouncy anime-opening music, bright and fast, with handclaps and a catchy tune.",
+  "voice": "Over the music a girl's singing voice is heard, sung by no one in the picture: an anime girl's voice, smug, bratty and teasing, sing-song and cheeky, very pleased with herself."
+ },
  "title": {
   "text": "Calculation, Translation,\nand Sloppy~♡",
   "under": "Halgakos Calculator",
@@ -44,7 +49,11 @@
    "cast": "",
    "still": "stills/S01.png",
    "frame": "A bright summer sky full of soft white clouds seen from high up, a pastel storybook town of red roofs far below. A thick old green book with gold corners tumbles down through the sky in the upper middle of the picture, its cover flapping, a few loose pages trailing behind it. No people.",
-   "prompt": "The green book tumbles down through the clouds, turning over and over and shedding loose pages, and the camera falls after it toward the little town below."
+   "prompt": "The green book tumbles down through the clouds, turning over and over and shedding loose pages, and the camera falls after it toward the little town below.",
+   "sound": {
+    "effects": "wind rushing past, pages fluttering, a far-off whistle of something falling.",
+    "lyric": "Sloppy~♡"
+   }
   },
   {
    "name": "S02",
@@ -58,7 +67,13 @@
    },
    "still": "stills/S02.png",
    "frame": "Halgakos strolls along a sunny shopping street of a pastel storybook town, seen from the knees up a little left of the middle, holding in her right hand an ice cream cone with one big scoop of pale green mint ice cream speckled with dark chocolate chips, her eyes closed in a blissful smile, her tail curled happily, her wings folded. Room in the lower right of the picture is calm and empty.",
-   "prompt": "She strolls along swinging her free arm, takes a happy lick of the mint-green ice cream, her tail swaying and her ears twitching; shop awnings and a few leaves drift past. Gentle sideways camera."
+   "prompt": "She strolls along swinging her free arm, takes a happy lick of the mint-green ice cream, her tail swaying and her ears twitching. The camera travels steadily backward along the street ahead of her, at her walking pace, so that she walks toward it and stays the same size in the picture. The street is solid and three-dimensional: the buildings on both sides pass the camera in true perspective, near things sliding by faster than far ones, and the vanishing point at the end of the street stays where it is. Every sign, lamp, awning, flower box and shopfront stays fixed to its building exactly as drawn in the first frame; nothing in the background is redrawn, swapped or changes shape.",
+   "sound": {
+    "effects": "her footsteps on the cobbles, the bustle of the street, a happy little hum as she licks the ice cream.",
+    "lyric": "My one day off, one ice cream cone,"
+   },
+   "model": "kling/v4/image-to-video",
+   "made_from": "first_frame"
   },
   {
    "name": "S03",
@@ -67,7 +82,11 @@
    "cast": "H",
    "still": "stills/S03.png",
    "frame": "The same sunny street. Halgakos in mid step in the middle of the picture, about to lick her cone of pale green mint ice cream speckled with dark chocolate chips, eyes closed, unaware; directly above her head, close, the thick green book is falling toward her with a round shadow already on her hair; small speed lines above the book.",
-   "prompt": "The book lands on her head with a comic bonk, her eyes go wide and spin, she wobbles, and the mint-green scoop pops off the cone and sails up out of the picture; the book drops to the pavement and falls open, glowing."
+   "prompt": "The book lands on her head with a comic bonk, her eyes go wide and spin, she wobbles, and the mint-green scoop pops off the cone and sails up out of the picture; the book drops to the pavement and falls open, glowing.",
+   "sound": {
+    "effects": "a whistle of something falling, a comic bonk, a wobbling boing, a soft plop.",
+    "lyric": "a book fell down and now I'm thrown!"
+   }
   },
   {
    "name": "S04",
@@ -76,7 +95,11 @@
    "cast": "",
    "still": "stills/S04.png",
    "frame": "Low camera on the cobbled street. The thick green book lies open on the ground in the middle, shining with golden light, and out of its pages pour dozens of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes, and little letters with wings, scattering in every direction past the camera; shop fronts behind. Only a pair of black shoes and stockinged ankles of someone standing at the edge of the picture.",
-   "prompt": "The little numeral and plus-sign creatures stream out of the glowing book and scamper off in all directions, some tumbling over each other, winged letters fluttering up past the camera; the light from the book pulses."
+   "prompt": "The little numeral and plus-sign creatures stream out of the glowing book and scamper off in all directions, some tumbling over each other, winged letters fluttering up past the camera; the light from the book pulses.",
+   "sound": {
+    "effects": "a magical shimmer, a patter of dozens of tiny feet, little squeaks and giggles.",
+    "lyric": "The sums grew legs, the words ran wild,"
+   }
   },
   {
    "name": "S05",
@@ -85,7 +108,11 @@
    "cast": "H",
    "still": "stills/S05.png",
    "frame": "Close on Halgakos from the chest up in the middle of the picture, deadpan and unimpressed with half-closed eyes, holding up an ice cream cone with no scoop on it, only a melting dollop of pale green mint ice cream with chocolate chips left in its rim and dripping down its side; behind her, out of focus, small cute creatures shaped like numerals and plus signs with tiny legs and round eyes run riot along the street.",
-   "prompt": "She looks at the empty cone, lets out a long sigh with drooping ears, then narrows her eyes, tosses the cone aside, draws a big pink pocket calculator from behind her back like a sword and jabs a thumb at herself."
+   "prompt": "She looks at the empty cone, lets out a long sigh with drooping ears, then narrows her eyes, tosses the cone aside, draws a big pink pocket calculator from behind her back like a sword and jabs a thumb at herself.",
+   "sound": {
+    "effects": "a long deadpan sigh, tiny feet pattering by, a bright ting as she draws the calculator.",
+    "lyric": "who cleans it up? Me, Sloppy~♡"
+   }
   },
   {
    "name": "S06",
@@ -94,7 +121,11 @@
    "cast": "H",
    "still": "stills/S06.png",
    "frame": "Very close over her shoulder: Halgakos's two hands hold a big pink pocket calculator with round blank keys, both thumbs poised over the keys; a strand of pink hair and the edge of a black sleeve with a white frill in the picture; a blurred street beyond. Little sparks of golden light sit on the keys.",
-   "prompt": "Her thumbs hammer the keys faster and faster, each press popping out a little glowing plus sign that floats up, the calculator's screen glowing brighter until it flashes."
+   "prompt": "Her thumbs hammer the keys faster and faster, each press popping out a little glowing plus sign that floats up, the calculator's screen glowing brighter until it flashes.",
+   "sound": {
+    "effects": "quick plastic key clicks, faster and faster, with a bright chime on each.",
+    "lyric": "Carry the one, mind the footnote,"
+   }
   },
   {
    "name": "S07",
@@ -103,7 +134,11 @@
    "cast": "H",
    "still": "stills/S07.png",
    "frame": "Halgakos in a sprinter's crouch on the street, seen from the side and a little in front, one hand on the ground and the calculator in the other, wings half spread, tail up, a wide determined grin; dust at her heels; the street stretching away ahead of her.",
-   "prompt": "She cracks her thumbs, springs forward, spreads her mismatched wings and takes off down the street close above the cobbles, dust and loose pages whirling behind her; the camera whips round to follow."
+   "prompt": "She cracks her thumbs, springs forward, spreads her mismatched wings and takes off down the street close above the cobbles, dust and loose pages whirling behind her; the camera whips round to follow.",
+   "sound": {
+    "effects": "thumbs cracking, a whoosh of wings, a gust of wind.",
+    "lyric": "stretch your thumbs, here we go Sloppy~♡"
+   }
   },
   {
    "name": "S08",
@@ -112,7 +147,11 @@
    "cast": "H",
    "still": "stills/S08.png",
    "frame": "Halgakos hovers in the bright sky above the pastel town, full figure in the middle of the picture, wings spread wide, the pink calculator raised in her right hand and the open green book in her left, a confident wink; loose pages and glowing plus signs circle around her like a ring. Heroic, like the title pose of an anime opening.",
-   "prompt": "The camera circles her slowly as she strikes two poses in turn: she thrusts the calculator up high, then swings the open book forward, winks and points straight at the viewer, pages and plus signs swirling round her."
+   "prompt": "The camera circles her slowly as she strikes two poses in turn: she thrusts the calculator up high, then swings the open book forward, winks and points straight at the viewer, pages and plus signs swirling round her.",
+   "sound": {
+    "effects": "a heroic whoosh, sparkling chimes, pages fluttering round her.",
+    "lyric": "Calculation! Translation! And Sloppy~♡"
+   }
   },
   {
    "name": "S09",
@@ -121,7 +160,11 @@
    "cast": "H",
    "still": "stills/S09.png",
    "frame": "A sunny classroom. Halgakos as a strict teacher, seen from the waist up at the left of the picture, beside a wide green chalkboard that has nothing on it but a few chalk doodles of plus signs and stars; small round glasses, one hand on her hip, a wooden pointer in the other resting on the board; she looks at the viewer with her smug look exactly as in the SECOND attached picture: half-lidded eyes, relaxed brows, and a small closed self-satisfied cat-like smile with one tiny fang showing.",
-   "prompt": "She raps the chalkboard twice with the pointer, pushes up her glasses so they flash, and wags the pointer slowly at the viewer; the smug half-lidded look and the small smile never leave her face. Chalk dust puffs."
+   "prompt": "She raps the chalkboard twice with the pointer, pushes up her glasses so they flash, and wags the pointer slowly at the viewer; the smug half-lidded look and the small smile never leave her face. Chalk dust puffs.",
+   "sound": {
+    "effects": "two raps of a pointer on a chalkboard, a bright ting as her glasses flash.",
+    "lyric": "Two plus two is four. You're still Sloppy~♡"
+   }
   },
   {
    "name": "S10",
@@ -130,7 +173,11 @@
    "cast": "H",
    "still": "stills/S10.png",
    "frame": "A long writing desk by a sunny window. Halgakos sits at its left end, seen from the waist up, writing in the open green book with a white feather quill, the pink calculator by her elbow, a pleased little smile; along the desk in front of her a row of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes stands to attention in one perfectly straight line, like little soldiers on parade, each saluting her.",
-   "prompt": "She finishes a neat line with a flourish of the quill and dots it; along the row the little creatures snap to attention and salute one after another, like a wave; she gives them one pleased nod."
+   "prompt": "She finishes a neat line with a flourish of the quill and dots it; along the row the little creatures snap to attention and salute one after another, like a wave; she gives them one pleased nod.",
+   "sound": {
+    "effects": "a quill scratching, a row of tiny heels clicking together one after another.",
+    "lyric": "Every word as written, every sum just right,"
+   }
   },
   {
    "name": "S11",
@@ -139,7 +186,11 @@
    "cast": "H",
    "still": "stills/S11.png",
    "frame": "The town street seen from the side, the camera level with the rooftops and looking a little down. Halgakos, full figure in the upper middle of the picture, drops through the air feet first in side view, her legs straight and together, her arms out for balance, her wings half open, her hair streaming up, grinning; her skirt hangs modestly. Well below her on the cobbles a cute round blob of dark blue ink with big worried eyes looks up at her. Speed lines above her.",
-   "prompt": "At once she drops and lands on the ink blob with both feet, in the first second of the shot, and it squashes perfectly flat, like a sheet of paper, with a puff of ink droplets; she bounces once on the flat sheet."
+   "prompt": "At once she drops and lands on the ink blob with both feet, in the first second of the shot, and it squashes perfectly flat, like a sheet of paper, with a puff of ink droplets; she bounces once on the flat sheet.",
+   "sound": {
+    "effects": "a falling whistle, then a big soft squish and a splat.",
+    "lyric": "Squish Sloppy~♡ Flat as a page tonight!"
+   }
   },
   {
    "name": "S12",
@@ -148,7 +199,10 @@
    "cast": "H",
    "still": "stills/S12.png",
    "frame": "Close on Halgakos from the chest up, a little right of the middle of the picture, on the town street, just after stamping something flat: she brushes her hands together in front of her, chin a little raised, with her smug look exactly as in the SECOND attached picture: half-lidded eyes, relaxed brows, and a small closed self-satisfied cat-like smile with one tiny fang showing; a few dark blue ink droplets hang in the air around her; the street behind her is out of focus.",
-   "prompt": "She dusts her hands off, tilts her chin up and raises a small V sign beside her face, smug and unhurried, the half-lidded look never leaving her face; a last ink droplet falls past."
+   "prompt": "She dusts her hands off, tilts her chin up and raises a small V sign beside her face, smug and unhurried, the half-lidded look never leaving her face; a last ink droplet falls past.",
+   "sound": {
+    "effects": "hands dusting off, a smug little hum, one last drip."
+   }
   },
   {
    "name": "S13",
@@ -162,7 +216,11 @@
    },
    "still": "stills/S13.png",
    "frame": "A bakery stall on the town street. Chikuwa, a little right of the middle, seen from the knees up, beams at the viewer with her arms full of golden bread rolls, a fish-cake stick held in her mouth; one of the small cute creatures shaped like numerals and plus signs with tiny legs and round eyes sits on the counter with a bread roll stuffed in its mouth, looking baffled. The lower left of the picture is calm.",
-   "prompt": "She bounces on her toes with her twin tails swinging, holds a bread roll out toward the viewer with a beaming smile, and tosses another over her shoulder; the little creature on the counter chews, puzzled."
+   "prompt": "She bounces on her toes with her twin tails swinging, holds a bread roll out toward the viewer with a beaming smile, and tosses another over her shoulder; the little creature on the counter chews, puzzled.",
+   "sound": {
+    "effects": "a cheerful bakery bell, the soft thump of bread rolls.",
+    "lyric": "Chikuwa! The answer is not always bread!"
+   }
   },
   {
    "name": "S14",
@@ -176,7 +234,11 @@
    },
    "still": "stills/S14.png",
    "frame": "A dim cosy archive of tall bookshelves lit by one warm lamp. Rune, a little left of the middle, sits on the floor hugging her knees beside an open ink bottle, big wobbling tears of dark blue ink running down her cheeks and pooling on the floor around her, looking up at the viewer with a trembling little smile. The lower right of the picture is calm.",
-   "prompt": "She sniffles, her shoulders hitch, and fat tears roll down her cheeks and plop into the puddle of ink spreading around her; she wipes one eye with her sleeve and gives a wobbly smile."
+   "prompt": "She sniffles, her shoulders hitch, and fat tears roll down her cheeks and plop into the puddle of ink spreading around her; she wipes one eye with her sleeve and gives a wobbly smile.",
+   "sound": {
+    "effects": "sniffles, slow drips into a puddle.",
+    "lyric": "Rune! Stop crying in the ink!"
+   }
   },
   {
    "name": "S15",
@@ -190,7 +252,11 @@
    },
    "still": "stills/S15.png",
    "frame": "A theatre stage with red curtains and one bright spotlight. Illya stands a little right of the middle, full figure, in a magical-girl pose with a feather quill held like a wand above her head, winking, pink sparkles and hearts around her. The lower left of the picture is calm.",
-   "prompt": "She twirls once on the spot with her long hair flying out, sweeps the quill in an arc that leaves a trail of pink sparkles and hearts, and ends in a pose with a wink at the viewer as the spotlight flares."
+   "prompt": "She twirls once on the spot with her long hair flying out, sweeps the quill in an arc that leaves a trail of pink sparkles and hearts, and ends in a pose with a wink at the viewer as the spotlight flares.",
+   "sound": {
+    "effects": "a spotlight thunk, a sparkling swirl of chimes.",
+    "lyric": "Illya! One heroine is plenty!"
+   }
   },
   {
    "name": "S16",
@@ -204,7 +270,11 @@
    },
    "still": "stills/S16.png",
    "frame": "A quiet street corner. Tsubakieh stands a little left of the middle, seen from the knees up, perfectly blank-faced with round dot eyes, a white baseball bat resting on her shoulder; behind her a bent lamp post and a dented post box, and three of the small cute creatures shaped like numerals and plus signs with tiny legs and round eyes with bumps on their heads hiding behind a barrel. The lower right of the picture is calm.",
-   "prompt": "Without any change in her blank face she slowly lowers the bat from her shoulder and sets its tip gently on the ground, then raises her free hand in a tiny peace sign; the little creatures behind the barrel shiver."
+   "prompt": "Without any change in her blank face she slowly lowers the bat from her shoulder and sets its tip gently on the ground, then raises her free hand in a tiny peace sign; the little creatures behind the barrel shiver.",
+   "sound": {
+    "effects": "a bat set down with a soft tock, a small nervous squeak.",
+    "lyric": "Tsubakieh! Put the bat down. Normally!"
+   }
   },
   {
    "name": "S17",
@@ -213,7 +283,11 @@
    "cast": "HCRIT",
    "still": "stills/S17.png",
    "frame": "All five run toward the viewer down the middle of the town street, full figures side by side: Halgakos in front in the middle with the pink calculator, Chikuwa at her right munching a bread roll, Rune at her left with ink tears streaming behind her, Illya further right posing as she runs, Tsubakieh further left with the bat over her shoulder and a blank face. Behind them a wave of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes and flying pages fills the street.",
-   "prompt": "They run toward the viewer, hair and ribbons streaming, each in her own way: Halgakos sprinting with her wings out, Chikuwa munching, Rune crying as she runs, Illya skipping with sparkles, Tsubakieh jogging blank-faced; the wave of little creatures and pages rolls along behind them."
+   "prompt": "They run toward the viewer, hair and ribbons streaming, each in her own way: Halgakos sprinting with her wings out, Chikuwa munching, Rune crying as she runs, Illya skipping with sparkles, Tsubakieh jogging blank-faced; the wave of little creatures and pages rolls along behind them.",
+   "sound": {
+    "effects": "five pairs of running feet, a rolling patter of tiny feet behind them.",
+    "lyric": "Calculation! Translation! And Sloppy~♡ -nim and -ssi, I keep them all,"
+   }
   },
   {
    "name": "S18",
@@ -222,7 +296,11 @@
    "cast": "H",
    "still": "stills/S18.png",
    "frame": "Halgakos floats in a soft golden sky among drifting pages, seen from the waist up in the middle of the picture, the green book open in her left hand, her right hand reaching up gently for one of several small glowing ribbon bookmarks, blank and pale gold, that drift down around her like petals; a soft careful smile.",
-   "prompt": "One by one she catches three of the drifting golden ribbons with great care, between finger and thumb, and tucks each between the pages of the open book, which glows a little brighter each time; she smiles softly."
+   "prompt": "One by one she catches three of the drifting golden ribbons with great care, between finger and thumb, and tucks each between the pages of the open book, which glows a little brighter each time; she smiles softly.",
+   "sound": {
+    "effects": "soft chimes as each ribbon is caught, pages turning.",
+    "lyric": "drop one honorific and you're Sloppy~♡"
+   }
   },
   {
    "name": "S19",
@@ -231,7 +309,11 @@
    "cast": "H",
    "still": "stills/S19.png",
    "frame": "Close on Halgakos from the shoulders up in the middle of the picture, looking straight at the viewer, chin a little raised, the pink calculator held lightly beside her cheek like a fan, with her smug look exactly as in the SECOND attached picture: half-lidded eyes, relaxed brows, and a small closed self-satisfied cat-like smile with one tiny fang showing, one brow a touch higher than the other; behind her, out of focus, the sunny town square. A few soft sparkles.",
-   "prompt": "She looks the viewer slowly up and down, gives one small approving nod, taps the calculator twice against her cheek, and the small smug smile widens just a little; she flicks her hair back over her shoulder."
+   "prompt": "She looks the viewer slowly up and down, gives one small approving nod, taps the calculator twice against her cheek, and the small smug smile widens just a little; she flicks her hair back over her shoulder.",
+   "sound": {
+    "effects": "two light taps of plastic on a cheek, a soft sparkle.",
+    "lyric": "not bad. For you. Sloppy~♡"
+   }
   },
   {
    "name": "S20",
@@ -240,7 +322,11 @@
    "cast": "HCRIT",
    "still": "stills/S20.png",
    "frame": "The town square. The five stand back to back in a ring in the middle of the picture, in battle poses: Halgakos aiming the pink calculator like a blaster, Chikuwa with bread rolls ready to throw, Rune holding a big ink bottle, Illya with her quill raised, Tsubakieh with the bat ready; all around them a ring of small cute creatures shaped like numerals and plus signs with tiny legs and round eyes closes in. Dynamic low angle.",
-   "prompt": "All five strike at once: a beam of golden light bursts from the calculator, bread rolls fly, a wave of ink splashes out, a spiral of pink sparkles sweeps round, the bat swings; the little creatures pop one after another into tidy rows of sparkles."
+   "prompt": "All five strike at once: a beam of golden light bursts from the calculator, bread rolls fly, a wave of ink splashes out, a spiral of pink sparkles sweeps round, the bat swings; the little creatures pop one after another into tidy rows of sparkles.",
+   "sound": {
+    "effects": "a beam of light firing, a swing and a crack, a splash, a volley of pops.",
+    "lyric": "Calculation! Translation! And Sloppy~♡"
+   }
   },
   {
    "name": "S21",
@@ -249,7 +335,11 @@
    "cast": "HCRIT",
    "still": "stills/S21.png",
    "frame": "A wide sunset sky above the town. All five leap into the air together, full figures in a row across the middle of the picture, arms thrown up, Halgakos in the middle holding the green book closed above her head; pages and sparkles whirl around them. Joyful, like the last pose of an anime opening.",
-   "prompt": "They leap up together and hang in the air with arms thrown up as the tidy rows of sparkles stream into the green book, which snaps shut in Halgakos's hands; the camera pulls back and up into the sunset sky."
+   "prompt": "They leap up together and hang in the air with arms thrown up as the tidy rows of sparkles stream into the green book, which snaps shut in Halgakos's hands; the camera pulls back and up into the sunset sky.",
+   "sound": {
+    "effects": "a big whoosh upward, a book snapping shut, a sparkling burst.",
+    "lyric": "Sloppy, sloppy, sloppy, Sloppy~♡"
+   }
   },
   {
    "name": "S22",
@@ -258,7 +348,11 @@
    "cast": "HCRIT",
    "still": "stills/S22.png",
    "frame": "Evening on the town street, warm lamps. In the lower half of the picture the five stand together, seen from the waist up: Halgakos in the middle looking mournfully at the empty ice cream cone in her hand; on one side of her Chikuwa kindly holds out a bread roll; on her other side Rune shyly holds up a fresh cone of pale green mint ice cream speckled with dark chocolate chips, which Halgakos has not noticed yet; Illya and Tsubakieh look on, smiling. The whole upper half of the picture is open evening sky with a few stars and nothing else in it.",
-   "prompt": "Chikuwa holds the bread roll closer and Halgakos sighs with drooping ears; then Rune nudges the mint ice cream into her view: Halgakos's ears spring up, she takes the cone in both hands and takes one blissful lick with her eyes closed, and the others laugh without a sound; the camera drifts slowly up toward the evening sky."
+   "prompt": "Chikuwa holds the bread roll closer and Halgakos sighs with drooping ears; then Rune nudges the mint ice cream into her view: Halgakos's ears spring up, she takes the cone in both hands and takes one blissful lick with her eyes closed, and the others laugh without a sound; the camera drifts slowly up toward the evening sky.",
+   "sound": {
+    "effects": "evening street murmur, a long sigh, then a happy gasp and a little hum.",
+    "lyric": "Now where is my ice cream Sloppy~♡ Sloppy~♡"
+   }
   }
  ]
 }

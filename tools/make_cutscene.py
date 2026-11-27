@@ -1,6 +1,6 @@
 """
-Makes the clips of a cutscene with the video model Seedance 2.5, on BytePlus ModelArk, one
-clip at a time; and joins the clips of a storyboard into one film.
+Makes the clips of a cutscene with a video model, one clip at a time: Seedance 2.5 on
+BytePlus ModelArk, or Kling 4.0 on fal; and joins the clips of a storyboard into one film.
 
 One shot, in a folder of its own:
 
@@ -39,7 +39,18 @@ of any shot that names another ("model"). So is what a shot is made from ("made_
 "first_frame", from its still alone, which is then exactly its first picture; or
 "references", from its still and the reference sheet of everyone in it (the board's
 "sheets", by the letters of the shot's "cast"), the prompt saying which picture is which.
-The service does not take a first frame and references together. Its takes are saved under
+The service does not take a first frame and references together. A model named
+kling/v4/image-to-video is Kling 4.0, asked of fal and not of BytePlus: it makes a shot
+from its first frame only, in that picture's own shape, 3 to 30 seconds, and always with
+sound, which has no switch and is whatever the prompt asks to be heard; it has no setting
+for the camera either, so that too is asked for in words. Its still is put in fal's file
+store when the shot is sent, since fal takes pictures by their address.
+
+Sound: the board's "sound" says whether the shots are made with it ("on"), and what the
+music and the singing voice are like; a shot's own "sound" says what else is heard in it
+("effects") and what words are sung in it ("lyric"). With it on, these are put at the end
+of the shot's prompt. Each clip then has a tune of its own: they do not join into a song,
+and the film is still laid over one track. Its takes are saved under
 dist/cutscenes/BOARD/takes with the task's number in their names. The film is made of the
 newest take of each shot, or of the one named for it in dist/cutscenes/BOARD/picks.json
 ({"S07": "S07-cgt-....mp4"}); a shot with no take yet is its still, held, drifting a little:
@@ -52,7 +63,12 @@ is saved with the task's number in its name, and so is what the service answered
 is read by its name from the environment or from the project's .env, whatever the case of
 the name, and is never printed or written anywhere.
 
-The request is the one BytePlus documents (read 2026-11-27):
+The keys are FAL_KEY for fal and BYTEPLUS_API_KEY (or ARK_API_KEY) for BytePlus.
+
+fal's side is as fal documents it (read 2026-11-27): https://fal.ai/models/kling/v4/image-to-video/llms.txt
+(the request), https://fal.ai/docs (the queue: the request is sent, asked after at the
+address the answer gives, and fetched when it is done; a picture is first put in the file
+store at rest.fal.ai). The request to BytePlus is the one BytePlus documents (read 2026-11-27):
 https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api
 and the models, what each makes and takes, are listed at https://docs.byteplus.com/en/docs/modelark/model-list
 """
@@ -72,6 +88,11 @@ BOARDS = ROOT / "tools" / "cutscenes"
 PROJECT = pathlib.Path(r"C:\Users\ADMIN\Dev\Halgakos-AI")
 BASE = "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks"
 KEY_NAMES = ("BYTEPLUS_API_KEY", "ARK_API_KEY")
+FAL = "https://queue.fal.run"
+FAL_STORE = "https://rest.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3"
+FAL_KEY_NAMES = ("FAL_KEY",)
+# What fal's models cost, in dollars a second of what they make, by size (pictures put in cost nothing).
+FAL_RATES = {"kling/v4/image-to-video": {"720p": .157, "1080p": .235, "4k": .549}}
 # What a clip is made of, in pixels, for each size and shape the 2.5 series makes; and what a million tokens cost, in dollars, with no video put in.
 SIZES = {"480p": {"16:9": (854, 480), "4:3": (752, 560), "1:1": (640, 640), "3:4": (560, 752), "9:16": (480, 854), "21:9": (992, 432)},
          "720p": {"16:9": (1280, 720), "4:3": (1112, 834), "1:1": (960, 960), "3:4": (834, 1112), "9:16": (720, 1280), "21:9": (1470, 630)},
@@ -85,9 +106,9 @@ KINDS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".web
 FONTS = {"heavy": ("seguibl.ttf", "segoeuib.ttf", "arialbd.ttf"), "plain": ("segoeuib.ttf", "arialbd.ttf"), "signs": ("seguisym.ttf", "segoeuib.ttf")}
 
 
-def secret():
-    """The key, under either of its names, whatever their case: from the environment, or from the project's .env. Never printed."""
-    wanted = {name.lower() for name in KEY_NAMES}
+def secret(names=KEY_NAMES):
+    """A key, under any of its names, whatever their case: from the environment, or from the project's .env. Never printed."""
+    wanted = {name.lower() for name in names}
     for name, value in os.environ.items():
         if name.lower() in wanted and value.strip():
             return value.strip()
@@ -135,12 +156,36 @@ def board_request(board, folder, shot):
 
     model = shot.get("model", board["model"])
     text = shot["prompt"].strip() + " " + board["style"].strip()
-    # The service makes whole seconds, four at the least: the film takes of a clip what its bars need.
-    seconds = max(4, math.ceil(shot["bars"] * board["bar"] - 1e-9))
+    # What is heard, if the shots are made with sound: the music, what sounds in this shot, and the voice with this shot's words to sing.
+    sound = board.get("sound") or {}
+    heard = bool(sound.get("on", board.get("generate_audio", False)))
+    if heard and sound:
+        own = shot.get("sound") or {}
+        said = ["Sound: " + own.get("music", sound.get("music", "")).strip()]
+        if own.get("effects"):
+            said.append("Sound effects: " + own["effects"].strip())
+        voice = own.get("voice", sound.get("voice", "")).strip()
+        if voice and own.get("lyric"):
+            said.append(f'{voice} She sings: "{own["lyric"]}"')
+        text += " " + " ".join(said)
+    elif not heard and sound.get("without"):
+        text += " " + sound["without"].strip()
+    # The service makes whole seconds, four at the least (fal's, three): the film takes of a clip what its bars need.
+    seconds = max(3 if model in FAL_RATES else 4, math.ceil(shot["bars"] * board["bar"] - 1e-9))
     way = shot.get("made_from", board.get("made_from", "first_frame"))
+    if model in FAL_RATES:
+        # Kling, on fal: a first frame and words. No shape (the picture's own), no switch for sound, nothing for the camera.
+        if way != "first_frame":
+            raise SystemExit(f"{shot['name']}: {model} makes a shot from its first frame only; give it \"made_from\": \"first_frame\".")
+        still = folder / shot["still"]
+        rest = {"duration": seconds, "resolution": board.get("resolution", "720p")}
+        shown = {"model": model, "prompt": text, "start_image_url": f"<{still.name}, {still.stat().st_size} bytes: put in fal's file store when sent>" if still.exists()
+                 else f"<{still.name}: NOT MADE YET>", **rest, "ratio": board.get("ratio", "16:9"), "sound": "always made; what is heard is in the prompt" if heard
+                 else "always made by this model; none was asked for, and the film's edit drops it"}
+        return ({"model": model, "prompt": text, "still": str(still), **rest} if still.exists() else None), shown
     pictures = [(folder / shot["still"], "first_frame" if way == "first_frame" else "reference_image")]
     rest = {"resolution": board.get("resolution", "720p"), "ratio": board.get("ratio", "16:9"), "duration": seconds,
-            "generate_audio": bool(board.get("generate_audio", False)), "watermark": False}
+            "generate_audio": heard, "watermark": False}
     if way == "references":
         # Made from references: its still, which the prompt says to begin from, and the sheet of everyone in it.
         said = ["@Image 1 is the first frame of the shot: begin exactly from it, and keep its drawing style."]
@@ -173,7 +218,11 @@ def board_request(board, folder, shot):
 
 def estimate(body):
     """About how many tokens a clip is, and about what that costs: from its length and its size, as the service's own pages reckon it."""
-    wide, tall = SIZES[body["resolution"]][body["ratio"]]
+    wide, tall = SIZES.get(body["resolution"], {}).get(body.get("ratio", "16:9"), (0, 0))
+    if body["model"] in FAL_RATES:
+        # (fal reckons by the second, not by tokens.)
+        rate = FAL_RATES[body["model"]].get(body["resolution"])
+        return wide, tall, 0, rate, None if rate is None else body["duration"] * rate
     tokens = body["duration"] * wide * tall * FRAMES_A_SECOND / 1024
     rate = RATES.get(body["model"], {}).get(body["resolution"])
     return wide, tall, tokens, rate, None if rate is None else tokens * rate / 1e6
@@ -182,6 +231,12 @@ def estimate(body):
 def say(shown):
     """What would be sent, and what it would cost."""
     wide, tall, tokens, rate, costs = estimate(shown)
+    if shown["model"] in FAL_RATES:
+        print("POST", f"{FAL}/{shown['model']}")
+        print(json.dumps({key: value for key, value in shown.items() if key != "model"}, indent=1, ensure_ascii=False))
+        print(f"\nOne clip: {shown['duration']} s at {shown['resolution']} ({wide} x {tall} for a picture of this shape), with sound. The prompt is {len(shown['prompt'])} letters.")
+        print("Estimated cost: " + ("not known for this size" if costs is None else f"${costs:.2f} (at ${rate} a second; a request that fails on the service's side is not charged)"))
+        return
     print("POST", BASE)
     print(json.dumps(shown, indent=1, ensure_ascii=False))
     if shown["resolution"] not in RATES.get(shown["model"], {shown["resolution"]: 0}):
@@ -190,8 +245,74 @@ def say(shown):
     print("Estimated cost: " + ("not known for this model and size" if costs is None else f"${costs:.2f} (at ${rate} a million tokens; nothing is charged if it fails)"))
 
 
+def make_fal(body, folder, stem, task):
+    """
+    The same of fal: the still is put in fal's file store, the request is sent to its queue (or one already sent is asked after), it is
+    waited for, and the clip and what fal answered are saved under a name with the request's number in it.
+    """
+    key = secret(FAL_KEY_NAMES)
+    if not key:
+        raise SystemExit(f"No key: put {FAL_KEY_NAMES[0]}=... in {PROJECT / '.env'} (or in the environment).")
+    headers = {"Authorization": f"Key {key}", "Content-Type": "application/json"}
+    model = body["model"]
+    folder.mkdir(parents=True, exist_ok=True)
+    if task:
+        sent = json.loads((folder / f"{stem}-{task}.sent.json").read_text(encoding="utf-8"))
+    else:
+        still = pathlib.Path(body["still"])
+        kind = KINDS[still.suffix.lower()]
+        place = requests.post(FAL_STORE, headers=headers, json={"file_name": still.name, "content_type": kind}, timeout=60)
+        if place.status_code != 200:
+            raise SystemExit(f"fal's file store refused the picture: HTTP {place.status_code} {place.text[:400]}")
+        place = place.json()
+        put = requests.put(place["upload_url"], data=still.read_bytes(), headers={"Content-Type": kind}, timeout=300)
+        if put.status_code not in (200, 201, 204):
+            raise SystemExit(f"The picture could not be put in fal's file store: HTTP {put.status_code} {put.text[:400]}")
+        asked = {"prompt": body["prompt"], "start_image_url": place["file_url"], "duration": body["duration"], "resolution": body["resolution"]}
+        reply = requests.post(f"{FAL}/{model}", headers=headers, json=asked, timeout=300)
+        if reply.status_code not in (200, 201, 202):
+            raise SystemExit(f"The service refused the request: HTTP {reply.status_code} {reply.text[:800]}")
+        sent = reply.json()
+        task = sent["request_id"]
+        (folder / f"{stem}-{task}.sent.json").write_text(json.dumps({**sent, "asked": asked}, indent=1, ensure_ascii=False), encoding="utf-8")
+    print("request", task, flush=True)
+    status, began = {}, time.time()
+    while time.time() - began < 45 * 60:
+        time.sleep(8)
+        try:
+            status = requests.get(sent["status_url"], headers=headers, timeout=60).json()
+        except (requests.RequestException, ValueError) as error:
+            print("asking again after", type(error).__name__, flush=True)
+            continue
+        print(f"{int(time.time() - began):4d} s", status.get("status"), flush=True)
+        if status.get("status") not in ("IN_QUEUE", "IN_PROGRESS"):
+            break
+    result = requests.get(sent["response_url"], headers=headers, timeout=120)
+    try:
+        answer = result.json()
+    except ValueError:
+        answer = {"text": result.text[:2000]}
+    (folder / f"{stem}-{task}.json").write_text(json.dumps({"status": status, "http": result.status_code, "answer": answer}, indent=1, ensure_ascii=False), encoding="utf-8")
+    if result.status_code != 200 or not isinstance(answer, dict) or "video" not in answer:
+        raise SystemExit(f"No clip: HTTP {result.status_code} {json.dumps(answer, ensure_ascii=False)[:800]}")
+    clip = requests.get(answer["video"]["url"], timeout=600)
+    clip.raise_for_status()
+    target = folder / f"{stem}-{task}.mp4"
+    target.write_bytes(clip.content)
+    print("saved", target, f"{len(clip.content):,} bytes")
+    # What fal says a second of this model costs now, asked of fal itself.
+    try:
+        priced = requests.get("https://api.fal.ai/v1/models/pricing", params={"endpoint_id": model}, headers=headers, timeout=60).json()
+        for price in priced.get("prices", []):
+            print(f"fal's price for {price.get('endpoint_id')}: {price.get('unit_price')} {price.get('currency')} a {price.get('unit')}")
+    except (requests.RequestException, ValueError) as error:
+        print("fal's price could not be asked:", type(error).__name__)
+
+
 def make(body, folder, stem, task):
     """Sends one task, or asks after one already sent; waits for it; and saves the clip and what the service answered under a name with the task's number in it."""
+    if body["model"] in FAL_RATES:
+        return make_fal(body, folder, stem, task)
     rate = RATES.get(body["model"], {}).get(body["resolution"])
     key = secret()
     if not key:
@@ -262,13 +383,17 @@ def table(board, folder):
         seconds += shown["duration"]
         print(f"{shot['name']:5} {shot['bar'] * board['bar']:5.0f}s {shown['duration']:4d}s  {'made' if (folder / shot['still']).exists() else 'NOT YET':7} {count:5d} "
               f"{tokens:9,.0f} {'?' if costs is None else f'${costs:6.2f}'}  {shot.get('made_from', board.get('made_from', 'first_frame')):11} "
-              f"{'flash' if 'flash' in shown['model'] else '2.5':8} {shot.get('cast', '') or '-'}"
+              f"{'kling 4' if shown['model'] in FAL_RATES else 'flash' if 'flash' in shown['model'] else '2.5':8} {shot.get('cast', '') or '-'}"
               + (f"  [{have[shot['name']].name}]" if have[shot["name"]] else ""))
     print(f"{'all':5} {'':6} {seconds:4d}s  {'':7} {'':5} {all_tokens:9,.0f} ${total:6.2f}  one take of each of the {len(board['shots'])} shots (nothing is charged for a take that fails)")
     size = board.get("resolution", "720p")
+    pixels = SIZES[size][board.get("ratio", "16:9")]
     for model, rates in RATES.items():
         if size in rates:
-            print(f"      the same, all of it with {model}: ${all_tokens * rates[size] / 1e6:.2f}")
+            print(f"      the same, all of it with {model}: ${seconds * pixels[0] * pixels[1] * FRAMES_A_SECOND / 1024 * rates[size] / 1e6:.2f}")
+    for model, rates in FAL_RATES.items():
+        if size in rates:
+            print(f"      the same, all of it with {model} (on fal): ${seconds * rates[size]:.2f}")
 
 
 def edit(board, folder):
@@ -456,7 +581,7 @@ def main():
             return None
         if body is None:
             raise SystemExit(f"{args.one} has no still yet ({folder / chosen[0]['still']}): nothing sent.")
-        return make(body, folder / "takes", args.one, args.task)
+        return make(body, folder / "takes", args.one + ("-kling" if body["model"] in FAL_RATES else ""), args.task)
     if args.edit or args.one:
         raise SystemExit(f"{args.shot} is not a storyboard: there is no {BOARDS / (args.shot + '.json')}.")
     shot = json.loads((folder / "shot.json").read_text(encoding="utf-8"))
