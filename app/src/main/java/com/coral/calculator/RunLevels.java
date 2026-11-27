@@ -449,6 +449,40 @@ final class RunLevels {
     /** How many times as many of those that fly are put in as a land was laid with. */
     static int flocksOf(int number) { return 2 + (levelOf(number) - 1) / 5; }
 
+    /** The first land with paper trees in it; and how many a land has. */
+    static final int TREES_FROM = 2;
+
+    static int treesIn(int number) { return number < TREES_FROM ? 0 : 2 + number / 25; }
+
+    /**
+     * Paper trees: a few in every land from the second, on flat open ground clear of everything else, each of a grade by the land's
+     * chapter (plain, fine from the fourth chapter, golden from the eighth). Drawn from numbers of their own.
+     */
+    private static void plant(Level level) {
+        int number = level.number, want = treesIn(number), until = level.arena >= 0 ? level.arena - 10 : level.gate - 6, chapter = Math.min(11, chapterOf(number));
+        if (want == 0) return;
+        Random random = new Random(104729L * number + 7919);
+        List<Integer> free = new ArrayList<>();
+        for (int column = 14; column < until; column++) {
+            int floor = top(level, column);
+            boolean clear = floor > 5 && floor < level.land.length && top(level, column - 1) == floor && top(level, column + 1) == floor;
+            for (int row = floor - 4; row < floor && clear; row++) clear = row >= 0 && level.land[row][column] == AIR;
+            for (int flag : level.flags) clear &= Math.abs(flag - column) > 4;
+            for (int[] thing : level.decor) clear &= Math.abs(thing[1] - column) > 6;
+            for (int[] room : level.rooms) clear &= Math.abs(room[1] - column) > 3;
+            for (int[] item : level.items) clear &= item[1] >= level.main || Math.abs(item[1] - column) > 2;
+            for (int[] weapon : level.weapons) clear &= Math.abs(weapon[1] - column) > 2;
+            // (Those put in to make up the numbers may stand by a tree; nothing else does.)
+            for (int[] foe : level.foes) clear &= crowd(foe) || foe[1] >= level.main || Math.abs(foe[1] - column) > 1 || foe[2] < floor - 5;
+            if (clear) free.add(column);
+        }
+        for (int count = 0; count < want && !free.isEmpty(); count++) {
+            int column = free.get(random.nextInt(free.size()));
+            level.trees.add(new int[]{column, top(level, column) - 1, RunCraft.grade(chapter, random.nextInt(100))});
+            for (int index = free.size() - 1; index >= 0; index--) if (Math.abs(free.get(index) - column) < 14) free.remove(index);
+        }
+    }
+
     /** Whether one was put in as one of a swarm (1), or is one of the unique creatures (2). */
     static boolean swarmed(int[] foe) { return foe.length > 5 && foe[5] == 1; }
 
@@ -1072,6 +1106,8 @@ final class RunLevels {
         final List<int[]> doors = new ArrayList<>();
         /** What stands about in its villages to be looked at: which picture, the column and the row it stands in. */
         final List<int[]> decor = new ArrayList<>();
+        /** Its paper trees, to be cut down for paper: the column and row each stands on, and its grade (plain, fine, golden). */
+        final List<int[]> trees = new ArrayList<>();
         /**
          * The places off the land that its doors lead to: for each, its kind; the column and
          * the floor of its door in the land; the first and last columns of the place itself,
@@ -1162,6 +1198,7 @@ final class RunLevels {
         level.movers.addAll(base.movers);
         level.doors.addAll(base.doors);
         level.decor.addAll(base.decor);
+        level.trees.addAll(base.trees);
         level.rooms.addAll(base.rooms);
         level.lodgers.addAll(base.lodgers);
         level.spawns.addAll(base.spawns);
@@ -1446,6 +1483,7 @@ final class RunLevels {
         friend(level);
         swarm(level);
         uniques(level);
+        plant(level);
         return level;
     }
 
@@ -1639,6 +1677,7 @@ final class RunLevels {
         friend(level);
         swarm(level);
         uniques(level);
+        plant(level);
         return level;
     }
 

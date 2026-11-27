@@ -885,6 +885,62 @@ final class PlusRun {
     static final int SWARM_SHARE = 25;
     private float swarmXp;
 
+    // Paper trees
+
+    /** Its paper trees: column, row, grade, and blows left (0 once down); paper cut, by grade; trees cut; and how long since one was struck, and where. */
+    private final List<int[]> trees = new ArrayList<>();
+    private final int[] paperCut = new int[RunCraft.GRADES];
+    private int treesCut;
+    private float treeStruck = 9;
+    private int treeAt = -1;
+
+    List<int[]> trees() { return trees; }
+    int paperCut(int grade) { return paperCut[grade]; }
+    int treesCut() { return treesCut; }
+    float treeStruck() { return treeStruck; }
+    int treeAt() { return treeAt; }
+
+    /** A use of what she carries near a paper tree in front of her chops at it; enough chops and it comes down, and gives its paper. */
+    private void chop() {
+        float middle = x + WIDE / 2, reach = Math.max(1.5f, weapon == UNARMED ? 1.2f : Math.min(3, RunArms.reach(Math.max(0, weapon), perks.levels[Math.max(0, Math.min(perks.levels.length - 1, weapon))]) + .6f));
+        for (int index = 0; index < trees.size(); index++) {
+            int[] tree = trees.get(index);
+            if (tree[3] <= 0) continue;
+            float across = tree[0] + .5f - middle;
+            if (Math.abs(across) > reach || across < 0 == !facingLeft && Math.abs(across) > .6f) continue;
+            if (Math.abs(tree[1] + 1 - (y + TALL)) > 1.6f) continue;
+            treeStruck = 0;
+            treeAt = index;
+            if (--tree[3] <= 0) {
+                paperCut[tree[2]] += RunCraft.treeGives(tree[2]);
+                treesCut++;
+            }
+            return;
+        }
+    }
+
+    // The Mother Tongue's Quill
+
+    /** How far its wave reaches; how many waves, and how long since the last. */
+    static final float QUILL_REACH = 9;
+    private int quillWaves;
+    private float quillAge = 9;
+
+    int quillWaves() { return quillWaves; }
+    float quillAge() { return quillAge; }
+
+    /** Its held attack: a wave of the first words, out from her, that every creature near her takes as a blow (one who waits, as one). */
+    private void quillWave() {
+        quillWaves++;
+        quillAge = 0;
+        float middle = x + WIDE / 2, mid = y + TALL / 2;
+        for (Foe foe : foes) {
+            if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET) continue;
+            if (Math.abs(foe.x + foe.wide() / 2 - middle) > QUILL_REACH || Math.abs(foe.y + foe.tall() / 2 - mid) > 4) continue;
+            beat(foe, SURE);
+        }
+    }
+
     // Moves bought at the counter
 
     /** How fast and how long an air dash and a dodge roll go; how slowly she slides down a wall and glides; how far a ground pound reaches. */
@@ -951,6 +1007,8 @@ final class PlusRun {
 
     /** The moves as time goes: a dash and a roll carry her; with the strike, a dash beats what it goes through. */
     private void moves(float seconds) {
+        treeStruck += seconds;
+        quillAge += seconds;
         flipAge += seconds;
         poundAge += seconds;
         if (onGround) dashUsed = false;
@@ -2403,6 +2461,7 @@ final class PlusRun {
         firmX = x;
         firmY = y;
         lootDice = level.number * 977L + 12345;
+        for (int[] tree : level.trees) trees.add(new int[]{tree[0], tree[1], tree[2], RunCraft.treeHolds(tree[2])});
     }
 
     private PlusRun(PlusRun other) {
@@ -2571,6 +2630,9 @@ final class PlusRun {
             foe.struck = from.struck;
             foes.add(foe);
         }
+        for (int[] tree : other.trees) trees.add(tree.clone());
+        System.arraycopy(other.paperCut, 0, paperCut, 0, paperCut.length);
+        treesCut = other.treesCut;
         // (Her moves, as they are.)
         airDashLeft = other.airDashLeft;
         rollLeft = other.rollLeft;
@@ -4253,14 +4315,17 @@ final class PlusRun {
             if (used) use();
             // Held, a tablet-book opens its panel and a ring of keys goes out in a fan: once for each hold. (With the white that is truly
             // hers the hold is her beam's.)
-            if (weapon != UNARMED && RunArms.heavy(weapon) && strike && !mastered) {
+            // (The Mother Tongue's Quill is held for its wave, whatever kind it is.)
+            boolean quill = RunLoot.ultimate(perks.item) && weapon == RunArms.kindOf(perks.item);
+            if (weapon != UNARMED && (RunArms.heavy(weapon) || quill) && strike && !mastered) {
                 heldFor += seconds;
                 if (heldFor >= RunArms.CHARGE && !heavied && energy >= specialCost()) {
                     heavied = true;
                     energy -= specialCost();
                     noteSpent(specialCost());
                     specialsUsed++;
-                    heavy();
+                    if (RunArms.heavy(weapon)) heavy();
+                    if (quill) quillWave();
                 }
             } else {
                 heldFor = 0;
@@ -5278,6 +5343,7 @@ final class PlusRun {
     private void use() {
         sinceStrike = 0;
         strikes++;
+        chop();
         copied();
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
         // How fast it flies and how far it reaches are the table's; a find of something she has already makes it reach a third as far again.

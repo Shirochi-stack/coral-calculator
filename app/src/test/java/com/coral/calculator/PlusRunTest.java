@@ -6223,7 +6223,7 @@ public class PlusRunTest {
                     if (sort == RunHunts.OF_KIND) assertTrue(where, RunHunts.GROUP_FROM[what] <= open && many >= 3);
                     else if (sort == RunHunts.ROVER) assertTrue(where, RunHunts.ROVER_FROM[what] <= open && many == 1);
                     else if (sort == RunHunts.CELLAR) assertTrue(where, open >= RunHunts.CELLAR_FROM && many == 1 && what == (RunHunts.tier(hunt) >= 3 ? PlusRun.RANK_S : PlusRun.RANK_A));
-                    else assertTrue(where, what == RunHunts.LANDING || (owned >> what - 1 & 1) != 0);
+                    else assertTrue(where, what == RunHunts.LANDING || what == RunHunts.TREES && open >= RunLevels.TREES_FROM || what != RunHunts.TREES && (owned >> what - 1 & 1) != 0);
                     assertTrue(where, RunHunts.materials(hunt)[0] >= 1);
                     assertFalse(where, RunHunts.words(hunt).isEmpty() || RunHunts.brief(hunt).isEmpty());
                 }

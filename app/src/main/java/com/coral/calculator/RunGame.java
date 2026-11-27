@@ -166,7 +166,7 @@ final class RunGame {
     private float hammered = 9;
     private String smithSaid = "";
     private final RectF smithCard = new RectF(), smithAct = new RectF(), packWear = new RectF();
-    private final RectF[] smithTabs = {new RectF(), new RectF(), new RectF()}, tradeBuys = {new RectF(), new RectF(), new RectF()},
+    private final RectF[] smithTabs = {new RectF(), new RectF(), new RectF(), new RectF()}, tradeBuys = {new RectF(), new RectF(), new RectF()},
             tradeSells = {new RectF(), new RectF(), new RectF()}, forgeRows = new RectF[RunArms.COUNT], reforges = new RectF[RunArms.COUNT],
             gearCells = new RectF[RunGear.SLOTS * RunGear.TIERS];
     private static final int[] SMITH_ART = {R.drawable.run_smith_moru, R.drawable.run_smith_pulmu, R.drawable.run_smith_sutdol};
@@ -552,7 +552,14 @@ final class RunGame {
      * on the pause; her active slots on the HUD; and how many times divine power has come in this land, as last seen. */
     private RunTree tree;
     /** The shields creatures carry: their pictures; blows that rang off and shields broken, as last seen; and how long ago the last of each was. */
-    private Bitmap mobShields, uniqueSheet;
+    private Bitmap mobShields, uniqueSheet, paperSheet;
+    /** Paper as seen cut in this land, by grade, and trees cut; the run they were seen in. The smithy's Craft tab: the kind looked at, and its buttons. */
+    private final int[] seenPaper = new int[RunCraft.GRADES];
+    private int seenTrees;
+    private PlusRun paperRun;
+    private int craftBase;
+    private final RectF[] craftKinds = new RectF[12], craftActs = {new RectF(), new RectF(), new RectF(), new RectF()};
+    private static final int CRAFT = 3;
     private int seenHeals, seenWinds;
     private float healAge = 9;
     private int seenClangs, seenBroken;
@@ -1537,6 +1544,14 @@ final class RunGame {
                 return;
             }
         }
+        if (smithTab == CRAFT) {
+            craftTouch(x, y, bank, has);
+            if (!smithCard.contains(x, y)) {
+                smithOpen = false;
+                audio.play("tap", .3f);
+            }
+            return;
+        }
         if (smithTab == RunGear.MORU) {
             int owned = kept().pack;
             for (int kind = 0; kind < RunArms.COUNT; kind++) {
@@ -1738,9 +1753,9 @@ final class RunGame {
         float y = top + pad + dp(50);
         if (here) {
             // The three sisters' work: a tab each, with whose it is where all three are in.
-            float each = (wide - pad * 2 - dp(12)) / 3;
-            String[] words = sisters() ? new String[]{"Moru: forge", "Pulmu: armour", "Sutdol: trade"} : new String[]{"Forge", "Armour", "Trade"};
-            for (int tab = 0; tab < 3; tab++) {
+            float each = (wide - pad * 2 - dp(18)) / 4;
+            String[] words = sisters() ? new String[]{"Moru: forge", "Pulmu: armour", "Sutdol: trade", "Paper: craft"} : new String[]{"Forge", "Armour", "Trade", "Craft"};
+            for (int tab = 0; tab < 4; tab++) {
                 smithTabs[tab].set(left + pad + tab * (each + dp(6)), y, left + pad + tab * (each + dp(6)) + each, y + dp(32));
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(tab == smithTab ? CalculatorLayout.CORAL : dark ? 0xFF2C3033 : 0xFFF0F1F2);
@@ -1754,7 +1769,9 @@ final class RunGame {
         }
         float bottom = top + tall - pad;
         smithAct.setEmpty();
-        if (smithTab == RunGear.MORU) {
+        if (smithTab == CRAFT) {
+            drawCraft(canvas, left, y, wide, pad, bottom, bank, has);
+        } else if (smithTab == RunGear.MORU) {
             int owned = kept().pack, count = Integer.bitCount(owned);
             float row = Math.max(dp(30), Math.min(dp(38), (body - dp(150)) / Math.max(1, count)));
             for (int kind = 0; kind < RunArms.COUNT; kind++) {
@@ -5891,6 +5908,30 @@ final class RunGame {
             session.keep("run_skills_said", 1);
             speak(RunStory.SKILLS[0], false);
         }
+        // Paper cut from the trees: kept at once, whatever comes of the land; and a tree down counts for a hunt that asks for them.
+        if (run != null) {
+            if (run != paperRun) {
+                paperRun = run;
+                java.util.Arrays.fill(seenPaper, 0);
+                seenTrees = 0;
+            }
+            for (int grade = 0; grade < RunCraft.GRADES; grade++) {
+                int now = run.paperCut(grade);
+                if (now > seenPaper[grade]) {
+                    session.keep("run_paper_" + grade, session.tally("run_paper_" + grade) + now - seenPaper[grade]);
+                    toast(RunCraft.PAPER_NAMES[grade] + " + " + (now - seenPaper[grade]), "For the smithy: " + session.tally("run_paper_" + grade) + " in all", 0);
+                    audio.play("pick", .8f);
+                    seenPaper[grade] = now;
+                }
+            }
+            if (run.treesCut() > seenTrees) {
+                for (int felled = seenTrees; felled < run.treesCut(); felled++) {
+                    for (int slot = 0; slot < RunHunts.SLOTS; slot++) if (RunHunts.countsTree(hunt(slot))) hunted(slot);
+                }
+                audio.play("crumble", .7f);
+                seenTrees = run.treesCut();
+            }
+        }
         // Her second wind: she says so.
         if (run != null && run.secondWinds() != seenWinds) {
             if (run.secondWinds() > seenWinds && screen == PLAY) {
@@ -10019,6 +10060,7 @@ final class RunGame {
                 else artIn(canvas, STAR_ART, x, y, tile * .5f);
             }
         }
+        drawTrees(canvas, first, last);
         for (PlusRun.Foe foe : run.foes()) {
             paint.setColorFilter(null);
             if (foe.x + foe.wide() < first - 9 || foe.x > last + 9) continue;
@@ -11992,6 +12034,7 @@ final class RunGame {
             return;
         }
         if (beaming) weapon = PlusRun.TABLET;
+        if (RunLoot.ultimate(perks.item) && weapon == RunArms.kindOf(perks.item)) quillAura(canvas, feetX, feetY, tall, leftward);
         // In the middle of one of her moves, it is drawn, whatever she holds.
         int move = run.moveShown();
         if (move != PlusRun.NO_MOVE) {
@@ -12028,6 +12071,225 @@ final class RunGame {
             drawHer(canvas, feetX, feetY, tall, pose, leftward);
         }
         paint.setAlpha(255);
+    }
+
+    // Paper trees, and crafting with paper
+
+    /** The paper trees: each standing, shaking as it is chopped, with pips of the blows it still takes; once down, a stump. */
+    private void drawTrees(Canvas canvas, int first, int last) {
+        List<int[]> trees = run.trees();
+        if (trees.isEmpty()) return;
+        if (paperSheet == null) paperSheet = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_cut_trees);
+        if (paperSheet == null) return;
+        int cell = paperSheet.getHeight();
+        for (int index = 0; index < trees.size(); index++) {
+            int[] tree = trees.get(index);
+            if (tree[0] < first - 3 || tree[0] > last + 3) continue;
+            boolean down = tree[3] <= 0, struck = run.treeAt() == index && run.treeStruck() < .25f;
+            float middle = (tree[0] + .5f - cameraX) * tile + (struck && !down ? (float) Math.sin(run.treeStruck() * 70) * tile * .06f : 0), feet = (tree[1] + 1 - cameraY) * tile;
+            float size = (down ? 1.3f : tree[2] == RunCraft.GOLDEN ? 3.1f : tree[2] == RunCraft.FINE ? 2.9f : 2.7f) * tile;
+            int frame = down ? 3 : tree[2];
+            source.set(frame * cell, 0, (frame + 1) * cell, cell);
+            target.set(middle - size / 2, feet - size + tile * .05f, middle + size / 2, feet + tile * .05f);
+            paint.setAlpha(255);
+            if (!down && tree[2] == RunCraft.GOLDEN) glowAt(canvas, middle, feet - size * .6f, size * .55f, 0xFFFFD45A, 90 + (int) (40 * Math.sin(clock * 3 + index)));
+            canvas.drawBitmap(paperSheet, source, target, paint);
+            if (!down && struck) {
+                int most = RunCraft.treeHolds(tree[2]);
+                float pip = tile * .1f, gap = tile * .04f, wide = most * pip + (most - 1) * gap, row = feet - size - tile * .1f;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xCC15171A);
+                canvas.drawRoundRect(middle - wide / 2 - tile * .04f, row - pip / 2 - tile * .04f, middle + wide / 2 + tile * .04f, row + pip / 2 + tile * .04f, pip, pip, paint);
+                for (int one = 0; one < most; one++) {
+                    paint.setColor(one < tree[3] ? 0xFFF5EEDC : 0xFF4A4F54);
+                    canvas.drawRect(middle - wide / 2 + one * (pip + gap), row - pip / 2, middle - wide / 2 + one * (pip + gap) + pip, row + pip / 2, paint);
+                }
+                paint.setColor(Color.BLACK);
+            }
+        }
+    }
+
+    /** A picture from the strip of the trees: 4 plain paper, 5 parchment, 6 a golden page, 7 a hatchet. */
+    private void paperIcon(Canvas canvas, int frame, float x, float y, float size) {
+        if (paperSheet == null) paperSheet = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_cut_trees);
+        if (paperSheet == null) return;
+        int cell = paperSheet.getHeight();
+        source.set(frame * cell, 0, (frame + 1) * cell, cell);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        paint.setAlpha(255);
+        canvas.drawBitmap(paperSheet, source, target, paint);
+    }
+
+    private int paper(int grade) { return session.tally("run_paper_" + grade); }
+
+    private void spendPaper(int grade, int many) { session.keep("run_paper_" + grade, Math.max(0, paper(grade) - many)); }
+
+    /** What she has made of the Roses, a bit for each kind; and whether the Quill is made. */
+    private int rosesMade() { return session.tally("run_roses"); }
+
+    /** What she can afford, on top of the smith's: paper of each grade. */
+    private boolean affordsPaper(int plain, int fine, int golden) { return paper(RunCraft.PLAIN) >= plain && paper(RunCraft.FINE) >= fine && paper(RunCraft.GOLDEN) >= golden; }
+
+    /** Something made at the Craft tab goes into her bag. */
+    private void intoBag(int code) {
+        List<Integer> bag = RunLoot.bag(session.note("run_bag"));
+        session.keepNote("run_bag", RunLoot.note(RunLoot.add(bag, code)));
+    }
+
+    /**
+     * The Craft tab: her paper at its head; the twelve kinds to choose from; and four things to make. A paper weapon of the kind looked at,
+     * folded (blue with fine paper in it). The weapon in her hands honed a rarity higher. A Halgakos Rose of the kind looked at. And, once
+     * every Rose is made, the Mother Tongue's Quill.
+     */
+    private void drawCraft(Canvas canvas, float left, float y, float wide, float pad, float bottom, int bank, int[] has) {
+        // Her paper.
+        float icon = dp(26);
+        for (int grade = 0; grade < RunCraft.GRADES; grade++) {
+            float x = left + pad + grade * (wide - pad * 2) / 3;
+            paperIcon(canvas, 4 + grade, x + icon / 2, y + icon / 2, icon);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            fitted(canvas, paper(grade) + " " + RunCraft.PAPER_NAMES[grade].toLowerCase(java.util.Locale.ROOT), x + icon + dp(4), y + icon / 2 + dp(5), dp(12), (wide - pad * 2) / 3 - icon - dp(8));
+        }
+        y += icon + dp(8);
+        // The twelve kinds.
+        float cell = (wide - pad * 2) / 6;
+        for (int base = 0; base < 12; base++) {
+            if (craftKinds[base] == null) craftKinds[base] = new RectF();
+            RectF at = craftKinds[base];
+            at.set(left + pad + base % 6 * cell + dp(2), y + base / 6 * cell + dp(2), left + pad + (base % 6 + 1) * cell - dp(2), y + (base / 6 + 1) * cell - dp(2));
+            boolean made = (rosesMade() >> base & 1) != 0;
+            lootFrame(canvas, made ? RunCraft.rose(base) : RunCraft.folded(base, false), at, base == craftBase);
+        }
+        y += cell * 2 + dp(8);
+        // The four things to make.
+        int level = herLevel(), hand = handCode();
+        String kind = RunLoot.WEAPONS[craftBase];
+        boolean blue = paper(RunCraft.FINE) >= RunCraft.FOLD_FINE;
+        boolean roseMade = (rosesMade() >> craftBase & 1) != 0, quillMade = session.tally("run_quill") != 0;
+        String[][] rows = {
+                {"Fold a paper " + kind.toLowerCase(java.util.Locale.ROOT) + (blue ? " (blue)" : " (white)"),
+                        RunCraft.FOLD_PLAIN + " plain" + (blue ? ", " + RunCraft.FOLD_FINE + " fine" : "") + ", + " + RunCraft.FOLD_PLUSES},
+                {RunCraft.honeable(hand) ? "Hone " + RunLoot.name(hand) + " to " + RunLoot.RARITIES[RunLoot.rarity(hand) + 1].toLowerCase(java.util.Locale.ROOT) : "Hone the weapon in her hands",
+                        RunCraft.honeable(hand) ? RunCraft.honeFine(RunLoot.rarity(hand)) + " fine, " + RunCraft.honeLeaf(RunLoot.rarity(hand)) + " gold leaf, + " + RunCraft.honePluses(RunLoot.rarity(hand))
+                                : "Take a found weapon (white to gold) in hand first"},
+                {"Halgakos Rose " + kind, roseMade ? "Made" : RunCraft.ROSE_GOLDEN + " golden, " + RunCraft.ROSE_LEAF + " leaf, " + RunCraft.ROSE_CRYSTAL + " crystal, + " + RunCraft.ROSE_PLUSES
+                        + (level < RunCraft.ROSE_LEVEL ? "  ·  from level " + RunCraft.ROSE_LEVEL : "")},
+                {"The Mother Tongue's Quill", quillMade ? "Made: the one above all others" : Integer.bitCount(rosesMade()) + " of 12 Roses made  ·  " + RunCraft.QUILL_GOLDEN + " golden, "
+                        + RunCraft.QUILL_LEAF + " leaf, + " + RunCraft.QUILL_PLUSES + (level < RunCraft.QUILL_LEVEL ? ", level " + RunCraft.QUILL_LEVEL : "")}};
+        boolean[] can = {
+                affordsPaper(RunCraft.FOLD_PLAIN, blue ? RunCraft.FOLD_FINE : 0, 0) && bank >= RunCraft.FOLD_PLUSES,
+                RunCraft.honeable(hand) && affordsPaper(0, RunCraft.honeFine(RunLoot.rarity(hand)), 0) && has[2] >= RunCraft.honeLeaf(RunLoot.rarity(hand)) && bank >= RunCraft.honePluses(RunLoot.rarity(hand)),
+                !roseMade && level >= RunCraft.ROSE_LEVEL && affordsPaper(0, 0, RunCraft.ROSE_GOLDEN) && has[2] >= RunCraft.ROSE_LEAF && has[1] >= RunCraft.ROSE_CRYSTAL && bank >= RunCraft.ROSE_PLUSES,
+                !quillMade && RunCraft.quillOpen(rosesMade(), level) && affordsPaper(0, 0, RunCraft.QUILL_GOLDEN) && has[2] >= RunCraft.QUILL_LEAF && bank >= RunCraft.QUILL_PLUSES};
+        float row = Math.min(dp(62), (bottom - y - dp(20)) / 4);
+        for (int index = 0; index < 4; index++) {
+            float top = y + index * row;
+            box.set(left + dp(8), top, left + wide - dp(8), top + row - dp(6));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(index == 3 ? (dark ? 0xFF3A2A33 : 0xFFFCEFF3) : dark ? 0xFF2C3033 : 0xFFF5F6F7);
+            canvas.drawRoundRect(box, dp(12), dp(12), paint);
+            if (index == 3) drawIcon(canvas, RunLoot.QUILL_ICON, box.left + dp(22), box.centerY(), row * .9f);
+            float words = box.left + (index == 3 ? dp(44) : dp(12)), button = dp(84);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(ink);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            fitted(canvas, rows[index][0], words, box.top + dp(20), dp(13), box.right - button - dp(12) - words);
+            text.setTypeface(Typeface.DEFAULT);
+            text.setColor(soft);
+            fitted(canvas, rows[index][1], words, box.top + dp(38), dp(11), box.right - button - dp(12) - words);
+            craftActs[index].set(box.right - button - dp(6), box.centerY() - dp(16), box.right - dp(6), box.centerY() + dp(16));
+            smithButton(canvas, craftActs[index], index == 0 ? "Fold" : index == 1 ? "Hone" : "Craft", can[index], index >= 2 ? 0xFFC0407A : CalculatorLayout.CORAL);
+            if (!can[index]) craftActs[index].setEmpty();
+        }
+        if (!smithSaid.isEmpty()) {
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(0xFF2E9E6E);
+            fitted(canvas, smithSaid, left + pad, bottom - dp(4), dp(12.5f), wide - pad * 2);
+        }
+    }
+
+    private void craftTouch(float x, float y, int bank, int[] has) {
+        for (int base = 0; base < 12; base++) {
+            if (craftKinds[base] != null && craftKinds[base].contains(x, y)) {
+                craftBase = base;
+                smithSaid = "";
+                audio.play("tap", .5f);
+                return;
+            }
+        }
+        int hand = handCode();
+        for (int index = 0; index < 4; index++) {
+            if (craftActs[index].isEmpty() || !craftActs[index].contains(x, y)) continue;
+            if (index == 0) {
+                boolean blue = paper(RunCraft.FINE) >= RunCraft.FOLD_FINE;
+                spendPaper(RunCraft.PLAIN, RunCraft.FOLD_PLAIN);
+                if (blue) spendPaper(RunCraft.FINE, RunCraft.FOLD_FINE);
+                pay(RunCraft.FOLD_PLUSES, new int[]{0, 0, 0});
+                int code = RunCraft.folded(craftBase, blue);
+                intoBag(code);
+                made(RunGear.MORU, RunLoot.name(code) + " is folded, and in her bag");
+            } else if (index == 1) {
+                int rarity = RunLoot.rarity(hand);
+                spendPaper(RunCraft.FINE, RunCraft.honeFine(rarity));
+                pay(RunCraft.honePluses(rarity), new int[]{0, 0, RunCraft.honeLeaf(rarity)});
+                int honed = RunCraft.honed(hand);
+                List<Integer> bag = RunLoot.bag(session.note("run_bag"));
+                int place = bag.indexOf(hand);
+                if (place >= 0) bag.set(place, honed);
+                else bag = RunLoot.add(bag, honed);
+                session.keepNote("run_bag", RunLoot.note(bag));
+                session.keepNote("run_hand", String.valueOf(honed));
+                if (run != null) run.hold(honed);
+                made(RunGear.MORU, RunLoot.name(honed) + " is honed to " + RunLoot.RARITIES[rarity + 1].toLowerCase(java.util.Locale.ROOT));
+            } else if (index == 2) {
+                spendPaper(RunCraft.GOLDEN, RunCraft.ROSE_GOLDEN);
+                pay(RunCraft.ROSE_PLUSES, new int[]{0, RunCraft.ROSE_CRYSTAL, RunCraft.ROSE_LEAF});
+                session.keep("run_roses", rosesMade() | 1 << craftBase);
+                int code = RunCraft.rose(craftBase);
+                intoBag(code);
+                made(RunGear.MORU, RunLoot.name(code) + ": made of golden pages, and in her bag");
+            } else {
+                spendPaper(RunCraft.GOLDEN, RunCraft.QUILL_GOLDEN);
+                pay(RunCraft.QUILL_PLUSES, new int[]{0, 0, RunCraft.QUILL_LEAF});
+                session.keep("run_quill", 1);
+                intoBag(RunLoot.QUILL);
+                made(RunGear.MORU, "The Mother Tongue's Quill. Take it in hand from her bag");
+            }
+            return;
+        }
+    }
+
+    /**
+     * About her, holding the Mother Tongue's Quill: a slow glow of rose and gold and letters drifting up off it; and, as its wave goes out,
+     * a ring of light and letters spreading as far as it reaches.
+     */
+    private void quillAura(Canvas canvas, float feetX, float feetY, float tall, boolean leftward) {
+        float hand = feetX + (leftward ? -1 : 1) * tall * .3f, high = feetY - tall * .55f;
+        glowAt(canvas, hand, high, tall * .7f, RunLoot.rose(clock), 110 + (int) (40 * Math.sin(clock * 3)));
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        String letters = "SLOPPY";
+        for (int one = 0; one < 5; one++) {
+            float age = (clock * .7f + one * .2f) % 1;
+            text.setTextSize(tall * .12f * (1 - age * .4f));
+            text.setColor(0xFFFFD45A);
+            text.setAlpha(Math.round(220 * (1 - age)));
+            canvas.drawText(String.valueOf(letters.charAt(one)), hand + (float) Math.sin(one * 2.3f + clock) * tall * .25f, high - age * tall * .8f, text);
+        }
+        text.setAlpha(255);
+        if (run.quillAge() < .8f) {
+            float through = run.quillAge() / .8f, reach = PlusRun.QUILL_REACH * tile * through;
+            stroke.setColor(0xFFFFD45A);
+            stroke.setAlpha(Math.round(230 * (1 - through)));
+            stroke.setStrokeWidth(tile * .18f * (1 - through) + 2);
+            canvas.drawCircle(feetX, feetY - tall * .5f, reach, stroke);
+            stroke.setColor(RunLoot.rose(clock));
+            canvas.drawCircle(feetX, feetY - tall * .5f, reach * .85f, stroke);
+            stroke.setAlpha(255);
+            glowAt(canvas, feetX, feetY - tall * .5f, reach * .6f, 0xFFFFE9A8, Math.round(140 * (1 - through)));
+        }
+        text.setTypeface(Typeface.DEFAULT);
     }
 
     // Her moves
