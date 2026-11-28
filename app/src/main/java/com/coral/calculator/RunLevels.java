@@ -293,7 +293,7 @@ final class RunLevels {
     /** Where in an arena something may come in: on its floor, on a platform, on a high perch, or in the open air. */
     static final int ON_FLOOR = 0, ON_PLATFORM = 1, ON_PERCH = 2, IN_AIR = 3;
     /** One of the last wave that is outsized is its kind and this much more. */
-    static final int GIANT = 100;
+    static final int GIANT = 1000;
     /** How many times over the troop of a wave comes; and how many outsized ones the last wave ends on. */
     static final int SWELL = 20, GIANTS = 4;
 
@@ -554,7 +554,11 @@ final class RunLevels {
             for (int column : taken) clear &= Math.abs(column - spot[0]) >= 9;
             for (int[] foe : level.foes) if (uniqueSpec(foe)) clear &= Math.abs(foe[1] - spot[0]) >= 9;
             if (!clear) continue;
-            int kind = first + random.nextInt(2);
+            // (From the sixth chapter on, the chapter's two later ones as well: four to choose from; before it, its two made of fire, frost and ink.)
+            int later = RunUniques.laterOf(chapter);
+            if (later < 0) later = RunUniques.statusOf(chapter);
+            int pick = random.nextInt(later < 0 ? 2 : 4);
+            int kind = pick < 2 ? first + pick : later + pick - 2;
             if (RunUniques.way(kind) == RunUniques.MINIBOSS) kind = kind == first ? first + 1 : first;
             taken.add(spot[0]);
             if (RunUniques.flies(kind)) {
@@ -1832,8 +1836,11 @@ final class RunLevels {
             if (!clear) continue;
             int kind = kinds[random.nextInt(kinds.length)];
             // (One in five is one of its chapter's own; never its mini-boss, nor its hornets.)
-            if (random.nextInt(5) == 0) {
-                int own = chapterFirst + random.nextInt(2);
+            // (Never in the mirror: only her shadows live there.)
+            if (random.nextInt(5) == 0 && dungeon != RunDungeons.MIRROR) {
+                int own = chapterFirst + random.nextInt(2), status = RunUniques.statusOf(Math.min(11, level.chapter));
+                // (And in the first six chapters' dungeons, every other time, one of its two made of fire, frost and ink.)
+                if (status >= 0 && spot[0] % 2 == 0) own = status + own - chapterFirst;
                 if (RunUniques.way(own) != RunUniques.MINIBOSS && !RunUniques.flies(own)) kind = own;
             }
             int way = RunUniques.way(kind);
@@ -1860,6 +1867,14 @@ final class RunLevels {
                 int[] spot = spots.get(random.nextInt(spots.size()));
                 level.items.add(new int[]{PlusRun.BREAD, spot[0], spot[1] - 1, 0});
             }
+        }
+        // In the mirror: on its third, sixth, ninth and twelfth floors the shadow of one she knows, by turns; on its fifth and tenth an Echo, a her
+        // from a timeline that ended badly. Two thirds of the way along, where she meets it at the end of what she has come through.
+        if (dungeon == RunDungeons.MIRROR && !spots.isEmpty() && (floor % 3 == 2 && floor < 12 || floor == 4 || floor == 9)) {
+            int kind = floor == 4 || floor == 9 ? RunUniques.ECHO_FIRST + random.nextInt(RunUniques.ECHO_COUNT) : RunUniques.CAST_FIRST + random.nextInt(RunUniques.CAST_COUNT);
+            int[] spot = spots.get(Math.min(spots.size() - 1, spots.size() * 2 / 3));
+            int row = RunUniques.floats(kind) ? spot[1] - 3 : spot[1] - 1;
+            level.foes.add(new int[]{kind, spot[0], row, 1, 0, 2});
         }
         // The keeper, in the middle of its hall; and pluses along the hall for the fight.
         if (hall >= 0) {
@@ -2137,7 +2152,7 @@ final class RunLevels {
             ledge(from + 7, FLOOR - 3, 4);
             ledge(from + 16, FLOOR - 5, 4);
             ledge(to - 10, FLOOR - 3, 4);
-            level.foes.add(new int[]{RunUniques.hiddenOf(chapterOf(number)), to - 5, FLOOR - 1, 1, 0, 2});
+            level.foes.add(new int[]{RunUniques.hiddenIn(number), to - 5, FLOOR - 1, 1, 0, 2});
             pluses(from + 3, from + 6, FLOOR - 1);
             level.rooms.add(new int[]{HIDEOUT, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], 0, FLOOR, ceiling, -1, 0});
         }

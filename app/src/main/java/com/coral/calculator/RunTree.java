@@ -43,8 +43,8 @@ final class RunTree {
 
     private final Resources resources;
     private final float density;
-    private Bitmap icons, notables;
-    private boolean notablesTried;
+    private Bitmap icons, notables, packNodes;
+    private boolean notablesTried, packNodesTried;
     /** Where the notables' pictures are, in the run's asset pack. */
     static final String NOTABLE_SHEET = "runart/tree_notables.webp";
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -165,11 +165,18 @@ final class RunTree {
         if (node.type == RunSkills.CENTRE) return RunSkills.SEED_ICON;
         if (node.type == RunSkills.START) return RunSkills.emblemOf(node.path);
         if (node.type == RunSkills.NOTABLE) return RunSkills.NOTABLES.get(node.notable).icon;
-        if (node.type == RunSkills.ROOT) return NODE_ICONS + 4 + node.stat;
-        // (A small node of a class's own: its gem is attack's, or intelligence's for that.)
-        if (node.effect >= 0) return NODE_ICONS + (node.effect == RunSkills.E_INT_PCT ? RunSkills.INT : RunSkills.ATK);
-        return NODE_ICONS + node.stat;
+        // A class's region: its own small gem and its own medallion for a root, with the class's weapon in it. A hybrid route: a gem half one
+        // and half the other. The core: ink-drop gems by stat, and its roots and jewels the crystals of their stats.
+        boolean classes = node.path < RunSkills.CLASS_COUNT;
+        if (node.type == RunSkills.ROOT) return classes ? PACK_NODES + CLASS_ROOTS + node.path : NODE_ICONS + 4 + node.stat;
+        if (classes) return PACK_NODES + CLASS_SMALLS + node.path;
+        if (node.path >= RunSkills.HYBRID) return PACK_NODES + HYBRID_SMALL;
+        return PACK_NODES + CORE_SMALLS + Math.max(0, node.stat);
     }
+
+    /** The pictures in the run's asset pack of the nodes that are not notables: past the notables' own, so that they never meet. */
+    static final int PACK_NODES = 1000, CLASS_SMALLS = 0, CLASS_ROOTS = 13, HYBRID_SMALL = 26, CORE_SMALLS = 27, PACK_NODE_COUNT = 31;
+    static final String NODE_SHEET = "runart/tree_nodes.webp";
 
     /** The emblem a node's region shows on its card: its class's, the first of a hybrid's two; or none for the core. */
     static int emblemOfRegion(int region) {
@@ -180,10 +187,22 @@ final class RunTree {
 
     /** One of the sheet's pictures, at a middle and a size. */
     void icon(Canvas canvas, int index, float x, float y, float size, int alpha) {
-        // (The notables' own pictures are in the run's asset pack, kept out of the base module; the emblems and node pictures in the app.)
-        boolean notable = index >= RunSkills.NOTABLE_ICONS;
+        // (The notables' own pictures are in the run's asset pack, kept out of the base module, and so are the class regions' node pictures;
+        // the emblems and the old node pictures are in the app.)
+        boolean notable = index >= RunSkills.NOTABLE_ICONS && index < PACK_NODES;
         Bitmap sheet;
-        if (notable) {
+        if (index >= PACK_NODES) {
+            if (packNodes == null && !packNodesTried) {
+                packNodesTried = true;
+                try (java.io.InputStream in = resources.getAssets().open(NODE_SHEET)) {
+                    packNodes = BitmapFactory.decodeStream(in);
+                } catch (java.io.IOException ignored) {
+                    packNodes = null;
+                }
+            }
+            sheet = packNodes;
+            index -= PACK_NODES;
+        } else if (notable) {
             if (notables == null && !notablesTried) {
                 notablesTried = true;
                 try (java.io.InputStream in = resources.getAssets().open(NOTABLE_SHEET)) {

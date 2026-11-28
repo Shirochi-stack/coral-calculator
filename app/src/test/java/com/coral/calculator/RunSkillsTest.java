@@ -28,7 +28,7 @@ public class RunSkillsTest {
 
     @Test public void aWebOfThirteenRegionsWithManyMoreNotablesThanBefore() {
         assertTrue("nodes " + TREE.size(), TREE.size() >= 1000);
-        assertEquals(RunSkills.CORE_KEYSTONES + RunSkills.CORE_KEYSTONE_COUNT, RunSkills.NOTABLES.size());
+        assertEquals(RunSkills.RIBBONS + RunSkills.RIBBON_COUNT, RunSkills.NOTABLES.size());
         assertTrue(RunSkills.NOTABLES.size() >= 140);
         // Every notable is in the tree exactly once, and every one has its own name and its own picture.
         int[] placed = new int[RunSkills.NOTABLES.size()];
@@ -45,12 +45,13 @@ public class RunSkillsTest {
             if (notable.keystone) keystones++;
         }
         assertTrue(actives >= 30);
-        assertEquals(RunSkills.CLASS_COUNT + RunSkills.CORE_KEYSTONE_COUNT, keystones);
+        // (And Skyborne, of the moves of the air, and Monochrome, of the ribbons.)
+        assertEquals(RunSkills.CLASS_COUNT + RunSkills.CORE_KEYSTONE_COUNT + 2, keystones);
         // Thirteen starts, one for each class; each class region with its seven.
         for (int clazz = 0; clazz < RunSkills.CLASS_COUNT; clazz++) {
             assertTrue(start(clazz) > 0);
             int mine = 0;
-            for (RunSkills.Node node : TREE) if (node.type == RunSkills.NOTABLE && node.path == clazz) mine++;
+            for (RunSkills.Node node : TREE) if (node.type == RunSkills.NOTABLE && node.path == clazz && node.notable < RunSkills.HYBRIDS) mine++;
             assertEquals(RunSkills.CLASSES[clazz], RunSkills.PER_CLASS, mine);
         }
         // Clusters: notables whose links are both to small nodes that are linked to each other's ring.
@@ -220,8 +221,9 @@ public class RunSkillsTest {
     @Test public void theNodesKeepTheirNumbers() {
         // What each node is, by its number, folded into one figure: if this changes, saves of the tree change meaning. Anything new goes after.
         long sum = 17;
-        for (RunSkills.Node node : TREE) sum = sum * 31 + node.type * 7 + node.path * 101 + (node.type == RunSkills.NOTABLE ? RunSkills.NOTABLES.get(node.notable).name.hashCode() : node.stat * 13 + node.effect);
-        assertEquals(1199, TREE.size());
+        // (The first 1199 as first drawn; the moves of the air were added after them.)
+        for (RunSkills.Node node : TREE.subList(0, 1199)) sum = sum * 31 + node.type * 7 + node.path * 101 + (node.type == RunSkills.NOTABLE ? RunSkills.NOTABLES.get(node.notable).name.hashCode() : node.stat * 13 + node.effect);
+        assertTrue("nodes " + TREE.size(), TREE.size() > 1199 + 30);
         assertEquals(KEPT, sum);
     }
 
@@ -337,6 +339,31 @@ public class RunSkillsTest {
         assertTrue(sheet.length() > 100_000);
         // (The base keeps only the old sheet of emblems and node pictures.)
         assertTrue(new java.io.File("src/main/res/drawable-nodpi/run_skill_icons.webp").length() < 300_000);
+    }
+
+    @Test public void eachClassRegionHasItsOwnNodePictures() {
+        Set<Integer> smalls = new HashSet<>(), roots = new HashSet<>();
+        for (int clazz = 0; clazz < RunSkills.CLASS_COUNT; clazz++) {
+            Set<Integer> mine = new HashSet<>();
+            for (RunSkills.Node node : TREE) {
+                if (node.path != clazz || node.type != RunSkills.SMALL && node.type != RunSkills.ROOT) continue;
+                int icon = RunTree.iconOf(node);
+                assertTrue(icon >= RunTree.PACK_NODES && icon < RunTree.PACK_NODES + RunTree.PACK_NODE_COUNT);
+                mine.add(icon);
+                (node.type == RunSkills.SMALL ? smalls : roots).add(icon);
+            }
+            assertEquals(RunSkills.CLASSES[clazz], 2, mine.size());
+        }
+        assertEquals(RunSkills.CLASS_COUNT, smalls.size());
+        assertEquals(RunSkills.CLASS_COUNT, roots.size());
+        // The core's small nodes by stat, and the hybrid routes' their own; each card still names what it gives.
+        for (RunSkills.Node node : TREE) {
+            if (node.type != RunSkills.SMALL || node.path < RunSkills.CLASS_COUNT) continue;
+            int icon = RunTree.iconOf(node);
+            assertEquals(node.path >= RunSkills.HYBRID ? RunTree.PACK_NODES + RunTree.HYBRID_SMALL : RunTree.PACK_NODES + RunTree.CORE_SMALLS + node.stat, icon);
+            assertTrue(RunSkills.title(node).length() > 3);
+        }
+        assertTrue(new java.io.File("../runart/src/main/assets/" + RunTree.NODE_SHEET).isFile());
     }
 
     @Test public void heartsAreTwentyHpAndPastTwentyTheyTurnColour() {

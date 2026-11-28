@@ -1,0 +1,12 @@
+plugins {
+    id 'com.android.asset-pack'
+}
+
+// The Mirror Depths' own art (the Imperfect Copy, and more to come), kept out of the base module. Delivered with the install; the debug
+// build (the GitHub APK) carries the same files, see app/build.gradle.
+assetPack {
+    packName = 'mirror'
+    dynamicDelivery {
+        deliveryType = 'install-time'
+    }
+}

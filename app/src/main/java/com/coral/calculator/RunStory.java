@@ -560,6 +560,7 @@ final class RunStory {
     /** Her line with the game's name in it: the first time the map is opened, and now and then as a land begins. */
     static final String[][] TITLE_LINE = {
             {"title1", "A sloppy copy? Not on my page Sloppy~♡", "H", PLAYER + "Her signature line, the game's own name in it: a translator who will not stand for careless copies. Confident, punchy, proud, a playful wink at the end."},
+            {"title2", "Queen of Sloppies? Every sloppy copy bows to me, page after page Sloppy~♡", "H", PLAYER + "The game's new name, Halgakos: The Queen of Sloppies. Every sloppy copy is a sloppy, and she rules them all, with endless pages still to climb. Regal, proud, smug, a teasing wink at the end."},
     };
 
     /** The first time a key is pressed in the first land: she says which keys. */
@@ -573,6 +574,92 @@ final class RunStory {
             {"skill2", "Divine power! Every blow lands three times Sloppy~♡", "H", PLAYER + "In the middle of a fight her divine power fills and bursts out; for a few seconds she hits three times as hard. Triumphant, radiant, a battle cry."},
             {"skill3", "All of it back? Fine. Choose better this time Sloppy~♡", "H", PLAYER + "The player has just taken back every point of her skill tree to spend them again. Mock exasperated, teasing, but secretly glad of the fresh start."},
             {"skill4", "My tree got redrawn! Every point came back, so spend them Sloppy~♡", "H", PLAYER + "Her skill tree has just been redrawn into a great new web of regions and routes, and every point she had spent has come back to her to spend again. Delighted, a little bossy, eager to explore it."},
+    };
+
+    /** Black is put on her, and weighs on her. */
+    static final String[][] BLACKENED = {
+            {"blk1", "Ugh, black ink all over me! Everything's heavy and dark Sloppy~♡", "H", PLAYER + "A cursed black ribbon has just soaked her in ink: she feels heavy, half blind, weak and dripping. Disgusted, sulky, shivering, but defiant."},
+    };
+
+    /**
+     * The Mirror Depths: going down; the Imperfect Copy (in her voice, colder, and her catchphrase turned on her) when met, halfway, and when
+     * beaten; and a shadow's touch blinding her.
+     */
+    static final String[][] MIRROR = {
+            {"mir1", "A mirror that goes all the way down. Every face in here is a sloppy copy of mine Sloppy~♡", "H", PLAYER + "She steps through a tall dark mirror into a silver, upside-down dungeon where her own shadows walk. Uneasy, quiet, trying to joke."},
+            {"mir2", "You call them sloppy copies. I was the first one. The imperfect one. Hello Sloppy~♡", "H", "The Imperfect Copy speaks: an uncanny pale copy of Halgakos with elf ears and no horns, a cracked mirror for a sword, the first copy ever made and thrown away. Her voice is Halgakos's, but cold, flat and hollow, every word measured, the catchphrase said like an insult."},
+            {"mir3", "Every page you wrote, I wrote first. Backwards Sloppy~♡", "H", "The Imperfect Copy, cracking, half her strength gone, cold and bitter, almost whispering. The same voice as Halgakos but drained of warmth."},
+            {"mir4", "You were never imperfect. You were me before the ink dried. Rest now Sloppy~♡", "H", PLAYER + "She has beaten the Imperfect Copy, who shatters into mirror shards. Gentle, sad, a little proud, kind."},
+            {"mir5", "Hey, who turned out the lights? My own shadow just touched me Sloppy~♡", "H", PLAYER + "A shadow of herself touched her and everything went dark around her for a moment. Startled, creeped out, joking to stay brave."},
+    };
+    /**
+     * The Echoes: seven of her from timelines that ended badly, each met in the mirror with a word of how hers ended (in her voice, worn by
+     * it), and her answer.
+     */
+    static final String[][] ECHOES = {
+            {"ech1", "The library flooded and nobody came. I kept reading until the ink ran off every page Sloppy~♡", "H", "An Echo of Halgakos from a timeline where the great library drowned: soaked, pale blue, hair dripping, voice quiet and waterlogged, lonely and tired."},
+            {"ech2", "I burned the last book to stay warm. Then there was nothing left to be Sloppy~♡", "H", "An Echo of Halgakos from a timeline that burned: grey with ash, eyes dull embers, voice hoarse and empty, guilty and numb."},
+            {"ech3", "I promised to guard the gate until she came back. She never did. I'm still standing here Sloppy~♡", "H", "An Echo of Halgakos who stayed a knight forever at a gate: steel-grey, stiff, voice proud but cracked, loyal and heartbroken."},
+            {"ech4", "They wanted one more song, then one more. I sang until there was no me left, only the encore Sloppy~♡", "H", "An Echo of Halgakos from a timeline where fame consumed her: faded idol in magenta, smile stuck on, voice sweet but hollow and exhausted."},
+            {"ech5", "Winter came to the archive and never left. I learned every word for cold Sloppy~♡", "H", "An Echo of Halgakos from a timeline of endless winter: frosted, scholarly, voice slow and brittle, shivering and resigned."},
+            {"ech6", "I served the Copy, polished her mirror, smiled when told. Serving was easier than being Sloppy~♡", "H", "An Echo of Halgakos who became the Imperfect Copy's maid: violet-shaded, eyes lowered, voice soft, obedient and sad."},
+            {"ech7", "Someone erased my story one line at a time. I don't remember my name, only yours Sloppy~♡", "H", "An Echo of Halgakos whose story was erased: pale and blank like an empty page, voice faint and whispering, confused and gentle."},
+    };
+    static final String[][] ECHO_ANSWERS = {
+            {"eca1", "Then let me finish the book for you. Rest, you've read enough Sloppy~♡", "H", PLAYER + "She answers the drowned Echo of herself, gently, kindly, determined."},
+            {"eca2", "There's still you. I'll carry the warmth from here Sloppy~♡", "H", PLAYER + "She answers the burned, ash-grey Echo of herself, warm and firm, near tears."},
+            {"eca3", "You can stand down, knight. I'm the one who came back Sloppy~♡", "H", PLAYER + "She answers the Echo who guarded a gate forever, softly, honouring her."},
+            {"eca4", "Encore's over. Take a bow and go home Sloppy~♡", "H", PLAYER + "She answers the faded idol Echo of herself, playful but tender."},
+            {"eca5", "Then I'll be the spring. Come on, thaw out Sloppy~♡", "H", PLAYER + "She answers the frozen scholar Echo of herself, bright and encouraging."},
+            {"eca6", "Nobody gets to order you around anymore. Not even a mirror Sloppy~♡", "H", PLAYER + "She answers the Echo who served the Copy, protective and fierce."},
+            {"eca7", "Your name is Halgakos. I'll write it back in, every letter Sloppy~♡", "H", PLAYER + "She answers the erased, blank Echo of herself, gentle and resolute."},
+    };
+    /** The mirror's shadows of those she knows, each in their own voice, as their shadows: a word when she meets them. */
+    static final String[][] CAST_SHADOWS = {
+            {"csh1", "You left me behind with the bread. The shadow of me is hungry for more than chikuwa now.", "C", "A shadow copy of Chikuwa in the mirror dungeon: the same cheerful baker's voice, but flat, hollow and a little menacing, as if echoing from glass."},
+            {"csh2", "Every ink ball I ever threw at you, I kept. Shall I give them all back at once?", "R", "A shadow copy of Rune in the mirror dungeon: Rune's voice but cold, smug and echoing, a mocking rival made of ink."},
+            {"csh3", "Hearts, hearts, hearts! Mine are black now. Do you still want one?", "I", "A shadow copy of Illya in the mirror dungeon: Illya's sweet sing-song voice turned eerie and giggling, echoing."},
+            {"csh4", "Batter up. This time I'm swinging for you, and I don't miss in the dark.", "T", "A shadow copy of Tsubakieh in the mirror dungeon: Tsubakieh's cool, sporty voice made low and threatening, echoing."},
+            {"csh5", "My feathers fell in the dark and grew back as shadows. Fly with me, little one, down and down.", "M", "A shadow copy of the Mawang in the mirror dungeon: her regal, airy voice turned hollow and hungry, echoing from glass."},
+    };
+    /** The first time she meets each of the twelve made of fire, frost and ink, or that stun: what it does to her, and what to do. */
+    static final String[][] STATUS_UNIQUES = {
+            {"u3a", "A matchstick with an attitude! Its embers burn, keep moving Sloppy~♡", "H", PLAYER + "A tiny sooty match-head sprite flicks burning embers at her. Wary, teasing, quick warning that fire burns her."},
+            {"u3b", "A frozen book. One slam and I'll be shivering Sloppy~♡", "H", PLAYER + "A frosted hardcover book slams shut in bursts of frost that chill her and slow her down. Shivering, cross."},
+            {"u3c", "Poison pens! Don't let those green darts stick Sloppy~♡", "H", PLAYER + "A porcupine whose quills are pens dripping green ink shoots poisoned darts. Disgusted, urgent tip."},
+            {"u3d", "That beetle is an ink bottle with a fuse. Stand back Sloppy~♡", "H", PLAYER + "A beetle shaped like a corked ink bottle with a lit fuse waddles closer to burst in ink. Alarmed, backing off."},
+            {"u3e", "That bookend is crackling. If it hits me I'll see stars Sloppy~♡", "H", PLAYER + "A brass bulldog bookend crackling with static charges to stun her. Nervous, joking."},
+            {"u3f", "Ice behind an icy shield. Break it, then shatter it Sloppy~♡", "H", PLAYER + "A book made of ice hides behind a frosty shell; frozen things shatter at a blow. Confident, strategic."},
+            {"u3g", "A fan on fire? Fire's no friend of paper Sloppy~♡", "H", PLAYER + "A burning paper fan leaps at her in bursts of flame. Wry, nervous about burning."},
+            {"u3h", "Eww, a sick page. It splits, and its ink is poison Sloppy~♡", "H", PLAYER + "A blotchy green-stained page splits in two and its ink poisons. Grossed out, warning."},
+            {"u3i", "A snow globe on legs. Freeze it three times and it's mine Sloppy~♡", "H", PLAYER + "A golem with a snow globe head pounds the ground with chilling snow; chill it three times and it freezes solid. Playful, smug plan."},
+            {"u3j", "A scribe made of charcoal. Its ink burns hotter than mine Sloppy~♡", "H", PLAYER + "A hooded charcoal scribe flicks burning ink at her. Competitive, a little jealous."},
+            {"u3k", "Smog with wings. Hold your breath, it's all poison Sloppy~♡", "H", PLAYER + "A fuzzy moth of green ink smoke darts at her trailing poison. Covering her nose, bossy."},
+            {"u3l", "Clap clap, crackle! One hit and my ears ring Sloppy~♡", "H", PLAYER + "A creature of two brass book covers bounces and claps with sparks that stun. Startled, dizzy joke."},
+    };
+    /** The first time she finds each of the six later hidden bosses in its hideout: who it is, and what to look out for. */
+    static final String[][] HIDDEN2 = {
+            {"hb2a", "An overdue notice the size of a house! It stamps, so stay off the ground Sloppy~♡", "H", PLAYER + "A hulking giant library due-date stamp on stubby legs, a mane of overdue slips, slams its stamp face down in ink shockwaves. Startled, then cheeky."},
+            {"hb2b", "A queen folded out of paper. Those fans are sharp, mind your whiskers Sloppy~♡", "H", PLAYER + "A tall elegant origami queen of white and gold paper slashes fans of sharp paper blades. Impressed, a little catty, careful."},
+            {"hb2c", "A bookworm in gold armour, chewing my pages. Hey, those are mine Sloppy~♡", "H", PLAYER + "A giant plump bookworm with gold-leaf book-spine segments and round glasses chomps through pages and spits paper scraps. Indignant, possessive."},
+            {"hb2d", "A tyrant made of sealing wax. Don't get stamped shut Sloppy~♡", "H", PLAYER + "A squat armoured tyrant of dripping royal purple sealing wax with a candle-flame crown swings a seal-stamp mace in hot wax splashes. Wary, joking."},
+            {"hb2e", "The Footnote King. So many tiny marks, and every one is aimed at me Sloppy~♡", "H", PLAYER + "A round regal king made of a swarm of tiny footnote marks with a crown of asterisks flings streams of marks with a pointer staff. Overwhelmed, wry."},
+            {"hb2f", "The last librarian. She looks so tired. I'll be gentle, but I won't lose Sloppy~♡", "H", PLAYER + "A tall gaunt ghostly old librarian with a lantern and a huge chained tome casts beams of pale words. Softer, respectful, then determined."},
+    };
+    /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
+    static final String[][] LATER_UNIQUES = {
+            {"u2a", "A newspaper bug! Don't let it roll you flat Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
+            {"u2b", "It shouts the headlines at us. So loud Sloppy~♡", "H", PLAYER + "A little town crier with a megaphone mouth is shouting words at them. Hands over ears, cross, playful."},
+            {"u2c", "That line can stretch! Keep your distance Sloppy~♡", "H", PLAYER + "A snake made of a ruled notebook line lashes out from far away. Alarmed, advising."},
+            {"u2d", "It crosses things out. Jump over the line Sloppy~♡", "H", PLAYER + "An ink knight draws a long red line along the ground ahead to strike through. Urgent, bossy tip."},
+            {"u2e", "Sticky tongue! It wants to pull us in Sloppy~♡", "H", PLAYER + "A fat glue-pot toad shoots a sticky tongue that pulls you in. Grossed out, giggly."},
+            {"u2f", "Ew, smudges everywhere. Don't step in them Sloppy~♡", "H", PLAYER + "An ink smudge slime leaves sticky smears that slow you down. Disgusted, fussy."},
+            {"u2g", "A mirror crab! Hit it from behind Sloppy~♡", "H", PLAYER + "A crab with a mirror shell bounces shots back; you must hit it from behind. Clever, pleased with herself."},
+            {"u2h", "It copies everything we do. Rude Sloppy~♡", "H", PLAYER + "A ghostly page echoes every attack back at them. Offended, pouty."},
+            {"u2i", "Its sand slows time down. Hurry Sloppy~♡", "H", PLAYER + "A little hourglass creature slows time around it. Impatient, hurrying."},
+            {"u2j", "It hides in its shell. Wait till it peeks out Sloppy~♡", "H", PLAYER + "A hermit crab in a scroll shell hides, then pops out to jab. Patient, sly."},
+            {"u2k", "A baby dragon! Cute, but it breathes fire Sloppy~♡", "H", PLAYER + "A chubby golden dragon hatchling on a hoard of books breathes fire. Charmed, then cautious."},
+            {"u2l", "Stay out of that lantern's light Sloppy~♡", "H", PLAYER + "A stone sentinel with a lantern head sweeps a burning beam of light. Low, tense warning."},
     };
 
     /** Her moves from the counter: the second wind, which leaves her half a heart once a land. */
@@ -1281,6 +1368,14 @@ final class RunStory {
         groups.add(DUNGEONS);
         groups.add(SMITH_QUESTS);
         groups.add(KNUCKLES);
+        groups.add(LATER_UNIQUES);
+        groups.add(STATUS_UNIQUES);
+        groups.add(HIDDEN2);
+        groups.add(MIRROR);
+        groups.add(ECHOES);
+        groups.add(ECHO_ANSWERS);
+        groups.add(CAST_SHADOWS);
+        groups.add(BLACKENED);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {

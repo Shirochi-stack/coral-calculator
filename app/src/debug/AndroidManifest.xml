@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug builds only: the gallery of the game's visual effects (see VfxGalleryActivity). -->
+    <application>
+        <activity
+            android:name="com.coral.calculator.VfxGalleryActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            android:label="Effects" />
+    </application>
+</manifest>
