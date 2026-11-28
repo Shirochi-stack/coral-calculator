@@ -1216,7 +1216,7 @@ public class FightTest {
                 {android.view.KeyEvent.KEYCODE_DPAD_DOWN, FightKeys.GUARD}, {android.view.KeyEvent.KEYCODE_J, FightKeys.LIGHT},
                 {android.view.KeyEvent.KEYCODE_K, FightKeys.HEAVY}, {android.view.KeyEvent.KEYCODE_L, FightKeys.SPECIAL},
                 {android.view.KeyEvent.KEYCODE_SHIFT_LEFT, FightKeys.DASH}, {android.view.KeyEvent.KEYCODE_SHIFT_RIGHT, FightKeys.DASH},
-                {android.view.KeyEvent.KEYCODE_O, FightKeys.DODGE},
+                {android.view.KeyEvent.KEYCODE_O, FightKeys.DASH},
                 {android.view.KeyEvent.KEYCODE_I, FightKeys.ULT}, {android.view.KeyEvent.KEYCODE_U, FightKeys.ULT},
                 {android.view.KeyEvent.KEYCODE_Q, -1}, {android.view.KeyEvent.KEYCODE_ENTER, -1}, {android.view.KeyEvent.KEYCODE_ESCAPE, -1}};
         for (int[] pair : map) assertEquals("key " + pair[0], pair[1], FightKeys.button(pair[0]));
@@ -1452,6 +1452,43 @@ public class FightTest {
             fight.step(STEP, strike, slip);
         }
         return fight;
+    }
+
+    /** The same swing, at someone who presses the dash button so long after it is begun, holding the arrow away from it or none. */
+    private static Fight dashedFrom(float dashAt, boolean away) {
+        Fight fight = apart(Fight.TSUBAKIEH, Fight.HALGAKOS, 1.3f);
+        Fight.Pad strike = new Fight.Pad(), slip = new Fight.Pad();
+        strike.heavy = true;
+        for (float gone = 0; gone < .8f; gone += STEP) {
+            slip.dash = dashAt >= 0 && gone >= dashAt && gone < dashAt + .05f;
+            slip.right = slip.dash && away;
+            fight.step(STEP, strike, slip);
+        }
+        return fight;
+    }
+
+    @Test public void theDashButtonCarriesTheDodge() {
+        // There is no dodge button: the dash, pressed in time, makes the blow miss as the dodge did, and counts as one slipped.
+        float swing = hurt(Fight.TSUBAKIEH, Fight.HEAVY);
+        Fight inTime = dashedFrom(.2f, false);
+        assertEquals(0, lost(inTime, 1), 0);
+        assertEquals(1, inTime.fighters[1].slips);
+        Fight back = dashedFrom(.2f, true);
+        assertEquals(0, lost(back, 1), 0);
+        // Too late, it is only a dash.
+        assertEquals(swing, lost(dashedFrom(.32f, false), 1), .01f);
+        // A dash pressed again before its dodge has rested is only a dash too.
+        Fight twice = apart(Fight.TSUBAKIEH, Fight.HALGAKOS, 3f);
+        Fight.Pad none = new Fight.Pad(), dash = new Fight.Pad();
+        dash.dash = true;
+        twice.step(STEP, none, dash);
+        assertTrue(twice.fighters[1].safe > 0);
+        dash.dash = false;
+        hold(twice, .4f, none, dash);
+        dash.dash = true;
+        twice.step(STEP, none, dash);
+        assertEquals(0, twice.fighters[1].safe, 0);
+        assertEquals(-1, FightKeys.button(android.view.KeyEvent.KEYCODE_P));
     }
 
     @Test public void aDodgeInTimeMakesABlowMissAndOneTooEarlyOrTooLateDoesNot() {

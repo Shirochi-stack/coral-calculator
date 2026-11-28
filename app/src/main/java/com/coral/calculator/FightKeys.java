@@ -16,8 +16,8 @@ final class FightKeys {
     /** The keys, as they are shown in the pause menu. */
     static final String[] HELP = {
             "A D or \u2190 \u2192  move  \u00b7  W, \u2191 or Space  jump",
-            "S or \u2193  guard  \u00b7  Shift dash (or a direction twice)",
-            "J quick  \u00b7  K heavy  \u00b7  L special  \u00b7  O dodge",
+            "S or \u2193  guard  \u00b7  Shift or O dash, on the ground or in the air",
+            "J quick  \u00b7  K heavy  \u00b7  L special",
             "I or U ultimate  \u00b7  Esc pause",
     };
 
@@ -33,8 +33,8 @@ final class FightKeys {
             case KeyEvent.KEYCODE_J: return LIGHT;
             case KeyEvent.KEYCODE_K: return HEAVY;
             case KeyEvent.KEYCODE_L: return SPECIAL;
-            case KeyEvent.KEYCODE_SHIFT_LEFT: case KeyEvent.KEYCODE_SHIFT_RIGHT: return DASH;
-            case KeyEvent.KEYCODE_O: return DODGE;
+            // The dash carries the dodge in it, so the dodge's old key is a dash too.
+            case KeyEvent.KEYCODE_SHIFT_LEFT: case KeyEvent.KEYCODE_SHIFT_RIGHT: case KeyEvent.KEYCODE_O: return DASH;
             case KeyEvent.KEYCODE_I: case KeyEvent.KEYCODE_U: return ULT;
             default: return -1;
         }

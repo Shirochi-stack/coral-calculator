@@ -845,6 +845,7 @@ final class Fight {
             } else if (dashWay != 0 && !me.airDashed && (level[me.side] < 0 || style[me.side] >= HARD)) {
                 // A dash in the air, toward the other or away from her, once a jump.
                 airDash(me, dashWay);
+                if (dash) slipping(me);
             } else if (special && me.rest[SPECIAL] <= 0) {
                 begin(me, foe, AIR_SPECIAL);
             } else if (heavy) {
@@ -926,6 +927,7 @@ final class Fight {
             me.state = back ? BACKSTEP : DASH;
             me.clock = 0;
             me.across = dashWay * SPEED[me.kind] * (back ? 2.2f : 2.6f);
+            if (dash) slipping(me);
         } else if (pad.left != pad.right) {
             if (me.state != WALK || me.backing != away) me.clock = 0;
             me.state = WALK;
@@ -963,6 +965,17 @@ final class Fight {
         me.across = way * (me.inAir() ? 6 : 9.5f);
         me.chain = 0;
         dodges++;
+    }
+
+    /**
+     * The dash button's dash, on the ground or in the air, carries the dodge in it: for its
+     * first moment nothing can touch her, unless she has slipped so only just before.
+     */
+    private void slipping(Fighter me) {
+        if (me.dodgeRest > 0) return;
+        me.safe = DODGE_SAFE;
+        me.dodgeRest = DODGE_REST;
+        me.slipped = false;
     }
 
     /** A dash in the air: she holds her height and goes along the line of the ground, the way given, for a moment. */
@@ -1282,7 +1295,7 @@ final class Fight {
      * Both meters fill. Returns whether it landed at all.
      */
     private boolean hurt(Fighter her, Fighter by, float damage, float knock, float stun, boolean floors, float from, Move move) {
-        if (her.state == DODGE && her.safe > 0 && !her.slipped) {
+        if ((her.state == DODGE || her.state == DASH || her.state == BACKSTEP || her.state == AIRDASH) && her.safe > 0 && !her.slipped) {
             // It was on her, and she was not there: a dodge that did what it was for, counted once.
             her.slipped = true;
             her.slips++;

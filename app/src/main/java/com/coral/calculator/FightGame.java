@@ -262,8 +262,8 @@ final class FightGame {
 
     /**
      * The buttons: on the left the two arrows, with the guard over them. On the right, under
-     * one thumb, the quick blow, the heavy one and the jump in a row, with the dodge, the
-     * special and the dash over them (the dash over the jump, for a dash in the air); and over
+     * one thumb, the quick blow, the heavy one and the jump in a row, with the special and
+     * the dash over them (the dash over the jump, for a dash in the air too); and over
      * those a place for the ultimate, which is only there while her meter is full.
      */
     private void arrange() {
@@ -280,7 +280,8 @@ final class FightGame {
         buttons[LIGHT].set(first, low, first + size, low + size);
         buttons[HEAVY].set(second, low, second + size, low + size);
         buttons[JUMP].set(third, low, third + size, low + size);
-        buttons[DODGE].set(first, high, first + size, high + size);
+        // (The dodge has no button of its own any more: the dash carries it. Its place is kept empty, off the screen.)
+        buttons[DODGE].set(-size * 4, -size * 4, -size * 3, -size * 3);
         buttons[SPECIAL].set(second, high, second + size, high + size);
         buttons[DASH].set(third, high, third + size, high + size);
         float grand = size * 1.14f;
@@ -1093,7 +1094,7 @@ final class FightGame {
                 float x = event.getX(finger), y = event.getY(finger), nearest = Float.MAX_VALUE;
                 int which = -1;
                 for (int index = 0; index < BUTTONS; index++) {
-                    if (index == ULT && !charged) continue;
+                    if (index == ULT && !charged || index == DODGE) continue;
                     float away = (float) Math.hypot(x - buttons[index].centerX(), y - buttons[index].centerY());
                     if (away < nearest) {
                         nearest = away;
@@ -1501,7 +1502,7 @@ final class FightGame {
         }
         if (screen == FIGHT) {
             // The buttons show her own fighter's special; on the device that joined, that is the one on the right.
-            for (int index = 0; index < BUTTONS; index++) button(canvas, index, fight.fighters[mode == GUEST ? 1 : 0]);
+            for (int index = 0; index < BUTTONS; index++) if (index != DODGE) button(canvas, index, fight.fighters[mode == GUEST ? 1 : 0]);
             plate(canvas, pauseButton, pauseButton.height() / 2, 200);
             paint.setColor(ink);
             canvas.drawRoundRect(pauseButton.centerX() - dp(5.5f), pauseButton.centerY() - dp(6.5f), pauseButton.centerX() - dp(2), pauseButton.centerY() + dp(6.5f), dp(1.2f), dp(1.2f), paint);
@@ -1691,23 +1692,12 @@ final class FightGame {
             path.quadTo(x - reach * .8f, y + reach * 1.05f, x - reach, y + reach * .1f);
             path.close();
             canvas.drawPath(path, paint);
-        } else if (which == DASH) {
-            // Two arrows one after the other, pointing the way she faces.
-            for (int one = 0; one < 2; one++) {
-                float at = x + (one - .5f) * reach * .9f;
-                path.reset();
-                path.moveTo(at + reach * .55f, y);
-                path.lineTo(at - reach * .35f, y - reach * .8f);
-                path.lineTo(at - reach * .35f, y + reach * .8f);
-                path.close();
-                canvas.save();
-                if (mine.facingLeft) canvas.scale(-1, 1, x, y);
-                canvas.drawPath(path, paint);
-                canvas.restore();
-            }
-        } else if (which == DODGE) {
-            // Someone slipping aside: a figure leaning into it, with the air she leaves behind her. Fainter while she cannot dodge again yet.
-            paint.setAlpha(mine.dodgeRest > 0 ? 80 : down ? 255 : 215);
+        } else if (which == DASH || which == DODGE) {
+            // The dash, which carries the dodge: someone leaning into a run, with the air she leaves behind her, the way she faces.
+            canvas.save();
+            if (mine.facingLeft) canvas.scale(-1, 1, x, y);
+            // (A little softer while its dodge rests: the dash still goes, but without the moment nothing can touch her.)
+            paint.setAlpha(down ? 255 : mine.dodgeRest > 0 ? 140 : 215);
             canvas.drawCircle(x + reach * .7f, y - reach * .85f, reach * .36f, paint);
             canvas.save();
             canvas.rotate(24, x + reach * .35f, y + reach * .2f);
@@ -1719,6 +1709,7 @@ final class FightGame {
                 box.set(x - reach * .45f - far, at - reach * .1f, x - reach * .45f, at + reach * .1f);
                 canvas.drawRoundRect(box, reach * .1f, reach * .1f, paint);
             }
+            canvas.restore();
         } else if (which == LIGHT || which == HEAVY || grand) {
             // A burst: small for the quick blow, large and with more points for the heavy one, and the largest for the ultimate.
             int points = which == LIGHT ? 4 : grand ? 12 : 8;
