@@ -1162,6 +1162,14 @@ final class PlusRun {
      * A dash: in the air, once until she lands, a burst the way she faces with no falling; on the ground, a dodge roll, a moment in
      * which nothing hurts her. Whether she did.
      */
+    /** Whether she has either move at all, the roll or the dash in the air: whether a button for them is worth showing. */
+    boolean dashes() { return perks.roll || perks.airDash; }
+
+    /** Whether a dash now would go: a roll on the ground, or the one dash of a jump in the air. */
+    boolean canDash() {
+        return state == PLAYING && (onGround ? perks.roll && rollLeft <= 0 : perks.airDash && !dashUsed && !climbing);
+    }
+
     boolean dash() {
         if (state != PLAYING) return false;
         float way = facingLeft ? -1 : 1;

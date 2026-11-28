@@ -244,11 +244,11 @@ final class RunGame {
             {"Her pets wait a fifth less between one thing and the next", "Her pets wait two fifths less"},
             {"A pet's blow counts twice on a big one", "And a pet takes a whole piece off a shield"},
             {"A third jump in the air, a flip: press jump again"},
-            {"In the air, double-tap a way (or Shift): a dash that way", "And the dash strikes whatever it goes through"},
+            {"In the air, the dash button over the arrows (or double-tap a way, or Shift): a dash the way she faces", "And the dash strikes whatever it goes through"},
             {"Whatever hurts her takes a blow of thorns", "Two blows of thorns", "Three blows of thorns"},
             {"Hold down in the air: she slams the ground with what she holds, even out of an air dash", "A wider slam that hits harder, and cracks two pieces off a shield",
                     "The widest slam: shields broken outright, and a shockwave along the ground"},
-            {"On the ground, double-tap a way (or Shift): a roll nothing hurts"},
+            {"On the ground, the dash button over the arrows (or double-tap a way, or Shift): a roll nothing hurts"},
             {"Against a wall in the air she clings: jump to kick off it"},
             {"Hold jump as she falls: she glides down slowly", "She glides slower, and so further", "Slower still, and every second and a half a gust lifts her"},
             {"Once a land, what would end her leaves half a heart"},
@@ -572,6 +572,9 @@ final class RunGame {
     /** The button that lets her down through a thin ledge, over the arrows; and whether it is held. */
     private final RectF downButton = new RectF();
     private boolean goDown;
+    /** The dash's own button, over the arrows between the two, once she has the roll or the dash in the air; and when it was last tapped. */
+    private final RectF dashButton = new RectF();
+    private float dashTapped = -9;
     /** What a card that names something won is: plain, good, or rare. And where what was won flies from, in squares. */
     private int toastRarity;
     /** A toast's picture that is a thing found: this much and its number. */
@@ -4403,6 +4406,9 @@ final class RunGame {
         // gap between them, so that the thumb that strikes rolls onto it. (The arrows' thumb has only the arrows.)
         float downs = Math.max(dp(46), size * .66f), gap = (strikeButton.right + jumpButton.left) / 2;
         downButton.set(gap - downs / 2, y - dp(10) - downs, gap + downs / 2, y - dp(10));
+        // The dash: the same size, over the arrows and between them, so that the arrows' thumb rolls up onto it from either.
+        float mid = (leftButton.right + rightButton.left) / 2;
+        dashButton.set(mid - downs / 2, y - dp(10) - downs, mid + downs / 2, y - dp(10));
         // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the down button.
         float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, downButton.left - dp(8));
         swapButton.set(swapRight - swaps, strikeButton.top - dp(12) - swaps, swapRight, strikeButton.top - dp(12));
@@ -9140,7 +9146,16 @@ final class RunGame {
                 pills("Back to the land", RESUME, "Guild counter", COUNTER);
                 return;
             }
-            doubleTap(event, action);
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && finale == NO_FINALE && run.dashes()
+                    && near(dashButton, event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                dashTapped = clock;
+                if (run.dash()) {
+                    audio.play("jump", .5f);
+                    buzz(false);
+                }
+            } else {
+                doubleTap(event, action);
+            }
             held(event);
             return;
         }
@@ -9556,6 +9571,8 @@ final class RunGame {
                     down = true;
                     continue;
                 }
+                // (A finger on the dash is on the dash, not on the arrow under it.)
+                if (finale == NO_FINALE && run != null && run.dashes() && near(dashButton, x, y)) continue;
                 if (y < low) continue;
                 if (x < between) left = true;
                 else if (x < arrows) right = true;
@@ -9798,6 +9815,7 @@ final class RunGame {
                 if (!lets) canvas.saveLayerAlpha(downButton.left - dp(6), downButton.top - dp(6), downButton.right + dp(6), downButton.bottom + dp(8), over ? 50 : 160);
                 control(canvas, downButton, goDown, 90, false);
                 if (!lets) canvas.restore();
+                if (finale == NO_FINALE && run.dashes()) dashControl(canvas);
                 // In the first land the arrows glow until she has moved, and the jump until she has jumped; and the palette, when she has
                 // been told of it, until she opens it.
                 if (number == 1 && !hintMoved) {
@@ -15419,6 +15437,47 @@ final class RunGame {
         paint.setAlpha(255);
         paint.setColor(Color.BLACK);
         return round;
+    }
+
+    /** Whether a finger is on a small round button, or near enough to it to mean it. */
+    private boolean near(RectF where, float x, float y) {
+        return x > where.left - dp(8) && x < where.right + dp(8) && y > where.top - dp(10) && y < where.bottom + dp(4);
+    }
+
+    /**
+     * The dash's button: two chevrons and the lines of the air she leaves, pointing the way she faces. Lit when a dash would go now (a roll
+     * on the ground, the one dash of a jump in the air), dim in its place when it would not, and coral for a moment when tapped.
+     */
+    private void dashControl(Canvas canvas) {
+        RectF where = dashButton;
+        boolean ready = run.canDash(), held = clock - dashTapped < .15f;
+        if (!ready && !held) canvas.saveLayerAlpha(where.left - dp(6), where.top - dp(6), where.right + dp(6), where.bottom + dp(8), 120);
+        float round = glass(canvas, where, held, CalculatorLayout.CORAL), reach = round * .26f;
+        canvas.save();
+        canvas.translate(where.centerX(), where.centerY());
+        if (run.facingLeft()) canvas.scale(-1, 1);
+        for (int pass = 0; pass < 2; pass++) {
+            canvas.save();
+            if (pass == 0) canvas.translate(0, dp(1.5f));
+            stroke.setColor(pass == 0 ? Color.BLACK : Color.WHITE);
+            stroke.setAlpha(pass == 0 ? 70 : 255);
+            stroke.setStrokeWidth(where.width() * .075f);
+            for (int chevron = 0; chevron < 2; chevron++) {
+                float at = chevron * reach * 1.1f;
+                path.reset();
+                path.moveTo(at - reach * .5f, -reach);
+                path.lineTo(at + reach * .5f, 0);
+                path.lineTo(at - reach * .5f, reach);
+                canvas.drawPath(path, stroke);
+            }
+            stroke.setStrokeWidth(where.width() * .05f);
+            canvas.drawLine(-reach * 2.3f, -reach * .55f, -reach * 1.2f, -reach * .55f, stroke);
+            canvas.drawLine(-reach * 2.6f, reach * .55f, -reach * 1.2f, reach * .55f, stroke);
+            canvas.restore();
+        }
+        stroke.setAlpha(255);
+        canvas.restore();
+        if (!ready && !held) canvas.restore();
     }
 
     /** A round button with an arrowhead in it pointing some way round; pink, when the arrows have been turned about on her. */
