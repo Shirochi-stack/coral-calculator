@@ -1868,6 +1868,14 @@ final class RunLevels {
                 level.items.add(new int[]{PlusRun.BREAD, spot[0], spot[1] - 1, 0});
             }
         }
+        // In the mirror: on its third, sixth, ninth and twelfth floors the shadow of one she knows, by turns; on its fifth and tenth an Echo, a her
+        // from a timeline that ended badly. Two thirds of the way along, where she meets it at the end of what she has come through.
+        if (dungeon == RunDungeons.MIRROR && !spots.isEmpty() && (floor % 3 == 2 && floor < 12 || floor == 4 || floor == 9)) {
+            int kind = floor == 4 || floor == 9 ? RunUniques.ECHO_FIRST + random.nextInt(RunUniques.ECHO_COUNT) : RunUniques.CAST_FIRST + random.nextInt(RunUniques.CAST_COUNT);
+            int[] spot = spots.get(Math.min(spots.size() - 1, spots.size() * 2 / 3));
+            int row = RunUniques.floats(kind) ? spot[1] - 3 : spot[1] - 1;
+            level.foes.add(new int[]{kind, spot[0], row, 1, 0, 2});
+        }
         // The keeper, in the middle of its hall; and pluses along the hall for the fight.
         if (hall >= 0) {
             level.foes.add(new int[]{RunDungeons.keeper(dungeon), hall + KEEPER_HALL / 2 + 2, hallFloor - 1, 1, 0, 2});
