@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import clips_data as data  # noqa: E402
 import make_clips as mk  # noqa: E402
 
-RAW = ROOT / "app" / "src" / "main" / "res" / "raw"
+RAW = ROOT / "films" / "src" / "main" / "assets" / "films"
 ASSETS = ROOT / "app" / "src" / "main" / "assets"
 LANGS = ("en", "ja", "ko", "zh")
 
