@@ -29,7 +29,8 @@ import java.util.Random;
  */
 abstract class TrickBase {
     private static final int OPEN = 0, SCENE = 1, OWN = 2, HOME = 3;
-    private static final float OPENING = 1.1f, OWNING = 2.5f;
+    /** How long her opening word and her owning up stay, and how fast a scene plays: slower than it was written, so that what she says can be read and what happens reacted to. */
+    private static final float OPENING = 2.2f, OWNING = 4f, PACE = .62f;
     /** The pictures the scenes borrow from the games: how many frames across each strip has. */
     static final int FX = TrickArt.fight_fx, PIECES = TrickArt.plus_run_art, FACES = TrickArt.fight_faces, NPC = TrickArt.run_npc;
     static final int LOSE = TrickArt.halgakos_lose, JUMP = TrickArt.halgakos_jump;
@@ -159,7 +160,9 @@ abstract class TrickBase {
                 }
                 break;
             case SCENE:
-                t += seconds;
+                // (The scene's own time runs slower than the clock, and so does her running in it: its lines stay with what happens.)
+                dt = seconds * PACE;
+                t += dt;
                 if (t >= length()) ownUp();
                 break;
             case OWN:
