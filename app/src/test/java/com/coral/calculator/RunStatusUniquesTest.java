@@ -9,7 +9,7 @@ import org.junit.Test;
 public class RunStatusUniquesTest {
     @Test public void twelveTwoForEachOfTheFirstSixChaptersWithTheirPicturesAndLines() {
         assertEquals(12, RunUniques.STATUS_COUNT);
-        assertEquals(RunUniques.COUNT, RunUniques.index(RunUniques.STATUS_FIRST) + RunUniques.STATUS_COUNT);
+        assertEquals(RunUniques.SHADOW_FIRST, RunUniques.STATUS_FIRST + RunUniques.STATUS_COUNT);
         assertTrue(new java.io.File("../runart/src/main/assets/" + RunUniques.STATUS_SHEET).isFile());
         int fire = 0, cold = 0, ink = 0, stun = 0;
         for (int index = 0; index < 12; index++) {

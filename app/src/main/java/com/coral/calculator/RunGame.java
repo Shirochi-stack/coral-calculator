@@ -170,6 +170,8 @@ final class RunGame {
     private long delveDive;
     private int[] offeredNow = new int[3];
     private boolean keeperSaid;
+    /** In the mirror: whether the Copy has said her piece at half her strength and beaten, and whether she has said she was blinded, this dive. */
+    private boolean copyHalf, copyDown, blindSaid;
     private final RectF marketCard = new RectF(), marketAct = new RectF();
     private final RectF[] marketTabs = {new RectF(), new RectF(), new RectF()}, hardRows = {new RectF(), new RectF(), new RectF(), new RectF()},
             rungRows = new RectF[RunMarket.RUNGS], wareBuys = new RectF[RunMarket.WARES];
@@ -2057,6 +2059,29 @@ final class RunGame {
     /** The backdrop of a dungeon's floor, by its band: its own picture for the first five floors, a grittier one for the next five, the abyss deeper. */
     private Bitmap depthsBack() {
         int band = RunDungeons.band(delveFloor), which = RunDungeons.backdrop(delve);
+        // The mirror's: the same, turned about and drained to silver and violet, glassed over (made once a band).
+        if (delve == RunDungeons.MIRROR) {
+            if (mirrorBacks[band] == null) {
+                int was = delve;
+                delve = 0;
+                Bitmap from = depthsBackOf(band, which);
+                delve = was;
+                Bitmap made = Bitmap.createBitmap(from.getWidth(), from.getHeight(), Bitmap.Config.ARGB_8888);
+                Canvas onto = new Canvas(made);
+                Paint glass = new Paint(Paint.FILTER_BITMAP_FLAG);
+                glass.setColorFilter(new android.graphics.ColorMatrixColorFilter(new float[]{.35f, .35f, .35f, 0, 40, .3f, .3f, .4f, 0, 34, .45f, .4f, .5f, 0, 60, 0, 0, 0, 1, 0}));
+                onto.scale(-1, 1, from.getWidth() / 2f, 0);
+                onto.drawBitmap(from, 0, 0, glass);
+                mirrorBacks[band] = made;
+            }
+            return mirrorBacks[band];
+        }
+        return depthsBackOf(band, which);
+    }
+
+    private final Bitmap[] mirrorBacks = new Bitmap[3];
+
+    private Bitmap depthsBackOf(int band, int which) {
         if (band == 0) {
             if (depths[which] == null) depths[which] = BitmapFactory.decodeResource(context.getResources(), DEPTHS[which]);
             return depths[which];
@@ -3678,6 +3703,27 @@ final class RunGame {
         paint.setColor(Color.BLACK);
     }
 
+    /** One of the colours' wares' pictures, from the runart pack. Whether it was drawn. */
+    private boolean colourWare(Canvas canvas, int which, float x, float y, float size) {
+        if (colourWares == null && !colourWaresTried) {
+            colourWaresTried = true;
+            try (java.io.InputStream in = context.getAssets().open("runart/colour_wares.webp")) {
+                colourWares = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                colourWares = null;
+            }
+        }
+        if (colourWares == null) return false;
+        int cell = colourWares.getHeight();
+        source.set(which * cell, 0, (which + 1) * cell, cell);
+        target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+        canvas.drawBitmap(colourWares, source, target, paint);
+        return true;
+    }
+
+    private Bitmap colourWares;
+    private boolean colourWaresTried;
+
     /** How many damage numbers show at once. */
     static final int NUMBERS_MOST = 8;
 
@@ -4822,11 +4868,47 @@ final class RunGame {
     private void openStairs() {
         delveAt = RunDungeons.inLand(number);
         if (delveAt < 0) return;
+        // The mirror shows nothing until Lucy has been beaten.
+        if (delveAt == RunDungeons.MIRROR && !mirrorOpen()) {
+            toast(RunDungeons.MIRROR_NAME, "The glass is dark. It wakes once Lucy is beaten", 0);
+            audio.play("no", .5f);
+            return;
+        }
         delveCard = 0;
         idle();
         screen = DELVE;
         audio.play("page", .6f);
         pills("Go down", DELVE_GO, "Not now", RESUME);
+    }
+
+    /** The Mirror Depths' way in: a tall standing mirror in a dark frame, its glass dark until Lucy is beaten, and then shimmering silver. */
+    private void drawMirrorDoor(Canvas canvas, int[] item) {
+        float px = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile, tall = tile * 2.8f, wide = tile * 1.5f;
+        boolean open = mirrorOpen();
+        float pulse = .5f + .5f * (float) Math.sin(clock * 2);
+        if (open) glowAt(canvas, px, feet - tall * .5f, tall * .6f, 0xFFB8C8FF, Math.round(70 + 60 * pulse));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF2A2236);
+        box.set(px - wide / 2 - tile * .12f, feet - tall - tile * .12f, px + wide / 2 + tile * .12f, feet);
+        canvas.drawRoundRect(box, wide / 2, wide / 2, paint);
+        paint.setColor(open ? 0xFFCFD8F0 : 0xFF151320);
+        box.set(px - wide / 2, feet - tall, px + wide / 2, feet - tile * .1f);
+        canvas.drawRoundRect(box, wide / 2.2f, wide / 2.2f, paint);
+        if (open) {
+            // Light running over the glass.
+            stroke.setColor(Color.WHITE);
+            stroke.setStrokeWidth(tile * .08f);
+            stroke.setAlpha(Math.round(120 + 100 * pulse));
+            float shine = (clock * .5f) % 1;
+            canvas.drawLine(px - wide * .4f + wide * .8f * shine, feet - tall * .85f, px - wide * .55f + wide * .8f * shine, feet - tall * .35f, stroke);
+            stroke.setAlpha(255);
+        }
+        paint.setColor(Color.BLACK);
+    }
+
+    /** Whether the Mirror Depths are open: Lucy beaten (the last land's prize won); or, in a build made for testing, asked for. */
+    private boolean mirrorOpen() {
+        return session.tally("run_prize_" + RunLevels.COUNT) != 0 || BuildConfig.DEBUG && session.tally("run_mirror_open") != 0;
     }
 
     /** Down into a dungeon: a new dive, laid afresh; what she collected in the land she leaves is kept. */
@@ -4844,7 +4926,8 @@ final class RunGame {
         begin(RunDungeons.land(dungeon), false);
         flash = .5f;
         floorCard();
-        speak(RunStory.DUNGEONS[1], true);
+        speak(dungeon == RunDungeons.MIRROR ? RunStory.MIRROR[0] : RunStory.DUNGEONS[1], true);
+        copyHalf = copyDown = blindSaid = false;
     }
 
     /** At the start of a floor, a word of which floor it is and what it is like. */
@@ -4852,7 +4935,7 @@ final class RunGame {
         int kind = delveKind();
         String words = kind != RunDungeons.PLAIN ? RunDungeons.KIND_NAMES[kind] + ": " + RunDungeons.KIND_WORDS[kind]
                 : delveFloor == RunDungeons.floors(delve) - 1 ? "Its keeper waits at the end" : "Laid anew for this dive";
-        toast(RunDungeons.NAMES[delve] + "  ·  floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve), words, 0);
+        toast(RunDungeons.name(delve) + "  ·  floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve), words, 0);
     }
 
     /** What she takes down to a floor: harder the deeper, harder again on a fierce floor; and what the blessings chosen give. */
@@ -4956,6 +5039,10 @@ final class RunGame {
 
     /** A dungeon's stairway in its land: an arch of books over steps down, lit from below; and the dungeon's name over it as she comes near. */
     private void drawStairs(Canvas canvas, int[] item) {
+        if (RunDungeons.inLand(number) == RunDungeons.MIRROR) {
+            drawMirrorDoor(canvas, item);
+            return;
+        }
         Bitmap art = stairsArt();
         float px = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile, tall = tile * 2.7f, wide = tall * art.getWidth() / art.getHeight();
         float pulse = .5f + .5f * (float) Math.sin(clock * 2.2f);
@@ -4964,7 +5051,7 @@ final class RunGame {
         target.set(px - wide / 2, feet - tall + tile * .06f, px + wide / 2, feet + tile * .06f);
         canvas.drawBitmap(art, null, target, paint);
         int dungeon = RunDungeons.inLand(number);
-        if (dungeon >= 0 && Math.abs(run.x() - item[1]) < 7) mark(canvas, px, feet - tall - tile * .15f, RunDungeons.NAMES[dungeon], 0xFF6A3FA0, false);
+        if (dungeon >= 0 && Math.abs(run.x() - item[1]) < 7) mark(canvas, px, feet - tall - tile * .15f, RunDungeons.name(dungeon), 0xFF6A3FA0, false);
     }
 
     /** The stairway fitted in a square about a place: for buttons and the map. */
@@ -5057,6 +5144,21 @@ final class RunGame {
         paint.setColor(Color.BLACK);
     }
 
+    /** Blinded by a shadow's touch: all but a little way round her dark, closing in and then easing off. */
+    private void drawBlind(Canvas canvas) {
+        if (run == null || run.herBlind() <= 0) return;
+        float hx = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, hy = (run.y() + PlusRun.TALL / 2 - cameraY) * tile;
+        float strength = Math.min(1, run.herBlind() / .6f);
+        paint.setShader(new android.graphics.RadialGradient(hx, hy, tile * (3.5f + 3 * (1 - strength)), new int[]{0x00000000, 0x00000000, 0xF0060410},
+                new float[]{0, .35f, 1}, android.graphics.Shader.TileMode.CLAMP));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAlpha(Math.round(255 * strength));
+        canvas.drawRect(0, 0, width, height, paint);
+        paint.setShader(null);
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+    }
+
     /** Over a dungeon's floor: on a lightless one, the dark, but for a ring of light about her; and the keeper's name and what it has left, while it is near. */
     private void drawDepthsOver(Canvas canvas) {
         if (delve < 0 || run == null || run.room() >= 0) return;
@@ -5111,7 +5213,7 @@ final class RunGame {
         if (delveCard == 0) {
             int dungeon = Math.max(0, delveAt), floors = RunDungeons.floors(dungeon), deepest = session.tally("run_deep_" + dungeon);
             boolean cleared = (session.tally("run_dungeons") >> dungeon & 1) != 0;
-            float top = card(canvas, RunDungeons.NAMES[dungeon], floors + " floors  ·  for level " + RunDungeons.recommended(dungeon) + "  ·  "
+            float top = card(canvas, RunDungeons.name(dungeon), floors + " floors  ·  for level " + RunDungeons.recommended(dungeon) + "  ·  "
                     + (cleared ? "cleared" : deepest > 0 ? "deepest: floor " + deepest : "never gone down"), dp(70));
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(ink);
@@ -5136,7 +5238,7 @@ final class RunGame {
 
     /** A dive over: cleared, what it gave; lost, the floor it ended on, and her on the card, sitting where she fell. */
     private void drawDiveResult(Canvas canvas) {
-        String name = RunDungeons.NAMES[delve];
+        String name = RunDungeons.name(delve);
         float wide = Math.min(safe.width() - dp(32), dp(320)) - dp(40);
         if (won) {
             float top = card(canvas, name + " is cleared", RunDungeons.floors(delve) + " floors  ·  kept + " + banked, dp(rungPrize.isEmpty() ? 40 : 66));
@@ -7298,11 +7400,26 @@ final class RunGame {
                     speak(RunStory.DUNGEONS[0], true);
                 }
             } else if (delve >= 0) {
+                // In the mirror: the Copy at half her strength, and beaten; and the first shadow's touch.
+                for (PlusRun.Foe foe : run.foes()) {
+                    if (!RunUniques.copy(foe.kind)) continue;
+                    if (!copyHalf && !foe.flat && foe.left * 2 < foe.most) {
+                        copyHalf = true;
+                        speak(RunStory.MIRROR[2], true);
+                    } else if (!copyDown && foe.flat) {
+                        copyDown = true;
+                        speak(RunStory.MIRROR[3], true);
+                    }
+                }
+                if (!blindSaid && run.herBlind() > 0) {
+                    blindSaid = true;
+                    speak(RunStory.MIRROR[4], true);
+                }
                 for (PlusRun.Foe foe : run.foes()) {
                     if (foe.flat || !RunUniques.is(foe.kind) || Math.abs(foe.x - run.x()) > 10) continue;
                     if (RunUniques.keeper(foe.kind) && !keeperSaid) {
                         keeperSaid = true;
-                        speak(RunStory.DUNGEONS[3], true);
+                        speak(RunUniques.copy(foe.kind) ? RunStory.MIRROR[1] : RunStory.DUNGEONS[3], true);
                         break;
                     }
                     if (RunUniques.way(foe.kind) == RunUniques.MIRROR && session.tally("run_dng10") == 0) {
@@ -8918,6 +9035,11 @@ final class RunGame {
                     openBoutique(0);
                     return;
                 }
+                // (A dungeon's stairway, or the mirror, before the smiths: its number is past theirs.)
+                if (what == PlusRun.STAIRS) {
+                    openStairs();
+                    return;
+                }
                 if (what >= PlusRun.SMITH) {
                     openSmith(what - PlusRun.SMITH, PLAY);
                     return;
@@ -9584,6 +9706,7 @@ final class RunGame {
             drawLand(canvas);
             drawDepthsOver(canvas);
             drawInked(canvas);
+            drawBlind(canvas);
             drawWayOn(canvas);
             drawDiary(canvas);
             // A moment in which something is won or handed over lies over the land, and under what is said and shown of how she stands.
@@ -9698,7 +9821,7 @@ final class RunGame {
                 canvas.drawColor(0x8C000000);
                 if (screen == PAUSED) {
                     // (With her backpack to look into.)
-                    float inside = card(canvas, "Paused", (delve >= 0 ? RunDungeons.NAMES[delve] + ", floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve)
+                    float inside = card(canvas, "Paused", (delve >= 0 ? RunDungeons.name(delve) + ", floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve)
                             : blackRung > 0 ? "The black arena, rung " + blackRung : RunStory.CHAPTERS[RunLevels.chapterOf(number)] + ", land " + number + "  ·  level " + RunLevels.levelOf(number))
                             + (hard() > 0 ? "  ·  harder by " + hard() : "") + (run != null && run.inked() ? "  ·  under black " + (int) Math.ceil(run.cursed()) + " s" : ""), dp(run != null && run.inked() ? 112 : 52));
                     // Black, and what it does to her, named.
@@ -9902,6 +10025,10 @@ final class RunGame {
         if (uniqueSheet == null) return;
         int way = RunUniques.way(foe.kind);
         if (foe.flat && foe.act > 1.1f) return;
+        if (RunUniques.shadow(foe.kind) || RunUniques.copy(foe.kind)) {
+            drawMirrored(canvas, foe, middle, feet, turned);
+            return;
+        }
         if (run.heals() != seenHeals) {
             if (run.heals() > seenHeals) healAge = 0;
             seenHeals = run.heals();
@@ -9982,6 +10109,65 @@ final class RunGame {
             }
         }
     }
+
+    /**
+     * The Mirror Depths' own: her shadows drawn from her own pictures in ink-black with a violet edge (the hidden one all but invisible until
+     * she is near), and the Imperfect Copy from her sheet in the mirror pack, in this dive's variant: as she is, hollow and shadowy, red-eyed, or
+     * pale pink as a bunny-white.
+     */
+    private void drawMirrored(Canvas canvas, PlusRun.Foe foe, float middle, float feet, boolean turned) {
+        float near = Math.abs(foe.x + foe.wide() / 2 - run.x() - PlusRun.WIDE / 2);
+        int alpha = foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : 255;
+        if (foe.kind == RunUniques.SHADOW_FIRST + 1 && !foe.flat) alpha = Math.round(alpha * Math.max(.08f, Math.min(1, (4 - near) / 2.5f)));
+        if (foe.dazed > 0 && (int) (clock * 16) % 2 == 0) alpha = alpha * 6 / 10;
+        if (RunUniques.copy(foe.kind)) {
+            if (copySheet == null && !copyTried) {
+                copyTried = true;
+                try (java.io.InputStream in = context.getAssets().open(RunUniques.COPY_SHEET)) {
+                    copySheet = BitmapFactory.decodeStream(in);
+                } catch (java.io.IOException ignored) {
+                    copySheet = null;
+                }
+            }
+            if (copySheet == null) return;
+            int frame = foe.flat ? 5 : foe.mode == 1 ? 2 : foe.mode == 2 ? 3 : foe.struck < .2f ? 4 : (int) (clock * 5) % 2;
+            int cell = copySheet.getHeight();
+            int variant = (int) Math.floorMod(delveDive, 4L);
+            // (Red-eyed: as she is, with a red light about her eyes and a red edge of glow.)
+            if (variant == 2 && !foe.flat) glowAt(canvas, middle, feet - foe.tall() * tile * .78f, foe.tall() * tile * .35f, 0xFFFF2A3A, 150);
+            paint.setColorFilter(COPY_VARIANTS[variant]);
+            paint.setAlpha(variant == 1 ? alpha * 3 / 4 : alpha);
+            source.set(frame * cell, 0, (frame + 1) * cell, cell);
+            float tall = foe.tall() * tile;
+            canvas.save();
+            if (turned) canvas.scale(-1, 1, middle, feet);
+            target.set(middle - tall / 2, feet - tall + tile * .04f, middle + tall / 2, feet + tile * .04f);
+            canvas.drawBitmap(copySheet, source, target, paint);
+            canvas.restore();
+            paint.setColorFilter(null);
+            paint.setAlpha(255);
+            return;
+        }
+        // Her shadows: the one that mirrors her, and the hidden one, with her sword; the one that shoots with her ink gun.
+        int weapon = foe.kind == RunUniques.SHADOW_FIRST + 2 ? PlusRun.GUN : PlusRun.SWORD;
+        int pose = foe.mode == 1 || foe.mode == 2 ? ARMED_USE : ARMED_RUN + (int) (clock * 8) % 4;
+        glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * .8f, 0xFF7A4BD8, Math.round(alpha * .35f));
+        paint.setColorFilter(SHADOW_INK);
+        paint.setAlpha(alpha);
+        // (As tall as she is drawn, a little more.)
+        frame(canvas, armed(weapon), pose, ARMED_FRAMES, middle, feet, tile * 1.62f * 1.05f, !turned);
+        paint.setColorFilter(null);
+        paint.setAlpha(255);
+    }
+
+    private Bitmap copySheet;
+    private boolean copyTried;
+    private static final android.graphics.ColorFilter SHADOW_INK = new android.graphics.ColorMatrixColorFilter(new float[]{
+            .12f, .08f, .1f, 0, 18, .08f, .06f, .1f, 0, 8, .2f, .15f, .25f, 0, 34, 0, 0, 0, 1, 0});
+    /** The Copy as she is; hollow and shadowy; red-eyed (a red glow, drawn with her); and bunny-pale pink. */
+    private static final android.graphics.ColorFilter[] COPY_VARIANTS = {null,
+            new android.graphics.ColorMatrixColorFilter(new float[]{.25f, .2f, .2f, 0, 10, .2f, .2f, .25f, 0, 8, .3f, .25f, .35f, 0, 30, 0, 0, 0, 1, 0}),
+            null, new android.graphics.LightingColorFilter(0xFFFFE8F0, 0x00140810)};
 
     private Bitmap laterSheet, statusSheet;
     private boolean laterTried, statusTried;
@@ -16062,7 +16248,10 @@ final class RunGame {
             // Its picture: for her wings, herself at the top of a jump.
             float icon = Math.min(dp(46), high - dp(14));
             paint.setAlpha(255);
-            if (UP_ART[index] >= 0) artIn(canvas, UP_ART[index], left + dp(14) + icon / 2, middle, icon);
+            // (The colours' three wares have pictures of their own: the prism, the quick ribbon's stopwatch, the lasting ribbon's hourglass.)
+            if ((index == PRISM || index == QUICK || index == LASTING) && colourWare(canvas, index == PRISM ? 0 : index == QUICK ? 1 : 2, left + dp(14) + icon / 2, middle, icon)) {
+                // drawn
+            } else if (UP_ART[index] >= 0) artIn(canvas, UP_ART[index], left + dp(14) + icon / 2, middle, icon);
             else if (UP_ART[index] == HER_FACE) round(canvas, 0, left + dp(14) + icon / 2, middle, icon * .46f);
             else if (UP_ART[index] >= MOVE_ART && UP_ART[index] <= MOVE_ART + PlusRun.MOVE_GLIDE) frame(canvas, movesSheet(), UP_ART[index] - MOVE_ART, PlusRun.MOVE_GLIDE + 1, left + dp(14) + icon / 2, middle + icon / 2, icon * .95f, false);
             else frame(canvas, jump, TOP, JUMP_FRAMES, left + dp(14) + icon / 2, middle + icon / 2, icon * .95f, false);

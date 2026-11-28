@@ -22,32 +22,43 @@ final class RunDungeons {
     /** The land each one's stairway stands in: two to a chapter, neither where someone waits at the end. */
     static final int[] LANDS = {3, 5, 8, 10, 14, 16, 20, 22, 26, 28, 33, 37, 43, 47, 53, 57, 63, 67, 73, 77, 83, 87, 93, 97};
 
-    /** Which backdrop each is drawn against: the catacomb, the ink crypt, the paper cavern, the vault. */
-    static int backdrop(int dungeon) { return (dungeon / 2 + dungeon % 2) % 4; }
+    /**
+     * And one more, past the twenty-four: the Mirror Depths, whose stairway is a tall mirror in the ninety-ninth land, dark until Lucy has
+     * been beaten; fifteen floors in three bands, where her own shadows live, and at the bottom the Imperfect Copy.
+     */
+    static final int MIRROR = COUNT, MIRROR_LAND = 99, MIRROR_FLOORS = 15;
+    static final String MIRROR_NAME = "The Mirror Depths";
 
-    /** How many floors deep it is: five in the first chapters, eight at the last. */
-    static int floors(int dungeon) { return 5 + dungeon / 7; }
+    /** Its name. */
+    static String name(int dungeon) { return dungeon == MIRROR ? MIRROR_NAME : NAMES[dungeon]; }
+
+    /** Which backdrop each is drawn against: the catacomb, the ink crypt, the paper cavern, the vault (the mirror, the ink crypt, glassed over). */
+    static int backdrop(int dungeon) { return dungeon == MIRROR ? 1 : (dungeon / 2 + dungeon % 2) % 4; }
+
+    /** How many floors deep it is: five in the first chapters, eight at the last; the mirror fifteen. */
+    static int floors(int dungeon) { return dungeon == MIRROR ? MIRROR_FLOORS : 5 + dungeon / 7; }
 
     /** Its land; and which dungeon, if any, has its stairway in a land. */
-    static int land(int dungeon) { return LANDS[dungeon]; }
+    static int land(int dungeon) { return dungeon == MIRROR ? MIRROR_LAND : LANDS[dungeon]; }
 
     static int inLand(int number) {
         for (int dungeon = 0; dungeon < COUNT; dungeon++) if (LANDS[dungeon] == number) return dungeon;
-        return -1;
+        return number == MIRROR_LAND ? MIRROR : -1;
     }
 
-    /** The three kinds of the seven that live in dungeons that this one has, each different. */
+    /** The three kinds of the seven that live in dungeons that this one has, each different; in the mirror, her three shadows. */
     static int[] delvers(int dungeon) {
+        if (dungeon == MIRROR) return new int[]{RunUniques.SHADOW_FIRST, RunUniques.SHADOW_FIRST + 1, RunUniques.SHADOW_FIRST + 2};
         int[] kinds = new int[3];
         for (int one = 0; one < 3; one++) kinds[one] = RunUniques.DELVER_FIRST + (dungeon + one * 3) % RunUniques.DELVER_COUNT;
         return kinds;
     }
 
     /** Its keeper. */
-    static int keeper(int dungeon) { return RunUniques.keeperOf(dungeon); }
+    static int keeper(int dungeon) { return dungeon == MIRROR ? RunUniques.COPY : RunUniques.keeperOf(dungeon); }
 
     /** The level it is for, as the land it is in. */
-    static int recommended(int dungeon) { return RunLoot.recommended(LANDS[dungeon]); }
+    static int recommended(int dungeon) { return RunLoot.recommended(land(dungeon)); }
 
     /** Which band of depth a floor is in: every five floors look different, grittier the deeper (0 floors 1 to 5, 1 floors 6 to 10, 2 and on deeper still). */
     static final int BAND_FLOORS = 5, BANDS = 3;
@@ -104,10 +115,12 @@ final class RunDungeons {
     // What it gives
 
     /** Pluses for clearing it: more the deeper and further on; the first time, three times as many. */
-    static int pluses(int dungeon, boolean first) { return (60 + LANDS[dungeon] * 6 + floors(dungeon) * 20) * (first ? 3 : 1); }
+    static int pluses(int dungeon, boolean first) { return (60 + land(dungeon) * 6 + floors(dungeon) * 20) * (first ? 3 : 1); }
 
     /** Its relic, the first time it is cleared: a thing to keep of its chapter, red or better (a Rose at the last). */
     static int relic(int dungeon) {
+        // (The mirror's: a Rose of its own, the Copy's mirror-shard sword, of the last chapter.)
+        if (dungeon == MIRROR) return RunLoot.code(RunLoot.WEAPON, 11, 0, RunLoot.ROSE);
         int[] types = {RunLoot.ACCESSORY, RunLoot.ARMOUR, RunLoot.WEAPON};
         int chapter = Math.min(11, dungeon / 2);
         int rarity = dungeon >= 20 ? RunLoot.ROSE : RunLoot.RED;

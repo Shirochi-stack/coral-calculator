@@ -581,6 +581,17 @@ final class RunStory {
             {"blk1", "Ugh, black ink all over me! Everything's heavy and dark Sloppy~♡", "H", PLAYER + "A cursed black ribbon has just soaked her in ink: she feels heavy, half blind, weak and dripping. Disgusted, sulky, shivering, but defiant."},
     };
 
+    /**
+     * The Mirror Depths: going down; the Imperfect Copy (in her voice, colder, and her catchphrase turned on her) when met, halfway, and when
+     * beaten; and a shadow's touch blinding her.
+     */
+    static final String[][] MIRROR = {
+            {"mir1", "A mirror that goes all the way down. Every face in here is a sloppy copy of mine Sloppy~♡", "H", PLAYER + "She steps through a tall dark mirror into a silver, upside-down dungeon where her own shadows walk. Uneasy, quiet, trying to joke."},
+            {"mir2", "You call them sloppy copies. I was the first one. The imperfect one. Hello Sloppy~♡", "H", "The Imperfect Copy speaks: an uncanny pale copy of Halgakos with elf ears and no horns, a cracked mirror for a sword, the first copy ever made and thrown away. Her voice is Halgakos's, but cold, flat and hollow, every word measured, the catchphrase said like an insult."},
+            {"mir3", "Every page you wrote, I wrote first. Backwards Sloppy~♡", "H", "The Imperfect Copy, cracking, half her strength gone, cold and bitter, almost whispering. The same voice as Halgakos but drained of warmth."},
+            {"mir4", "You were never imperfect. You were me before the ink dried. Rest now Sloppy~♡", "H", PLAYER + "She has beaten the Imperfect Copy, who shatters into mirror shards. Gentle, sad, a little proud, kind."},
+            {"mir5", "Hey, who turned out the lights? My own shadow just touched me Sloppy~♡", "H", PLAYER + "A shadow of herself touched her and everything went dark around her for a moment. Startled, creeped out, joking to stay brave."},
+    };
     /** The first time she meets each of the twelve made of fire, frost and ink, or that stun: what it does to her, and what to do. */
     static final String[][] STATUS_UNIQUES = {
             {"u3a", "A matchstick with an attitude! Its embers burn, keep moving Sloppy~♡", "H", PLAYER + "A tiny sooty match-head sprite flicks burning embers at her. Wary, teasing, quick warning that fire burns her."},
@@ -1320,6 +1331,7 @@ final class RunStory {
         groups.add(KNUCKLES);
         groups.add(LATER_UNIQUES);
         groups.add(STATUS_UNIQUES);
+        groups.add(MIRROR);
         groups.add(BLACKENED);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
