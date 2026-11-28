@@ -4641,6 +4641,15 @@ final class RunGame {
         } else {
             dashButton.set(poundButton.left, poundButton.top - dp(10) - downs, poundButton.right, poundButton.top - dp(10));
         }
+        // Her pouch: on the left thumb, over the left arrow and to the left of the button that lets her down; where there is no room there
+        // (a narrow screen), a row higher, over the left arrow.
+        float pouchSide = downs, pouchRight = downButton.left - dp(10);
+        if (pouchRight - pouchSide >= safe.left + dp(6)) {
+            pouchButton.set(Math.max(safe.left + dp(6), Math.min(leftButton.centerX() - pouchSide / 2, pouchRight - pouchSide)), downButton.top, 0, downButton.bottom);
+            pouchButton.right = pouchButton.left + pouchSide;
+        } else {
+            pouchButton.set(leftButton.centerX() - pouchSide / 2, downButton.top - dp(10) - pouchSide, leftButton.centerX() + pouchSide / 2, downButton.top - dp(10));
+        }
         // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the pound's place.
         float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, poundButton.left - dp(8));
         swapButton.set(swapRight - swaps, strikeButton.top - dp(12) - swaps, swapRight, strikeButton.top - dp(12));
@@ -5817,6 +5826,9 @@ final class RunGame {
         seenLives = seenCasts = seenBraces = seenPaid = seenReminders = seenChests = 0;
         seenDiaries = seenLifted = 0;
         seenXp = seenFound = 0;
+        seenMerchantBlows = seenGifts = seenDrinks = seenStops = seenFoundPotions = 0;
+        pickerOpen = false;
+        pouchFinger = -1;
         diaryAge = 99;
         villageSaid = false;
         roomCardAge = roomResultAge = -1;
@@ -5971,7 +5983,7 @@ final class RunGame {
             float screenX = (atX - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
             if (x < screenX - tile * .75f || x > screenX + tile * .75f || y < feet - tile * 1.6f || y > feet + tile * .1f) continue;
             // (Not where a button lies over them.)
-            if (stallButton.contains(x, y) || downButton.contains(x, y) || dashButton.contains(x, y) || poundButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y) || slotAt(x, y) >= 0) return false;
+            if (stallButton.contains(x, y) || pouchButton.contains(x, y) || downButton.contains(x, y) || dashButton.contains(x, y) || poundButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y) || slotAt(x, y) >= 0) return false;
             int stage = talkStage();
             session.keep("run_talk_" + stage, session.tally("run_talk_" + stage) | 1 << index);
             audio.play("tap", .5f);
@@ -7857,7 +7869,10 @@ final class RunGame {
             }
         }
         // The Vampire Merchant: struck, given to, met, fought.
-        if (run != null && screen == PLAY) merchantWatch(seconds);
+        if (run != null && screen == PLAY) {
+            merchantWatch(seconds);
+            potionWatch(seconds);
+        }
         // Each of the later chapters' creatures, the first time she comes near one: she says what to look out for.
         if (run != null && screen == PLAY && captionLeft <= 0 && !audio.speaking()) {
             for (PlusRun.Foe foe : run.foes()) {
@@ -9566,6 +9581,26 @@ final class RunGame {
                     return;
                 }
             }
+            // Her pouch: a tap drinks what it shows; held, it opens the row of everything in it. While the row is open, a touch chooses from it.
+            if (pickerOpen && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN)) {
+                pickerTouch(event.getX(event.getActionIndex()), event.getY(event.getActionIndex()));
+                return;
+            }
+            {
+                int index = event.getActionIndex(), finger = event.getPointerId(index);
+                boolean pressed = action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN;
+                boolean let = action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL;
+                if (pressed && pouchButton.contains(event.getX(index), event.getY(index))) {
+                    pouchFinger = finger;
+                    pouchDown = clock;
+                    return;
+                }
+                if (let && finger == pouchFinger) {
+                    pouchFinger = -1;
+                    if (!pickerOpen) usePouch(pouchShown());
+                    return;
+                }
+            }
             // The button that changes what she holds: a tap gives her the other of the last two; held, it opens her backpack.
             {
                 int index = event.getActionIndex(), finger = event.getPointerId(index);
@@ -10101,6 +10136,8 @@ final class RunGame {
             }
             if ((fresh & RunKeys.EXTRA) != 0) overJump();
             if ((fresh & RunKeys.DASH) != 0 && run.dash()) audio.play("jump", .5f);
+            if ((fresh & RunKeys.POUCH) != 0) usePouch(pouchShown());
+            if ((fresh & RunKeys.POUCH_NEXT) != 0) pouchNext();
             for (int slot = 0; slot < PlusRun.SLOTS; slot++) if ((fresh & RunKeys.SKILL_1 << slot) != 0) callSlot(slot);
             if ((fresh & RunKeys.DOWN) != 0 && !run.atStall() && run.door() >= 0) {
                 idle();
@@ -10323,6 +10360,8 @@ final class RunGame {
                 }
                 if (run.weapon() != PlusRun.UNARMED || run.has(PlusRun.RED) || run.has(PlusRun.BLUE)) strikeControl(canvas);
                 if (run.nextUp() != PlusRun.UNARMED) swapControl(canvas);
+                pouchControl(canvas);
+                if (pickerOpen) drawPouchPicker(canvas);
                 if (run.atStall()) {
                     stallControl(canvas);
                 } else {
@@ -10903,7 +10942,10 @@ final class RunGame {
     private float merchantPleased = 9, merchantCurtsy = 9, merchantMockAge = -1;
     private String merchantSaid = "";
     private final RectF merchantCard = new RectF(), merchantAct = new RectF(), merchantYes = new RectF(), merchantNo = new RectF();
-    private final RectF[] merchantTabs = {new RectF(), new RectF(), new RectF()}, merchantRows = new RectF[RunLilith.GIFT_KINDS];
+    private final RectF[] merchantTabs = {new RectF(), new RectF(), new RectF(), new RectF()}, merchantRows = new RectF[RunLilith.GIFT_KINDS], shelfCells = new RectF[RunPotions.COUNT];
+    private final int[] shelfOf = new int[RunPotions.COUNT];
+    private int shelfCount;
+    static final int WARES = 0, RARE = 1, GIFTS = 2, TALK = 3;
     /** Her draughts, small to large: what each mends of a hundred, and what each costs before she likes Halgakos. */
     static final String[] DRAUGHTS = {"Little crimson draught", "Draught of the night", "Grand moonlit draught"};
     static final int[] DRAUGHT_MENDS = {25, 50, 100}, DRAUGHT_PRICE = {30, 70, 150};
@@ -11120,12 +11162,14 @@ final class RunGame {
     private void drawMerchantPanel(Canvas canvas) {
         canvas.drawColor(0x99000000);
         int affinity = RunLilith.affinity(merchantStore), grudge = session.tally(RunLilith.GRUDGE), tier = RunLilith.tier(affinity);
-        float wide = Math.min(safe.width() - dp(24), dp(430)), pad = dp(16), body = dp(420);
-        float tall = pad + dp(118) + body + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
+        // (On a wide screen, as the game is mostly played, her picture and name stand at the left and the tabs and rows at the right.)
+        boolean side = safe.height() < dp(640) && safe.width() > safe.height();
+        float wide = side ? Math.min(safe.width() - dp(24), dp(760)) : Math.min(safe.width() - dp(24), dp(430)), pad = dp(16), body = dp(420);
+        float tall = side ? safe.height() - dp(16) : pad + dp(118) + body + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
         merchantCard.set(left, top, left + wide, top + tall);
         plate(canvas, merchantCard, dp(22), 255);
         Bitmap face = merchantPortrait();
-        float faceTall = dp(108);
+        float faceTall = side ? Math.min(dp(190), tall - dp(150)) : dp(108);
         if (face != null) {
             float faceWide = faceTall * .62f;
             int sideOf = Math.round(face.getHeight() * .36f);
@@ -11134,20 +11178,26 @@ final class RunGame {
             paint.setAlpha(255);
             canvas.drawBitmap(face, source, target, paint);
         }
-        float words = left + pad + faceTall * .62f + dp(12);
+        float column = side ? dp(230) : 0;
+        float words = side ? left + pad : left + pad + faceTall * .62f + dp(12), info = side ? top + pad + faceTall + dp(4) : top + pad, room = side ? column - pad : left + wide - pad - words;
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(ink);
         text.setTypeface(Typeface.DEFAULT_BOLD);
-        fitted(canvas, merchantName(), words, top + pad + dp(20), dp(19), left + wide - pad - words);
+        fitted(canvas, merchantName(), words, info + dp(20), dp(19), room);
         text.setTypeface(Typeface.DEFAULT);
         text.setColor(0xFFB0213A);
-        fitted(canvas, RunLilith.TIER_NAMES[tier] + (grudge > 0 ? "  ·  she remembers being struck" : ""), words, top + pad + dp(42), dp(13), left + wide - pad - words);
-        merchantHearts(canvas, words + dp(46), top + pad + dp(64), dp(8.5f));
+        fitted(canvas, RunLilith.TIER_NAMES[tier] + (grudge > 0 ? "  ·  she remembers being struck" : ""), words, info + dp(42), dp(13), room);
+        merchantHearts(canvas, words + dp(46), info + dp(64), dp(8.5f));
         text.setColor(soft);
-        fitted(canvas, run.purse() + " pluses to spend", words, top + pad + dp(92), dp(12.5f), left + wide - pad - words);
-        float y = top + pad + dp(120), each = (wide - pad * 2 - dp(12)) / 3, bottom = top + tall - pad;
-        String[] names = {"Wares", "Gifts", "Talk"};
-        for (int tab = 0; tab < 3; tab++) {
+        fitted(canvas, run.purse() + " pluses to spend", words, info + dp(92), dp(12.5f), room);
+        // (Where the tabs and rows go: under all that, or at the right of it.)
+        float paneLeft = side ? left + column : left, paneWide = side ? wide - column : wide;
+        left = paneLeft;
+        wide = paneWide;
+        float y = side ? top + pad : top + pad + dp(120), each = (wide - pad * 2 - dp(18)) / 4, bottom = top + tall - pad;
+        float giftRow = side ? dp(38) : dp(44);
+        String[] names = {"Wares", "Rare", "Gifts", "Talk"};
+        for (int tab = 0; tab < 4; tab++) {
             merchantTabs[tab].set(left + pad + tab * (each + dp(6)), y, left + pad + tab * (each + dp(6)) + each, y + dp(32));
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(tab == merchantTab ? 0xFFB0213A : dark ? 0xFF2C3033 : 0xFFF0F1F2);
@@ -11160,42 +11210,25 @@ final class RunGame {
         merchantAct.setEmpty();
         for (int row = 0; row < merchantRows.length; row++) if (merchantRows[row] == null) merchantRows[row] = new RectF(); else merchantRows[row].setEmpty();
         text.setTextAlign(Paint.Align.LEFT);
-        if (merchantTab == 0) {
-            for (int one = 0; one < DRAUGHTS.length; one++) {
-                int price = RunLilith.price(DRAUGHT_PRICE[one], affinity, grudge);
-                text.setTextAlign(Paint.Align.LEFT);
-                box.set(left + dp(8), y, left + wide - dp(8), y + dp(56));
-                paint.setColor(dark ? 0xFF2C3033 : 0xFFF5F6F7);
-                canvas.drawRoundRect(box, dp(12), dp(12), paint);
-                merchantRows[one].set(left + wide - dp(18) - dp(96), y + dp(12), left + wide - dp(18), y + dp(44));
-                text.setColor(ink);
-                fitted(canvas, DRAUGHTS[one], left + dp(20), y + dp(24), dp(13.5f), merchantRows[one].left - left - dp(28));
-                text.setColor(soft);
-                fitted(canvas, "Mends " + (DRAUGHT_MENDS[one] == 100 ? "all of her" : DRAUGHT_MENDS[one] + " in a hundred of her") + (price < DRAUGHT_PRICE[one] ? "  ·  less, for you" : ""),
-                        left + dp(20), y + dp(42), dp(11.5f), merchantRows[one].left - left - dp(28));
-                smithButton(canvas, merchantRows[one], price + " +", run.purse() >= price, 0xFFB0213A);
-                y += dp(62);
-            }
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setColor(soft);
-            fitted(canvas, "More of her wares as she comes to trust you.", left + pad, y + dp(14), dp(12), wide - pad * 2);
-        } else if (merchantTab == 1) {
+        if (merchantTab == WARES || merchantTab == RARE) {
+            drawPotionShelf(canvas, left, y, wide, bottom - dp(20), merchantTab == RARE, affinity, grudge, side);
+        } else if (merchantTab == GIFTS) {
             boolean any = false;
             for (int gift = 0; gift < RunLilith.GIFT_KINDS; gift++) {
                 int have = session.tally(RunLilith.HAVE + gift), given = session.tally(RunLilith.GIVEN + gift);
                 if (have <= 0 && given <= 0) continue;
                 any = true;
                 text.setTextAlign(Paint.Align.LEFT);
-                box.set(left + dp(8), y, left + wide - dp(8), y + dp(40));
+                box.set(left + dp(8), y, left + wide - dp(8), y + giftRow - dp(4));
                 paint.setColor(dark ? 0xFF2C3033 : 0xFFF5F6F7);
                 canvas.drawRoundRect(box, dp(10), dp(10), paint);
-                merchantRows[gift].set(left + wide - dp(18) - dp(84), y + dp(6), left + wide - dp(18), y + dp(34));
+                merchantRows[gift].set(left + wide - dp(18) - dp(84), y + dp(4), left + wide - dp(18), y + giftRow - dp(8));
                 text.setColor(ink);
                 fitted(canvas, RunLilith.GIFTS[gift] + "  ×" + have, left + dp(20), y + dp(17), dp(13), merchantRows[gift].left - left - dp(28));
                 text.setColor(given > 0 ? (RunLilith.likes(gift) ? 0xFF2E9E6E : 0xFFB0213A) : soft);
                 fitted(canvas, given > 0 ? (RunLilith.likes(gift) ? "She likes it" : "She does not like it") : "What will she think of it?", left + dp(20), y + dp(33), dp(11), merchantRows[gift].left - left - dp(28));
                 smithButton(canvas, merchantRows[gift], "Give", have > 0, 0xFFB0213A);
-                y += dp(44);
+                y += giftRow;
             }
             if (!any) {
                 text.setTextAlign(Paint.Align.LEFT);
@@ -11225,25 +11258,31 @@ final class RunGame {
             return;
         }
         int affinity = RunLilith.affinity(merchantStore), grudge = session.tally(RunLilith.GRUDGE);
-        if (merchantTab == 0) {
-            for (int one = 0; one < DRAUGHTS.length; one++) {
-                if (!merchantRows[one].contains(x, y)) continue;
-                int price = RunLilith.price(DRAUGHT_PRICE[one], affinity, grudge);
+        if (merchantTab == WARES || merchantTab == RARE) {
+            for (int index = 0; index < shelfCount; index++) {
+                if (shelfCells[index] == null || !shelfCells[index].contains(x, y)) continue;
+                int potion = shelfOf[index], price = RunLilith.price(RunPotions.PRICE[potion], affinity, grudge);
+                if (RunPotions.permanent(potion) && RunPotions.permanentStock(affinity, session.tally(RunPotions.BOUGHT + potion)) <= 0) {
+                    audio.play("no", .5f);
+                    merchantSaid = "None left for now: more as she trusts you";
+                    return;
+                }
                 if (!run.buyFromMerchant(price)) {
                     audio.play("no", .5f);
                     merchantSaid = "Not enough pluses";
                     speak(RunStory.MERCHANT_SHOP[2], true);
                     return;
                 }
-                run.drinkHeal(DRAUGHT_MENDS[one]);
+                session.keep(RunPotions.HAVE + potion, session.tally(RunPotions.HAVE + potion) + 1);
+                if (RunPotions.permanent(potion)) session.keep(RunPotions.BOUGHT + potion, session.tally(RunPotions.BOUGHT + potion) + 1);
                 audio.play("buy", .6f);
                 buzz(true);
-                merchantSaid = "Drunk: " + DRAUGHTS[one].toLowerCase(java.util.Locale.ROOT);
+                merchantSaid = RunPotions.NAMES[potion] + (RunPotions.permanent(potion) ? ": in your bag, drink it from the pouch's row" : ": in your pouch");
                 merchantPleased = 0;
-                speak(RunStory.MERCHANT_SHOP[price < DRAUGHT_PRICE[one] && RunLilith.tier(affinity) >= RunLilith.FOND ? 1 : 0], true);
+                speak(RunStory.MERCHANT_SHOP[price < RunPotions.PRICE[potion] && RunLilith.tier(affinity) >= RunLilith.FOND ? 1 : 0], true);
                 return;
             }
-        } else if (merchantTab == 1) {
+        } else if (merchantTab == GIFTS) {
             for (int gift = 0; gift < RunLilith.GIFT_KINDS; gift++) {
                 if (merchantRows[gift] == null || !merchantRows[gift].contains(x, y)) continue;
                 int have = session.tally(RunLilith.HAVE + gift);
@@ -11267,6 +11306,46 @@ final class RunGame {
         if (!merchantCard.contains(x, y)) {
             merchantOpen = false;
             audio.play("tap", .3f);
+        }
+    }
+
+    /** Her shelf: her potions as cells in rows (her rare, permanent ones on a tab of their own), each with its bottle, name, what it does, price and how many are carried. */
+    private void drawPotionShelf(Canvas canvas, float left, float y, float wide, float bottom, boolean rare, int affinity, int grudge, boolean side) {
+        int tier = RunLilith.tier(affinity);
+        shelfCount = 0;
+        for (int potion = 0; potion < RunPotions.COUNT; potion++) {
+            boolean on = rare ? RunPotions.permanent(potion) : RunPotions.onShelf(potion, tier);
+            if (on) shelfOf[shelfCount++] = potion;
+        }
+        int columns = side ? 3 : 2;
+        float gap = dp(6), cellWide = (wide - dp(16) - gap * (columns - 1)) / columns, cellTall = Math.min(dp(62), (bottom - y - gap * 4) / Math.max(1, (shelfCount + columns - 1) / columns));
+        for (int index = 0; index < shelfCount; index++) {
+            int potion = shelfOf[index], price = RunLilith.price(RunPotions.PRICE[potion], affinity, grudge);
+            if (shelfCells[index] == null) shelfCells[index] = new RectF();
+            float x = left + dp(8) + index % columns * (cellWide + gap), top = y + index / columns * (cellTall + gap);
+            RectF at = shelfCells[index];
+            at.set(x, top, x + cellWide, top + cellTall);
+            boolean none = rare && RunPotions.permanentStock(affinity, session.tally(RunPotions.BOUGHT + potion)) <= 0;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(rare ? (dark ? 0xFF2A1420 : 0xFFF6E8EC) : dark ? 0xFF2C3033 : 0xFFF5F6F7);
+            canvas.drawRoundRect(at, dp(10), dp(10), paint);
+            potionIcon(canvas, potion, at.left + cellTall * .42f, at.bottom - cellTall * .1f, cellTall * .8f, none ? 100 : 255);
+            float words = at.left + cellTall * .86f, room = at.right - words - dp(6);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(none ? soft : ink);
+            fitted(canvas, RunPotions.NAMES[potion], words, at.top + cellTall * .32f, dp(12.5f), room);
+            text.setColor(soft);
+            fitted(canvas, RunPotions.WORDS[potion], words, at.top + cellTall * .56f, dp(10.5f), room);
+            text.setColor(run.purse() >= price && !none ? 0xFFB0213A : soft);
+            String count = rare ? RunPotions.permanentStock(affinity, session.tally(RunPotions.BOUGHT + potion)) + " left" : "×" + session.tally(RunPotions.HAVE + potion);
+            fitted(canvas, price + " +   " + count, words, at.top + cellTall * .84f, dp(11.5f), room);
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(soft);
+        float under = y + ((shelfCount + columns - 1) / columns) * (cellTall + gap) + dp(14);
+        if (under < bottom + dp(14)) {
+            fitted(canvas, rare ? (affinity < 20 ? "She keeps these for those she trusts." : "One more of each as she trusts you more; five of each in all.")
+                    : "Tap one to buy it. More of her wares as she trusts you.", left + dp(16), under, dp(11.5f), wide - dp(32));
         }
     }
 
@@ -11309,6 +11388,314 @@ final class RunGame {
             talk.add(RunStory.MERCHANT_ANSWERS[3]);
             toast("You spared her", "She will remember it", 0);
         }
+    }
+    // Her pouch (see RunPotions): the button on the left thumb that drinks what it shows, held for a row of everything in it; her drinking,
+    // and what a potion looks like taking effect.
+
+    private final RectF pouchButton = new RectF();
+    private final RectF[] pickCells = new RectF[RunPotions.COUNT];
+    private final int[] pickOf = new int[RunPotions.COUNT];
+    private int pouchFinger = -1, seenDrinks, seenStops, seenFoundPotions, pickCount;
+    private float pouchDown, pouchQuip = -9, pouchSaidAge = 9;
+    private String pouchSaid = "";
+    private boolean pickerOpen, potionArtTried;
+    private Bitmap potionArt, pouchIcon;
+    /** How long the pouch is held before the row of everything in it opens. */
+    static final float PICK_HOLD = .4f;
+
+    private Bitmap potionArt() {
+        if (!potionArtTried) {
+            potionArtTried = true;
+            potionArt = runAsset("runart/potions.webp");
+            pouchIcon = runAsset("runart/run_icon_pouch.webp");
+        }
+        return potionArt;
+    }
+
+    /** What she carries of each potion. */
+    private int[] carried() {
+        int[] have = new int[RunPotions.COUNT];
+        for (int potion = 0; potion < RunPotions.COUNT; potion++) have[potion] = Math.max(0, session.tally(RunPotions.HAVE + potion));
+        return have;
+    }
+
+    /** The potion her pouch button shows, or -1 for an empty pouch. */
+    private int pouchShown() { return RunPotions.shown(session.tally(RunPotions.CHOSEN) - 1, carried()); }
+
+    /** A potion's bottle, standing on its feet, so tall. */
+    private void potionIcon(Canvas canvas, int potion, float middle, float feet, float tall, int alpha) {
+        Bitmap art = potionArt();
+        if (art == null || potion < 0) return;
+        paint.setAlpha(alpha);
+        cell(canvas, art, potion, RunPotions.COUNT, middle, feet, tall, false);
+        paint.setAlpha(255);
+    }
+
+    /** A potion from the pouch (or the bag, for a permanent one): drunk if it can be; if not, why not, with a soft no and now and then her word. */
+    private void usePouch(int potion) {
+        if (run == null) return;
+        if (potion < 0) {
+            audio.play("no", .4f);
+            pouchSaid = "The pouch is empty";
+            pouchSaidAge = 0;
+            if (clock - pouchQuip > 6 && !audio.speaking()) {
+                pouchQuip = clock;
+                speak(RunStory.POUCH[1], true);
+            }
+            return;
+        }
+        String why = run.cannotDrink(potion);
+        if (why != null) {
+            audio.play("no", .4f);
+            float wait = run.potionWait(potion);
+            pouchSaid = wait > 0 ? why + " · " + (int) Math.ceil(wait) + " s" : why;
+            pouchSaidAge = 0;
+            if (clock - pouchQuip > 6 && !audio.speaking()) {
+                pouchQuip = clock;
+                speak(RunStory.POUCH[why.startsWith("No more heals") ? 3 : 0], true);
+            }
+            return;
+        }
+        if (run.drink(potion)) {
+            audio.play("pop", .5f);
+            buzz(false);
+        }
+    }
+
+    /** Each moment: a held pouch opens its row; a potion drunk to the end is taken from the bag and is seen taking effect; a spilled one is said. */
+    private void potionWatch(float seconds) {
+        pouchSaidAge += seconds;
+        if (pouchFinger >= 0 && !pickerOpen && clock - pouchDown >= PICK_HOLD) {
+            pickerOpen = true;
+            buzz(false);
+            audio.play("page", .4f);
+        }
+        if (run.potionsDrunk() > seenDrinks) {
+            seenDrinks = run.potionsDrunk();
+            int potion = run.lastPotion();
+            if (potion >= 0) {
+                if (run.keptLast()) toast("Second draught", RunPotions.NAMES[potion] + ": not used up", 0);
+                else session.keep(RunPotions.HAVE + potion, Math.max(0, session.tally(RunPotions.HAVE + potion) - 1));
+                if (RunPotions.permanent(potion)) {
+                    session.keep(RunPotions.DRUNK + potion, session.tally(RunPotions.DRUNK + potion) + 1);
+                    toast(RunPotions.NAMES[potion], RunPotions.WORDS[potion], 0);
+                }
+                potionTakes(potion);
+            }
+        }
+        if (run.potionsFound() > seenFoundPotions) {
+            seenFoundPotions = run.potionsFound();
+            int potion = Math.max(0, Math.min(RunPotions.COUNT - 1, run.lastPotionFound()));
+            session.keep(RunPotions.HAVE + potion, session.tally(RunPotions.HAVE + potion) + 1);
+            audio.play("pick", .6f);
+            toast(RunPotions.NAMES[potion], "In her pouch: tap the pouch to drink it", 0);
+        }
+        if (run.drinksStopped() > seenStops) {
+            seenStops = run.drinksStopped();
+            audio.play("no", .5f);
+            pouchSaid = "Spilled: the bottle is kept";
+            pouchSaidAge = 0;
+            if (clock - pouchQuip > 6 && !audio.speaking()) {
+                pouchQuip = clock;
+                speak(RunStory.POUCH[2], true);
+            }
+        }
+    }
+
+    /** A potion taking effect where she stands: a heal rises about her in its colour; a buff sparkles into an aura; a permanent one bursts and shines. */
+    private void potionTakes(int potion) {
+        float x = (run.x() + PlusRun.WIDE / 2) * tile, feet = (run.y() + PlusRun.TALL) * tile, size = tile * 2.2f;
+        int colour = RunPotions.COLOURS[potion];
+        if (RunPotions.heals(potion)) {
+            Vfx.play(Vfx.HEAL, x, feet - tile * .9f, size * 1.2f, 0, colour);
+            Vfx.play(Vfx.SPARKLE, x, feet - tile * 1.4f, size * .8f, 0, colour);
+            audio.play("heart", .6f);
+        } else if (RunPotions.permanent(potion)) {
+            Vfx.play(Vfx.IMPACT_STAR, x, feet - tile * .9f, size * 1.4f, 0, colour);
+            Vfx.play(Vfx.SPARKLE, x, feet - tile * 1.6f, size, 0, Vfx.WHITE);
+            audio.play("unlock", .7f);
+        } else {
+            Vfx.play(Vfx.SPARKLE, x, feet - tile * .9f, size, 0, colour);
+            audio.play("buff", .6f);
+        }
+    }
+
+    /** The auras of the buffs she has on, about her, each in its colour, fading as it runs out. */
+    private void potionAuras(Canvas canvas, float feetX, float feetY, float tall) {
+        if (run == null) return;
+        int ring = 0;
+        for (int potion = RunPotions.MIGHT; potion <= RunPotions.STAR; potion++) {
+            float left = run.potionOn(potion);
+            if (left <= 0) continue;
+            float pulse = .5f + .5f * (float) Math.sin(clock * 4 + potion), fade = Math.min(1, left / 3);
+            glowAt(canvas, feetX, feetY - tall * .45f, tall * (.62f + .06f * ring + .05f * pulse), RunPotions.COLOURS[potion], Math.round((70 + 50 * pulse) * fade));
+            ring++;
+        }
+    }
+
+    /**
+     * Her drinking, from her own drinking sheet where what she wears has it (uncorking, to her lips, the gulp, and the wipe), in step with the
+     * drink; where it has not, as she stands, with the bottle lifted. The bottle she drinks is over her hand either way, in its own shape.
+     */
+    private boolean drawDrinking(Canvas canvas, float feetX, float feetY, float tall, boolean leftward) {
+        int potion = run.drinking();
+        if (potion < 0) return false;
+        float through = run.drinkThrough();
+        int frame = Math.min(3, (int) (through * 4));
+        String name = "drink";
+        Bitmap art = vanityCovers(name) ? moveArt(name) : null;
+        if (art != null) {
+            android.util.SparseArray<Bitmap> forms = moveForms.get(name);
+            if (forms == null) moveForms.put(name, forms = new android.util.SparseArray<>());
+            frame(canvas, dressed(name, formed(art, forms)), frame, MOVE_FRAMES, feetX, feetY, tall, leftward);
+        } else {
+            return false;
+        }
+        // (Its own bottle, small, where her hand is: by her side, then up to her lips.)
+        float way = leftward ? -1 : 1, lift = frame == 0 ? .5f : frame == 3 ? .3f : .78f;
+        potionIcon(canvas, potion, feetX + way * tall * (frame == 0 ? .2f : .16f), feetY - tall * lift + tall * .07f, tall * .2f, 235);
+        return true;
+    }
+
+    /** The pouch button: glass, as the buttons over the land are; the potion it shows and how many, a ring for its wait, faint when empty. */
+    private void pouchControl(Canvas canvas) {
+        int shown = pouchShown();
+        boolean held = pouchFinger >= 0;
+        glass(canvas, pouchButton, held, 0xFF8A5A33);
+        potionArt();
+        if (shown < 0) {
+            if (pouchIcon != null) {
+                paint.setAlpha(110);
+                fitIn(canvas, pouchIcon, pouchButton, .62f);
+                paint.setAlpha(255);
+            }
+        } else {
+            potionIcon(canvas, shown, pouchButton.centerX(), pouchButton.bottom - pouchButton.height() * .16f, pouchButton.height() * .66f, 255);
+            if (pouchIcon != null) {
+                paint.setAlpha(235);
+                box.set(pouchButton.left - pouchButton.width() * .06f, pouchButton.top - pouchButton.height() * .06f, pouchButton.left + pouchButton.width() * .34f, pouchButton.top + pouchButton.height() * .36f);
+                canvas.drawBitmap(pouchIcon, null, box, paint);
+                paint.setAlpha(255);
+            }
+            text.setTextAlign(Paint.Align.RIGHT);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setColor(Color.WHITE);
+            text.setTextSize(pouchButton.height() * .26f);
+            canvas.drawText(String.valueOf(session.tally(RunPotions.HAVE + shown)), pouchButton.right - pouchButton.width() * .1f, pouchButton.bottom - pouchButton.height() * .1f, text);
+            text.setTypeface(Typeface.DEFAULT);
+            // Its wait, as a ring going round.
+            float wait = run.potionWait(shown), full = Math.max(.1f, run.potionWaitFull(shown));
+            if (wait > 0) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0x88000000);
+                box.set(pouchButton);
+                canvas.drawArc(box, -90, 360 * Math.min(1, wait / full), true, paint);
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(Color.WHITE);
+                text.setTextSize(pouchButton.height() * .3f);
+                canvas.drawText(String.valueOf((int) Math.ceil(wait)), pouchButton.centerX(), pouchButton.centerY() + pouchButton.height() * .1f, text);
+            }
+            if (run.drinking() >= 0) {
+                stroke.setColor(RunPotions.COLOURS[run.drinking()]);
+                stroke.setStrokeWidth(dp(3));
+                box.set(pouchButton.left - dp(3), pouchButton.top - dp(3), pouchButton.right + dp(3), pouchButton.bottom + dp(3));
+                canvas.drawArc(box, -90, 360 * run.drinkThrough(), false, stroke);
+            }
+        }
+        if (held && !pickerOpen) {
+            stroke.setColor(Color.WHITE);
+            stroke.setStrokeWidth(dp(2));
+            box.set(pouchButton.left - dp(6), pouchButton.top - dp(6), pouchButton.right + dp(6), pouchButton.bottom + dp(6));
+            canvas.drawArc(box, -90, 360 * Math.min(1, (clock - pouchDown) / PICK_HOLD), false, stroke);
+        }
+        if (pouchSaidAge < 1.8f && !pouchSaid.isEmpty()) {
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(Color.WHITE);
+            text.setTextSize(dp(12));
+            float alpha = Math.min(1, (1.8f - pouchSaidAge) / .4f);
+            text.setAlpha(Math.round(255 * alpha));
+            canvas.drawText(pouchSaid, pouchButton.left, pouchButton.top - dp(8), text);
+            text.setAlpha(255);
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /** A picture fitted into a box, centred, so much of its size. */
+    private void fitIn(Canvas canvas, Bitmap art, RectF in, float much) {
+        float scale = Math.min(in.width() / art.getWidth(), in.height() / art.getHeight()) * much;
+        float w = art.getWidth() * scale, h = art.getHeight() * scale;
+        box.set(in.centerX() - w / 2, in.centerY() - h / 2, in.centerX() + w / 2, in.centerY() + h / 2);
+        canvas.drawBitmap(art, null, box, paint);
+    }
+
+    /** The row of everything in the pouch (and, after them, the merchant's permanent ones from the bag), over the pouch: each with how many, and its wait. */
+    private void drawPouchPicker(Canvas canvas) {
+        int[] have = carried();
+        pickCount = 0;
+        for (int potion = 0; potion < RunPotions.COUNT; potion++) if (have[potion] > 0) pickOf[pickCount++] = potion;
+        float side = Math.max(dp(48), pouchButton.height() * .9f), gap = dp(6);
+        int perRow = Math.max(1, (int) ((safe.width() - (pouchButton.left - safe.left) - dp(12)) / (side + gap)));
+        int rows = Math.max(1, (pickCount + perRow - 1) / perRow);
+        float left = pouchButton.left, top = pouchButton.top - dp(12) - rows * (side + gap);
+        box.set(left - dp(8), top - dp(30), left + Math.min(pickCount, perRow) * (side + gap) + dp(4), pouchButton.top - dp(6));
+        if (pickCount == 0) box.right = left + dp(220);
+        plate(canvas, box, dp(14), 235);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        text.setTextSize(dp(12));
+        canvas.drawText(pickCount == 0 ? "Nothing in the pouch: the merchant sells potions" : "Tap one to keep it on the pouch", left, top - dp(12), text);
+        int chosen = pouchShown();
+        for (int index = 0; index < pickCount; index++) {
+            int potion = pickOf[index];
+            if (pickCells[index] == null) pickCells[index] = new RectF();
+            float x = left + index % perRow * (side + gap), y = top + index / perRow * (side + gap);
+            RectF at = pickCells[index];
+            at.set(x, y, x + side, y + side);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(potion == chosen ? 0xFFF4E2C8 : RunPotions.permanent(potion) ? 0xFF2A1420 : dark ? 0xFF2C3033 : 0xFFF5F6F7);
+            canvas.drawRoundRect(at, dp(10), dp(10), paint);
+            float wait = run.potionWait(potion);
+            potionIcon(canvas, potion, at.centerX(), at.bottom - side * .1f, side * .74f, wait > 0 ? 110 : 255);
+            text.setTextAlign(Paint.Align.RIGHT);
+            text.setColor(RunPotions.permanent(potion) ? Color.WHITE : ink);
+            text.setTextSize(dp(11));
+            canvas.drawText("×" + have[potion], at.right - dp(4), at.bottom - dp(4), text);
+            if (wait > 0) {
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(0xFFB0213A);
+                text.setTextSize(dp(13));
+                canvas.drawText((int) Math.ceil(wait) + " s", at.centerX(), at.centerY() + dp(4), text);
+            }
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /** A touch while the row is open: one chosen (a permanent one is drunk at once, from the bag); anywhere else closes it. */
+    private void pickerTouch(float x, float y) {
+        for (int index = 0; index < pickCount; index++) {
+            if (pickCells[index] == null || !pickCells[index].contains(x, y)) continue;
+            int potion = pickOf[index];
+            audio.play("tap", .5f);
+            if (RunPotions.permanent(potion)) {
+                usePouch(potion);
+            } else {
+                session.keep(RunPotions.CHOSEN, potion + 1);
+            }
+            pickerOpen = false;
+            return;
+        }
+        pickerOpen = false;
+        audio.play("tap", .3f);
+    }
+
+    /** The next thing in the pouch, shown on it (the keyboard's F). */
+    private void pouchNext() {
+        int[] in = RunPotions.pouch(carried());
+        if (in.length == 0) return;
+        int shown = pouchShown(), at = 0;
+        for (int index = 0; index < in.length; index++) if (in[index] == shown) at = index;
+        session.keep(RunPotions.CHOSEN, in[(at + 1) % in.length] + 1);
+        audio.play("tap", .4f);
     }
     private Bitmap laterSheet, statusSheet, hidden2Sheet;
     private boolean laterTried, statusTried, hidden2Tried;
@@ -12520,6 +12907,14 @@ final class RunGame {
             }
             if (item[0] == PlusRun.GIFT) {
                 drawGift(canvas, item);
+                continue;
+            }
+            if (item[0] == PlusRun.POTION) {
+                // A potion lying on a floor: its own bottle, bobbing, with a glow of its colour.
+                int potion = Math.max(0, Math.min(RunPotions.COUNT - 1, item.length > 4 ? item[4] : 0));
+                float px = (item[1] + .5f - cameraX) * tile, pfeet = (item[2] + 1 - cameraY) * tile + (float) Math.sin(clock * 3 + item[1]) * tile * .05f;
+                glowAt(canvas, px, pfeet - tile * .4f, tile * .55f, RunPotions.COLOURS[potion], 100);
+                potionIcon(canvas, potion, px, pfeet - tile * .05f, tile * .8f, 255);
                 continue;
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
@@ -14728,6 +15123,11 @@ final class RunGame {
             return;
         }
         // The ground pound and the aerial strike have pictures of their own for each thing she may hold.
+        potionAuras(canvas, feetX, feetY, tall);
+        if (drawDrinking(canvas, feetX, feetY, tall, leftward)) {
+            paint.setAlpha(255);
+            return;
+        }
         if (drawSmashOrAerial(canvas, weapon, feetX, feetY, tall, leftward)) {
             paint.setAlpha(255);
             return;

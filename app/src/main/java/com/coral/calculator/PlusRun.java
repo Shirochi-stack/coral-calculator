@@ -149,6 +149,13 @@ final class PlusRun {
 
     /** And on some floors of the dungeons, the Vampire Merchant's stall (see {@link RunLilith}); and a gift for her, lying on a floor (its fifth number which). */
     static final int LILITH = 850, GIFT = 50;
+    /** A potion lying on a floor of a dungeon (its fifth number which): picked up, it goes in her pouch. */
+    static final int POTION = 51;
+    private int potionsFound, lastPotionFound = -1;
+
+    int potionsFound() { return potionsFound; }
+
+    int lastPotionFound() { return lastPotionFound; }
     private int merchantBlows, gifts, lastGift = -1;
     private float merchantCool, lilithMend;
     private boolean lilithAsks, lilithFinishing, lilithMocks;
@@ -247,7 +254,7 @@ final class PlusRun {
     String cannotDrink(int potion) {
         if (state != PLAYING) return "Not now";
         if (drinking >= 0) return "Still drinking";
-        if (RunPotions.permanent(potion)) return "Drunk from the bag";
+        if (RunPotions.permanent(potion) && bossFight()) return "Not in the middle of a fight";
         if (climbing() || inWater()) return "Not while climbing or swimming";
         if (potionWait(potion) > 0) return "Not ready yet";
         if (RunPotions.heals(potion) && bossFight() && bossHeals >= RunPotions.BOSS_HEALS) return "No more heals in this fight";
@@ -308,6 +315,20 @@ final class PlusRun {
 
     /** A potion drunk to the end: what it does, and its cooldown begins. */
     private void potionDrunk(int potion) {
+        // (A permanent potion, the merchant's: what it gives, from now on; no cooldown.)
+        if (RunPotions.permanent(potion)) {
+            if (potion == RunPotions.LIFE) {
+                perks.potionLife++;
+                hp = Math.min(maxHp(), hp + RunPotions.LIFE_HEALTH);
+            } else if (potion == RunPotions.FURY) {
+                perks.potionAtk += RunPotions.STAT_PERCENT;
+            } else if (potion == RunPotions.BASTION) {
+                perks.potionDef += RunPotions.STAT_PERCENT;
+            } else {
+                perks.potionInt += RunPotions.STAT_PERCENT;
+            }
+            return;
+        }
         int herbal = herbalism();
         boolean boss = bossFight();
         if (RunPotions.heals(potion)) {
@@ -329,19 +350,19 @@ final class PlusRun {
     }
 
     /** The tree's alchemy: how much quicker she drinks and how much shorter her cooldowns are (in a hundred), whether her hands are steady, and the chance in a hundred that a potion is not used up. (Its nodes come with the tree's alchemy.) */
-    int quickSip() { return 0; }
+    int quickSip() { return Math.max(0, skillOf(RunSkills.E_QUICK_SIP)); }
 
-    int herbalism() { return 0; }
+    int herbalism() { return Math.max(0, skillOf(RunSkills.E_HERBALIST)); }
 
-    int steadyHands() { return 0; }
+    int steadyHands() { return Math.max(0, skillOf(RunSkills.E_STEADY_HANDS)); }
 
-    int secondDraught() { return 0; }
+    int secondDraught() { return Math.max(0, skillOf(RunSkills.E_SECOND_DRAUGHT)); }
 
     /** From how quick a sip she walks as she drinks, rather than creeping. */
-    static final int QUICK_SIP_WALKS = 45;
+    static final int QUICK_SIP_WALKS = RunSkills.QUICK_SIP_WALKS;
 
     /** Whether a hurt stops a drink: a hard one always; a light one unless the tree steadies her hands. */
-    private void drinkHurt(boolean hard) {
+    void drinkHurt(boolean hard) {
         if (drinking >= 0 && (hard || steadyHands() <= 0)) stopDrink();
     }
 
@@ -3721,7 +3742,11 @@ final class PlusRun {
     }
 
     /** The other of the last two she has used; or, with no other, the next thing in her backpack. */
-    boolean swap() { return switchTo(nextUp()); }
+    boolean swap() {
+        // (A swap stops a drink.)
+        stopDrink();
+        return switchTo(nextUp());
+    }
 
     /** What a swap would put in her hands, or nothing. */
     int nextUp() {
@@ -6548,6 +6573,14 @@ final class PlusRun {
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST && item[0] != FORM + WHITE) continue;
+                if (item[0] == POTION) {
+                    items.remove(index);
+                    potionsFound++;
+                    lastPotionFound = item.length > 4 ? item[4] : 0;
+                    tookX = item[1] + .5f;
+                    tookY = item[2] + .5f;
+                    continue;
+                }
                 if (item[0] == GIFT) {
                     items.remove(index);
                     gifts++;

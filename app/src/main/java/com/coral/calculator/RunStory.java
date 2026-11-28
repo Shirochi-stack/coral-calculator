@@ -714,6 +714,13 @@ final class RunStory {
             {"lia2", "She can't even be hurt. Note to self: be nicer Sloppy~♡", "H", PLAYER + "The immortal vampire merchant laughed off her attacks and left. Rattled, rueful, joking."},
             {"lia3", "I couldn't do it. Nobody should be that alone Sloppy~♡", "H", PLAYER + "She chose to spare the vampire merchant at the last moment. Soft, sad, sure."},
     };
+    /** Her pouch: a potion not ready yet, an empty pouch, a drink spilled when something stopped it, and no more heals in a fight with a boss. */
+    static final String[][] POUCH = {
+            {"pou1", "Not yet. One more sip and I'd slosh Sloppy~♡", "H", PLAYER + "She tries to drink another potion before it is ready. Quick, wry, a little queasy." + FAST},
+            {"pou2", "My pouch is empty. Shopping trip later Sloppy~♡", "H", PLAYER + "She reaches into her potion pouch and finds nothing. Disappointed, then perky." + FAST},
+            {"pou3", "Spilled it! At least I kept the bottle Sloppy~♡", "H", PLAYER + "Her drink was knocked from her lips mid-gulp. Annoyed, salvaging it." + FAST},
+            {"pou4", "No more drinks in this fight. Win it dry Sloppy~♡", "H", PLAYER + "She has drunk all the healing she is allowed in a boss fight. Grim, determined, a joke through gritted teeth." + FAST},
+    };
     /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
     static final String[][] LATER_UNIQUES = {
             {"u2a", "A newspaper bug! Don't let it roll you flat Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
@@ -1447,6 +1454,7 @@ final class RunStory {
         groups.add(KEEPSAKES);
         groups.add(KEEPSAKE_REPLIES);
         groups.add(MERCHANT_ANSWERS);
+        groups.add(POUCH);
         groups.add(MIRROR);
         groups.add(ECHOES);
         groups.add(ECHO_ANSWERS);

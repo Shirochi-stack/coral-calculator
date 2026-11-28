@@ -1820,6 +1820,9 @@ final class RunLevels {
             if (stall >= 0 && RunLilith.appearsOn(dungeon, floor, dive)) level.items.add(new int[]{PlusRun.SPOT, stall, top(level, stall) - 1, 0, PlusRun.LILITH});
             int lies = flatNear(level, flag + 9);
             if (gift >= 0 && lies >= 0) level.items.add(new int[]{PlusRun.GIFT, lies, top(level, lies) - 1, 0, gift});
+            // And on some, a potion, near where she comes down.
+            int potion = RunPotions.foundOn(dungeon, floor, dive), stands = flatNear(level, 8);
+            if (potion >= 0 && stands >= 0 && stands < flag) level.items.add(new int[]{PlusRun.POTION, stands, top(level, stands) - 1, 0, potion});
         }
         return level;
     }

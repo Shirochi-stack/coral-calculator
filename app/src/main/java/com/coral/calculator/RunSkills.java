@@ -93,7 +93,8 @@ final class RunSkills {
             E_SECOND_WIND = 46, E_BLOOD = 47, E_IRON = 48, E_PET = 49, E_STOMP = 50, E_RICOCHET = 51, E_CHARGE = 52, E_LAST_STAND = 53, E_FRENZY = 54,
             E_POUND_AREA = 55, E_POUND_HIT = 56, E_GLIDE = 57, E_AERIAL_TIME = 58, E_AERIAL_HIT = 59, E_SKYBORNE = 60,
             E_RED = 61, E_BLUE = 62, E_BROWN = 63, E_GREEN = 64, E_YELLOW = 65, E_PURPLE = 66, E_WHITE = 67, E_MONO = 68,
-            E_EFFECTS = 69;
+            E_QUICK_SIP = 69, E_STEADY_HANDS = 70, E_HERBALIST = 71, E_SECOND_DRAUGHT = 72,
+            E_EFFECTS = 73;
 
     /**
      * Whether an effect is felt only with the weapons of the class that gives it (a class's own way of fighting), or always, whatever is in
@@ -104,6 +105,7 @@ final class RunSkills {
             case E_HP_PCT: case E_SHIELD: case E_REGEN: case E_SECOND_WIND: case E_BLOOD: case E_IRON: case E_AIR: case E_SWIM: case E_CLIMB: case E_FORMS:
             case E_MAGNET: case E_PLUSES: case E_SHRUG: case E_DP: case E_ENERGY: case E_WARD_HIT: case E_GLIDE: case E_AERIAL_TIME: case E_SKYBORNE:
             case E_RED: case E_BLUE: case E_BROWN: case E_GREEN: case E_YELLOW: case E_PURPLE: case E_WHITE: case E_MONO:
+            case E_QUICK_SIP: case E_STEADY_HANDS: case E_HERBALIST: case E_SECOND_DRAUGHT:
                 return false;
             default:
                 return true;
@@ -184,9 +186,16 @@ final class RunSkills {
             case E_PURPLE: return "in purple, " + n + "% chance to shrug off a hurt";
             case E_WHITE: return "in white, +" + n + "% attack";
             case E_MONO: return "only one ribbon at a time";
+            case E_QUICK_SIP: return "she drinks potions " + n + "% quicker" + (n >= QUICK_SIP_WALKS ? ", and walks as she drinks" : "");
+            case E_STEADY_HANDS: return "a light hurt no longer spills a drink, only a hard one";
+            case E_HERBALIST: return "potions ready " + n + "% sooner (never more than half sooner, with her gear)";
+            case E_SECOND_DRAUGHT: return n + "% chance a potion is not used up";
             default: return "";
         }
     }
+
+    /** From how much quicker a sip she walks as she drinks. */
+    static final int QUICK_SIP_WALKS = 45;
 
     /** HP that blood ink never takes. */
     static final int BLOOD_KEEPS = 10;
@@ -274,6 +283,8 @@ final class RunSkills {
     static final int[] SKY_CLASS = {8, 12, 9, 2, 1};
     /** The ribbons' notables, added after those: seven felt in a colour, four of their mixes, six actives and Monochrome. */
     static final int RIBBONS = SKY_CLASSES + 5, RIBBON_COUNT = 18;
+    /** And the alchemy's, after those: quick sipping three times, steady hands, herbalism three times, and the second draught. */
+    static final int ALCHEMY = RIBBONS + RIBBON_COUNT, ALCHEMY_COUNT = 8;
     /** A class's seven, by their places: the one by the start, the two clusters' outward, the two actives' clusters, the deep one and the keystone. */
     static final int EARLY = 0, OUTER_LEFT = 1, OUTER_RIGHT = 2, ACTIVE_LEFT = 3, ACTIVE_RIGHT = 4, DEEP = 5, CLASS_KEYSTONE = 6;
 
@@ -465,7 +476,16 @@ final class RunSkills {
             n("Gale Force", ACTIVE, 0, E_GREEN, 80, E_SPEED, 20),
             n("Lightning Step", ACTIVE, 0, E_YELLOW, 45, E_SPEED, 30),
             n("Looking Glass", ACTIVE, 0, E_PURPLE, 50, E_REFLECT, 100),
-            n("Monochrome", KEYSTONE, 0, E_FORMS, 100, E_ATK_PCT, 30, E_MONO, -1)
+            n("Monochrome", KEYSTONE, 0, E_FORMS, 100, E_ATK_PCT, 30, E_MONO, -1),
+            // (Added after: alchemy, for her potions: each rank a node of its own.)
+            n("Quick Sip", PASSIVE, 0, E_QUICK_SIP, 15),
+            n("Quicker Sip", PASSIVE, 0, E_QUICK_SIP, 15),
+            n("Gulp", PASSIVE, 0, E_QUICK_SIP, 15),
+            n("Steady Hands", PASSIVE, 0, E_STEADY_HANDS, 1),
+            n("Herbalist", PASSIVE, 0, E_HERBALIST, 10),
+            n("Apothecary", PASSIVE, 0, E_HERBALIST, 10),
+            n("Master Herbalist", PASSIVE, 0, E_HERBALIST, 10),
+            n("Second Draught", PASSIVE, 0, E_SECOND_DRAUGHT, 20)
         // (end of the table)
         };
         NOTABLES = Collections.unmodifiableList(new ArrayList<>(MAKING));
@@ -534,6 +554,7 @@ final class RunSkills {
             core();
             skyward();
             ribbons();
+            alchemy();
             return nodes;
         }
 
@@ -977,6 +998,47 @@ final class RunSkills {
                     previous = small;
                 }
                 link(previous, notable(from.path, RIBBONS + which, spot));
+            }
+        }
+
+        /**
+         * The alchemy's notables, laid after the ribbons' so that nothing before them changes its number: in the middle of the tree (not at a
+         * branch's end, where its capstone goes), each on a spur of two steps from a small node with room, going round from a quarter turn on.
+         */
+        void alchemy() {
+            for (int which = 0; which < ALCHEMY_COUNT; which++) {
+                double best = Double.MAX_VALUE;
+                double[] spot = null;
+                int near = -1;
+                double turn = which * Math.PI * 2 / ALCHEMY_COUNT + .55;
+                for (double out = 30; out <= 66 && spot == null; out += 2) {
+                    for (double sway = 0; sway <= .7 && spot == null; sway += .03) {
+                        for (int side = -1; side <= 1; side += 2) {
+                            double[] p = polar(out, turn + side * sway);
+                            if (!room(p, .8)) continue;
+                            for (Node node : nodes) {
+                                if (node.type != SMALL || node.next.size() != 2 || nextToEnd(node.id)) continue;
+                                double length = far(node, p[0], p[1]);
+                                if (length < 6 || length > 9 || length >= best) continue;
+                                double[] one = {node.x + (p[0] - node.x) / 3, node.y + (p[1] - node.y) / 3}, two = {node.x + (p[0] - node.x) * 2 / 3, node.y + (p[1] - node.y) * 2 / 3};
+                                if (!room(one, .38) || !room(two, .38) || !clear(node.x, node.y, p[0], p[1], node.id, -1)) continue;
+                                best = length;
+                                spot = p;
+                                near = node.id;
+                            }
+                            if (spot != null) break;
+                        }
+                    }
+                }
+                if (spot == null) throw new IllegalStateException("no room for alchemy " + which);
+                Node from = nodes.get(near);
+                int previous = near;
+                for (int step = 1; step <= 2; step++) {
+                    int small = statSmall(from.path, new double[]{from.x + (spot[0] - from.x) * step / 3, from.y + (spot[1] - from.y) * step / 3});
+                    link(previous, small);
+                    previous = small;
+                }
+                link(previous, notable(from.path, ALCHEMY + which, spot));
             }
         }
 

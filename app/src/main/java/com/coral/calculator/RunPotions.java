@@ -87,6 +87,25 @@ final class RunPotions {
     /** How long a drink takes for her: shorter by quick sipping (in a hundred), at most by half. */
     static float drinkFor(int potion, int quickSip) { return drinkSeconds(potion) * (1 - Math.min(.5f, Math.max(0, quickSip) / 100f)); }
 
+    /** Which potion lies on a floor of a dive, if any: one floor in three, most often a little crimson draught. -1 for none. */
+    static int foundOn(int dungeon, int floor, long dive) {
+        java.util.Random dice = new java.util.Random(dive * 31337L + dungeon * 977L + floor * 61L + 29);
+        if (dice.nextInt(3) != 0) return -1;
+        int roll = dice.nextInt(10);
+        return roll < 6 ? HEAL_S : roll < 8 ? HEAL_M : roll == 8 ? CLEANSE : EMBER + dice.nextInt(3);
+    }
+
+    /** Whether the merchant has a potion on her shelf, by how she feels: the small heals and lotus water always; more as she warms to Halgakos. */
+    static boolean onShelf(int potion, int tier) {
+        switch (potion) {
+            case HEAL_S: case HEAL_M: case CLEANSE: return true;
+            case HEAL_L: case REGEN: case EMBER: case FROST: case VENOM: return tier >= RunLilith.WARY;
+            case MIGHT: case GUARD: case SWIFT: return tier >= RunLilith.WARM;
+            case LUCK: case RICHES: case STAR: return tier >= RunLilith.FOND;
+            default: return false;
+        }
+    }
+
     /** The permanent potions of each kind she may have bought, by the merchant's affinity: one at 20, and one more every 20 after, five at a hundred. */
     static final int PERMANENT_MOST = 5;
 
