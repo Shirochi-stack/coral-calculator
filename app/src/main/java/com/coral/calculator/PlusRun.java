@@ -328,6 +328,9 @@ final class PlusRun {
         final int kind;
         boolean stays, left;
         float x, y, wait = 1, busy, fromX, fromY, toX, toY, down, gift = GIFT_EVERY, ward = WARD_EVERY, puddle;
+        /** Whether it climbs after her up what she climbs, and how far it has climbed (for the step of its climbing it is at). */
+        boolean climbing;
+        float climbed;
         /** Where whoever draws it last saw it. */
         float seenX, seenY;
         Foe at;
@@ -588,6 +591,19 @@ final class PlusRun {
             }
             return;
         }
+        // While she climbs, one that runs climbs after her, on what she climbs, just under her feet (one under another); one that flies flies.
+        // When she lets go it lets go too, and drops back to following her.
+        if (!floats && climbing) {
+            float wantY = herFeet + 1.05f + place * 1.1f, before = it.y;
+            it.x += (herX - it.x) * Math.min(1, 10 * seconds);
+            it.y += (wantY - it.y) * Math.min(1, 10 * seconds);
+            it.climbed += Math.abs(it.y - before);
+            it.left = facingLeft;
+            it.down = 0;
+            it.climbing = true;
+            return;
+        }
+        it.climbing = false;
         // By her: a floater in the air at her shoulder, behind her; one that runs, on the ground behind her, down onto it and up onto it as she goes.
         float wantX = herX + (facingLeft ? 1 : -1) * (floats ? .8f + .75f * place : 1.1f + .85f * place);
         if (kind == MONKEY) {
@@ -3525,6 +3541,7 @@ final class PlusRun {
         firmX = x;
         firmY = y;
         lootDice = level.number * 977L + 12345;
+        findSecrets();
         for (int[] tree : level.trees) trees.add(new int[]{tree[0], tree[1], tree[2], RunCraft.treeHolds(tree[2])});
     }
 
@@ -3749,6 +3766,9 @@ final class PlusRun {
         }
         tough = other.tough;
         bite = other.bite;
+        secrets.addAll(other.secrets);
+        secretsFound = other.secretsFound;
+        secretAge = other.secretAge.clone();
         for (float[] boom : other.booms) booms.add(boom.clone());
         for (float[] fire : other.fires) fires.add(fire.clone());
         for (float[] smear : other.smears) smears.add(smear.clone());
@@ -4922,6 +4942,144 @@ final class PlusRun {
     int rounds() { return rounds; }
     /** How far through a swing of the brush or sword she is, from 0 to 1; below zero when she is not swinging. */
     float swinging() { return swing > 0 ? 1 - swing / SWING : -1; }
+
+    // Secret spaces
+
+    /**
+     * The secret spaces of a land: a false wall and the little room behind it, a cave's or a home's. Until it is found, each is drawn as the
+     * rock round it (see {@link #shown}), and what is in it is not drawn at all; it is found by walking into the false wall, which fades, or by
+     * striking it, which breaks it open. Each: the false wall's column, its top and bottom rows, and the first and last columns of all of it.
+     */
+    private final List<int[]> secrets = new ArrayList<>();
+    private int secretsFound, secretsBroken;
+    private float[] secretAge = new float[0];
+
+    /** How long a secret space takes to show once found. */
+    static final float SECRET_SHOWS = .5f;
+
+    private void findSecrets() {
+        for (int column = 0; column < columns; column++) {
+            for (int row = 0; row < level.land.length; row++) {
+                if (level.land[row][column] != RunLevels.FAKE || row > 0 && level.land[row - 1][column] == RunLevels.FAKE) continue;
+                int bottom = row;
+                while (bottom + 1 < level.land.length && level.land[bottom + 1][column] == RunLevels.FAKE) bottom++;
+                // The room behind it: the side where, a few squares on, there is rock again the height of the false wall.
+                for (int side = -1; side <= 1; side += 2) {
+                    int wide = 0;
+                    while (wide < 6 && open(column + side * (wide + 1), row, bottom)) wide++;
+                    if (wide < 1 || wide > 5 || !closed(column + side * (wide + 1), row, bottom)) continue;
+                    int far = column + side * wide;
+                    secrets.add(new int[]{column, row, bottom, Math.min(column, far), Math.max(column, far)});
+                    break;
+                }
+                row = bottom;
+            }
+        }
+        secretAge = new float[secrets.size()];
+    }
+
+    private boolean open(int column, int top, int bottom) {
+        if (column < 0 || column >= columns) return false;
+        for (int row = top; row <= bottom; row++) if (level.land[row][column] != RunLevels.AIR) return false;
+        return true;
+    }
+
+    private boolean closed(int column, int top, int bottom) {
+        if (column < 0 || column >= columns) return false;
+        for (int row = top; row <= bottom; row++) if (!solid(level.land[row][column])) return false;
+        return true;
+    }
+
+    /** Whether a square is in a secret space not yet found: drawn as the rock round it, and nothing in it drawn. */
+    boolean hidden(int column, int row) {
+        for (int at = 0; at < secrets.size(); at++) {
+            int[] one = secrets.get(at);
+            if ((secretsFound & 1 << at) == 0 && column >= one[3] && column <= one[4] && row >= one[1] && row <= one[2]) return true;
+        }
+        return false;
+    }
+
+    /** What a square is drawn as: rock, in a secret space not yet found; otherwise what it is. */
+    char shown(int column, int row) { return hidden(column, row) ? RunLevels.BLOCK : at(column, row); }
+
+    /** How long ago the secret space a square is in was found; -1 for a square in none, or in one not yet found. */
+    float foundAgo(int column, int row) {
+        for (int at = 0; at < secrets.size(); at++) {
+            int[] one = secrets.get(at);
+            if ((secretsFound & 1 << at) != 0 && column >= one[3] && column <= one[4] && row >= one[1] && row <= one[2]) return secretAge[at];
+        }
+        return -1;
+    }
+
+    /** How near she must be to a secret space for its one hairline crack to show. */
+    static final float HINT_NEAR = 3;
+
+    /** The secret spaces, whether each is found and how long ago, and how many were broken open; for drawing them and for the tests. */
+    List<int[]> secrets() { return secrets; }
+    boolean secretFound(int at) { return (secretsFound & 1 << at) != 0; }
+    float secretAge(int at) { return at < secretAge.length ? secretAge[at] : 9; }
+    int secretsBroken() { return secretsBroken; }
+
+    /** A secret space is found: by her walking into its false wall, which fades away; or broken open by a blow, in a burst of rubble. */
+    private void foundSecret(int at, boolean broken) {
+        if ((secretsFound & 1 << at) != 0) return;
+        secretsFound |= 1 << at;
+        secretAge[at] = 0;
+        if (!broken) return;
+        int[] one = secrets.get(at);
+        secretsBroken++;
+        booms.add(new float[]{one[0] + .5f, (one[1] + one[2] + 1) / 2f, 1.1f, PLAIN, 0});
+        if (splashes.size() < 12) splashes.add(new float[]{one[0] + .5f, (one[1] + one[2] + 1) / 2f, 0});
+    }
+
+    /** A blow of hers over a box: whatever crack hides a place off the land there breaks open, unless it is too strong for the blow. */
+    private void crack(float from, float to, float top, float bottom) {
+        for (int index = 0; index < level.rooms.size() && room < 0; index++) {
+            int[] one = level.rooms.get(index);
+            if (one[7] == 1 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
+                if (strongCrack(one) && dealt() < crackNeeds(level.number)) {
+                    clangX = one[1] + .5f;
+                    clangY = one[2] - 1;
+                    clangs++;
+                    continue;
+                }
+                revealed |= 1 << index;
+                reveals++;
+            }
+        }
+    }
+
+    /** Whether a place off the land is still hidden behind its crack: no button is shown for it, though a use of it there still breaks through. */
+    boolean crackHidden(int index) { return index >= 0 && index < level.rooms.size() && level.rooms.get(index)[7] == 1 && (revealed & 1 << index) == 0; }
+
+    /** The secret space whose false wall a square is in, not yet found; or -1. */
+    private int secretAt(int column, int row) {
+        for (int at = 0; at < secrets.size(); at++) {
+            int[] one = secrets.get(at);
+            if ((secretsFound & 1 << at) == 0 && one[0] == column && row >= one[1] && row <= one[2]) return at;
+        }
+        return -1;
+    }
+
+    /** A blow of hers over a box: whatever false wall of a secret space it meets breaks open. */
+    private void breakSecrets(float from, float to, float top, float bottom) {
+        for (int at = 0; at < secrets.size(); at++) {
+            int[] one = secrets.get(at);
+            if ((secretsFound & 1 << at) == 0 && one[0] + 1 > from && one[0] < to && one[2] + 1 > top && one[1] < bottom) foundSecret(at, true);
+        }
+    }
+
+    /** As time goes: walked into, a secret space is found; and those found show, a little more at a time. */
+    private void secrets(float seconds) {
+        for (int at = 0; at < secrets.size(); at++) {
+            if ((secretsFound & 1 << at) != 0) {
+                secretAge[at] += seconds;
+                continue;
+            }
+            int[] one = secrets.get(at);
+            if (x + WIDE > one[0] + .15f && x < one[0] + .85f && y + TALL > one[1] + .2f && y < one[2] + .8f) foundSecret(at, false);
+        }
+    }
     /** How many times she has used what she carries, picked something up, had something thrown at her, and sent or wiped it away. */
     int strikes() { return strikes; }
     int picked() { return picked; }
@@ -5524,6 +5682,7 @@ final class PlusRun {
         }
         for (Foe foe : foes) move(foe, seconds);
         pets(seconds);
+        secrets(seconds);
         if (!born.isEmpty()) {
             foes.addAll(born);
             born.clear();
@@ -6633,6 +6792,8 @@ final class PlusRun {
      */
     private int sweep(int by, float from, float to, float top, float bottom) {
         if (sweeping) swept.add(new float[]{by, from, to, top, bottom});
+        breakSecrets(from, to, top, bottom);
+        crack(from, to, top, bottom);
         int met = 0;
         for (int index = 0; index < foes.size(); index++) {
             Foe foe = foes.get(index);
@@ -6962,19 +7123,8 @@ final class PlusRun {
                     || foe.y + foe.tall() <= top) continue;
             beat(foe, swungWith == SWORD ? SWORDED : PLAIN);
         }
-        for (int index = 0; index < level.rooms.size() && room < 0; index++) {
-            int[] one = level.rooms.get(index);
-            if (one[7] == 1 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
-                if (strongCrack(one) && dealt() < crackNeeds(level.number)) {
-                    clangX = one[1] + .5f;
-                    clangY = one[2] - 1;
-                    clangs++;
-                    continue;
-                }
-                revealed |= 1 << index;
-                reveals++;
-            }
-        }
+        crack(from, to, top, bottom);
+        breakSecrets(from, to, top, bottom);
         for (int index = shots.size() - 1; index >= 0; index--) {
             Shot shot = shots.get(index);
             if (shot.hers || shot.x < from - .2f || shot.x > to + .2f || shot.y < top - .2f || shot.y > bottom + .2f) continue;
@@ -7050,6 +7200,16 @@ final class PlusRun {
             } else if (shot.kind == DEBRIS) shot.down = shot.age < HANGS ? 0 : 13;
             // A ledge is thin: it stops only what comes down on it, which makes it somewhere to shelter.
             char in = at((int) Math.floor(shot.x), (int) Math.floor(shot.y));
+            // One of hers that meets the false wall of a secret space breaks it open, and is spent on it.
+            if (shot.hers && !shot.pets && in == RunLevels.FAKE) {
+                int secret = secretAt((int) Math.floor(shot.x), (int) Math.floor(shot.y));
+                if (secret >= 0) {
+                    foundSecret(secret, true);
+                    ended(shot);
+                    shots.remove(index);
+                    continue;
+                }
+            }
             // One of hers that bounces turns back from a wall, while it has bounces left.
             if (shot.hers && shot.bounces > 0 && shot.left > seconds && in != RunLevels.LEDGE && solid(in) && Math.abs(shot.across) >= Math.abs(shot.down)) {
                 shot.x -= shot.across * seconds * 1.5f;
