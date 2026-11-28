@@ -15553,6 +15553,11 @@ final class RunGame {
         boolean ready = run.canDash(), held = clock - dashTapped < .15f;
         if (!ready && !held) canvas.saveLayerAlpha(where.left - dp(6), where.top - dp(6), where.right + dp(6), where.bottom + dp(8), 120);
         float round = glass(canvas, where, held, CalculatorLayout.CORAL), reach = round * .26f;
+        // Her own shape, dashing, from the run's pack; the chevrons drawn here only where the pack is not.
+        if (iconOn(canvas, DASH_ICON, where, round, run.facingLeft())) {
+            if (!ready && !held) canvas.restore();
+            return;
+        }
         canvas.save();
         canvas.translate(where.centerX(), where.centerY());
         if (run.facingLeft()) canvas.scale(-1, 1);
@@ -15580,11 +15585,47 @@ final class RunGame {
         if (!ready && !held) canvas.restore();
     }
 
+    /** The pictures on the dash's and the pound's buttons: her shape, white with a dark edge, from the run's pack; and whether each was looked for. */
+    private static final int DASH_ICON = 0, POUND_ICON = 1;
+    private static final String[] ICON_FILES = {"runart/run_icon_dash.webp", "runart/run_icon_pound.webp"};
+    private final Bitmap[] icons = new Bitmap[2];
+    private final boolean[] iconsTried = new boolean[2];
+    private static final android.graphics.ColorFilter ICON_SHADE = new android.graphics.PorterDuffColorFilter(0xFF1A1020, android.graphics.PorterDuff.Mode.SRC_IN);
+
+    /** Draws one of them on its button, turned the way she faces if asked; whether there was one to draw. */
+    private boolean iconOn(Canvas canvas, int which, RectF where, float round, boolean flipped) {
+        if (!iconsTried[which]) {
+            iconsTried[which] = true;
+            icons[which] = runAsset(ICON_FILES[which]);
+        }
+        Bitmap icon = icons[which];
+        if (icon == null) return false;
+        float x = where.centerX(), y = where.centerY(), half = round * .74f;
+        canvas.save();
+        if (flipped) canvas.scale(-1, 1, x, y);
+        // A dark copy of her first, a little lower and spread a touch wider, so the white shape reads over a bright sky as well as a cave.
+        paint.setColorFilter(ICON_SHADE);
+        paint.setAlpha(170);
+        for (int spread = 0; spread < 2; spread++) {
+            float out = dp(1 + spread);
+            box.set(x - half - out, y - half - out + dp(1.5f), x + half + out, y + half + out + dp(1.5f));
+            canvas.drawBitmap(icon, null, box, paint);
+        }
+        paint.setColorFilter(null);
+        box.set(x - half, y - half, x + half, y + half);
+        paint.setAlpha(255);
+        canvas.drawBitmap(icon, null, box, paint);
+        canvas.restore();
+        return true;
+    }
+
     /** The ground pound's button, up while she is in the air: a heavy arrow down onto a line of ground, with cracks going out from it. */
     private void poundControl(Canvas canvas) {
         RectF where = poundButton;
         boolean held = clock - poundTapped < .15f;
         float round = glass(canvas, where, held, 0xFFFF8A3D), reach = round * .34f;
+        // Her own shape, diving down onto the ground; the arrow drawn here only where the pack is not.
+        if (iconOn(canvas, POUND_ICON, where, round, false)) return;
         canvas.save();
         canvas.translate(where.centerX(), where.centerY());
         for (int pass = 0; pass < 2; pass++) {
