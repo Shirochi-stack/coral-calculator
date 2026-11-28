@@ -3027,9 +3027,30 @@ final class RunGame {
      */
     private void drawGearMarks(Canvas canvas) {
         for (PlusRun.Foe foe : run.foes()) {
-            if (foe.flat || foe.away || foe.poisoned <= 0 && foe.burning <= 0 && foe.frozen <= 0) continue;
+            if (foe.flat || foe.away || foe.poisoned <= 0 && foe.burning <= 0 && foe.frozen <= 0 && foe.iced <= 0 && foe.stunned <= 0) continue;
             float left = (foe.x - cameraX) * tile, top = (foe.y - cameraY) * tile, wide = foe.wide() * tile, tall = foe.tall() * tile;
             if (left < -tile * 2 || left > width + tile) continue;
+            // Frozen solid: a block of ice over it, and the chill of how near it is to that before.
+            if (foe.iced > 0) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFBFEFFF);
+                paint.setAlpha(170);
+                canvas.drawRoundRect(left - tile * .1f, top - tile * .12f, left + wide + tile * .1f, top + tall + tile * .04f, tile * .08f, tile * .08f, paint);
+                stroke(0xFFFFFFFF, dp(2));
+                stroke.setAlpha(230);
+                canvas.drawRoundRect(left - tile * .1f, top - tile * .12f, left + wide + tile * .1f, top + tall + tile * .04f, tile * .08f, tile * .08f, stroke);
+                canvas.drawLine(left + wide * .15f, top + tall * .1f, left + wide * .35f, top + tall * .45f, stroke);
+                stroke.setAlpha(255);
+            }
+            // Stunned: stars going round over its head.
+            if (foe.stunned > 0) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFFFE066);
+                for (int star = 0; star < 3; star++) {
+                    double turn = clock * 6 + star * Math.PI * 2 / 3;
+                    canvas.drawCircle(left + wide / 2 + (float) Math.cos(turn) * wide * .45f, top - tile * .12f + (float) Math.sin(turn) * tile * .08f, tile * .06f, paint);
+                }
+            }
             if (foe.frozen > 0) {
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0xFFA8E6FF);
@@ -3191,10 +3212,13 @@ final class RunGame {
      * FX_MOST bits at once.)
      */
     private final List<float[]> moveBits = new ArrayList<>();
+    private final java.util.Set<PlusRun.Foe> defeated = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     static final int FX_MOST = 48;
     private int seenPounds, seenAerials, seenAerialHits;
     private float poundFxAge = 9, poundFxX, poundFxY, poundFxReach, featherClock;
     private int poundFxFlavour, poundFxLevel;
+    private boolean poundPictured;
+    private final java.util.Set<float[]> splashesSeen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
     private void movesAfter(float seconds) {
         poundFxAge += seconds;
@@ -3208,6 +3232,10 @@ final class RunGame {
             poundFxFlavour = PlusRun.flavourOf(PlusRun.blowOf(run.weapon()));
             shake = Math.max(shake, .1f + .04f * poundFxLevel);
             audio.play("quake", .5f + .15f * poundFxLevel);
+            // The shockwave and the dust, as wide as it reaches; at the third step a burst on top.
+            poundPictured = vfx(Vfx.SHOCKWAVE, poundFxX, poundFxY - .2f, poundFxReach * 2.2f, 0, Vfx.WHITE, poundFxLevel >= 2 ? Vfx.BLOOM : 0) >= 0;
+            vfx(Vfx.DUST, poundFxX, poundFxY - .4f, poundFxReach * 1.6f, 0, Vfx.WHITE, 0);
+            if (poundFxLevel >= 3) vfx(Vfx.EXPLOSION, poundFxX, poundFxY - .6f, 2.2f, 0, Vfx.WHITE, 0);
             int bits = 8 + 5 * poundFxLevel;
             for (int bit = 0; bit < bits && moveBits.size() < FX_MOST; bit++) {
                 float side = bit % 2 == 0 ? -1 : 1, speed = 2.5f + random.nextFloat() * 3 * poundFxLevel;
@@ -3222,10 +3250,42 @@ final class RunGame {
             if (run.aerialHits() / 3 != seenAerialHits / 3) audio.play("slash", .35f);
             seenAerialHits = run.aerialHits();
         }
+        // A creature beaten goes in its own way: bits of it thrown off as it is made (and more of them for a big one).
+        // Ink bursting out of one beaten while ink-poisoned (or the beetle's): an ink explosion.
+        for (float[] splash : run.inkSplashes()) if (splashesSeen.add(splash)) vfx(Vfx.INK_EXPLOSION, splash[0], splash[1], splash[2] * 2, 0, Vfx.WHITE, 0);
+        if (splashesSeen.size() > 100) splashesSeen.clear();
+        for (PlusRun.Foe foe : run.foes()) {
+            if (!foe.flat || foe.act > .1f || !defeated.add(foe)) continue;
+            boolean big = RunLevels.boss(foe.kind) || RunUniques.is(foe.kind);
+            // In the effects' pictures: in its own way, and a big one goes with a bang.
+            float vx = foe.x + foe.wide() / 2, vy = foe.y + foe.tall() * .5f, across = Math.max(foe.wide(), foe.tall()) * (big ? 2 : 1.6f);
+            int how = foe.defeat == PlusRun.DEFEAT_SPLAT || foe.defeat == PlusRun.DEFEAT_MELT ? Vfx.INK_SPLAT : foe.defeat == PlusRun.DEFEAT_SHATTER ? Vfx.ICE_BURST
+                    : foe.defeat == PlusRun.DEFEAT_ASH ? Vfx.FIRE_BURST : foe.defeat == PlusRun.DEFEAT_CRUMBLE ? Vfx.DUST : Vfx.POOF;
+            boolean pictured = vfx(how, vx, vy, across, 0, Vfx.WHITE, 0) >= 0;
+            if (big && RunUniques.great(foe.kind) || RunLevels.boss(foe.kind)) vfx(Vfx.EXPLOSION, vx, vy, across * 1.4f, 0, Vfx.WHITE, Vfx.BLOOM);
+            if (foe.defeat == PlusRun.DEFEAT_SHATTER) audio.play("crumble", .6f);
+            if (pictured || foe.defeat == PlusRun.DEFEAT_FADE) continue;
+            int bits = (big ? 14 : 7), style = foe.defeat;
+            float cx = foe.x + foe.wide() / 2, cy = foe.y + foe.tall() * .5f;
+            for (int bit = 0; bit < bits && moveBits.size() < FX_MOST; bit++) {
+                float side = bit % 2 == 0 ? -1 : 1, spread = foe.wide() * (.3f + random.nextFloat() * .5f);
+                int kind = style == PlusRun.DEFEAT_SPLAT || style == PlusRun.DEFEAT_MELT ? PlusRun.SPLASHES : style == PlusRun.DEFEAT_CRUMBLE ? PlusRun.THUDS
+                        : style == PlusRun.DEFEAT_SHATTER ? PlusRun.SPARKLES : style == PlusRun.DEFEAT_ASH ? FEATHER_BIT + 1 : FEATHER_BIT;
+                float up = style == PlusRun.DEFEAT_ASH ? -1.5f - random.nextFloat() : style == PlusRun.DEFEAT_MELT ? 1 : -3 - random.nextFloat() * 3;
+                moveBits.add(new float[]{cx + side * random.nextFloat() * foe.wide() * .4f, cy, side * spread * 3, up, 0, kind, .7f + random.nextFloat() * .6f});
+            }
+        }
+        if (defeated.size() > 200) defeated.clear();
         // Feathers off her wings, and the wind behind her, while she glides or hangs in an aerial strike.
         boolean aloft = run.gliding() || run.aerialOn();
         if (aloft && (featherClock -= seconds) <= 0 && moveBits.size() < FX_MOST) {
             featherClock = run.aerialOn() ? .07f : .16f;
+            // (Where the effects' pictures play, a drift of feathers now and then instead.)
+            float fx = run.x() + PlusRun.WIDE / 2 + (run.facingLeft() ? .5f : -.5f), fy = run.y() + PlusRun.TALL * .35f;
+            if (vfx(Vfx.FEATHERS, fx, fy, run.aerialOn() ? 1.6f : 1.2f, run.facingLeft() ? 0 : 180, Vfx.WHITE, 0) >= 0) {
+                featherClock = run.aerialOn() ? .3f : .5f;
+                return;
+            }
             float cx = run.x() + PlusRun.WIDE / 2 + (run.facingLeft() ? .35f : -.35f), cy = run.y() + PlusRun.TALL * .35f;
             moveBits.add(new float[]{cx + (random.nextFloat() - .5f) * .6f, cy + (random.nextFloat() - .5f) * .4f, (run.facingLeft() ? 1 : -1) * (.6f + random.nextFloat()),
                     -.4f + random.nextFloat() * .5f, 0, FEATHER_BIT + (random.nextInt(2)), 1.1f + random.nextFloat() * .5f});
@@ -3258,7 +3318,7 @@ final class RunGame {
         if (poundFxAge < .6f) {
             float x = (poundFxX - cameraX) * tile, y = (poundFxY - cameraY) * tile, through = Math.min(1, poundFxAge / .35f), reach = poundFxReach * tile;
             int colour = poundFxFlavour == PlusRun.SPLASHES ? 0xFF2A3266 : poundFxFlavour == PlusRun.CUTS ? 0xFFFFE08A : poundFxFlavour == PlusRun.SPARKLES ? 0xFFB9F3FF : 0xFFF2E6CF;
-            if (poundFxAge < .35f) {
+            if (poundFxAge < .35f && !poundPictured) {
                 stroke.setColor(colour);
                 stroke.setAlpha(Math.round(230 * (1 - through)));
                 stroke.setStrokeWidth(tile * (.16f - .1f * through));
@@ -3287,7 +3347,7 @@ final class RunGame {
             }
             // Dust, rolling out low on both sides.
             paint.setStyle(Paint.Style.FILL);
-            for (int puff = 0; puff < 6 + 2 * poundFxLevel; puff++) {
+            for (int puff = 0; puff < (poundPictured ? 0 : 6 + 2 * poundFxLevel); puff++) {
                 float side = puff % 2 == 0 ? -1 : 1, out = reach * (.2f + .8f * through) * (.5f + .5f * (puff % 4) / 3f);
                 paint.setColor(0xFFE9E0D0);
                 paint.setAlpha(Math.round(170 * Math.max(0, 1 - poundFxAge / .6f)));
@@ -3327,6 +3387,19 @@ final class RunGame {
             }
             stroke.setAlpha(255);
         }
+        // Ink bursting out of one beaten while ink-poisoned.
+        for (float[] splash : run.inkSplashes()) {
+            float x = (splash[0] - cameraX) * tile, y = (splash[1] - cameraY) * tile, through = Math.min(1, splash[3] / .4f), reach = splash[2] * tile * (.3f + .7f * through);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFF1B2152);
+            paint.setAlpha(Math.round(200 * (1 - through)));
+            for (int blob = 0; blob < 10; blob++) {
+                double turn = blob * Math.PI / 5 + splash[0];
+                canvas.drawCircle(x + (float) Math.cos(turn) * reach, y + (float) Math.sin(turn) * reach * .7f, tile * .12f * (1 - through * .5f), paint);
+            }
+            canvas.drawCircle(x, y, tile * .3f * (1 - through), paint);
+            paint.setAlpha(255);
+        }
         // The bits: what flew off a pound, and feathers.
         paint.setStyle(Paint.Style.FILL);
         for (float[] bit : moveBits) {
@@ -3351,6 +3424,101 @@ final class RunGame {
         paint.setAlpha(255);
         stroke.setAlpha(255);
     }
+    // The effects' own pictures (see Vfx), anchored in the land: played at a place in it, in the land's pixels, and drawn with the view.
+
+    private boolean vfxStarted;
+    private int vfxThisFrame;
+    private float vfxFrameAt = -1;
+
+    /** Whether the land is a light one (where light added to an effect is lost, and it is drawn with the normal blend). */
+    private boolean lightLand() { return delve < 0; }
+
+    /** Plays one at a place in the land (squares), so many squares across, at an angle; or -1 if the library is not there or too much is playing at once. */
+    private int vfx(int id, float x, float y, float squares, float angle, int tint, int flags) {
+        if (!vfxStarted) {
+            Vfx.init(context);
+            vfxStarted = true;
+        }
+        if (vfxFrameAt != clock) {
+            vfxFrameAt = clock;
+            vfxThisFrame = 0;
+        }
+        // (Never more than a few new ones in a frame: a swarm stays readable.)
+        if (++vfxThisFrame > VFX_A_FRAME && !Vfx.LOOP[id]) return -1;
+        int blend = lightLand() && Vfx.ADD[id] ? Vfx.NORMAL : 0;
+        return Vfx.play(id, x * tile, y * tile, squares * tile, angle, tint, flags | blend, 1, 0);
+    }
+
+    static final int VFX_A_FRAME = 5;
+
+    private void drawVfx(Canvas canvas) {
+        if (!vfxStarted) return;
+        canvas.save();
+        canvas.translate(-cameraX * tile, -cameraY * tile);
+        Vfx.draw(canvas);
+        canvas.restore();
+    }
+
+    /** A blow landing, in the effects' pictures: in the way of what dealt it, and a great blow, a broken shield or a creature beaten on top. Whether it played. */
+    private boolean hitVfx(float[] hit) {
+        boolean great = hit[3] > 0, beaten = hit[8] > 0, broke = hit[9] > 0;
+        float x = hit[0], y = hit[1] + .25f;
+        int flavour = (int) hit[7], flip = run.facingLeft() ? Vfx.MIRROR : 0;
+        int id = flavour == PlusRun.CUTS ? (hit[2] >= 3 * PlusRun.BLOW ? Vfx.SLASH_HEAVY : Vfx.SLASH_LIGHT) : flavour == PlusRun.SPLASHES ? Vfx.INK_SPLASH
+                : flavour == PlusRun.SPARKLES ? Vfx.SPARKLE : Vfx.IMPACT_STAR;
+        int played = broke ? -1 : vfx(id, x, y, flavour == PlusRun.CUTS ? 1.5f : 1.15f, flavour == PlusRun.CUTS ? (run.facingLeft() ? 20 : -20) : 0, Vfx.WHITE, flip);
+        if (great) vfx(Vfx.CRIT, x, y, 1.9f, 0, Vfx.WHITE, Vfx.BLOOM);
+        if (broke) played = vfx(Vfx.SHIELD_BREAK, x, y, 1.9f, 0, Vfx.WHITE, Vfx.BLOOM);
+        return played >= 0;
+    }
+
+    /** Burning, frozen, poisoned and stunned, in the effects' looping pictures, on what is on screen (and on her): started, kept on it as it goes, and stopped. */
+    private final java.util.Map<Object, int[]> loops = new java.util.IdentityHashMap<>();
+    static final int LOOPS_MOST = 14;
+
+    private void statusLoops() {
+        if (run == null) return;
+        java.util.Set<Object> still = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        float from = cameraX - 2, to = cameraX + width / tile + 2;
+        for (PlusRun.Foe foe : run.foes()) {
+            if (foe.flat || foe.away || foe.x < from || foe.x > to) continue;
+            boolean[] on = {foe.burning > 0, foe.iced > 0 || foe.frozen > 0, foe.poisoned > 0, foe.stunned > 0};
+            if (!on[0] && !on[1] && !on[2] && !on[3]) continue;
+            still.add(foe);
+            keepLoops(foe, on, foe.x + foe.wide() / 2, foe.y, foe.tall(), Math.max(foe.wide(), foe.tall()));
+        }
+        boolean[] hers = {run.herBurn() > 0, run.herChill() > 0, run.herPoison() > 0, run.herStun() > 0};
+        if (hers[0] || hers[1] || hers[2] || hers[3]) {
+            still.add(run);
+            keepLoops(run, hers, run.x() + PlusRun.WIDE / 2, run.y(), PlusRun.TALL, PlusRun.TALL);
+        }
+        for (java.util.Iterator<java.util.Map.Entry<Object, int[]>> each = loops.entrySet().iterator(); each.hasNext(); ) {
+            java.util.Map.Entry<Object, int[]> one = each.next();
+            if (still.contains(one.getKey())) continue;
+            for (int handle : one.getValue()) if (handle >= 0) Vfx.stop(handle);
+            each.remove();
+        }
+    }
+
+    private void keepLoops(Object who, boolean[] on, float middle, float top, float tall, float size) {
+        int[] handles = loops.get(who);
+        if (handles == null) {
+            if (loops.size() >= LOOPS_MOST) return;
+            loops.put(who, handles = new int[]{-1, -1, -1, -1});
+        }
+        int[] ids = {Vfx.FLAMES, Vfx.FREEZE, Vfx.POISON, Vfx.STUN};
+        for (int which = 0; which < 4; which++) {
+            // (Flames and frost over its body, poison rising off it, stars over its head.)
+            float y = which == 3 ? top - .15f : top + tall * .5f, across = which == 3 ? size * .9f : size * 1.3f;
+            if (on[which] && handles[which] < 0) handles[which] = vfx(ids[which], middle, y, across, 0, Vfx.WHITE, 0);
+            else if (!on[which] && handles[which] >= 0) {
+                Vfx.stop(handles[which]);
+                handles[which] = -1;
+            }
+            if (handles[which] >= 0) Vfx.move(handles[which], middle * tile, y * tile);
+        }
+    }
+
     /** How long a creature just hit is lifted near to white, and how long it is squashed by the blow. */
     static final float STRUCK_WHITE = .12f, STRUCK_SQUASH = .16f;
 
@@ -3374,7 +3542,7 @@ final class RunGame {
             if (hit[0] < first - 2 || hit[0] > last + 2) continue;
             boolean great = hit[3] > 0, beaten = hit[8] > 0, broke = hit[9] > 0;
             if (hit[6] == 0) {
-                hit[6] = 1;
+                hit[6] = hitVfx(hit) ? 2 : 1;
                 if (perks.item != 0 && RunLoot.rarity(perks.item) >= RunLoot.RED && RunArms.kindOf(perks.item) == run.weapon()) shake = Math.max(shake, .12f);
                 if (great || hit[2] >= 3 * PlusRun.BLOW || broke) shake = Math.max(shake, great || broke ? .14f : .08f);
                 // The hit-stop: a heavy blow, a shield broken, or a big one beaten.
@@ -3383,8 +3551,10 @@ final class RunGame {
             float age = hit[4], x = (hit[0] - cameraX) * tile, y = (hit[1] - cameraY) * tile + tile * .25f;
             float big = great || broke ? 1.6f : beaten ? 1.35f : 1;
             int flavour = (int) hit[7];
+            // (Where the effects' own pictures are playing it, only the number is drawn here: the rest is the fallback.)
+            boolean pictured = hit[6] == 2;
             // The burst.
-            if (age < .18f) {
+            if (age < .18f && !pictured) {
                 float through = age / .18f, reach = tile * (.3f + .45f * through) * big;
                 int alpha = Math.round(255 * (1 - through));
                 if (flavour == PlusRun.CUTS) {
@@ -3449,7 +3619,7 @@ final class RunGame {
                 paint.setAlpha(255);
             }
             // A great blow, a shield breaking and a creature beaten: a ring going out.
-            if ((great || broke || beaten) && age < .3f) {
+            if ((great || broke || beaten) && age < .3f && !pictured) {
                 float through = age / .3f;
                 stroke.setColor(broke ? 0xFFBFE6FF : great ? 0xFFFFC433 : 0xFFFFFFFF);
                 stroke.setAlpha(Math.round(220 * (1 - through)));
@@ -3458,7 +3628,7 @@ final class RunGame {
                 stroke.setAlpha(255);
             }
             // The ink.
-            if (age < .35f) {
+            if (age < .35f && !pictured) {
                 float through = age / .35f;
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0xFF1B2152);
@@ -4841,6 +5011,30 @@ final class RunGame {
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(0xFF2A1C3A);
         fitted(canvas, (int) Math.ceil(run.cursed()) + " s", left + dp(27), top + high / 2 + dp(4.5f), dp(12), wide - dp(32));
+    }
+
+    /** What afflicts her, on the HUD beside the black chip: burning, chilled, ink-poisoned, stunned, each with its seconds. */
+    private void drawStatusChips(Canvas canvas, float left, float top) {
+        float[] left_ = {run.herBurn(), run.herChill(), run.herPoison(), run.herStun()};
+        int[] colours = {0xFFFF6A2A, 0xFF6FC8FF, 0xFF5FBF6A, 0xFFFFC933};
+        String[] marks = {"\uD83D\uDD25", "\u2744", "\u2620", "\u2605"};
+        float high = dp(22), wide = dp(52);
+        for (int which = 0; which < 4; which++) {
+            if (left_[which] <= 0) continue;
+            box.set(left, top, left + wide, top + high);
+            plate(canvas, box, high / 2, 235);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(colours[which]);
+            canvas.drawCircle(left + dp(11), top + high / 2, dp(8), paint);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(Color.WHITE);
+            fitted(canvas, marks[which], left + dp(11), top + high / 2 + dp(4), dp(10), dp(14));
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(0xFF2A1C3A);
+            fitted(canvas, (int) Math.ceil(left_[which]) + " s", left + dp(22), top + high / 2 + dp(4.5f), dp(12), wide - dp(25));
+            left += wide + dp(4);
+        }
+        paint.setColor(Color.BLACK);
     }
 
     /** Over a dungeon's floor: on a lightless one, the dark, but for a ring of light about her; and the keeper's name and what it has left, while it is near. */
@@ -7109,6 +7303,16 @@ final class RunGame {
                 speak(RunStory.LATER_UNIQUES[which], true);
                 break;
             }
+            // And the first time she meets each of the twelve made of fire, frost and ink.
+            for (PlusRun.Foe foe : run.foes()) {
+                if (captionLeft > 0) break;
+                if (foe.flat || !RunUniques.status(foe.kind) || Math.abs(foe.x - run.x()) > 8 || Math.abs(foe.y - run.y()) > 5) continue;
+                int which = foe.kind - RunUniques.STATUS_FIRST;
+                if (session.tally("run_u3_" + which) != 0) continue;
+                session.keep("run_u3_" + which, 1);
+                speak(RunStory.STATUS_UNIQUES[which], true);
+                break;
+            }
         }
         // Deep water, the first time: in blue she can swim in it; without it she cannot breathe.
         if (run != null && screen == PLAY && run.inWater() && captionLeft <= 0 && !audio.speaking()) {
@@ -7268,7 +7472,9 @@ final class RunGame {
         float wasX = run.x() + PlusRun.WIDE / 2, wasY = run.y() + PlusRun.TALL;
         boolean wasLeft = run.facingLeft();
         run.step(seconds, goLeft, goRight, goJump || jumpPressed, goStrike || strikePressed);
+        Vfx.update(seconds);
         movesAfter(seconds);
+        statusLoops();
         jumpPressed = false;
         strikePressed = false;
         sinceUse += seconds;
@@ -9708,7 +9914,15 @@ final class RunGame {
         paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
                 : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
         // (Those of the dungeons are in a sheet of their own; and those of the later chapters in the run's asset pack.)
-        boolean later = RunUniques.later(foe.kind), delving = !later && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        boolean status = RunUniques.status(foe.kind), later = RunUniques.later(foe.kind), delving = !later && !status && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        if (status && statusSheet == null && !statusTried) {
+            statusTried = true;
+            try (java.io.InputStream in = context.getAssets().open(RunUniques.STATUS_SHEET)) {
+                statusSheet = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                statusSheet = null;
+            }
+        }
         if (delving && delverSheet == null) delverSheet = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_delvers);
         if (later && laterSheet == null && !laterTried) {
             laterTried = true;
@@ -9718,13 +9932,13 @@ final class RunGame {
                 laterSheet = null;
             }
         }
-        Bitmap sheet = later ? laterSheet : delving ? delverSheet : uniqueSheet;
+        Bitmap sheet = status ? statusSheet : later ? laterSheet : delving ? delverSheet : uniqueSheet;
         if (sheet == null) {
             paint.setAlpha(255);
             return;
         }
-        int rows = later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
-        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
+        int rows = status ? RunUniques.STATUS_COUNT : later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
+        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (status ? RunUniques.index(RunUniques.STATUS_FIRST) : later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
         if (!foe.flat) laterStrikes(canvas, foe, way, middle, feet);
         if (way == RunUniques.DROPPER && foe.turn == 0 && !foe.flat) {
             // The spider's thread, up out of sight.
@@ -9749,8 +9963,8 @@ final class RunGame {
         }
     }
 
-    private Bitmap laterSheet;
-    private boolean laterTried;
+    private Bitmap laterSheet, statusSheet;
+    private boolean laterTried, statusTried;
 
     /**
      * What the later chapters' creatures do, drawn about them: the strikethrough's line, red as it is raised and bold as it strikes; the
@@ -11112,6 +11326,7 @@ final class RunGame {
         drawForeground(canvas);
         drawHits(canvas, first, last);
         drawMoveFx(canvas);
+        drawVfx(canvas);
         // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
         for (PlusRun.Foe foe : run.foes()) {
             if (foe.flat || foe.most <= PlusRun.BLOW || foe.left >= foe.most || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
@@ -13014,8 +13229,28 @@ final class RunGame {
         }
     }
 
-    /** Halgakos as she is at this moment of the run, her feet at a place: empty-handed, or carrying what she fights with. */
+    /** Halgakos as she is at this moment of the run, her feet at a place: empty-handed, or carrying what she fights with; tinted by what afflicts her. */
     private void her(Canvas canvas, float feetX, float feetY, float tall, int weapon, boolean leftward, int alpha) {
+        android.graphics.ColorFilter tint = run.herBurn() > 0 ? BURNT_TINT : run.herChill() > 0 ? CHILLED_TINT : run.herPoison() > 0 ? POISONED_TINT : null;
+        if (tint != null) paint.setColorFilter(tint);
+        herDrawn(canvas, feetX, feetY, tall, weapon, leftward, alpha);
+        if (tint != null) paint.setColorFilter(null);
+        // Stunned: stars going round over her head.
+        if (run.herStun() > 0) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFFFE066);
+            for (int star = 0; star < 4; star++) {
+                double turn = clock * 7 + star * Math.PI / 2;
+                canvas.drawCircle(feetX + (float) Math.cos(turn) * tall * .22f, feetY - tall * 1.02f + (float) Math.sin(turn) * tall * .05f, tall * .035f, paint);
+            }
+            paint.setColor(Color.BLACK);
+        }
+    }
+
+    private static final android.graphics.ColorFilter BURNT_TINT = new android.graphics.LightingColorFilter(0xFFFFC0A0, 0x00301000),
+            CHILLED_TINT = new android.graphics.LightingColorFilter(0xFFB8DCFF, 0x00102838), POISONED_TINT = new android.graphics.LightingColorFilter(0xFFC0E8B8, 0x00081800);
+
+    private void herDrawn(Canvas canvas, float feetX, float feetY, float tall, int weapon, boolean leftward, int alpha) {
         paint.setAlpha(alpha);
         // (The beam of the white that is truly hers is fired from her tablet-book: she holds it for as long as the beam is gathered or out.)
         boolean beaming = run.mastered() && (run.beamCharge() > 0 || run.beam() > 0);
@@ -14218,6 +14453,7 @@ final class RunGame {
         boolean divine = run.dpMaking() > 0 || run.dp() > 0 || run.divineLeft() > 0;
         if (divine) drawDivine(canvas, x + dp(232), under);
         drawBlackChip(canvas, x + dp(divine ? 336 : 232), under);
+        drawStatusChips(canvas, x + dp(divine ? 336 : 232) + (run.inked() ? dp(76) : 0), under);
         if (anySlot) drawSlots(canvas);
         drawBreath(canvas, x, under + dp(26));
         drawDelveLabel(canvas, safe.centerX(), leftButton.top - dp(30));

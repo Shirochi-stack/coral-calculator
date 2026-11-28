@@ -581,6 +581,21 @@ final class RunStory {
             {"blk1", "Ugh, black ink all over me! Everything's heavy and dark Sloppy~♡", "H", PLAYER + "A cursed black ribbon has just soaked her in ink: she feels heavy, half blind, weak and dripping. Disgusted, sulky, shivering, but defiant."},
     };
 
+    /** The first time she meets each of the twelve made of fire, frost and ink, or that stun: what it does to her, and what to do. */
+    static final String[][] STATUS_UNIQUES = {
+            {"u3a", "A matchstick with an attitude! Its embers burn, keep moving Sloppy~♡", "H", PLAYER + "A tiny sooty match-head sprite flicks burning embers at her. Wary, teasing, quick warning that fire burns her."},
+            {"u3b", "A frozen book. One slam and I'll be shivering Sloppy~♡", "H", PLAYER + "A frosted hardcover book slams shut in bursts of frost that chill her and slow her down. Shivering, cross."},
+            {"u3c", "Poison pens! Don't let those green darts stick Sloppy~♡", "H", PLAYER + "A porcupine whose quills are pens dripping green ink shoots poisoned darts. Disgusted, urgent tip."},
+            {"u3d", "That beetle is an ink bottle with a fuse. Stand back Sloppy~♡", "H", PLAYER + "A beetle shaped like a corked ink bottle with a lit fuse waddles closer to burst in ink. Alarmed, backing off."},
+            {"u3e", "That bookend is crackling. If it hits me I'll see stars Sloppy~♡", "H", PLAYER + "A brass bulldog bookend crackling with static charges to stun her. Nervous, joking."},
+            {"u3f", "Ice behind an icy shield. Break it, then shatter it Sloppy~♡", "H", PLAYER + "A book made of ice hides behind a frosty shell; frozen things shatter at a blow. Confident, strategic."},
+            {"u3g", "A fan on fire? Fire's no friend of paper Sloppy~♡", "H", PLAYER + "A burning paper fan leaps at her in bursts of flame. Wry, nervous about burning."},
+            {"u3h", "Eww, a sick page. It splits, and its ink is poison Sloppy~♡", "H", PLAYER + "A blotchy green-stained page splits in two and its ink poisons. Grossed out, warning."},
+            {"u3i", "A snow globe on legs. Freeze it three times and it's mine Sloppy~♡", "H", PLAYER + "A golem with a snow globe head pounds the ground with chilling snow; chill it three times and it freezes solid. Playful, smug plan."},
+            {"u3j", "A scribe made of charcoal. Its ink burns hotter than mine Sloppy~♡", "H", PLAYER + "A hooded charcoal scribe flicks burning ink at her. Competitive, a little jealous."},
+            {"u3k", "Smog with wings. Hold your breath, it's all poison Sloppy~♡", "H", PLAYER + "A fuzzy moth of green ink smoke darts at her trailing poison. Covering her nose, bossy."},
+            {"u3l", "Clap clap, crackle! One hit and my ears ring Sloppy~♡", "H", PLAYER + "A creature of two brass book covers bounces and claps with sparks that stun. Startled, dizzy joke."},
+    };
     /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
     static final String[][] LATER_UNIQUES = {
             {"u2a", "A newspaper bug! Don't let it roll you flat Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
@@ -1304,6 +1319,7 @@ final class RunStory {
         groups.add(SMITH_QUESTS);
         groups.add(KNUCKLES);
         groups.add(LATER_UNIQUES);
+        groups.add(STATUS_UNIQUES);
         groups.add(BLACKENED);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);

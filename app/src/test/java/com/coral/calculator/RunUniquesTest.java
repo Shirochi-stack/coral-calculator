@@ -15,7 +15,7 @@ public class RunUniquesTest {
     private static final int FLOOR = RunLevels.FLOOR;
 
     @Test public void twoToEachChapterAndEveryLandHasItsOwn() {
-        assertEquals(59, RunUniques.COUNT);
+        assertEquals(71, RunUniques.COUNT);
         assertEquals(RunUniques.FIRST + 24, RunUniques.HIDDEN_FIRST);
         assertEquals(RunLevels.LUCY + 1, RunUniques.FIRST);
         Set<Integer> ways = new HashSet<>();
