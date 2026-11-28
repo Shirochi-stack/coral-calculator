@@ -53,6 +53,10 @@ final class RunLoot {
     // What is dropped
 
     static final int WEAPON = 0, ARMOUR = 1, ACCESSORY = 2;
+    /** (Economy) A curio: the fourth kind of thing, kept apart from the bag; see {@link RunArtifacts}. */
+    static final int ARTIFACT = 3;
+    /** (Economy) The raw type of a named weapon (see {@link RunWeapons}): {@link #type} reads it as a weapon. */
+    static final int NAMED = 4;
     static final String[] TYPES = {"weapon", "armour", "accessory"};
     /** The twelve kinds of weapon. */
     static final String[] WEAPONS = {"Sword", "Katana", "Greatsword", "Book", "Summoning Staff", "Knife", "Pen", "Mace", "Hammer", "Wand", "Ink Gun", "Scythe", "Knuckles"};
@@ -307,7 +311,10 @@ final class RunLoot {
     /** A thing to keep, as one number: what it is, the chapter it is of, which of its kind, and its rarity. */
     static int code(int type, int theme, int base, int rarity) { return ((type * 16 + theme) * 64 + base) * 8 + rarity; }
 
-    static int type(int code) { return code / 8 / 64 / 16; }
+    static int type(int code) {
+        int raw = code / 8 / 64 / 16;
+        return raw >= NAMED ? WEAPON : raw;
+    }
 
     static int theme(int code) { return code / 8 / 64 % 16; }
 
@@ -349,6 +356,8 @@ final class RunLoot {
 
     /** What it is called: its rarity is said by its colour, not its name; the rose is named for her. */
     static String name(int code) {
+        if (type(code) == ARTIFACT) return RunArtifacts.name(RunArtifacts.idOf(code));
+        if (RunWeapons.named(code)) return RunWeapons.name(code);
         if (addition(code)) return "Book of Addition";
         if (paper(code)) return "Folded Page " + WEAPONS[paperIndex(code)];
         if (ultimate(code)) return "The Mother Tongue's Quill";
@@ -391,6 +400,8 @@ final class RunLoot {
         int count = type == WEAPON ? WEAPONS.length : ARMOUR_DROPS;
         // (The better armours come from the later chapters: of thirty, a chapter's run of them goes up with it.)
         int base = type == WEAPON ? baseRoll % count : Math.min(count - 1, theme * 2 + baseRoll % 8);
+        // (Economy: now and then a weapon is a named one.)
+        if (type == WEAPON) return RunWeapons.maybe(code(type, theme, base, rarity), baseRoll + typeRoll);
         return code(type, theme, base, rarity);
     }
 
@@ -398,6 +409,8 @@ final class RunLoot {
     static final int ROSE_ICONS = 144, ARMOUR_ICONS = 156, ACCESSORY_ICONS = 186, ADDITION_ICON = 228;
 
     static int iconOf(int code) {
+        if (type(code) == ARTIFACT) return RunArtifacts.ICON_BASE + RunArtifacts.idOf(code);
+        if (RunWeapons.named(code)) return RunWeapons.ICON_BASE + RunWeapons.indexOf(code);
         if (addition(code)) return ADDITION_ICON;
         if (paper(code)) return paperIndex(code) == SCYTHE ? PAPER_ICONS : paperIndex(code) == KNUCKLES ? KNUCKLE_PAPER_ICON : MORE_PAPER_ICONS + paperIndex(code);
         if (ultimate(code)) return QUILL_ICON;

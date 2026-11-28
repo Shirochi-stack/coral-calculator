@@ -503,6 +503,15 @@ final class RunGame {
     private final int[] mapPerRow = new int[3];
     /** Whether the screen is short and wide (a phone on its side): the map's tabs are put up beside the line under its name. */
     private boolean mapShort;
+    // The map on its side is a long page that is scrolled: the lands are large enough to put a thumb on, and the chapters are as many as there are, one under another.
+    // Each land keeps the place it has with the page at the top (landBase), and lands[] is that place moved up by how far the page has been scrolled, so that
+    // everything that draws or touches a land goes on using lands[] as it always did.
+    private final RectF[] landBase = new RectF[RunLevels.TOTAL];
+    private final RectF mapWindow = new RectF();
+    private final float[] mapLong = new float[3], mapBand = new float[3];
+    private boolean mapWide, mapPressed, mapDragging, mapCaught;
+    private float mapScroll, mapFling, mapBottomRow, mapDownX, mapDownY, mapDownScroll, mapLastY, mapSpeed;
+    private long mapLastAt;
     private final RectF[] tabs = {new RectF(), new RectF(), new RectF()}, tabs3 = {new RectF(), new RectF(), new RectF()}, stallWares = {new RectF(), new RectF(), new RectF(), new RectF()};
     private final RectF stallButton = new RectF();
     /** Which volume's lands the map shows; and from where the counter was opened, to go back there. */
@@ -745,7 +754,10 @@ final class RunGame {
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
         stroke.setStrokeJoin(Paint.Join.ROUND);
-        for (int index = 0; index < lands.length; index++) lands[index] = new RectF();
+        for (int index = 0; index < lands.length; index++) {
+            lands[index] = new RectF();
+            landBase[index] = new RectF();
+        }
         for (int index = 0; index < wares.length; index++) wares[index] = new RectF();
         // A chapter in which everything asked was done before there were medals has its medal now.
         for (int chapter = 0; chapter < RunLevels.ALL_CHAPTERS; chapter++) medal(chapter, false);
@@ -917,6 +929,7 @@ final class RunGame {
         kept.slotted = RunSkills.slotted(taken, skillSlots());
         // What she wears of what she has found.
         kept.worn = RunLoot.worn(session.note("run_worn"));
+        RunArtifacts.refresh(session);
         // The weapon found that she has taken in hand: in her backpack as its kind, and what she begins every land with.
         int hand = handCode();
         if (hand != 0) {
@@ -1519,6 +1532,76 @@ final class RunGame {
 
     private Bitmap boutiqueHouse, keeperArt;
 
+    /** (Economy) Aelwyn at the counter of her wagon, in the villages of the third, fifth... chapters: her eight pictures, one after another, and a mark over her. */
+    private Bitmap elfHouse, elfArt;
+    private boolean elfTried;
+
+    private void loadElf() {
+        if (elfTried) return;
+        elfTried = true;
+        for (int which = 0; which < 2; which++) {
+            try (java.io.InputStream in = context.getAssets().open(which == 0 ? "runart/elf_idle.webp" : "runart/elf_stall.webp")) {
+                if (which == 0) elfArt = BitmapFactory.decodeStream(in);
+                else elfHouse = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException missing) {
+                // (Without the pack she is not drawn.)
+            }
+        }
+    }
+
+    /** (Economy) A signpost in a village: a post and a board, and a mark over it; read, it says a line of the village's lore. */
+    private void drawSign(Canvas canvas, int[] item) {
+        float x = (item[1] + .5f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF7A5230);
+        canvas.drawRect(x - tile * .05f, floor - tile * 1.1f, x + tile * .05f, floor, paint);
+        paint.setColor(0xFFC99A5B);
+        canvas.drawRoundRect(x - tile * .42f, floor - tile * 1.35f, x + tile * .42f, floor - tile * .85f, tile * .08f, tile * .08f, paint);
+        paint.setColor(0xFF5A3A1E);
+        for (int line = 0; line < 3; line++) canvas.drawRect(x - tile * .3f, floor - tile * 1.25f + line * tile * .12f, x + tile * (.3f - line * .08f), floor - tile * 1.2f + line * tile * .12f, paint);
+        paint.setColor(Color.BLACK);
+        mark(canvas, x, floor - tile * 1.75f, "Read", 0xFF8A5A33, false);
+    }
+
+    /** (Economy) What a signpost says: the chapter's village's name and a line of lore. */
+    private void readSign(int chapter) {
+        int which = Math.max(0, Math.min(RunWorldLore.SIGNS.length - 1, chapter));
+        toast(RunLevels.VILLAGES[Math.min(RunLevels.VILLAGES.length - 1, which)], RunWorldLore.SIGNS[which], 0);
+        audio.play("page", .6f);
+    }
+
+    /** (Economy) Paper butterflies over a village: a few, drifting about on their own paths. */
+    private void drawButterflies(Canvas canvas, int from, int row, int span) {
+        paint.setStyle(Paint.Style.FILL);
+        int[] colours = {0xFFFF8FB8, 0xFF6FD0C0, 0xFFFFD25A, 0xFFB79CFF, 0xFFFFA06A, 0xFF8FD0FF};
+        for (int index = 0; index < 6; index++) {
+            float t = clock * (.25f + index * .03f) + index * 1.9f;
+            float bx = from + 3 + ((index * 7.3f + t * 2.2f) % (span - 4)) + (float) Math.sin(t * 3) * .8f;
+            float by = row - 1.4f - (float) Math.abs(Math.sin(t * 1.3f + index)) * 1.3f;
+            float x = (bx - cameraX) * tile, y = (by - cameraY) * tile, flap = .25f + .75f * Math.abs((float) Math.sin(clock * (13 + index) + index));
+            paint.setColor(colours[index]);
+            canvas.drawOval(x - tile * .13f * flap - tile * .02f, y - tile * .09f, x - tile * .02f, y + tile * .05f, paint);
+            canvas.drawOval(x + tile * .02f, y - tile * .09f, x + tile * .13f * flap + tile * .02f, y + tile * .05f, paint);
+            paint.setColor(0xFF3B2F2F);
+            canvas.drawRect(x - tile * .012f, y - tile * .07f, x + tile * .012f, y + tile * .05f, paint);
+        }
+        paint.setColor(Color.BLACK);
+    }
+
+    private void drawElf(Canvas canvas, int[] item) {
+        loadElf();
+        float x = (item[1] + 1.6f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .12f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF2F7F76);
+        canvas.drawRect(x - tile * 1.3f, feet - tile * .5f, x + tile * 1.3f, floor, paint);
+        paint.setColor(0xFFF2E3C2);
+        canvas.drawRect(x - tile * 1.35f, feet - tile * .55f, x + tile * 1.35f, feet - tile * .43f, paint);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        if (elfArt != null) cell(canvas, elfArt, RunMerchants.frameAt(clock), 8, x, feet - tile * .5f, tile * 1.75f, false);
+        mark(canvas, x, feet - tile * 2.45f, "Shop", 0xFF2F8F7A, false);
+    }
+
     /** Tulle at her counter, in the boutique of a village: her six pictures, one after another (she never moves between them), and a mark over her. */
     private void drawKeeper(Canvas canvas, int[] item) {
         float x = (item[1] + 1.6f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .12f;
@@ -1966,6 +2049,117 @@ final class RunGame {
             return true;
         }
         return false;
+    }
+
+    /**
+     * The stone and boards of the little rooms behind doors (a wine cellar, a map room, a vault, a clock tower, the homes and shops of a
+     * village): a sheet of eight squares in the runart pack, each material a lit top and what lies under it. Brick, planks, cut slabs, cracked rock.
+     */
+    private Bitmap lookTiles;
+    private boolean lookTilesTried;
+    private static final int BRICK_TILES = 0, PLANK_TILES = 1, SLAB_TILES = 2, CRACKED_TILES = 3;
+    /** Which material each look is built of; a room with no look of its own (a range, a trample) is plain cracked rock. */
+    private static final int[] LOOK_STUFF = {BRICK_TILES, PLANK_TILES, SLAB_TILES, PLANK_TILES, SLAB_TILES, PLANK_TILES, CRACKED_TILES, BRICK_TILES,
+            PLANK_TILES, BRICK_TILES, PLANK_TILES, SLAB_TILES, CRACKED_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES};
+    /** How each look dyes its stone: lit where it is stood on or stands inside the room, dim in the walls round it (made once). */
+    private android.graphics.ColorFilter[] lookLit, lookDim;
+    private android.graphics.LinearGradient sideShade;
+    private final android.graphics.Matrix sideMatrix = new android.graphics.Matrix();
+
+    private boolean lookTilesReady() {
+        if (lookTiles == null) {
+            if (lookTilesTried) return false;
+            lookTilesTried = true;
+            try (java.io.InputStream in = context.getAssets().open("runart/run_look_tiles.webp")) {
+                lookTiles = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                return false;
+            }
+        }
+        return lookTiles != null;
+    }
+
+    private android.graphics.LinearGradient floorShade, lipShade;
+
+    /**
+     * The floor of a building of a village: boards (flagstones in the smithy and the black market) with a lit skirting lip along the walking
+     * line, going right across the screen and down under the buttons, a shadow tucked under the lip and the floor darkening as it comes
+     * toward her, so it reads as ground she stands on and not a ledge. Returns whether it drew it.
+     */
+    private boolean houseFloor(Canvas canvas, int[] in, int first, int last) {
+        int look = look();
+        if (in[0] != RunLevels.HOUSE || look < 0 || look >= LOOK_STUFF.length || !lookTilesReady()) return false;
+        int stuff = look == 11 || look == 12 ? SLAB_TILES : PLANK_TILES;
+        float top = (in[11] - cameraY) * tile;
+        if (top >= height) return true;
+        android.graphics.ColorFilter lit = new android.graphics.PorterDuffColorFilter(mixed(Color.WHITE, LOOK_CAP[look], .3f), android.graphics.PorterDuff.Mode.MULTIPLY);
+        paint.setAlpha(255);
+        paint.setColorFilter(lit);
+        int rows = (int) Math.ceil((height - top) / tile) + 1;
+        for (int column = first; column <= last; column++) {
+            float left = (column - cameraX) * tile;
+            for (int row = 0; row < rows; row++) groundSquare(canvas, lookTiles, stuff * 2 + (row == 0 ? 0 : 1), left, top + row * tile, column, row, row == 0);
+        }
+        paint.setColorFilter(null);
+        // The shade: a shadow tucked under the lip, and the floor deepening toward the bottom of the screen.
+        paint.setStyle(Paint.Style.FILL);
+        if (floorShade == null) floorShade = new android.graphics.LinearGradient(0, 0, 0, 1, 0x00000000, 0x80000000, android.graphics.Shader.TileMode.CLAMP);
+        if (lipShade == null) lipShade = new android.graphics.LinearGradient(0, 0, 0, 1, 0x77000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP);
+        waterMatrix.setScale(1, height - top);
+        waterMatrix.postTranslate(0, top);
+        floorShade.setLocalMatrix(waterMatrix);
+        paint.setShader(floorShade);
+        canvas.drawRect(0, top, width, height + 1, paint);
+        waterMatrix.setScale(1, tile * .4f);
+        waterMatrix.postTranslate(0, top + tile * .2f);
+        lipShade.setLocalMatrix(waterMatrix);
+        paint.setShader(lipShade);
+        canvas.drawRect(0, top + tile * .2f, width, top + tile * .6f, paint);
+        paint.setShader(null);
+        paint.setColor(Color.BLACK);
+        return true;
+    }
+
+    /**
+     * One square of a room behind a door, drawn from its look's stone, boards or brick, with a lit lip on the top of whatever is stood on,
+     * and the sides of a block that stand free darkened a little, so a step reads as a step. Returns whether it drew it.
+     */
+    private boolean lookSquare(Canvas canvas, int column, int row, float left, float y, boolean capped) {
+        if (!lookTilesReady()) return false;
+        int look = look(), kinds = LOOK_STUFF.length;
+        int[] in = run.level().rooms.get(run.room());
+        if (lookLit == null) {
+            lookLit = new android.graphics.ColorFilter[kinds + 1];
+            lookDim = new android.graphics.ColorFilter[kinds + 1];
+            for (int each = 0; each <= kinds; each++) {
+                int cap = each == kinds ? 0xFF8A5F3E : LOOK_CAP[each], wall = each == kinds ? 0xFF2A1D1A : LOOK_WALL[each];
+                lookLit[each] = new android.graphics.PorterDuffColorFilter(mixed(Color.WHITE, cap, .38f), android.graphics.PorterDuff.Mode.MULTIPLY);
+                lookDim[each] = new android.graphics.PorterDuffColorFilter(mixed(Color.WHITE, wall, .62f), android.graphics.PorterDuff.Mode.MULTIPLY);
+            }
+        }
+        int slot = look < 0 || look >= kinds ? kinds : look;
+        int stuff = slot == kinds ? CRACKED_TILES : LOOK_STUFF[slot];
+        boolean within = look >= 0 && row >= in[12] && row < in[11] && column >= in[3] && column <= in[4];
+        // In a building of a village, its floor is laid in one piece from the walking line to the bottom of the screen (houseFloor).
+        if (in[0] == RunLevels.HOUSE && look >= 0 && row >= in[11]) return true;
+        paint.setColorFilter(capped || within ? lookLit[slot] : lookDim[slot]);
+        groundSquare(canvas, lookTiles, stuff * 2 + (capped ? 0 : 1), left, y, column, row, capped);
+        paint.setColorFilter(null);
+        // The side of a block that stands with air beside it: a soft shade going in from its edge.
+        for (int side = 0; side < 2; side++) {
+            if (run.shown(column + (side == 0 ? -1 : 1), row) == RunLevels.BLOCK) continue;
+            if (sideShade == null) sideShade = new android.graphics.LinearGradient(0, 0, 1, 0, 0x66000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP);
+            sideMatrix.setScale(side == 0 ? tile * .3f : -tile * .3f, 1);
+            sideMatrix.postTranslate(side == 0 ? left : left + tile, 0);
+            sideShade.setLocalMatrix(sideMatrix);
+            int was = paint.getAlpha();
+            paint.setShader(sideShade);
+            paint.setAlpha(was);
+            canvas.drawRect(side == 0 ? left : left + tile * .7f, y, side == 0 ? left + tile * .3f : left + tile + 1, y + tile + 1, paint);
+            paint.setShader(null);
+            paint.setAlpha(was);
+        }
+        return true;
     }
 
     /** A place's own picture behind it, where it has one: under the sea for a lagoon, a basement for a hideout. Returns whether it drew one. */
@@ -2898,6 +3092,16 @@ final class RunGame {
 
     /** One of the pictures in the sheet, as a square of a size about a place. */
     void drawIcon(Canvas canvas, int index, float x, float y, float size) {
+        // (Economy: curios and the named weapons have a sheet of their own, in the runart pack.)
+        if (RunEconomyArt.extra(index)) {
+            android.graphics.Bitmap extra = RunEconomyArt.sheet(context, index);
+            if (extra != null) {
+                RunEconomyArt.source(index, source);
+                target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+                canvas.drawBitmap(extra, source, target, paint);
+            }
+            return;
+        }
         if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
         int column = index % LOOT_COLUMNS, row = index / LOOT_COLUMNS;
         source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
@@ -4360,6 +4564,7 @@ final class RunGame {
         boolean reshaped = shelf != null && !shelf.closed() && (width != this.width || height != this.height);
         if (reshaped) shelf.close();
         if (boutique != null && !boutique.closed() && (width != this.width || height != this.height)) boutique.close();
+        if (merchants != null && !merchants.closed() && (width != this.width || height != this.height)) merchants.close();
         this.width = width;
         this.height = height;
         safe.set(insets);
@@ -4385,38 +4590,43 @@ final class RunGame {
         // (On a screen wider than it is tall, the width is used: its chapters side by side, each in rows of its own, the lands as large as fit.)
         float room = safe.height() - dp(92) - dp(150) - dp(44);
         for (int volume = 0; volume < 3; volume++) mapPerRow[volume] = eachOf(volume);
-        mapShort = safe.width() > safe.height() * 1.15f && safe.height() < dp(460);
+        mapWide = safe.width() > safe.height() * 1.15f;
+        mapShort = mapWide && safe.height() < dp(460);
         float mapTop = mapShort ? dp(94) : dp(136);
-        for (int volume = 0; volume < 3 && safe.width() > safe.height() * 1.15f; volume++) {
+        // The window the lands are seen through, on its side: from under the tabs to over the button that goes on, which is pinned at the foot.
+        mapBottomRow = mapShort ? dp(50) : dp(66);
+        mapWindow.set(safe.left, safe.top + mapTop, safe.right, safe.bottom - dp(16) - mapBottomRow - dp(8));
+        for (int volume = 0; volume < 3 && mapWide; volume++) {
+            // On its side the chapters are one under another, as long as the page needs, and the lands are as large as the width lets them be:
+            // about a quarter of the screen's height (but never under seventy-two across), and a chapter that is too many for one row is in two.
             int each = eachOf(volume), from = firstOf(volume), chapters = (lastOf(volume) - from) / each;
-            float gap = dp(7), colGap = dp(22), label = dp(24), bandGap = dp(10), roomH = safe.height() - mapTop - dp(74), availW = safe.width() - dp(36);
-            float best = 0;
-            int bestCols = 1, bestPer = each;
-            for (int cols = 1; cols <= chapters; cols++) {
-                for (int per : new int[]{each, (each + 1) / 2, (each + 2) / 3}) {
-                    int rows = (each + per - 1) / per, bands = (chapters + cols - 1) / cols;
-                    float colW = (availW - colGap * (cols - 1)) / cols;
-                    if (colW < dp(110)) continue;
-                    float side = Math.min(dp(84), Math.min((colW - gap * (per - 1)) / per, (roomH / bands - label - bandGap - gap * (rows - 1)) / rows));
-                    if (side > best + dp(1)) {
-                        best = side;
-                        bestCols = cols;
-                        bestPer = per;
-                    }
+            float gap = dp(9), label = dp(30), bandGap = dp(14), availW = safe.width() - dp(36);
+            float want = Math.min(dp(120), Math.max(dp(72), safe.height() * .26f));
+            int per = each;
+            float fit = (availW - gap * (per - 1)) / per;
+            if (fit < want * .9f && each > 3) {
+                int fewer = (each + 1) / 2;
+                float fitFewer = (availW - gap * (fewer - 1)) / fewer;
+                if (fitFewer > fit) {
+                    per = fewer;
+                    fit = fitFewer;
                 }
             }
-            float side = Math.max(dp(22), best);
-            int cols = bestCols, per = bestPer, rows = (each + per - 1) / per;
+            float side = Math.max(dp(22), Math.min(want, fit));
+            int rows = (each + per - 1) / per;
             mapPerRow[volume] = per;
-            float blockW = per * side + gap * (per - 1), blockH = label + rows * side + gap * (rows - 1) + bandGap;
-            float left = safe.centerX() - (cols * blockW + colGap * (cols - 1)) / 2, top = safe.top + mapTop;
+            float blockW = per * side + gap * (per - 1), bandH = label + rows * side + gap * (rows - 1) + bandGap;
+            float left = safe.centerX() - blockW / 2, top = mapWindow.top + dp(4);
             for (int index = 0; index < lastOf(volume) - from; index++) {
-                int chapter = index / each, at = index % each, col = chapter % cols, band = chapter / cols;
-                float x = left + col * (blockW + colGap) + at % per * (side + gap), down = top + band * blockH + label + at / per * (side + gap);
+                int chapter = index / each, at = index % each;
+                float x = left + at % per * (side + gap), down = top + chapter * bandH + label + at / per * (side + gap);
                 lands[from + index].set(x, down, x + side, down + side);
             }
+            mapBand[volume] = bandH;
+            mapLong[volume] = Math.max(0, chapters * bandH - bandGap + dp(8) - mapWindow.height());
         }
-        for (int volume = 0; volume < 3 && safe.width() <= safe.height() * 1.15f; volume++) {
+        for (int volume = 0; volume < 3 && !mapWide; volume++) {
+            mapLong[volume] = 0;
             int each = eachOf(volume), from = firstOf(volume);
             float gap = volume == 0 ? dp(8) : dp(5);
             float side = Math.max(dp(22), Math.min(dp(54), Math.min((safe.width() - dp(28) - gap * (each - 1)) / each, room / RunLevels.CHAPTERS - dp(34))));
@@ -4426,6 +4636,7 @@ final class RunGame {
                 lands[from + index].set(x, down, x + side, down + side);
             }
         }
+        for (int index = 0; index < lands.length; index++) landBase[index].set(lands[index]);
         // (The tabs leave room at the end of their row for the buttons that open her skill tree and her backpack.)
         float tab = Math.min(dp(132), (safe.width() - dp(44) - dp(84) - dp(52)) / 2);
         tabs[0].set(safe.left + dp(18), safe.top + dp(80), safe.left + dp(18) + tab, safe.top + dp(114));
@@ -4507,27 +4718,138 @@ final class RunGame {
         int from = firstOf(volume), last = lastOf(volume) - 1;
         float lowest = 0, leftmost = Float.MAX_VALUE, rightmost = 0;
         for (int index = from; index <= last; index++) {
-            lowest = Math.max(lowest, lands[index].bottom);
-            leftmost = Math.min(leftmost, lands[index].left);
-            rightmost = Math.max(rightmost, lands[index].right);
+            lowest = Math.max(lowest, landBase[index].bottom);
+            leftmost = Math.min(leftmost, landBase[index].left);
+            rightmost = Math.max(rightmost, landBase[index].right);
         }
+        // The page opens on the chapter she has got to: its name at the top if it fits with its lands, and if not, so that her land is in view.
+        mapScroll = 0;
+        mapFling = 0;
+        int reached = open();
+        if (mapWide && mapLong[volume] > 0 && reached > from && reached <= last + 1) {
+            int each = eachOf(volume);
+            float chapterTop = landBase[from + (reached - 1 - from) / each * each].top - dp(30) - mapWindow.top - dp(4);
+            float landEnd = landBase[reached - 1].bottom + dp(10) - mapWindow.bottom;
+            mapScroll = Math.max(chapterTop, landEnd);
+        }
+        scrollMap(0);
         float under = lowest + dp(16);
-        // (In landscape, clear of the way into the gallery at the foot on the right.)
-        if (safe.width() > safe.height() * 1.15f) rightmost = Math.min(rightmost, safe.right - dp(14) - dp(66) - dp(12));
-        goButton.set(leftmost, under, rightmost, under + dp(48));
+        if (!mapWide) {
+            goButton.set(leftmost, under, rightmost, under + dp(48));
+        } else {
+            // On its side the button that goes on is pinned at the foot, in a row with the way into the gallery on the right; as wide as
+            // the lands, but not more than a thumb has any use for, and clear of the gallery.
+            float foot = safe.bottom - dp(16), across = Math.min(dp(66), mapBottomRow);
+            cringeButton.set(safe.right - dp(14) - across, foot - mapBottomRow, safe.right - dp(14), foot);
+            float wide = Math.min(rightmost - leftmost, dp(460)), middle = (leftmost + rightmost) / 2;
+            float right = Math.min(middle + wide / 2, cringeButton.left - dp(12));
+            goButton.set(right - wide, foot - dp(48), right, foot);
+        }
         text.setTextSize(dp(26));
         float from0 = safe.left + dp(18) + text.measureText("Plus run") + dp(12), to = soundButton.left - dp(8);
         shopButton.set(Math.max(from0, to - dp(160)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
         // The way into the gallery: her cringing face with its name under it, at the foot of the map on the right, across from her
         // and clear of what she says. Where there is little room under the lands it is smaller, and loses its name before its face.
-        float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
-        float across = Math.min(dp(66), tall);
-        cringeButton.set(safe.right - dp(14) - across, foot - tall, safe.right - dp(14), foot);
+        if (!mapWide) {
+            float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
+            float across = Math.min(dp(66), tall);
+            cringeButton.set(safe.right - dp(14) - across, foot - tall, safe.right - dp(14), foot);
+        }
+    }
+
+    /** How long the map's page is, past what shows: nothing, unless the screen is on its side and its lands are more than the window holds. */
+    private float mapLength() { return mapWide ? mapLong[page] : 0; }
+
+    /** The page is scrolled by this much more (down is positive), and no further than its ends; the lands go where that puts them. */
+    private void scrollMap(float by) {
+        mapScroll = Math.max(0, Math.min(mapLength(), mapScroll + by));
+        for (int index = firstOf(page); index < lastOf(page); index++) lands[index].set(landBase[index]);
+        for (int index = firstOf(page); index < lastOf(page); index++) lands[index].offset(0, -mapScroll);
+    }
+
+    /** Whether a point is on the lands' window, where a drag turns the page: a land can be touched only there. */
+    private boolean onMapWindow(float x, float y) { return mapWide && mapWindow.contains(x, y); }
+
+    /**
+     * A touch on the map's page, when it is scrolled. It may be the start of a drag, so nothing is started by it going down: a land is
+     * chosen when the finger comes up, if it has not moved more than a thumb's slop, and a page that was still sliding is only stopped.
+     * Whether the touch was the page's.
+     */
+    private boolean mapTouch(MotionEvent event) {
+        int action = event.getActionMasked();
+        float x = event.getX(), y = event.getY();
+        if (action == MotionEvent.ACTION_DOWN) {
+            mapPressed = onMapWindow(x, y);
+            if (!mapPressed) return false;
+            mapCaught = mapFling != 0;
+            mapFling = 0;
+            mapDragging = false;
+            mapDownX = x;
+            mapDownY = y;
+            mapDownScroll = mapScroll;
+            mapLastY = y;
+            mapLastAt = event.getEventTime();
+            mapSpeed = 0;
+            return true;
+        }
+        if (!mapPressed) return false;
+        if (action == MotionEvent.ACTION_MOVE) {
+            if (!mapDragging && Math.abs(y - mapDownY) > dp(10)) mapDragging = true;
+            if (mapDragging) {
+                scrollMap(mapDownScroll + (mapDownY - y) - mapScroll);
+                long now = event.getEventTime();
+                if (now > mapLastAt) {
+                    // (How fast the finger is going, blended with how fast it went, so that a flick is one smooth speed.)
+                    float speed = (mapLastY - y) * 1000f / (now - mapLastAt);
+                    mapSpeed = mapSpeed * .6f + speed * .4f;
+                    mapLastY = y;
+                    mapLastAt = now;
+                }
+            }
+            return true;
+        }
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            mapPressed = false;
+            if (action == MotionEvent.ACTION_UP && !mapDragging) {
+                if (!mapCaught) pickLand(mapDownX, mapDownY);
+            } else if (mapDragging && action == MotionEvent.ACTION_UP && event.getEventTime() - mapLastAt < 90 && Math.abs(mapSpeed) > dp(120)) {
+                mapFling = Math.max(-dp(6000), Math.min(dp(6000), mapSpeed));
+            }
+            mapDragging = false;
+            return true;
+        }
+        return true;
+    }
+
+    /** A land chosen on the map: played, or, from a gate, warped to; nothing if it is not open yet. */
+    private void pickLand(float x, float y) {
+        for (int index = firstOf(page); index < lastOf(page); index++) {
+            if (!lands[index].contains(x, y) || index + 1 > open()) continue;
+            if (warping) {
+                buzz(false);
+                warpTo(index + 1);
+            } else {
+                audio.play("tap", .5f);
+                buzz(false);
+                play(index + 1);
+            }
+            return;
+        }
+    }
+
+    /** The page, let go while sliding, slows as it goes and stops at its ends. */
+    private void slideMap(float seconds) {
+        if (mapFling == 0) return;
+        float before = mapScroll;
+        scrollMap(mapFling * seconds);
+        mapFling *= (float) Math.exp(-3.4f * seconds);
+        if (Math.abs(mapFling) < dp(14) || mapScroll == before) mapFling = 0;
     }
 
     void close() {
         if (shelf != null) shelf.close();
         if (boutique != null) boutique.close();
+        if (merchants != null) merchants.close();
         audio.close();
     }
 
@@ -4537,6 +4859,7 @@ final class RunGame {
         if (video != null) video.skip();
         if (shelf != null) shelf.close();
         if (boutique != null) boutique.close();
+        if (merchants != null) merchants.close();
         if (screen == PLAY) pause();
         audio.hush();
     }
@@ -4546,6 +4869,11 @@ final class RunGame {
         // A clip being watched is what Back ends, as a tap does.
         if (video != null) {
             video.skip();
+            return true;
+        }
+        // Aelwyn's wagon: Back is out of it, to her counter.
+        if (merchants != null && !merchants.closed()) {
+            merchants.close();
             return true;
         }
         // The boutique: Back is out of it, to the counter.
@@ -4628,6 +4956,7 @@ final class RunGame {
         delve = -1;
         audio.hush();
         screen = MAP;
+        turnTo(page);
         session.refresh();
         news();
     }
@@ -5623,6 +5952,7 @@ final class RunGame {
         for (int sort : RunLevels.townOf(number)) {
             if (sort == RunLevels.GACHA) words.append(", ribbon gacha");
             if (sort == RunLevels.BOUTIQUE) words.append(", Tulle and Thread");
+            if (sort == RunLevels.ELF) words.append(", Aelwyn's wagon");
             if (sort == RunLevels.MARKET) words.append(", black market");
         }
         return words.append(" · the arch is a portal").toString();
@@ -7385,6 +7715,7 @@ final class RunGame {
 
     void advance(float seconds) {
         clock += seconds;
+        if (screen == MAP) slideMap(seconds);
         sayNews(seconds);
         if (captionLeft > 0) captionLeft -= seconds;
         if (refused > 0) refused -= seconds;
@@ -8589,7 +8920,7 @@ final class RunGame {
                 if (kind == RunLevels.HOUSE) {
                     int sort = here.rooms.get(in)[14], owner = RunLevels.ownerOf(here.rooms.get(in));
                     if (owner >= 0) toast(RunStory.NAMES[OWNER_NAME + owner] + "'s home", RunStory.NAMES[OWNER_NAME + owner] + " is in. Something here is dear to her: walk up to it", 0);
-                    else toast(sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
+                    else toast(sort == RunLevels.ELF ? "Aelwyn's Wagon" : sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.ELF ? "Curios to buy, and junk and curios to sell" : sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
                             : sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
                             : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
                             : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
@@ -8681,6 +9012,15 @@ final class RunGame {
         // Things to keep, picked up: into her bag, and named in a card in the colour of what they are.
         while (seenFound < run.found().size()) {
             int code = run.found().get(seenFound++);
+            // (Economy: a curio goes to her curios, not her bag.)
+            if (RunArtifacts.is(code)) {
+                RunArtifacts.add(session, RunArtifacts.idOf(code), 1);
+                int curio = RunArtifacts.rarity(RunArtifacts.idOf(code));
+                toast(RunLoot.RARITIES[curio] + " curio: " + RunArtifacts.name(RunArtifacts.idOf(code)), RunArtifacts.flavour(RunArtifacts.idOf(code)) + "  ·  worth " + RunArtifacts.value(RunArtifacts.idOf(code)), LOOT_PICTURE + code);
+                toastRarity = curio >= RunLoot.GOLD ? 2 : curio >= RunLoot.BLUE ? 1 : 0;
+                audio.play(curio >= RunLoot.GOLD ? "unlock" : "tap", 1);
+                continue;
+            }
             session.keepNote("run_bag", RunLoot.note(RunLoot.add(RunLoot.bag(session.note("run_bag")), code)));
             int rarity = RunLoot.rarity(code);
             toast(RunLoot.RARITIES[rarity] + ": " + RunLoot.name(code), "In her bag  ·  " + RunLoot.TYPES[RunLoot.type(code)]
@@ -8700,6 +9040,7 @@ final class RunGame {
             audio.play("page", .8f);
             buzz(false);
         }
+        passiveProcs();
         // A loose floorboard comes up: what was under it is there.
         if (run.lifted() != seenLifted) {
             seenLifted = run.lifted();
@@ -9194,6 +9535,10 @@ final class RunGame {
                 audio.play("tap", .5f);
                 buzz(false);
                 idle();
+                if (what >= PlusRun.SIGN) {
+                    readSign(what - PlusRun.SIGN);
+                    return;
+                }
                 if (what == PlusRun.BOARD) {
                     openHunts();
                     return;
@@ -9208,6 +9553,10 @@ final class RunGame {
                 }
                 if (what == PlusRun.BOUTIQUE) {
                     openBoutique(0);
+                    return;
+                }
+                if (what == PlusRun.ELF) {
+                    openElf(false);
                     return;
                 }
                 // (A dungeon's stairway, or the mirror, before the smiths: its number is past theirs.)
@@ -9302,6 +9651,8 @@ final class RunGame {
             shopTouch(action, x, y);
             return;
         }
+        // The map on its side is a page to scroll: its lands are chosen as the finger comes up, not as it goes down.
+        if (screen == MAP && mapWide && mapTouch(event)) return;
         if (action != MotionEvent.ACTION_DOWN) return;
         if (screen == STORY) {
             // A touch turns the page.
@@ -9320,7 +9671,7 @@ final class RunGame {
                 turnTo(tabOf(0).contains(x, y) ? 0 : tabOf(1).contains(x, y) ? 1 : 2);
             } else {
                 for (int index = firstOf(page); index < lastOf(page); index++) {
-                    if (lands[index].contains(x, y) && index + 1 <= open()) {
+                    if (lands[index].contains(x, y) && !mapWide && index + 1 <= open()) {
                         buzz(false);
                         warpTo(index + 1);
                         return;
@@ -9363,7 +9714,7 @@ final class RunGame {
             } else {
                 int first = firstOf(page), last = lastOf(page);
                 for (int index = first; index < last; index++) {
-                    if (lands[index].contains(x, y) && index + 1 <= open()) {
+                    if (lands[index].contains(x, y) && !mapWide && index + 1 <= open()) {
                         audio.play("tap", .5f);
                         buzz(false);
                         play(index + 1);
@@ -9747,6 +10098,20 @@ final class RunGame {
      * is Back, which the stage gives as Back. Whether the key was one of the game's.
      */
     boolean key(int keyCode, boolean down) {
+        // On the map, on its side, the arrows (and W and S) and Page Up and Page Down scroll the page, Home and End take it to its ends.
+        if (screen == MAP && mapLength() > 0 && !treeOpen && !packOpen && !bagOpen && !huntsOpen && !smithOpen && !marketOpen && !fanOpen) {
+            int way = keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN || keyCode == android.view.KeyEvent.KEYCODE_S ? 1
+                    : keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP || keyCode == android.view.KeyEvent.KEYCODE_W ? -1
+                    : keyCode == android.view.KeyEvent.KEYCODE_PAGE_DOWN ? 3 : keyCode == android.view.KeyEvent.KEYCODE_PAGE_UP ? -3
+                    : keyCode == android.view.KeyEvent.KEYCODE_MOVE_END ? 99 : keyCode == android.view.KeyEvent.KEYCODE_MOVE_HOME ? -99 : 0;
+            if (way != 0) {
+                if (down) {
+                    mapFling = 0;
+                    scrollMap(way * mapWindow.height() / 3);
+                }
+                return true;
+            }
+        }
         int does = RunKeys.of(keyCode);
         if (does == 0 || does == RunKeys.BACK) return false;
         int fresh = keys.press(keyCode, down);
@@ -9804,10 +10169,12 @@ final class RunGame {
             int what = run.spot();
             audio.play("tap", .5f);
             idle();
-            if (what == PlusRun.BOARD) openHunts();
+            if (what >= PlusRun.SIGN) readSign(what - PlusRun.SIGN);
+            else if (what == PlusRun.BOARD) openHunts();
             else if (what == PlusRun.MACHINE) crank();
             else if (what == PlusRun.DEALER) openMarket();
             else if (what == PlusRun.BOUTIQUE) openBoutique(0);
+            else if (what == PlusRun.ELF) openElf(false);
             else if (what == PlusRun.STAIRS) openStairs();
             else if (keepsake(what)) lookAtKeepsake(what - PlusRun.KEEPSAKE);
             else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
@@ -9845,6 +10212,12 @@ final class RunGame {
         }
         if (packOpen && turned != 0) {
             inventory.wheel(turned);
+            return true;
+        }
+        // On the map, on its side, the wheel scrolls the page.
+        if (screen == MAP && mapLength() > 0 && turned != 0 && !bagOpen && !huntsOpen && !smithOpen && !marketOpen && !fanOpen) {
+            mapFling = 0;
+            scrollMap(-turned * dp(72));
             return true;
         }
         return false;
@@ -9994,7 +10367,8 @@ final class RunGame {
                         int what = run.spot();
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
-                        if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
+                        if (what >= PlusRun.SIGN) artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
+                        else if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
                         else if (what == PlusRun.BOARD) pieceIn(canvas, four, SCROLL_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else if (what == PlusRun.MACHINE) pieceIn(canvas, two, RIBBON_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else if (what == PlusRun.SMITH) thing(canvas, PlusRun.SWORD, stallButton.centerX(), stallButton.centerY() - dp(6), stallButton.height() * .5f, 35, false, false);
@@ -10003,8 +10377,8 @@ final class RunGame {
                         else if (what == PlusRun.STAIRS) stairsIn(canvas, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .52f);
                         else if (keepsake(what) && keepsakes() != null) cell(canvas, keepsakes(), what - PlusRun.KEEPSAKE, RunLevels.OWNERS, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .1f, stallButton.height() * .5f, false);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
-                        label(canvas, stallButton, what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                        label(canvas, stallButton, what >= PlusRun.SIGN ? "Read" : what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.ELF ? "Shop" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -10797,11 +11171,21 @@ final class RunGame {
     // Her inventory (her backpack and her bag as one): see RunInventory and RunInventoryUi
 
     /** Her inventory is opened: from a land, where the land waits; from the pause; or from the map. */
-    private void openPack(int from) {
+    /** (Economy) Pluses into her bank (what a sale brings), what she has to spend in words, and her pack opened at a merchant, to sell. */
+    void bankAdd(int pluses) { session.keep("run_bank", bank() + pluses); }
+
+    String purseWords() { return "She has + " + bank(); }
+
+    /** (Economy) Whether she stands at a merchant's counter (Aelwyn's): the inventory she opens from the pause card then has the Sell buttons. */
+    private boolean atMerchant() { return run != null && run.spot() == PlusRun.ELF; }
+
+    private void openPack(int from) { openPack(from, atMerchant()); }
+
+    private void openPack(int from, boolean sell) {
         packOpen = true;
         packFrom = from;
         swapFinger = -1;
-        inventory.open(from != MAP && run != null);
+        inventory.open(from != MAP && run != null, sell);
         goLeft = goRight = goJump = goStrike = false;
         jumpPressed = strikePressed = false;
         audio.play("page", .6f);
@@ -11375,12 +11759,16 @@ final class RunGame {
         // In a place off the land nothing is drawn beyond its walls: whatever else lies beyond the end of the land is not there to be seen.
         if (run.room() >= 0) {
             int[] in = level.rooms.get(run.room());
-            canvas.clipRect((in[3] - 2 - cameraX) * tile, (in[12] - 2 - cameraY) * tile, (in[4] + 3 - cameraX) * tile, (in[11] + 3 - cameraY) * tile);
+            // (A building's floor goes on down to the bottom of the screen, under the buttons.)
+            boolean building = in[0] == RunLevels.HOUSE && look() >= 0;
+            canvas.clipRect(building ? 0 : (in[3] - 2 - cameraX) * tile, (in[12] - 2 - cameraY) * tile, building ? width : (in[4] + 3 - cameraX) * tile,
+                    building ? height : (in[11] + 3 - cameraY) * tile);
         }
         // The ground jumps when something heavy comes down on it.
         if (shake > 0) canvas.translate((random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4), (random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4));
         paint.setAlpha(255);
         // What stands in its villages, behind everything else.
+        if (level.town > 0 && !level.decor.isEmpty()) drawButterflies(canvas, level.town, level.decor.get(0)[2], RunLevels.townWide(RunLevels.townOf(level.number).length));
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
             // Over a hundred, it is something of the fourth sheet: a chest in a stash.
@@ -11388,7 +11776,11 @@ final class RunGame {
                 drawVillagePiece(canvas, decor, level);
                 continue;
             }
-            if (decor[0] == 307) {
+            if (decor[0] == 308) {
+                // (Aelwyn's wagon: a picture of its own, in the runart pack.)
+                loadElf();
+                if (elfHouse != null) cell(canvas, elfHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else if (decor[0] == 307) {
                 // (The vanity boutique: a picture of its own.)
                 if (boutiqueHouse == null) boutiqueHouse = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_vanity_shop);
                 cell(canvas, boutiqueHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
@@ -11446,6 +11838,10 @@ final class RunGame {
                 }
                 if (here == RunLevels.AIR) continue;
                 if (here == RunLevels.BLOCK && underSquare(canvas, column, row, left, y)) continue;
+                if (here == RunLevels.BLOCK && run.room() >= 0 && lookSquare(canvas, column, row, left, y, run.shown(column, row - 1) != RunLevels.BLOCK)) {
+                    paint.setColor(Color.BLACK);
+                    continue;
+                }
                 if (here == RunLevels.BLOCK && run.room() >= 0) {
                     // In a place off the land, its walls are dark, of the colour of the place, with a lighter board where they are stood on.
                     boolean capped = run.shown(column, row - 1) != RunLevels.BLOCK;
@@ -11588,6 +11984,7 @@ final class RunGame {
                 }
             }
         }
+        if (run.room() >= 0) houseFloor(canvas, level.rooms.get(run.room()), first, last);
         // Under the land it is darker: the caves and the rock round them.
         if (run.room() < 0 && level.under != null && (RunLevels.ROWS - cameraY) * tile < height) {
             paint.setStyle(Paint.Style.FILL);
@@ -11603,8 +12000,11 @@ final class RunGame {
             if (look >= 0) canvas.drawColor(LOOK_LIGHT[look]);
             paint.setColor(look < 0 ? 0xFF2A1D1A : LOOK_WALL[look]);
             float from = (run.roomFrom() - 1 - cameraX) * tile, to = (run.roomTo() + 2 - cameraX) * tile;
-            if (from > 0) canvas.drawRect(0, 0, from + 1, height, paint);
-            if (to < width) canvas.drawRect(to - 1, 0, width, height, paint);
+            // (A building's floor runs on past its walls: only above the floor is the dark beside it.)
+            int[] in = level.rooms.get(run.room());
+            float stop = in[0] == RunLevels.HOUSE && look >= 0 ? Math.min(height, (in[11] - cameraY) * tile) : height;
+            if (from > 0) canvas.drawRect(0, 0, from + 1, stop, paint);
+            if (to < width) canvas.drawRect(to - 1, 0, width, stop, paint);
             paint.setColor(Color.BLACK);
         }
         // The ledges that move: books lying open on the air.
@@ -11715,8 +12115,10 @@ final class RunGame {
                 continue;
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
-                if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
+                if (item[4] >= PlusRun.SIGN) drawSign(canvas, item);
+                else if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
                 else if (item[4] == PlusRun.BOUTIQUE) drawKeeper(canvas, item);
+                else if (item[4] == PlusRun.ELF) drawElf(canvas, item);
                 else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] == PlusRun.STAIRS) drawStairs(canvas, item);
                 else if (keepsake(item[4])) drawKeepsake(canvas, item);
@@ -12520,6 +12922,10 @@ final class RunGame {
             } else if (sort == RunLevels.SMITHY) {
                 canvas.drawRect(x - round * .5f, y - round * .5f, x + round * .5f, y - round * .1f, paint);
                 canvas.drawRect(x - round * .1f, y - round * .1f, x + round * .1f, y + round * .65f, paint);
+            } else if (sort == RunLevels.ELF) {
+                // (A coin purse, for the elf's wagon.)
+                canvas.drawCircle(x, y + round * .15f, round * .45f, paint);
+                canvas.drawRect(x - round * .2f, y - round * .45f, x + round * .2f, y - round * .1f, paint);
             } else if (sort == RunLevels.BOUTIQUE) {
                 // (A coat hanger, for the boutique.)
                 path.reset();
@@ -13809,7 +14215,43 @@ final class RunGame {
     }
 
     /** Halgakos as she is at this moment of the run, her feet at a place: empty-handed, or carrying what she fights with; tinted by what afflicts her. */
+    /** (Economy) Gear of gold and better shows: a glow about her and sparks, in the look of what she holds or wears; and what a passive does as it goes off. */
+    private float auraAt;
+    private int seenProcs;
+
+    private void gearAura(Canvas canvas, float feetX, float feetY, float tall, boolean leftward) {
+        if (!vfxStarted) {
+            Vfx.init(context);
+            vfxStarted = true;
+        }
+        PlusRun.Perks p = run.perks();
+        int held = RunInventory.itemFor(p, run.weapon());
+        int best = RunWeaponFx.best(held, p.worn.armour, p.worn.first, p.worn.second);
+        if (best < 0) return;
+        RunWeaponFx.Style style = held != 0 && RunWeapons.named(held) && RunLoot.rarity(held) >= RunLoot.GOLD ? RunWeaponFx.of(held) : new RunWeaponFx.Style(Vfx.SPARKLE, best == RunLoot.ROSE ? RunLoot.rose(clock) : RunLoot.COLOURS[best]);
+        float pulse = .5f + .5f * (float) Math.sin(clock * 3.2f);
+        Vfx.glow(canvas, feetX, feetY - tall * .5f, tall * (.5f + .1f * (best - RunLoot.GOLD)), style.colour, RunWeaponFx.glow(best, pulse));
+        if (clock - auraAt > RunWeaponFx.every(best)) {
+            auraAt = clock;
+            float side = leftward ? -1 : 1, across = feetX / tile + cameraX, down = feetY / tile + cameraY;
+            float spread = (random.nextFloat() - .5f) * .9f;
+            vfx(style.effect == Vfx.POISON ? Vfx.SPARKLE : style.effect, across + side * (.35f + spread * .4f), down - tall / tile * (.35f + random.nextFloat() * .45f), .7f + .12f * (best - RunLoot.GOLD), 0, style.colour, 0);
+        }
+    }
+
+    private void passiveProcs() {
+        if (run.passiveProcs() == seenProcs) return;
+        seenProcs = run.passiveProcs();
+        int kind = run.passiveKind();
+        PlusRun.Perks p = run.perks();
+        int rarity = kind == RunWeaponPassives.NOVA ? RunLoot.rarity(p.worn.armour) : RunLoot.rarity(RunInventory.itemFor(p, run.weapon()));
+        int tint = RunWeaponFx.of(RunInventory.itemFor(p, run.weapon())).colour;
+        vfx(RunWeaponFx.procEffect(kind), run.passiveX(), run.passiveY(), RunWeaponFx.procSize(kind) + (rarity >= RunLoot.ROSE ? .6f : 0), kind == RunWeaponPassives.ARC ? random.nextFloat() * 360 : 0, kind == RunWeaponPassives.NOVA ? Vfx.WHITE : tint, 0);
+        audio.play(kind == RunWeaponPassives.BURST || kind == RunWeaponPassives.NOVA ? "unlock" : "star", .5f);
+    }
+
     private void her(Canvas canvas, float feetX, float feetY, float tall, int weapon, boolean leftward, int alpha) {
+        gearAura(canvas, feetX, feetY, tall, leftward);
         android.graphics.ColorFilter tint = run.herBurn() > 0 ? BURNT_TINT : run.herChill() > 0 ? CHILLED_TINT : run.herPoison() > 0 ? POISONED_TINT : null;
         if (tint != null) paint.setColorFilter(tint);
         herDrawn(canvas, feetX, feetY, tall, weapon, leftward, alpha);
@@ -14444,13 +14886,20 @@ final class RunGame {
         canvas.rotate((float) Math.toDegrees(angle));
         canvas.scale(scale, scale);
         canvas.translate(-hx, -hy);
-        if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
-        int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
-        source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        // (Economy: a named weapon's picture is in the weapons' own sheet.)
+        android.graphics.Bitmap sheet = RunEconomyArt.extra(icon) ? RunEconomyArt.sheet(context, icon) : null;
+        if (sheet == null && !RunEconomyArt.extra(icon)) {
+            if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
+            sheet = lootIcons;
+            int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
+            source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        } else if (sheet != null) {
+            RunEconomyArt.source(icon, source);
+        }
         target.set(0, 0, LOOT_ICON, LOOT_ICON);
         int was = paint.getAlpha();
         paint.setAlpha(alpha);
-        canvas.drawBitmap(lootIcons, source, target, paint);
+        if (sheet != null) canvas.drawBitmap(sheet, source, target, paint);
         paint.setAlpha(was);
         canvas.restore();
     }
@@ -15609,6 +16058,11 @@ final class RunGame {
         boolean ready = run.canDash(), held = clock - dashTapped < .15f;
         if (!ready && !held) canvas.saveLayerAlpha(where.left - dp(6), where.top - dp(6), where.right + dp(6), where.bottom + dp(8), 120);
         float round = glass(canvas, where, held, CalculatorLayout.CORAL), reach = round * .26f;
+        // Her own shape, dashing, from the run's pack; the chevrons drawn here only where the pack is not.
+        if (iconOn(canvas, DASH_ICON, where, round, run.facingLeft())) {
+            if (!ready && !held) canvas.restore();
+            return;
+        }
         canvas.save();
         canvas.translate(where.centerX(), where.centerY());
         if (run.facingLeft()) canvas.scale(-1, 1);
@@ -15636,11 +16090,47 @@ final class RunGame {
         if (!ready && !held) canvas.restore();
     }
 
+    /** The pictures on the dash's and the pound's buttons: her shape, white with a dark edge, from the run's pack; and whether each was looked for. */
+    private static final int DASH_ICON = 0, POUND_ICON = 1;
+    private static final String[] ICON_FILES = {"runart/run_icon_dash.webp", "runart/run_icon_pound.webp"};
+    private final Bitmap[] icons = new Bitmap[2];
+    private final boolean[] iconsTried = new boolean[2];
+    private static final android.graphics.ColorFilter ICON_SHADE = new android.graphics.PorterDuffColorFilter(0xFF1A1020, android.graphics.PorterDuff.Mode.SRC_IN);
+
+    /** Draws one of them on its button, turned the way she faces if asked; whether there was one to draw. */
+    private boolean iconOn(Canvas canvas, int which, RectF where, float round, boolean flipped) {
+        if (!iconsTried[which]) {
+            iconsTried[which] = true;
+            icons[which] = runAsset(ICON_FILES[which]);
+        }
+        Bitmap icon = icons[which];
+        if (icon == null) return false;
+        float x = where.centerX(), y = where.centerY(), half = round * .74f;
+        canvas.save();
+        if (flipped) canvas.scale(-1, 1, x, y);
+        // A dark copy of her first, a little lower and spread a touch wider, so the white shape reads over a bright sky as well as a cave.
+        paint.setColorFilter(ICON_SHADE);
+        paint.setAlpha(170);
+        for (int spread = 0; spread < 2; spread++) {
+            float out = dp(1 + spread);
+            box.set(x - half - out, y - half - out + dp(1.5f), x + half + out, y + half + out + dp(1.5f));
+            canvas.drawBitmap(icon, null, box, paint);
+        }
+        paint.setColorFilter(null);
+        box.set(x - half, y - half, x + half, y + half);
+        paint.setAlpha(255);
+        canvas.drawBitmap(icon, null, box, paint);
+        canvas.restore();
+        return true;
+    }
+
     /** The ground pound's button, up while she is in the air: a heavy arrow down onto a line of ground, with cracks going out from it. */
     private void poundControl(Canvas canvas) {
         RectF where = poundButton;
         boolean held = clock - poundTapped < .15f;
         float round = glass(canvas, where, held, 0xFFFF8A3D), reach = round * .34f;
+        // Her own shape, diving down onto the ground; the arrow drawn here only where the pack is not.
+        if (iconOn(canvas, POUND_ICON, where, round, false)) return;
         canvas.save();
         canvas.translate(where.centerX(), where.centerY());
         for (int pass = 0; pass < 2; pass++) {
@@ -16406,6 +16896,7 @@ final class RunGame {
         // Over the lands opened from a gate: which of them have gates she has found, lit; and what choosing does.
         for (int index = firstOf(page); index < lastOf(page); index++) {
             if (starsOf(index + 1) <= 0 || index + 1 >= RunLevels.OPEN_TO) continue;
+            if (mapWide && (lands[index].bottom < mapWindow.top || lands[index].top > mapWindow.bottom)) continue;
             float beat = .5f + .5f * (float) Math.sin(clock * 3 + index * .4f);
             stroke.setColor(0xFF8E6BFF);
             stroke.setAlpha(Math.round(150 + 100 * beat));
@@ -16483,39 +16974,45 @@ final class RunGame {
         }
         int firstShown = firstOf(page), lastShown = lastOf(page);
         int each = eachOf(page);
+        // (On its side the lands are seen through a window, and the page slides under it: nothing of it is drawn over the tabs or the button at the foot.)
+        canvas.save();
+        if (mapWide) canvas.clipRect(mapWindow);
         for (int index = firstShown; index < lastShown; index++) {
             RectF where = lands[index];
+            // (The chapter's name, its levels and the corners of its lands grow with its lands.)
+            float grown = mapWide ? Math.min(1.5f, Math.max(1, where.width() / dp(64))) : 1;
+            float corner = Math.max(dp(13), where.width() * .15f);
+            if (mapWide && (where.bottom < mapWindow.top || where.top - dp(36) > mapWindow.bottom)) continue;
             int land = index + 1, got = starsOf(land);
             if ((index - firstShown) % each == 0) {
                 text.setTextAlign(Paint.Align.LEFT);
                 text.setColor(land <= open ? ink : soft);
-                text.setTextSize(dp(14));
+                text.setTextSize(dp(14) * grown);
                 // (As wide as its row of lands, and no wider: in landscape another chapter stands beside it.)
                 float block = lands[Math.min(lastShown - 1, index + mapPerRow[page] - 1)].right - where.left;
-                text.setTextSize(dp(14));
-                if (text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) > block) text.setTextSize(dp(14) * block / text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]));
-                canvas.drawText(RunStory.CHAPTERS[RunLevels.chapterOf(land)], where.left, where.top - dp(8), text);
+                if (text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) > block) text.setTextSize(dp(14) * grown * block / text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]));
+                canvas.drawText(RunStory.CHAPTERS[RunLevels.chapterOf(land)], where.left, where.top - dp(8) * grown, text);
                 // The levels of its lands: how tough they are.
                 float named = text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]);
                 // (The levels she would be in them, having played her way there: what her level is measured against.)
                 int low = RunLoot.recommended(land), high = RunLoot.recommended(Math.min(RunLevels.TOTAL, land + each - 1));
                 text.setColor(soft);
-                text.setTextSize(dp(11.5f));
+                text.setTextSize(dp(11.5f) * grown);
                 String levels = low == high ? "level " + low : "levels " + low + " to " + high;
-                if (named + dp(26) + text.measureText(levels) <= block) canvas.drawText(levels, where.left + named + dp(26), where.top - dp(8), text);
+                if (named + dp(26) + text.measureText(levels) <= block) canvas.drawText(levels, where.left + named + dp(26), where.top - dp(8) * grown, text);
                 text.setColor(land <= open ? ink : soft);
-                text.setTextSize(dp(14));
+                text.setTextSize(dp(14) * grown);
                 if (session.tally("run_medal_" + RunLevels.chapterOf(land)) != 0) {
                     paint.setAlpha(255);
-                    art(canvas, STAR_ART, where.left + text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) + dp(12), where.top - dp(4), dp(16), false);
+                    art(canvas, STAR_ART, where.left + text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) + dp(12) * grown, where.top - dp(4) * grown - dp(2) * (grown - 1), dp(16) * grown, false);
                 }
             }
             boolean reached = land <= open;
-            plate(canvas, where, dp(13), reached ? 245 : 110);
+            plate(canvas, where, corner, reached ? 245 : 110);
             if (land == open && got == 0) {
                 stroke.setColor(CalculatorLayout.CORAL);
-                stroke.setStrokeWidth(dp(2.5f));
-                canvas.drawRoundRect(where, dp(13), dp(13), stroke);
+                stroke.setStrokeWidth(dp(2.5f) * grown);
+                canvas.drawRoundRect(where, corner, corner, stroke);
             }
             // The lands where someone waits at the end are marked in her colour.
             int boss = RunLevels.bossOf(land);
@@ -16563,6 +17060,18 @@ final class RunGame {
             RectF where = lands[index];
             stairsIn(canvas, where.right - where.width() * .15f, where.top + where.width() * .15f, where.width() * .3f);
             if ((session.tally("run_dungeons") >> dungeon & 1) != 0) artIn(canvas, STAR_ART, where.right - where.width() * .07f, where.top + where.width() * .27f, where.width() * .2f);
+        }
+        canvas.restore();
+        // A thin bar down the side of the window while the page is longer than it, to show where in it she is.
+        if (mapLength() > 0) {
+            float track = mapWindow.height() - dp(16), shown = track * mapWindow.height() / (mapWindow.height() + mapLength());
+            float at = mapWindow.top + dp(8) + (track - shown) * mapScroll / mapLength();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(ink);
+            paint.setAlpha(70);
+            canvas.drawRoundRect(safe.right - dp(8), at, safe.right - dp(5), at + shown, dp(1.5f), dp(1.5f), paint);
+            paint.setAlpha(255);
+            paint.setColor(Color.BLACK);
         }
         // Under the lands, on with the furthest land she has reached: the button a thumb finds first.
         paint.setStyle(Paint.Style.FILL);
@@ -16907,6 +17416,26 @@ final class RunGame {
 
     /** The boutique is laid over the game, with the game's voice and sounds lent to it. */
     private void openBoutique() { openBoutique(0); }
+
+    /** (Economy) Aelwyn's wagon is laid over the game, with the game's voice lent to it; Sell opens the pack in its sell mode. */
+    private RunMerchants merchants;
+
+    private void openElf(boolean sell) {
+        if (merchants != null && !merchants.closed()) return;
+        audio.hush();
+        int[] edges = {Math.round(safe.left), Math.round(safe.top), Math.round(width - safe.right), Math.round(height - safe.bottom)};
+        merchants = RunMerchants.over(stage, session, dark, edges, new RunMerchants.Host() {
+            @Override public void say(String name) { audio.say(name); }
+
+            @Override public boolean speaking() { return audio.speaking(); }
+
+            @Override public void hush() { audio.hush(); }
+
+            @Override public void play(String effect) { audio.play(effect, .5f); }
+
+            @Override public void closed() { }
+        }, Math.max(0, number));
+    }
 
     private void openBoutique(int page) {
         if (boutique != null && !boutique.closed()) return;

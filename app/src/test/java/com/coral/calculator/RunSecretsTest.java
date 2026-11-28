@@ -103,7 +103,7 @@ public class RunSecretsTest {
         int things = 0;
         Set<Integer> types = new HashSet<>();
         for (PlusRun.Drop drop : run.scattered()) {
-            if (drop.code == 0) continue;
+            if (drop.code == 0 || RunArtifacts.is(drop.code)) continue;
             things++;
             types.add(RunLoot.type(drop.code));
             assertTrue(RunLoot.rarity(drop.code) >= RunLoot.GOLD);

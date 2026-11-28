@@ -142,6 +142,10 @@ final class PlusRun {
 
     /** What she has looked at a keepsake for: a chest put down by it, so much in it, the first time. */
     void keepsakeChest(int column, int row, int much) { items.add(new int[]{CHEST, column, row, 0, much}); }
+    /** (Economy) And Aelwyn, the elf merchant, at her wagon's counter in a village: she buys and sells curios. */
+    static final int ELF = 900;
+    /** (Economy) A signpost with a line of a village's lore, to be read: from here up, by the chapter. */
+    static final int SIGN = 1000;
     /**
      * A pot of black ink, which stands in the later lands and throws the black curse: how
      * often, for how long it swells before it does, from how far off it throws, and how
@@ -2753,7 +2757,7 @@ final class PlusRun {
     /** How much of an effect what she wears gives her, with what is in her hands. */
     int gear(int effect) {
         if (effect == RunLoot.DODGE && skillOf(RunSkills.E_IRON) > 0) return 0;
-        int sum = perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect) + (effect == RunLoot.THORNS ? perks.thorns : 0);
+        int sum = perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect) + (effect == RunLoot.THORNS ? perks.thorns : 0) + RunArtifacts.effect(effect) + RunWeapons.effect(RunInventory.itemFor(perks, weapon), effect) + (effect == RunLoot.HASTE ? passive.haste(RunInventory.itemFor(perks, weapon)) : 0);
         return GEAR_MOST[effect] > 0 ? Math.min(GEAR_MOST[effect], sum) : sum;
     }
 
@@ -2772,7 +2776,7 @@ final class PlusRun {
     }
 
     /** Her chance to slip a hurt, before iron reflexes make it defence. */
-    private int dodgeRaw() { return Math.min(GEAR_MOST[RunLoot.DODGE], perks.worn.of(RunLoot.DODGE, RunLoot.classOf(weapon)) + skill(RunLoot.DODGE)); }
+    private int dodgeRaw() { return Math.min(GEAR_MOST[RunLoot.DODGE], perks.worn.of(RunLoot.DODGE, RunLoot.classOf(weapon)) + skill(RunLoot.DODGE) + RunArtifacts.effect(RunLoot.DODGE)); }
 
     /** How much of one of the tree's effects she has now: what is felt whatever she holds, what is felt with what is in her hands, and the actives called on. */
     int skillOf(int effect) { return perks.skills.with(effect, RunSkills.classOfWeapon(weapon)) + activeEffect(effect); }
@@ -3769,6 +3773,12 @@ final class PlusRun {
         }
     }
 
+    /** (Economy: a chest holds a curio about one time in eight, more in a stash or a hideout. Kept out of the step's own method, which must stay small enough for the JIT to compile.) */
+    private void chestCurio() {
+        boolean secret = room >= 0 && (level.rooms.get(room)[0] == RunLevels.STASH || level.rooms.get(room)[0] == RunLevels.HIDEOUT);
+        if (lootRoll(100) < (secret ? 35 : 12) + RunArtifacts.lucky()) found.add(RunArtifacts.found(secret ? RunArtifacts.GREAT : RunArtifacts.CHEST, lootRoll(100), lootRoll(1000)));
+    }
+
     /** Something has fallen: it is let loose where it is, out of anything solid. */
     private void loose(Drop drop) {
         unstick(drop);
@@ -3883,6 +3893,8 @@ final class PlusRun {
                 int code = RunLoot.dropped(RunLoot.WAITS, theme, rarity, typeRoll, lootRoll(10000));
                 loose(new Drop(middle, top, (type - 1) * 2.2f, -9, code));
             }
+            // (Economy: and a curio of the better sort, always, from one who waits.)
+            loose(new Drop(middle, top, 3.4f, -9, RunArtifacts.found(RunArtifacts.GREAT, lootRoll(100), lootRoll(1000))));
             return;
         }
         // (Gold and black ink drop as the hardest do.)
@@ -3892,10 +3904,15 @@ final class PlusRun {
             int code = RunLoot.dropped(boss ? RunLoot.WAITS : hard ? RunLoot.HARDEST : RunLoot.ORDINARY, Math.min(RunLoot.THEMES.length - 1, level.chapter), rarity, lootRoll(10000), lootRoll(10000));
             loose(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, code));
         }
+        // (Economy: now and then a curio, rarely from an ordinary creature, often from a boss; a lucky one carried makes it likelier.)
+        if (lootRoll(10000) < RunArtifacts.creatureChance(boss, landLevel) * (100 + RunArtifacts.lucky()) / 100) {
+            loose(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, RunArtifacts.found(boss ? RunArtifacts.GREAT : RunArtifacts.CREATURE, lootRoll(100), lootRoll(1000))));
+        }
     }
 
     /** What lies about falls, bounces and comes to rest; pluses near her come to her; things to keep are picked up; what has lain long enough is gone. */
     private void scatter(float seconds) {
+        passive.tick(seconds);
         float drawn = gear(RunLoot.MAGNET) / 10f, reach = Math.max(1.4f + drawn, Math.max(perks.reach + drawn, magnet > 0 ? MAGNET_REACH : 0)), herX = x + WIDE / 2, herY = y + TALL / 2;
         for (int index = scattered.size() - 1; index >= 0; index--) {
             Drop drop = scattered.get(index);
@@ -5865,6 +5882,7 @@ final class PlusRun {
         }
     }
 
+    // (Careful: this method is within 70 bytes of the JVM's limit of 8000 bytes of bytecode, past which the JIT never compiles it and a land's whole simulation runs five times slower, which turned a ten-minute test run into an hour. Put new rules in methods of their own and call them.)
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         // Stunned, she can do nothing for a moment.
         if (herStun > 0) left = right = jump = strike = false;
@@ -6273,6 +6291,7 @@ final class PlusRun {
                     chests++;
                     lastChest = item.length > 4 && item[4] > 0 ? item[4] : 10;
                     bonus += lastChest;
+                    chestCurio();
                     if (room >= 0 && level.rooms.get(room)[0] == RunLevels.STASH && (roomsDone & 1 << room) == 0) {
                         roomsDone |= 1 << room;
                         roomWins++;
@@ -6931,6 +6950,32 @@ final class PlusRun {
         with = by;
         beat(foe);
         with = PLAIN;
+        // (Economy: a burst where it landed, or a jump to the next creature, for half the force.)
+        if (!passiveBusy && (passive.burst || passive.arc)) {
+            boolean burst = passive.burst, arc = passive.arc;
+            passive.burst = passive.arc = false;
+            passiveBusy = true;
+            if (burst) blast(foeX, foeY, 1.7f, by);
+            if (arc) {
+                Foe next = null;
+                float best = 4.5f * 4.5f;
+                for (Foe other : foes) {
+                    if (other == foe || other.flat || absent(other) || other.kind == RunLevels.TARGET) continue;
+                    float across = other.x + other.wide() / 2 - foeX, down = other.y + other.tall() / 2 - foeY, far = across * across + down * down;
+                    if (far < best) {
+                        best = far;
+                        next = other;
+                    }
+                }
+                if (next != null) {
+                    float kept = blowScale;
+                    blowScale = .5f;
+                    beat(next, by);
+                    blowScale = kept;
+                }
+            }
+            passiveBusy = false;
+        }
         // Ink splashes where it lands (no more than a few at once).
         if (splashes.size() < 12) splashes.add(new float[]{foe.x + foe.wide() / 2, foe.y + foe.tall() * .5f, 0});
         // A mace's smash, and a hammer's blow worked on to the last step, leave what they hit reeling (not those who wait).
@@ -7021,6 +7066,16 @@ final class PlusRun {
 
     private boolean dashCut;
 
+    /** (Economy) What the named weapon in her hands does as she strikes, and what her armour does when she is hurt: see {@link RunWeaponPassives}. */
+    private final RunWeaponPassives.State passive = new RunWeaponPassives.State();
+    private final java.util.Random passiveDice = new java.util.Random(7);
+    private boolean passiveBusy;
+
+    int passiveProcs() { return passive.procs; }
+    int passiveKind() { return passive.lastProc; }
+    float passiveX() { return passive.procX; }
+    float passiveY() { return passive.procY; }
+
     private void fell(Foe foe, int by) {
         int thing = thingOf(by), way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : thing == UNARMED ? -1 : RunHunts.wayOf(thing);
         fells.add(new int[]{foe.kind, way});
@@ -7071,6 +7126,11 @@ final class PlusRun {
         // (Her tree makes some blows harder: on one nearly beaten, on one not yet hurt, after a rest.)
         boolean hers = thingOf(with) != UNARMED;
         if (!waits && hers) dealt = Math.max(1, Math.round(dealt * (1 + bonus(foe) / 100f)));
+        // (Economy: the named weapon's passive: more blows, or a burst or a jump when this one is done.)
+        if (hers && !passiveBusy) {
+            int held = RunInventory.itemFor(perks, weapon);
+            if (held != 0) dealt += passive.hit(held, dealt, foe.most > 0 ? (float) foe.left / foe.most : 1, foeX, foeY, passiveDice, BLOW);
+        }
         // A shield in the way: a blow too weak rings off it; a strong one takes a piece of it (two, with the tree's shieldbreaking at its
         // strongest), and the last one breaks it.
         if (!waits && atShield(foe)) {
@@ -7129,6 +7189,7 @@ final class PlusRun {
             flattened++;
             fell(foe, with);
             if (hers || with == LANDED || with == PLUNGED) killed();
+            if (hers) passive.kill(RunInventory.itemFor(perks, weapon), foeX, foeY);
             if (RunLevels.flier(foe.kind)) fliers++;
             // A paper target is only hit: two pluses for it. And where signs keep coming, each one dealt with counts, and is a plus.
             if (foe.kind == RunLevels.TARGET) {
@@ -8217,6 +8278,11 @@ final class PlusRun {
             if (!fell) return true;
         } else {
             hurts++;
+            if (!fell && passive.hurt(perks.worn.armour, x + WIDE / 2, y + TALL / 2) && !passiveBusy) {
+                passiveBusy = true;
+                blast(x + WIDE / 2, y + TALL / 2, 2.6f, SURE);
+                passiveBusy = false;
+            }
             if (room >= 0 && wave > 0) arenaHurts++;
             // A letter that has been through a hurt is not one to hand over.
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();

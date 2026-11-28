@@ -24,8 +24,8 @@ final class RunInventory {
     static final int PLAIN = 1 << 20;
     static final int MAIN = 0, SECOND = 1, ARMOUR = 2, FIRST = 3, LAST = 4, SLOTS = 5;
     /** What the grid shows. */
-    static final int ALL = 0, WEAPONS = 1, ARMOURS = 2, ACCESSORIES = 3;
-    static final String[] TABS = {"All", "Weapons", "Armour", "Accessories"};
+    static final int ALL = 0, WEAPONS = 1, ARMOURS = 2, ACCESSORIES = 3, CURIOS = 4;
+    static final String[] TABS = {"All", "Weapons", "Armour", "Accessories", "Curios"};
     /** How the grid is ordered: the rarest first; by what it is (weapons by their class, and the rest); the latest found first. */
     static final int BY_RARITY = 0, BY_TYPE = 1, BY_NEW = 2;
     static final String[] SORTS = {"Rarity", "Type", "Newest"};
@@ -234,6 +234,21 @@ final class RunInventory {
             if (tab == ALL || type == tab - 1) cells.add(new Cell(code, index));
         }
         Collections.sort(cells, order(sort));
+        return cells;
+    }
+
+    /** (Economy) The curios tab: one cell for each kind of curio she has, in an order (by rarity, or by what they are worth for "type"; newest is by number). */
+    static List<Cell> curioCells(Unlocks.Store store, int sort) {
+        List<Cell> cells = new ArrayList<>();
+        int[] counts = RunArtifacts.counts(store);
+        for (int id = 0; id < RunArtifacts.COUNT; id++) if (counts[id] > 0) cells.add(new Cell(RunArtifacts.entry(id), id));
+        Collections.sort(cells, (one, other) -> {
+            int a = RunArtifacts.idOf(one.entry), b = RunArtifacts.idOf(other.entry);
+            if (sort == BY_NEW) return Integer.compare(b, a);
+            if (sort == BY_TYPE) return Integer.compare(RunArtifacts.value(b), RunArtifacts.value(a));
+            int rare = Integer.compare(RunArtifacts.rarity(b), RunArtifacts.rarity(a));
+            return rare != 0 ? rare : Integer.compare(RunArtifacts.value(b), RunArtifacts.value(a));
+        });
         return cells;
     }
 

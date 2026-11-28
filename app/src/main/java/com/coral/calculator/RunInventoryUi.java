@@ -36,15 +36,21 @@ final class RunInventoryUi {
 
     private final RectF panel = new RectF(), equip = new RectF(), figure = new RectF(), grid = new RectF(), detail = new RectF(), close = new RectF(),
             smithy = new RectF(), more = new RectF(), shut = new RectF();
-    private final RectF[] slots = new RectF[RunInventory.SLOTS], tabs = new RectF[4], sorts = new RectF[3], acts = new RectF[3];
-    private final int[] actions = new int[3];
+    private final RectF[] slots = new RectF[RunInventory.SLOTS], tabs = new RectF[5], sorts = new RectF[3], acts = new RectF[4];
+    private final RectF junkButton = new RectF();
+    private final int[] actions = new int[4];
+    /** (Economy) Opened from a merchant: the Sell buttons and the sell-all-junk button are there; otherwise only lock and carry. */
+    private boolean sellMode;
+    /** A line of what was just sold, for a moment. */
+    private String sold = "";
+    private float soldAge = 9;
     private int columns = 4;
     private float side = 50, gap = 6;
     private boolean sheet, landscape;
     private float downX, downY, lastY;
     private boolean downInGrid, dragging;
 
-    private static final int NONE = 0, AS_MAIN = 1, AS_SECOND = 2, WEAR = 3, OFF = 4;
+    private static final int NONE = 0, AS_MAIN = 1, AS_SECOND = 2, WEAR = 3, OFF = 4, CARRY = 5, LOCK = 6, SELL = 7;
     private static final int[] SLOT_ORDER = {RunInventory.MAIN, RunInventory.SECOND, RunInventory.ARMOUR, RunInventory.FIRST, RunInventory.LAST};
 
     RunInventoryUi(RunGame game) {
@@ -62,9 +68,14 @@ final class RunInventoryUi {
     private float dp(float value) { return g.dp(value); }
 
     /** It is opened: in a land (what she has there) or from the map or the pause (what is kept). The tab and the order are as she left them. */
-    void open(boolean inLand) {
+    void open(boolean inLand) { open(inLand, false); }
+
+    /** (Economy) Opened at a merchant to sell: the same, with the Sell buttons. */
+    void open(boolean inLand, boolean sell) {
         this.inLand = inLand;
-        tab = Math.max(0, Math.min(3, g.session.tally("run_inv_tab")));
+        this.sellMode = sell;
+        sold = "";
+        tab = Math.max(0, Math.min(4, g.session.tally("run_inv_tab")));
         sort = Math.max(0, Math.min(2, g.session.tally("run_inv_sort")));
         selected = 0;
         expanded = false;
@@ -86,7 +97,7 @@ final class RunInventoryUi {
     }
 
     private void setTab(int one) {
-        tab = (one % 4 + 4) % 4;
+        tab = (one % 5 + 5) % 5;
         g.session.keep("run_inv_tab", tab);
         scroll = 0;
         focusCell = 0;
@@ -125,6 +136,18 @@ final class RunInventoryUi {
         } else if (what == WEAR) {
             List<Integer> bag = RunLoot.bag(g.session.note("run_bag"));
             if (RunInventory.canWear(worn, bag, selected)) worn(RunInventory.equip(worn, selected));
+        } else if (what == CARRY) {
+            // (Economy) A curio into her pouch, or out of it.
+            int id = RunArtifacts.idOf(selected);
+            boolean on = RunArtifacts.carried(g.session).contains(id);
+            if (!RunArtifacts.carry(g.session, id, !on)) said("The pouch holds " + RunArtifacts.POUCH + ": take one out first");
+            else g.weaponsChanged(0);
+            kept = g.kept();
+        } else if (what == LOCK) {
+            RunEconomy.lock(g.session, selected, !RunEconomy.locked(g.session, selected));
+            g.audio.play("tap", .4f);
+        } else if (what == SELL) {
+            sellOne(selected);
         } else if (what == OFF) {
             int slot = RunInventory.slotOf(g.session, selected);
             if (slot == RunInventory.SECOND) {
@@ -133,6 +156,42 @@ final class RunInventoryUi {
                 worn(RunInventory.unequip(worn, slot));
             }
         }
+    }
+
+    /** (Economy) A line said for a moment, and the sale of one thing: what she is paid goes into her bank, and what she has goes out of the bag or the pouch. */
+    private void said(String words) {
+        sold = words;
+        soldAge = 0;
+    }
+
+    private void sellOne(int entry) {
+        int pay = RunEconomy.sell(g.session, entry, RunArtifacts.sellBonus());
+        if (pay <= 0) {
+            said(RunEconomy.locked(g.session, entry) ? "It is locked: unlock it to sell it" : "She keeps what she wears or holds");
+            return;
+        }
+        g.bankAdd(pay);
+        g.audio.play("unlock", .6f);
+        said("Sold " + (RunArtifacts.is(entry) ? RunArtifacts.name(RunArtifacts.idOf(entry)) : name(entry)) + " for + " + pay);
+        // (The card is closed when the last of a kind is gone.)
+        if (!RunEconomy.sellable(g.session, entry) && (RunArtifacts.is(entry) ? RunArtifacts.counts(g.session)[RunArtifacts.idOf(entry)] == 0
+                : RunInventory.count(RunLoot.bag(g.session.note("run_bag")), entry) == 0)) selected = 0;
+        g.weaponsChanged(0);
+        kept = g.kept();
+    }
+
+    private void sellAllJunk() {
+        int[] result = RunEconomy.sellJunk(g.session, RunArtifacts.sellBonus());
+        if (result[1] == 0) {
+            said("No junk: white and blue gear, and plain curios, that are not worn or locked");
+            return;
+        }
+        g.bankAdd(result[0]);
+        g.audio.play("unlock", .8f);
+        said("Sold " + result[1] + (result[1] == 1 ? " piece" : " pieces") + " of junk for + " + result[0]);
+        selected = 0;
+        g.weaponsChanged(0);
+        kept = g.kept();
     }
 
     /** What Enter does with what is looked at: a weapon becomes the main one; what is worn comes off, and the rest goes on. */
@@ -212,6 +271,10 @@ final class RunInventoryUi {
         }
         if (close.contains(x, y)) {
             g.closePack();
+            return;
+        }
+        if (sellMode && !junkButton.isEmpty() && junkButton.contains(x, y)) {
+            sellAllJunk();
             return;
         }
         if (!smithy.isEmpty() && smithy.contains(x, y)) {
@@ -320,7 +383,8 @@ final class RunInventoryUi {
         List<Integer> bag = RunLoot.bag(g.session.note("run_bag"));
         RunLoot.Worn worn = g.wornNow();
         int owned = RunInventory.owned(g.session) | g.packedKinds(inLand);
-        cells = RunInventory.cells(owned, bag, tab, sort);
+        cells = tab == RunInventory.CURIOS ? RunInventory.curioCells(g.session, sort) : RunInventory.cells(owned, bag, tab, sort);
+        soldAge += .016f;
         if (cells.size() > 0) focusCell = Math.max(0, Math.min(cells.size() - 1, focusCell));
         RectF safe = g.safe;
         boolean wide = safe.width() > safe.height() * 1.1f;
@@ -339,9 +403,17 @@ final class RunInventoryUi {
             smithy.set(close.left - dp(8) - dp(124), headTop + dp(2), close.left - dp(8), headTop + dp(30));
             g.smithButton(canvas, smithy, "What she wears  ›", true, 0xFF3F7FC4);
         }
-        say(canvas, "Inventory", panel.left + pad, headTop + dp(23), 20, g.ink, true, Paint.Align.LEFT, dp(120));
-        say(canvas, bag.size() + " of " + RunLoot.BAG + " found", panel.left + pad + dp(112), headTop + dp(22), 11.5f, g.soft, false, Paint.Align.LEFT,
-                (inLand ? close.left : smithy.left) - dp(8) - (panel.left + pad + dp(112)));
+        say(canvas, sellMode ? "Sell" : "Inventory", panel.left + pad, headTop + dp(23), 20, g.ink, true, Paint.Align.LEFT, dp(120));
+        junkButton.setEmpty();
+        if (sellMode) {
+            // (Economy) Sell all junk, with what it comes to: only white and blue gear and plain curios, never what is worn or locked.
+            int[] junk = RunEconomy.junkTotal(g.session, RunArtifacts.sellBonus());
+            junkButton.set(close.left - dp(8) - dp(176), headTop + dp(2), close.left - dp(8), headTop + dp(30));
+            g.smithButton(canvas, junkButton, junk[1] == 0 ? "No junk to sell" : "Sell all junk  + " + junk[0], junk[1] > 0, 0xFFD9822B);
+        }
+        float titleRight = (sellMode ? junkButton.left : inLand ? close.left : smithy.left) - dp(8);
+        say(canvas, sold.isEmpty() || soldAge > 4 ? (sellMode ? g.purseWords() : bag.size() + " of " + RunLoot.BAG + " found") : sold, panel.left + pad + dp(sellMode ? 64 : 112), headTop + dp(22), 11.5f,
+                !sold.isEmpty() && soldAge <= 4 ? CalculatorLayout.CORAL : g.soft, false, Paint.Align.LEFT, titleRight - (panel.left + pad + dp(sellMode ? 64 : 112)));
         float top = headTop + dp(40);
         float equipLeft, equipRight, gridLeft, gridRight, gridTop, gridBottom, detailLeft = 0, detailRight = 0;
         if (wide) {
@@ -457,8 +529,8 @@ final class RunInventoryUi {
 
     /** The tabs and the order, in two rows. Returns the top of what is under them. */
     private float drawTabs(Canvas canvas, float left, float top, float right) {
-        float gapX = dp(6), across = (right - left - gapX * 3) / 4;
-        for (int index = 0; index < 4; index++) {
+        float gapX = dp(6), across = (right - left - gapX * 4) / 5;
+        for (int index = 0; index < 5; index++) {
             float x = left + index * (across + gapX);
             tabs[index].set(x, top, x + across, top + dp(30));
             g.smithButton(canvas, tabs[index], RunInventory.TABS[index], tab == index, CalculatorLayout.CORAL);
@@ -544,6 +616,21 @@ final class RunInventoryUi {
             canvas.drawRoundRect(where.left - out, where.top - out, where.right + out, where.bottom + out, round, round, line);
         }
         if (!badges) return;
+        // (Economy) A curio: how many she has, and a tick if it is in her pouch. A lock on whatever is locked against being sold.
+        if (RunArtifacts.is(entry)) {
+            int id = RunArtifacts.idOf(entry), have = RunArtifacts.counts(g.session)[id];
+            if (have > 1) {
+                String word = "x" + have;
+                g.text.setTextSize(dp(9.5f));
+                float wide = g.text.measureText(word) + dp(8);
+                RectF pill = new RectF(where.left + dp(3), where.bottom - dp(15), where.left + dp(3) + wide, where.bottom - dp(3));
+                fill.setColor(0xCC20242A);
+                canvas.drawRoundRect(pill, dp(6), dp(6), fill);
+                say(canvas, word, pill.centerX(), pill.bottom - dp(3), 9.5f, Color.WHITE, true, Paint.Align.CENTER, wide);
+            }
+            if (RunArtifacts.carried(g.session).contains(id)) tick(canvas, where.right - where.width() * .17f, where.top + where.width() * .17f, where.width() * .12f);
+        }
+        if (RunEconomy.locked(g.session, entry)) lockMark(canvas, where.right - where.width() * .17f, where.bottom - where.width() * .17f, where.width() * .13f);
         if (RunInventory.weapon(entry)) {
             int level = kept.levels[RunInventory.kindOf(entry)];
             if (level > 0) {
@@ -557,6 +644,17 @@ final class RunInventoryUi {
             }
         }
         if (RunInventory.slotOf(g.session, entry) >= 0) tick(canvas, where.right - where.width() * .17f, where.top + where.width() * .17f, where.width() * .12f);
+    }
+
+    /** A small padlock: this is locked against being sold. */
+    private void lockMark(Canvas canvas, float x, float y, float radius) {
+        fill.setColor(0xFF3F7FC4);
+        canvas.drawCircle(x, y, radius, fill);
+        fill.setColor(Color.WHITE);
+        canvas.drawRoundRect(x - radius * .45f, y - radius * .05f, x + radius * .45f, y + radius * .55f, radius * .12f, radius * .12f, fill);
+        line.setColor(Color.WHITE);
+        line.setStrokeWidth(Math.max(dp(1.2f), radius * .2f));
+        canvas.drawArc(x - radius * .3f, y - radius * .6f, x + radius * .3f, y + radius * .15f, 180, 180, false, line);
     }
 
     private void tick(Canvas canvas, float x, float y, float radius) {
@@ -655,6 +753,7 @@ final class RunInventoryUi {
 
     /** What it comes to against what she has on: a weapon against the main one (or the secondary one, if it is the main one); the rest against what it would replace. */
     private String compare(int entry, RunLoot.Worn worn) {
+        if (RunArtifacts.is(entry)) return "";
         if (RunInventory.weapon(entry)) {
             int main = RunInventory.main(g.session), second = RunInventory.second(g.session);
             int against = entry == main ? second : main;
@@ -700,6 +799,8 @@ final class RunInventoryUi {
         String kind;
         if (weapon) {
             kind = RunInventory.className(RunInventory.kindOf(entry));
+        } else if (RunArtifacts.is(entry)) {
+            kind = "Curio  ·  worth + " + RunEconomy.price(entry, sellMode ? RunArtifacts.sellBonus() : 0);
         } else if (type == RunLoot.ARMOUR) {
             int lean = RunLoot.leansTo(RunLoot.base(entry));
             kind = "Armour  ·  " + (lean == RunLoot.ANY ? "every class" : RunLoot.CLASS_NAMES[lean]);
@@ -721,7 +822,14 @@ final class RunInventoryUi {
         int[] colours = new int[3];
         boolean[] can = new boolean[3];
         int count = 0;
-        if (weapon) {
+        if (RunArtifacts.is(entry)) {
+            // (Economy) A curio: into the pouch or out of it; a lock; and, at a merchant, sell.
+            boolean carrying = RunArtifacts.carried(g.session).contains(RunArtifacts.idOf(entry));
+            wants[count] = CARRY;
+            labels[count] = carrying ? "Take out of pouch" : "Carry it (" + RunArtifacts.carried(g.session).size() + "/" + RunArtifacts.POUCH + ")";
+            colours[count] = CalculatorLayout.CORAL;
+            can[count++] = true;
+        } else if (weapon) {
             if (slot == RunInventory.MAIN) {
                 wants[count] = NONE;
                 labels[count] = "Main weapon";
@@ -755,6 +863,21 @@ final class RunInventoryUi {
             colours[count] = CalculatorLayout.CORAL;
             can[count++] = ok;
         }
+        // (Economy) A lock against selling, for anything; and at a merchant, Sell, with what she would be paid.
+        if (!RunInventory.plain(entry)) {
+            boolean locked = RunEconomy.locked(g.session, entry);
+            wants[count] = LOCK;
+            labels[count] = locked ? "Unlock" : "Lock";
+            colours[count] = 0xFF3F7FC4;
+            can[count++] = true;
+            if (sellMode) {
+                boolean ok = RunEconomy.sellable(g.session, entry);
+                wants[count] = ok ? SELL : NONE;
+                labels[count] = locked ? "Locked" : ok ? "Sell  + " + RunEconomy.price(entry, RunArtifacts.sellBonus()) : "In use";
+                colours[count] = 0xFFD9822B;
+                can[count++] = ok;
+            }
+        }
         float buttonTall = dp(34), bottom = detail.bottom - pad;
         float buttonsTop;
         if (wide) {
@@ -769,7 +892,7 @@ final class RunInventoryUi {
             actions[index] = can[index] ? wants[index] : NONE;
             g.smithButton(canvas, acts[index], labels[index], can[index], colours[index]);
         }
-        for (int index = count; index < 3; index++) actions[index] = NONE;
+        for (int index = count; index < actions.length; index++) actions[index] = NONE;
         // What it does.
         float limit = buttonsTop - dp(6) - (!wide && !expanded ? dp(14) : 0);
         boolean full = wide || expanded;
@@ -797,6 +920,22 @@ final class RunInventoryUi {
                 body.add("Its element: " + RunArms.ELEMENTS[RunArms.element(entry)]);
                 shade.add(g.soft);
             }
+            // (Economy: what a named weapon does besides.)
+            if (RunWeapons.named(entry)) {
+                for (String does2 : RunWeapons.effectWords(entry)) {
+                    body.add("•  " + does2);
+                    shade.add(CalculatorLayout.CORAL);
+                }
+            }
+        } else if (RunArtifacts.is(entry)) {
+            int id = RunArtifacts.idOf(entry);
+            body.add(RunArtifacts.flavour(id));
+            shade.add(g.ink);
+            body.add(RunArtifacts.perkWords(id));
+            shade.add(RunArtifacts.perk(id) == RunArtifacts.NO_PERK ? g.soft : CalculatorLayout.CORAL);
+            body.add("Worth " + RunArtifacts.value(id) + " pluses to a merchant" + (RunArtifacts.sellBonus() > 0 && sellMode ? ", " + RunEconomy.price(entry, RunArtifacts.sellBonus()) + " with what she carries" : "")
+                    + (RunArtifacts.counts(g.session)[id] > 1 ? "  ·  she has " + RunArtifacts.counts(g.session)[id] : ""));
+            shade.add(g.soft);
         } else {
             for (int pair = 0; pair * 2 + 2 < does.length; pair++) {
                 int effect = does[1 + pair * 2];
@@ -865,6 +1004,7 @@ final class RunInventoryUi {
         if (!RunInventory.weapon(entry)) return "";
         int kind = RunInventory.kindOf(entry), level = kept.levels[kind];
         StringBuilder told = new StringBuilder();
+        if (RunWeapons.named(entry)) told.append(RunWeapons.look(entry)).append(' ');
         if (!RunInventory.plain(entry) && RunLoot.addition(entry)) told.append("The plus-book she began with, before she had a book of her own: found again. ");
         if (!RunInventory.plain(entry)) {
             told.append(RunArms.NAMES[kind]).append(": ").append(RunArms.itemBlows(entry) > 0 ? "+" + RunArms.itemBlows(entry) + (RunArms.itemBlows(entry) == 1 ? " blow, " : " blows, ") : "")
