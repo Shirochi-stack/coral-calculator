@@ -1163,7 +1163,7 @@ final class PlusRun {
      * which nothing hurts her. Whether she did.
      */
     /** Whether she has either move at all, the roll or the dash in the air: whether a button for them is worth showing. */
-    boolean dashes() { return perks.roll || perks.airDash; }
+    boolean hasDash() { return perks.roll || perks.airDash; }
 
     /** Whether a dash now would go: a roll on the ground, or the one dash of a jump in the air. */
     boolean canDash() {

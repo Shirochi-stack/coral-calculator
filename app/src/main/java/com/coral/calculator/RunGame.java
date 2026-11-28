@@ -9146,7 +9146,7 @@ final class RunGame {
                 pills("Back to the land", RESUME, "Guild counter", COUNTER);
                 return;
             }
-            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && finale == NO_FINALE && run.dashes()
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && finale == NO_FINALE && run.hasDash()
                     && near(dashButton, event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
                 dashTapped = clock;
                 if (run.dash()) {
@@ -9572,7 +9572,7 @@ final class RunGame {
                     continue;
                 }
                 // (A finger on the dash is on the dash, not on the arrow under it.)
-                if (finale == NO_FINALE && run != null && run.dashes() && near(dashButton, x, y)) continue;
+                if (finale == NO_FINALE && run != null && run.hasDash() && near(dashButton, x, y)) continue;
                 if (y < low) continue;
                 if (x < between) left = true;
                 else if (x < arrows) right = true;
@@ -9815,7 +9815,7 @@ final class RunGame {
                 if (!lets) canvas.saveLayerAlpha(downButton.left - dp(6), downButton.top - dp(6), downButton.right + dp(6), downButton.bottom + dp(8), over ? 50 : 160);
                 control(canvas, downButton, goDown, 90, false);
                 if (!lets) canvas.restore();
-                if (finale == NO_FINALE && run.dashes()) dashControl(canvas);
+                if (finale == NO_FINALE && run.hasDash()) dashControl(canvas);
                 // In the first land the arrows glow until she has moved, and the jump until she has jumped; and the palette, when she has
                 // been told of it, until she opens it.
                 if (number == 1 && !hintMoved) {
