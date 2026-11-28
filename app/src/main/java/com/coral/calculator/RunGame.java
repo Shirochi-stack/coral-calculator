@@ -1898,7 +1898,7 @@ final class RunGame {
      * floor and brick, a dungeon's stone of its band. Returns whether it drew it.
      */
     private boolean underSquare(Canvas canvas, int column, int row, float left, float y) {
-        boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
+        boolean capped = run.shown(column, row - 1) != RunLevels.BLOCK;
         int kind = roomKind();
         if (kind == RunLevels.LAGOON || kind == RunLevels.HIDEOUT || kind == RunLevels.ARENA) {
             if (roomSquares == null) roomSquares = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ground_rooms);
@@ -4681,6 +4681,8 @@ final class RunGame {
             int stand = RunLevels.top(here, column);
             for (int row = 0; row < RunLevels.ROWS && stand < 0; row++) if (here.land[row][column] == RunLevels.THIN) stand = row;
             while (column < here.columns - 2 && stand < 0) stand = RunLevels.top(here, ++column);
+            // (Or on the floor of a row asked for: down in a cave, say.)
+            if (session.tally("run_from_row") > 0) stand = session.tally("run_from_row");
             run.place(column + (1 - PlusRun.WIDE) / 2, stand - PlusRun.TALL - .05f);
         }
         // And, for the same, she may start in a colour, as from a ribbon, and with something in her hands.
@@ -6715,6 +6717,17 @@ final class RunGame {
                 }
             }
         }
+        // Each of the later chapters' creatures, the first time she comes near one: she says what to look out for.
+        if (run != null && screen == PLAY && captionLeft <= 0 && !audio.speaking()) {
+            for (PlusRun.Foe foe : run.foes()) {
+                if (foe.flat || !RunUniques.later(foe.kind) || Math.abs(foe.x - run.x()) > 8 || Math.abs(foe.y - run.y()) > 5) continue;
+                int which = foe.kind - RunUniques.LATER_FIRST;
+                if (session.tally("run_u2_" + which) != 0) continue;
+                session.keep("run_u2_" + which, 1);
+                speak(RunStory.LATER_UNIQUES[which], true);
+                break;
+            }
+        }
         // Deep water, the first time: in blue she can swim in it; without it she cannot breathe.
         if (run != null && screen == PLAY && run.inWater() && captionLeft <= 0 && !audio.speaking()) {
             boolean blue = run.has(PlusRun.BLUE);
@@ -8181,7 +8194,7 @@ final class RunGame {
             if (which >= 0 && !foe.flat && foe.x >= from && foe.x <= to && (seen & 1 << which) == 0) found = which;
         }
         for (int[] arm : run.arms()) if (arm[1] >= from && arm[1] <= to && (seen & 1 << 8) == 0) found = 8;
-        for (int[] item : run.items()) if (item[0] > PlusRun.FORM && item[0] < PlusRun.CHEST && item[1] >= from && item[1] <= to && (seen & 1 << 24) == 0) found = 24;
+        for (int[] item : run.items()) if (item[0] > PlusRun.FORM && item[0] < PlusRun.CHEST && item[1] >= from && item[1] <= to && (seen & 1 << 24) == 0 && !run.hidden(item[1], item[2])) found = 24;
         for (int index = 0; index < run.level().movers.size(); index++) {
             float x = run.moverX(index, run.time());
             if (x >= from && x <= to && (seen & 1 << 20) == 0) found = 20;
@@ -9025,7 +9038,8 @@ final class RunGame {
                     stallControl(canvas);
                 } else {
                     stallSign.setEmpty();
-                    if (run.door() >= 0) doorControl(canvas);
+                    // (No button for a crack not yet broken open: nothing shows it is there but a hairline, close by.)
+                    if (run.door() >= 0 && !(run.room() < 0 && run.crackHidden(run.door()))) doorControl(canvas);
                     else if (atGate()) {
                         button(canvas, stallButton, false, 0xFF5B4BC4);
                         paint.setAlpha(255);
@@ -9262,7 +9276,7 @@ final class RunGame {
             seenHeals = run.heals();
         }
         int frame = foe.flat ? 5 : foe.mode == 1 ? 2 : foe.mode == 2 ? 3 : foe.struck < .2f ? 4
-                : way == RunUniques.MIMIC && foe.turn == 0 ? 0 : (int) (clock * 5 + foe.x) % 2;
+                : way == RunUniques.MIMIC && foe.turn == 0 ? 0 : way == RunUniques.HERMIT && foe.turn == 1 ? 2 : (int) (clock * 5 + foe.x) % 2;
         float tall = Math.max(foe.tall(), foe.wide() * .9f) * tile * 1.4f;
         if (way == RunUniques.BURROWER && foe.unseen && !foe.flat) {
             // Under the ground: a mound of earth moving along.
@@ -9288,12 +9302,25 @@ final class RunGame {
         }
         paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
                 : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
-        // (Those of the dungeons are in a sheet of their own.)
-        boolean delving = RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        // (Those of the dungeons are in a sheet of their own; and those of the later chapters in the run's asset pack.)
+        boolean later = RunUniques.later(foe.kind), delving = !later && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
         if (delving && delverSheet == null) delverSheet = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_delvers);
-        Bitmap sheet = delving ? delverSheet : uniqueSheet;
-        int rows = delving ? RunUniques.COUNT - RunUniques.SHEET_ROWS : RunUniques.SHEET_ROWS;
-        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (delving ? RunUniques.SHEET_ROWS : 0);
+        if (later && laterSheet == null && !laterTried) {
+            laterTried = true;
+            try (java.io.InputStream in = context.getAssets().open(RunUniques.LATER_SHEET)) {
+                laterSheet = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                laterSheet = null;
+            }
+        }
+        Bitmap sheet = later ? laterSheet : delving ? delverSheet : uniqueSheet;
+        if (sheet == null) {
+            paint.setAlpha(255);
+            return;
+        }
+        int rows = later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
+        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
+        if (!foe.flat) laterStrikes(canvas, foe, way, middle, feet);
         if (way == RunUniques.DROPPER && foe.turn == 0 && !foe.flat) {
             // The spider's thread, up out of sight.
             stroke.setColor(0xCCE8E4F0);
@@ -9314,6 +9341,56 @@ final class RunGame {
                 float qx = (at[0] - cameraX) * tile, qy = (at[1] - cameraY) * tile;
                 thing(canvas, PlusRun.PEN, qx, qy, tile * .55f, (float) Math.toDegrees(foe.clock * 2.4f + one * Math.PI * 2 / 3) + 90, false, false);
             }
+        }
+    }
+
+    private Bitmap laterSheet;
+    private boolean laterTried;
+
+    /**
+     * What the later chapters' creatures do, drawn about them: the strikethrough's line, red as it is raised and bold as it strikes; the
+     * serpent's lash and the toad's tongue; the sand-glass's slow time; the sentinel's beam, faint as it gathers and bright as it sweeps.
+     */
+    private void laterStrikes(Canvas canvas, PlusRun.Foe foe, int way, float middle, float feet) {
+        float dir = foe.leftward ? -1 : 1, mid = (foe.y + foe.tall() * .5f - cameraY) * tile, front = middle + dir * foe.wide() * .45f * tile;
+        if (way == RunUniques.LINER && foe.mode >= 1 && foe.mode <= 2) {
+            boolean striking = foe.mode == 2;
+            stroke.setColor(striking ? 0xFFFF2A3A : 0xAAFF5A6A);
+            stroke.setStrokeWidth(tile * (striking ? .16f : .05f));
+            if (!striking) stroke.setPathEffect(new android.graphics.DashPathEffect(new float[]{tile * .3f, tile * .2f}, clock * tile * 2));
+            canvas.drawLine(front, mid, front + dir * PlusRun.LINE * tile, mid, stroke);
+            stroke.setPathEffect(null);
+        } else if ((way == RunUniques.LASHER || way == RunUniques.PULLER) && foe.mode == 2) {
+            float reach = way == RunUniques.LASHER ? PlusRun.LASH : PlusRun.TONGUE, through = (float) Math.sin(Math.min(1, 1 - foe.act / .45f) * Math.PI);
+            stroke.setColor(way == RunUniques.LASHER ? 0xFF4C7BE8 : 0xFFF4EEDF);
+            stroke.setStrokeWidth(tile * (way == RunUniques.LASHER ? .14f : .12f));
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            float y = way == RunUniques.LASHER ? (foe.y + foe.tall() * .7f - cameraY) * tile : mid;
+            canvas.drawLine(front, y, front + dir * reach * tile * Math.max(.15f, through), y, stroke);
+            stroke.setStrokeCap(Paint.Cap.BUTT);
+        } else if (way == RunUniques.HOURGLASS) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFFFD27A);
+            paint.setAlpha(Math.round(28 + 14 * (float) Math.sin(clock * 3)));
+            canvas.drawCircle(middle, mid, PlusRun.SAND_REACH * tile, paint);
+            stroke.setColor(0x66FFC44A);
+            stroke.setStrokeWidth(tile * .04f);
+            canvas.drawCircle(middle, mid, PlusRun.SAND_REACH * tile, stroke);
+            paint.setAlpha(255);
+        } else if (way == RunUniques.SWEEPER && foe.mode >= 1 && foe.mode <= 2) {
+            float[] from = PlusRun.lantern(foe);
+            float lx = (from[0] - cameraX) * tile, ly = (from[1] - cameraY) * tile, angle = PlusRun.beamAngle(foe), reach = PlusRun.SWEEP_REACH * tile;
+            path.reset();
+            path.moveTo(lx, ly);
+            for (float side = -.09f; side <= .091f; side += .045f) {
+                path.lineTo(lx + dir * (float) Math.cos(angle + side) * reach, ly - (float) Math.sin(angle + side) * reach);
+            }
+            path.close();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFFFF1A8);
+            paint.setAlpha(foe.mode == 2 ? 150 : 45);
+            canvas.drawPath(path, paint);
+            paint.setAlpha(255);
         }
     }
 
@@ -10632,14 +10709,20 @@ final class RunGame {
         for (int column = first; column <= last; column++) {
             float left = (column - cameraX) * tile;
             for (int row = top; row <= bottom; row++) {
-                char here = run.at(column, row);
+                char here = run.shown(column, row);
                 float y = (row - cameraY) * tile;
                 paint.setAlpha(255);
-                // A false wall is drawn as the rock it pretends to be, until she is in it or right by it: then it is all but gone.
+                // A secret space not yet found is drawn as the rock round it: the same squares, nothing of what is inside. Found, the rock
+                // over it fades away, and its false wall is left faint, to be seen through.
+                float ago = run.foundAgo(column, row);
+                boolean fading = false;
                 if (here == RunLevels.FAKE) {
-                    boolean by = Math.abs(run.x() + PlusRun.WIDE / 2 - column - .5f) < 1.6f && Math.abs(run.y() + PlusRun.TALL / 2 - row - .5f) < 2.2f;
                     here = RunLevels.BLOCK;
-                    paint.setAlpha(by ? 70 : 255);
+                    paint.setAlpha(Math.round(255 - 185 * Math.min(1, Math.max(0, ago) / PlusRun.SECRET_SHOWS)));
+                } else if (ago >= 0 && ago < PlusRun.SECRET_SHOWS && here == RunLevels.AIR) {
+                    here = RunLevels.BLOCK;
+                    fading = true;
+                    paint.setAlpha(Math.round(255 * (1 - ago / PlusRun.SECRET_SHOWS)));
                 }
                 if (here == RunLevels.VINE) {
                     drawVine(canvas, chapter, left, y);
@@ -10661,7 +10744,7 @@ final class RunGame {
                 if (here == RunLevels.BLOCK && underSquare(canvas, column, row, left, y)) continue;
                 if (here == RunLevels.BLOCK && run.room() >= 0) {
                     // In a place off the land, its walls are dark, of the colour of the place, with a lighter board where they are stood on.
-                    boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
+                    boolean capped = run.shown(column, row - 1) != RunLevels.BLOCK;
                     int look = look();
                     int[] in = level.rooms.get(run.room());
                     // (What stands inside it, between its floor and its ceiling, is masonry of the place's own colour, with its courses
@@ -10699,7 +10782,8 @@ final class RunGame {
                 } else if (here == RunLevels.BLOCK) {
                     // The top of a pile has the turf on it; the rest is what lies under. Every other one is
                     // turned about, so the same picture side by side does not show as a pattern.
-                    boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
+                    // (Rock fading off a secret space just found has no turf on it anywhere.)
+                    boolean capped = !fading && run.shown(column, row - 1) != RunLevels.BLOCK;
                     if (chapter >= RunLevels.CHAPTERS * 2) {
                         // (The third volume's ground is in a row of squares of its own.)
                         if (ground3 == null) ground3 = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_art5);
@@ -10832,8 +10916,9 @@ final class RunGame {
         if (level.arena >= 0 && level.guarded) drawWays(canvas, level);
         drawDoors(canvas, level);
         // The pluses, each bobbing a little and turning as it hangs there.
+        drawSecretHints(canvas);
         for (int[] plus : run.pluses()) {
-            if (plus[0] < first - 1 || plus[0] > last + 1) continue;
+            if (plus[0] < first - 1 || plus[0] > last + 1 || run.hidden(plus[0], plus[1])) continue;
             float x = (plus[0] + .5f - cameraX) * tile;
             float y = (plus[1] + .9f - cameraY) * tile + (float) Math.sin(clock * 4 + plus[0]) * tile * .08f;
             float turned = Math.max(.18f, Math.abs((float) Math.cos(clock * 3 + plus[0] * .7f)));
@@ -10906,7 +10991,7 @@ final class RunGame {
         }
         // What lies about to help, in a ring of its own colour; what a friend holds out is in her hands already.
         for (int[] item : run.items()) {
-            if (item[3] != 0 || item[1] < first - 1 || item[1] > last + 1) continue;
+            if (item[3] != 0 || item[1] < first - 1 || item[1] > last + 1 || run.hidden(item[1], item[2])) continue;
             if (item[0] == PlusRun.LEVER || item[0] == PlusRun.PLATE || item[0] == PlusRun.SHRINE) {
                 drawStanding(canvas, item);
                 continue;
@@ -11594,8 +11679,13 @@ final class RunGame {
                     else doorMark(canvas, 100 + one[14], one[1], one[2], false, 0);
                 }
             } else if (in < 0) {
-                door(canvas, known ? picture : CRACK_PICTURE, one[1], one[2], at == index, known ? "Enter" : "Break");
-                // Where a passage comes out looks like a crack too, until she has come out of it.
+                // A place hidden behind a crack is not to be seen until a blow breaks it open: at most a hairline crack, close by.
+                if (!known) {
+                    hairline(canvas, one[1], one[2], one[1] + .5f, one[2] - 1);
+                    continue;
+                }
+                door(canvas, picture, one[1], one[2], at == index, "Enter");
+                // Where a passage comes out looks like a crack, until she has come out of it.
                 if (one[5] != one[1]) door(canvas, been ? DOOR_PICTURE : CRACK_PICTURE, one[5], one[9], at == index, "Enter");
                 // Found, a door has a mark over it that says what kind of place it leads to: and a tick, once that is done with.
                 boolean found = been || (session.tally("run_rooms_" + number) & 1 << index) != 0 || known && one[7] != 1;
@@ -11611,6 +11701,37 @@ final class RunGame {
                 paint.setAlpha(255);
             }
         }
+    }
+
+    /** The one hint a secret space gives: the false wall's middle square, a hairline crack in it, only when she is near. */
+    private void drawSecretHints(Canvas canvas) {
+        java.util.List<int[]> secrets = run.secrets();
+        for (int at = 0; at < secrets.size(); at++) {
+            if (run.secretFound(at)) continue;
+            int[] one = secrets.get(at);
+            int row = (one[1] + one[2]) / 2;
+            hairline(canvas, one[0], row + 1, one[0] + .5f, row + .5f);
+        }
+    }
+
+    /**
+     * A hairline crack in one square, faint, if she is within a few squares of where it hints at: a thin dark line, broken twice, that
+     * glints now and then. Never the shape of what it hides.
+     */
+    private void hairline(Canvas canvas, int column, int floor, float nearX, float nearY) {
+        float far = (float) Math.hypot(run.x() + PlusRun.WIDE / 2 - nearX, run.y() + PlusRun.TALL / 2 - nearY);
+        if (far > PlusRun.HINT_NEAR) return;
+        float fade = Math.min(1, (PlusRun.HINT_NEAR - far) / 1.2f), left = (column - cameraX) * tile, top = (floor - 1 - cameraY) * tile;
+        stroke.setColor(0xFF1A1210);
+        stroke.setAlpha(Math.round(80 * fade));
+        stroke.setStrokeWidth(Math.max(1, tile * .025f));
+        float ax = left + tile * .42f, ay = top + tile * .2f, bx = left + tile * .55f, by = top + tile * .45f, cx = left + tile * .47f, cy = top + tile * .72f;
+        canvas.drawLine(ax, ay, bx, by, stroke);
+        canvas.drawLine(bx, by, cx, cy, stroke);
+        // (A glint along it, now and then.)
+        float glint = (clock * .6f + column * .37f) % 3;
+        if (glint < .4f) glowAt(canvas, bx, by, tile * .12f, 0xFFFFF4D0, Math.round(120 * fade * (float) Math.sin(glint / .4f * Math.PI)));
+        stroke.setAlpha(255);
     }
 
     private void door(Canvas canvas, int picture, int column, int floor, boolean here, String word) {
@@ -13705,6 +13826,36 @@ final class RunGame {
         for (PlusRun.Pet it : run.herd()) drawPet(canvas, it);
     }
 
+    /** The row of each pet that runs in the sheet of climbing pets (-1 for one that flies, which never climbs). */
+    private static final int[] PET_CLIMB_ROW = {-1, 0, 1, -1, 2, 3, 4, -1, -1, 5, 6, 7, -1, 8};
+    static final String PET_CLIMB_SHEET = "runart/pet_climb.webp";
+    private Bitmap petClimb;
+    private boolean petClimbTried;
+
+    /** A pet that runs, climbing: one of its two pictures. Whether it was drawn (it is not, without the sheet). */
+    private boolean drawPetClimb(Canvas canvas, int kind, int step, float x, float y, float tall) {
+        int row = kind >= 0 && kind < PET_CLIMB_ROW.length ? PET_CLIMB_ROW[kind] : -1;
+        if (row < 0) return false;
+        if (petClimb == null && !petClimbTried) {
+            petClimbTried = true;
+            try (java.io.InputStream in = context.getAssets().open(PET_CLIMB_SHEET)) {
+                petClimb = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                petClimb = null;
+            }
+        }
+        if (petClimb == null) return false;
+        int cell = petClimb.getWidth() / 2;
+        source.set(step * cell, row * cell, (step + 1) * cell, (row + 1) * cell);
+        target.set(x - tall / 2, y - tall + tile * .04f, x + tall / 2, y + tile * .04f);
+        // (The second step drawn the other way about too, so that the hand over hand reads even where its two pictures are alike.)
+        canvas.save();
+        if (step == 1) canvas.scale(-1, 1, x, y);
+        canvas.drawBitmap(petClimb, source, target, paint);
+        canvas.restore();
+        return true;
+    }
+
     private void drawPet(Canvas canvas, PlusRun.Pet it) {
         int kind = it.kind;
         float x = (it.x - cameraX) * tile, y = (it.y - cameraY) * tile, across = it.x - it.seenX, down = it.y - it.seenY;
@@ -13714,6 +13865,8 @@ final class RunGame {
         int pose = busy ? 4 : petGlad < .7f ? 5 : floats ? (Math.abs(across) > .05f ? 3 : (int) (clock * 5) % 2)
                 : Math.abs(down) > .03f ? 3 : Math.abs(across) > .01f ? 1 + (int) (clock * 9) % 2 : 0;
         float tall = tile * .95f * 170 / 100, hop = petGlad < .7f ? Math.abs((float) Math.sin(petGlad / .7f * Math.PI * 2)) * tile * .25f : 0;
+        // Climbing after her: its own two pictures of climbing, hand over hand by turns as it goes, from the run's asset pack.
+        if (it.climbing && drawPetClimb(canvas, kind, (int) (it.climbed * 2.6f) % 2, x, y, tall)) return;
         // A soft shadow under one that floats, so that it is seen to be in the air.
         cell(canvas, petArt(kind), pose, 6, x, y + tile * .04f - hop, tall, !it.left);
         if (petWordLeft > 0 && petWordOf == kind) {
@@ -13838,6 +13991,12 @@ final class RunGame {
             paint.setColor(Color.WHITE);
             paint.setAlpha(Math.round(90 * show));
             canvas.drawOval(x - tile * .45f * show, y - tile * .04f, x - tile * .1f * show, y + tile * .01f, paint);
+        }
+        for (float[] smear : run.smears()) {
+            float x = (smear[0] - cameraX) * tile, y = (smear[1] - cameraY) * tile, show = Math.min(1, smear[2] / .8f);
+            paint.setColor(0xFF2E2A33);
+            paint.setAlpha(Math.round(190 * show));
+            canvas.drawOval(x - tile * .75f, y - tile * .08f, x + tile * .75f, y + tile * .08f, paint);
         }
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);

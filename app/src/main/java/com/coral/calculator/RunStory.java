@@ -575,6 +575,22 @@ final class RunStory {
             {"skill4", "My tree got redrawn! Every point came back, so spend them Sloppy~♡", "H", PLAYER + "Her skill tree has just been redrawn into a great new web of regions and routes, and every point she had spent has come back to her to spend again. Delighted, a little bossy, eager to explore it."},
     };
 
+    /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
+    static final String[][] LATER_UNIQUES = {
+            {"u2a", "A newspaper bug! Don't let it roll you flat, Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
+            {"u2b", "It shouts the headlines at us. So loud, Sloppy~♡", "H", PLAYER + "A little town crier with a megaphone mouth is shouting words at them. Hands over ears, cross, playful."},
+            {"u2c", "That line can stretch! Keep your distance, Sloppy~♡", "H", PLAYER + "A snake made of a ruled notebook line lashes out from far away. Alarmed, advising."},
+            {"u2d", "It crosses things out. Jump over the line, Sloppy~♡", "H", PLAYER + "An ink knight draws a long red line along the ground ahead to strike through. Urgent, bossy tip."},
+            {"u2e", "Sticky tongue! It wants to pull us in, Sloppy~♡", "H", PLAYER + "A fat glue-pot toad shoots a sticky tongue that pulls you in. Grossed out, giggly."},
+            {"u2f", "Ew, smudges everywhere. Don't step in them, Sloppy~♡", "H", PLAYER + "An ink smudge slime leaves sticky smears that slow you down. Disgusted, fussy."},
+            {"u2g", "A mirror crab! Hit it from behind, Sloppy~♡", "H", PLAYER + "A crab with a mirror shell bounces shots back; you must hit it from behind. Clever, pleased with herself."},
+            {"u2h", "It copies everything we do. Rude, Sloppy~♡", "H", PLAYER + "A ghostly page echoes every attack back at them. Offended, pouty."},
+            {"u2i", "Its sand slows time down. Hurry, Sloppy~♡", "H", PLAYER + "A little hourglass creature slows time around it. Impatient, hurrying."},
+            {"u2j", "It hides in its shell. Wait till it peeks out, Sloppy~♡", "H", PLAYER + "A hermit crab in a scroll shell hides, then pops out to jab. Patient, sly."},
+            {"u2k", "A baby dragon! Cute, but it breathes fire, Sloppy~♡", "H", PLAYER + "A chubby golden dragon hatchling on a hoard of books breathes fire. Charmed, then cautious."},
+            {"u2l", "Stay out of that lantern's light, Sloppy~♡", "H", PLAYER + "A stone sentinel with a lantern head sweeps a burning beam of light. Low, tense warning."},
+    };
+
     /** Her moves from the counter: the second wind, which leaves her half a heart once a land. */
     static final String[][] MOVES = {
             {"wind1", "Not yet! Second wind Sloppy~♡", "H", PLAYER + "She was about to be knocked out but her second wind kicks in and leaves her standing on half a heart. Gritty, defiant, catching her breath, then a cheeky grin."},
