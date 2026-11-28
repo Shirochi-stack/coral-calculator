@@ -331,6 +331,14 @@ public class RunSkillsTest {
         assertEquals(0, run.activeLeft(0), 0);
     }
 
+    @Test public void theNotablesPicturesAreInTheRunsAssetPackNotTheBase() {
+        java.io.File sheet = new java.io.File("../runart/src/main/assets/" + RunTree.NOTABLE_SHEET);
+        assertTrue(sheet.isFile());
+        assertTrue(sheet.length() > 100_000);
+        // (The base keeps only the old sheet of emblems and node pictures.)
+        assertTrue(new java.io.File("src/main/res/drawable-nodpi/run_skill_icons.webp").length() < 300_000);
+    }
+
     @Test public void heartsAreTwentyHpAndPastTwentyTheyTurnColour() {
         assertEquals(20, RunSkills.HEART);
         float[] third = RunSkills.heart(2, 50, 60);

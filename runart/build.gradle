@@ -1,0 +1,12 @@
+plugins {
+    id 'com.android.asset-pack'
+}
+
+// Plus run's own art that does not need to be in the base module (which is near Play's 200 MB): the skill tree's notable icons now, and
+// more to come. Delivered with the install; the debug build (the GitHub APK) carries the same files, see app/build.gradle.
+assetPack {
+    packName = 'runart'
+    dynamicDelivery {
+        deliveryType = 'install-time'
+    }
+}
