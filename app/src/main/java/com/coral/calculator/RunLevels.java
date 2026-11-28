@@ -161,6 +161,9 @@ final class RunLevels {
      * sorts, by the land and by which of the land's villages it is.
      */
     static final int HOUSE = 6, PET_SHOP = 0, GUILD_HALL = 1, HOME = 2, SMITHY = 3, MARKET = 4, GACHA = 5, BOUTIQUE = 7;
+    /** (Economy) Aelwyn's wagon, a building of the villages of the even chapters after the first (the third, fifth and so on): the elf merchant buys and sells curios. */
+    static final int ELF = 8;
+    static boolean elfHere(int number) { return chapterOf(number) >= 2 && chapterOf(number) % 2 == 0; }
     /** The chapter whose village, Rosemarrow, has Tulle and Thread, the vanity boutique, among its buildings. */
     static final int BOUTIQUE_CHAPTER = 2;
 
@@ -203,6 +206,7 @@ final class RunLevels {
         if (number >= GACHA_FROM) sorts.add(GACHA);
         if (number >= MARKET_FROM) sorts.add(MARKET);
         if (chapterOf(number) == BOUTIQUE_CHAPTER) sorts.add(BOUTIQUE);
+        if (elfHere(number)) sorts.add(ELF);
         int[] out = new int[sorts.size()];
         for (int index = 0; index < out.length; index++) out[index] = sorts.get(index);
         return out;
@@ -2213,7 +2217,7 @@ final class RunLevels {
             int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL;
             wall(2);
             int from = at;
-            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL || sort == MARKET || sort == BOUTIQUE ? 16 : sort == SMITHY ? 18 : sort == HOME ? 19 : 14);
+            open(sort == PET_SHOP ? 19 : sort == GUILD_HALL || sort == MARKET || sort == BOUTIQUE || sort == ELF ? 16 : sort == SMITHY ? 18 : sort == HOME ? 19 : 14);
             int to = at - 1;
             wall(2);
             level.land[FLOOR - 1][from + 1] = ENTRY;
@@ -2233,6 +2237,10 @@ final class RunLevels {
             } else if (sort == BOUTIQUE) {
                 // Tulle at her counter, in the middle of it; the vanity boutique is opened there.
                 level.items.add(new int[]{PlusRun.SPOT, from + 8, FLOOR - 1, 0, PlusRun.BOUTIQUE});
+                pluses(from + 3, from + 5, FLOOR - 1);
+            } else if (sort == ELF) {
+                // Aelwyn at her counter, in the middle of it; her wagon's trade is opened there.
+                level.items.add(new int[]{PlusRun.SPOT, from + 8, FLOOR - 1, 0, PlusRun.ELF});
                 pluses(from + 3, from + 5, FLOOR - 1);
             } else if (sort == MARKET) {
                 // Whoever deals there, at the back of it.
@@ -2275,7 +2283,7 @@ final class RunLevels {
                     level.items.add(new int[]{PlusRun.DIARY, from + 12, FLOOR - 1, 0, page});
                 }
             }
-            int look = sort == HOME ? HOME_LOOK + Math.floorMod(number * 3 + level.rooms.size(), HOME_LOOKS) : sort == BOUTIQUE ? HOME_LOOK + 1 : LOOKS + sort;
+            int look = sort == HOME ? HOME_LOOK + Math.floorMod(number * 3 + level.rooms.size(), HOME_LOOKS) : sort == BOUTIQUE ? HOME_LOOK + 1 : sort == ELF ? HOME_LOOK + 2 : LOOKS + sort;
             level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, look, sort});
         }
 
@@ -2813,6 +2821,8 @@ final class RunLevels {
                         level.town = from;
                         level.decor.add(new int[]{400, from + 1, floor - 1});
                         level.items.add(new int[]{gives, from + 4, floor - 1, who});
+                        // (Economy: and a signpost between her and the first building, with a line of what the village is.)
+                        level.items.add(new int[]{PlusRun.SPOT, from + 6, floor - 1, 0, PlusRun.SIGN + level.chapter});
                         int column = from + 7;
                         for (int which = 0; which < sorts.length; which++) {
                             if (which == 2) {
@@ -2821,7 +2831,7 @@ final class RunLevels {
                             }
                             int sort = sorts[which];
                             level.decor.add(new int[]{sort == PET_SHOP ? 300 + level.number % 2 : sort == GUILD_HALL ? 302 + level.number % 2 : sort == SMITHY ? 304
-                                    : sort == MARKET ? 305 : sort == GACHA ? 306 : sort == BOUTIQUE ? 307 : (house + which) % 3, column, floor - 1});
+                                    : sort == MARKET ? 305 : sort == GACHA ? 306 : sort == BOUTIQUE ? 307 : sort == ELF ? 308 : (house + which) % 3, column, floor - 1});
                             built.add(new int[]{HOUSE, column, floor, 0, column, floor, sort});
                             if (which % 2 == 1) level.decor.add(new int[]{lamp, column + 5, floor - 1});
                             column += TOWN_GAP;

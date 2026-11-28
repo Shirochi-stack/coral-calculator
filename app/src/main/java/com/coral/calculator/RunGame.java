@@ -1507,6 +1507,76 @@ final class RunGame {
 
     private Bitmap boutiqueHouse, keeperArt;
 
+    /** (Economy) Aelwyn at the counter of her wagon, in the villages of the third, fifth... chapters: her eight pictures, one after another, and a mark over her. */
+    private Bitmap elfHouse, elfArt;
+    private boolean elfTried;
+
+    private void loadElf() {
+        if (elfTried) return;
+        elfTried = true;
+        for (int which = 0; which < 2; which++) {
+            try (java.io.InputStream in = context.getAssets().open(which == 0 ? "runart/elf_idle.webp" : "runart/elf_stall.webp")) {
+                if (which == 0) elfArt = BitmapFactory.decodeStream(in);
+                else elfHouse = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException missing) {
+                // (Without the pack she is not drawn.)
+            }
+        }
+    }
+
+    /** (Economy) A signpost in a village: a post and a board, and a mark over it; read, it says a line of the village's lore. */
+    private void drawSign(Canvas canvas, int[] item) {
+        float x = (item[1] + .5f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF7A5230);
+        canvas.drawRect(x - tile * .05f, floor - tile * 1.1f, x + tile * .05f, floor, paint);
+        paint.setColor(0xFFC99A5B);
+        canvas.drawRoundRect(x - tile * .42f, floor - tile * 1.35f, x + tile * .42f, floor - tile * .85f, tile * .08f, tile * .08f, paint);
+        paint.setColor(0xFF5A3A1E);
+        for (int line = 0; line < 3; line++) canvas.drawRect(x - tile * .3f, floor - tile * 1.25f + line * tile * .12f, x + tile * (.3f - line * .08f), floor - tile * 1.2f + line * tile * .12f, paint);
+        paint.setColor(Color.BLACK);
+        mark(canvas, x, floor - tile * 1.75f, "Read", 0xFF8A5A33, false);
+    }
+
+    /** (Economy) What a signpost says: the chapter's village's name and a line of lore. */
+    private void readSign(int chapter) {
+        int which = Math.max(0, Math.min(RunWorldLore.SIGNS.length - 1, chapter));
+        toast(RunLevels.VILLAGES[Math.min(RunLevels.VILLAGES.length - 1, which)], RunWorldLore.SIGNS[which], 0);
+        audio.play("page", .6f);
+    }
+
+    /** (Economy) Paper butterflies over a village: a few, drifting about on their own paths. */
+    private void drawButterflies(Canvas canvas, int from, int row, int span) {
+        paint.setStyle(Paint.Style.FILL);
+        int[] colours = {0xFFFF8FB8, 0xFF6FD0C0, 0xFFFFD25A, 0xFFB79CFF, 0xFFFFA06A, 0xFF8FD0FF};
+        for (int index = 0; index < 6; index++) {
+            float t = clock * (.25f + index * .03f) + index * 1.9f;
+            float bx = from + 3 + ((index * 7.3f + t * 2.2f) % (span - 4)) + (float) Math.sin(t * 3) * .8f;
+            float by = row - 1.4f - (float) Math.abs(Math.sin(t * 1.3f + index)) * 1.3f;
+            float x = (bx - cameraX) * tile, y = (by - cameraY) * tile, flap = .25f + .75f * Math.abs((float) Math.sin(clock * (13 + index) + index));
+            paint.setColor(colours[index]);
+            canvas.drawOval(x - tile * .13f * flap - tile * .02f, y - tile * .09f, x - tile * .02f, y + tile * .05f, paint);
+            canvas.drawOval(x + tile * .02f, y - tile * .09f, x + tile * .13f * flap + tile * .02f, y + tile * .05f, paint);
+            paint.setColor(0xFF3B2F2F);
+            canvas.drawRect(x - tile * .012f, y - tile * .07f, x + tile * .012f, y + tile * .05f, paint);
+        }
+        paint.setColor(Color.BLACK);
+    }
+
+    private void drawElf(Canvas canvas, int[] item) {
+        loadElf();
+        float x = (item[1] + 1.6f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .12f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF2F7F76);
+        canvas.drawRect(x - tile * 1.3f, feet - tile * .5f, x + tile * 1.3f, floor, paint);
+        paint.setColor(0xFFF2E3C2);
+        canvas.drawRect(x - tile * 1.35f, feet - tile * .55f, x + tile * 1.35f, feet - tile * .43f, paint);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        if (elfArt != null) cell(canvas, elfArt, RunMerchants.frameAt(clock), 8, x, feet - tile * .5f, tile * 1.75f, false);
+        mark(canvas, x, feet - tile * 2.45f, "Shop", 0xFF2F8F7A, false);
+    }
+
     /** Tulle at her counter, in the boutique of a village: her six pictures, one after another (she never moves between them), and a mark over her. */
     private void drawKeeper(Canvas canvas, int[] item) {
         float x = (item[1] + 1.6f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .12f;
@@ -4317,6 +4387,7 @@ final class RunGame {
         boolean reshaped = shelf != null && !shelf.closed() && (width != this.width || height != this.height);
         if (reshaped) shelf.close();
         if (boutique != null && !boutique.closed() && (width != this.width || height != this.height)) boutique.close();
+        if (merchants != null && !merchants.closed() && (width != this.width || height != this.height)) merchants.close();
         this.width = width;
         this.height = height;
         safe.set(insets);
@@ -4475,6 +4546,7 @@ final class RunGame {
     void close() {
         if (shelf != null) shelf.close();
         if (boutique != null) boutique.close();
+        if (merchants != null) merchants.close();
         audio.close();
     }
 
@@ -4484,6 +4556,7 @@ final class RunGame {
         if (video != null) video.skip();
         if (shelf != null) shelf.close();
         if (boutique != null) boutique.close();
+        if (merchants != null) merchants.close();
         if (screen == PLAY) pause();
         audio.hush();
     }
@@ -4493,6 +4566,11 @@ final class RunGame {
         // A clip being watched is what Back ends, as a tap does.
         if (video != null) {
             video.skip();
+            return true;
+        }
+        // Aelwyn's wagon: Back is out of it, to her counter.
+        if (merchants != null && !merchants.closed()) {
+            merchants.close();
             return true;
         }
         // The boutique: Back is out of it, to the counter.
@@ -5529,6 +5607,7 @@ final class RunGame {
         for (int sort : RunLevels.townOf(number)) {
             if (sort == RunLevels.GACHA) words.append(", ribbon gacha");
             if (sort == RunLevels.BOUTIQUE) words.append(", Tulle and Thread");
+            if (sort == RunLevels.ELF) words.append(", Aelwyn's wagon");
             if (sort == RunLevels.MARKET) words.append(", black market");
         }
         return words.append(" · the arch is a portal").toString();
@@ -8448,7 +8527,7 @@ final class RunGame {
                 // And a card that says what it is and what to do in it: before anything in it begins, where something is about to.
                 if (kind == RunLevels.HOUSE) {
                     int sort = here.rooms.get(in)[14];
-                    toast(sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
+                    toast(sort == RunLevels.ELF ? "Aelwyn's Wagon" : sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.ELF ? "Curios to buy, and junk and curios to sell" : sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
                             : sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
                             : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
                             : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
@@ -9063,6 +9142,10 @@ final class RunGame {
                 audio.play("tap", .5f);
                 buzz(false);
                 idle();
+                if (what >= PlusRun.SIGN) {
+                    readSign(what - PlusRun.SIGN);
+                    return;
+                }
                 if (what == PlusRun.BOARD) {
                     openHunts();
                     return;
@@ -9077,6 +9160,10 @@ final class RunGame {
                 }
                 if (what == PlusRun.BOUTIQUE) {
                     openBoutique(0);
+                    return;
+                }
+                if (what == PlusRun.ELF) {
+                    openElf(false);
                     return;
                 }
                 // (A dungeon's stairway, or the mirror, before the smiths: its number is past theirs.)
@@ -9652,10 +9739,12 @@ final class RunGame {
             int what = run.spot();
             audio.play("tap", .5f);
             idle();
-            if (what == PlusRun.BOARD) openHunts();
+            if (what >= PlusRun.SIGN) readSign(what - PlusRun.SIGN);
+            else if (what == PlusRun.BOARD) openHunts();
             else if (what == PlusRun.MACHINE) crank();
             else if (what == PlusRun.DEALER) openMarket();
             else if (what == PlusRun.BOUTIQUE) openBoutique(0);
+            else if (what == PlusRun.ELF) openElf(false);
             else if (what == PlusRun.STAIRS) openStairs();
             else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
             else {
@@ -9839,7 +9928,8 @@ final class RunGame {
                         int what = run.spot();
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
-                        if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
+                        if (what >= PlusRun.SIGN) artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
+                        else if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
                         else if (what == PlusRun.BOARD) pieceIn(canvas, four, SCROLL_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else if (what == PlusRun.MACHINE) pieceIn(canvas, two, RIBBON_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else if (what == PlusRun.SMITH) thing(canvas, PlusRun.SWORD, stallButton.centerX(), stallButton.centerY() - dp(6), stallButton.height() * .5f, 35, false, false);
@@ -9847,8 +9937,8 @@ final class RunGame {
                         else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else if (what == PlusRun.STAIRS) stairsIn(canvas, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .52f);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
-                        label(canvas, stallButton, what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                        label(canvas, stallButton, what >= PlusRun.SIGN ? "Read" : what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.ELF ? "Shop" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -10530,11 +10620,10 @@ final class RunGame {
 
     String purseWords() { return "She has + " + bank(); }
 
-    void openPackToSell(int from) {
-        openPack(from, true);
-    }
+    /** (Economy) Whether she stands at a merchant's counter (Aelwyn's): the inventory she opens from the pause card then has the Sell buttons. */
+    private boolean atMerchant() { return run != null && run.spot() == PlusRun.ELF; }
 
-    private void openPack(int from) { openPack(from, false); }
+    private void openPack(int from) { openPack(from, atMerchant()); }
 
     private void openPack(int from, boolean sell) {
         packOpen = true;
@@ -11124,6 +11213,7 @@ final class RunGame {
         if (shake > 0) canvas.translate((random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4), (random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4));
         paint.setAlpha(255);
         // What stands in its villages, behind everything else.
+        if (level.town > 0 && !level.decor.isEmpty()) drawButterflies(canvas, level.town, level.decor.get(0)[2], RunLevels.townWide(RunLevels.townOf(level.number).length));
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
             // Over a hundred, it is something of the fourth sheet: a chest in a stash.
@@ -11131,7 +11221,11 @@ final class RunGame {
                 drawVillagePiece(canvas, decor, level);
                 continue;
             }
-            if (decor[0] == 307) {
+            if (decor[0] == 308) {
+                // (Aelwyn's wagon: a picture of its own, in the runart pack.)
+                loadElf();
+                if (elfHouse != null) cell(canvas, elfHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else if (decor[0] == 307) {
                 // (The vanity boutique: a picture of its own.)
                 if (boutiqueHouse == null) boutiqueHouse = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_vanity_shop);
                 cell(canvas, boutiqueHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
@@ -11453,8 +11547,10 @@ final class RunGame {
                 continue;
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
-                if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
+                if (item[4] >= PlusRun.SIGN) drawSign(canvas, item);
+                else if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
                 else if (item[4] == PlusRun.BOUTIQUE) drawKeeper(canvas, item);
+                else if (item[4] == PlusRun.ELF) drawElf(canvas, item);
                 else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] == PlusRun.STAIRS) drawStairs(canvas, item);
                 else if (item[4] >= PlusRun.SMITH) drawSmith(canvas, item);
@@ -12252,6 +12348,10 @@ final class RunGame {
             } else if (sort == RunLevels.SMITHY) {
                 canvas.drawRect(x - round * .5f, y - round * .5f, x + round * .5f, y - round * .1f, paint);
                 canvas.drawRect(x - round * .1f, y - round * .1f, x + round * .1f, y + round * .65f, paint);
+            } else if (sort == RunLevels.ELF) {
+                // (A coin purse, for the elf's wagon.)
+                canvas.drawCircle(x, y + round * .15f, round * .45f, paint);
+                canvas.drawRect(x - round * .2f, y - round * .45f, x + round * .2f, y - round * .1f, paint);
             } else if (sort == RunLevels.BOUTIQUE) {
                 // (A coat hanger, for the boutique.)
                 path.reset();
@@ -16546,6 +16646,26 @@ final class RunGame {
 
     /** The boutique is laid over the game, with the game's voice and sounds lent to it. */
     private void openBoutique() { openBoutique(0); }
+
+    /** (Economy) Aelwyn's wagon is laid over the game, with the game's voice lent to it; Sell opens the pack in its sell mode. */
+    private RunMerchants merchants;
+
+    private void openElf(boolean sell) {
+        if (merchants != null && !merchants.closed()) return;
+        audio.hush();
+        int[] edges = {Math.round(safe.left), Math.round(safe.top), Math.round(width - safe.right), Math.round(height - safe.bottom)};
+        merchants = RunMerchants.over(stage, session, dark, edges, new RunMerchants.Host() {
+            @Override public void say(String name) { audio.say(name); }
+
+            @Override public boolean speaking() { return audio.speaking(); }
+
+            @Override public void hush() { audio.hush(); }
+
+            @Override public void play(String effect) { audio.play(effect, .5f); }
+
+            @Override public void closed() { }
+        }, Math.max(0, number));
+    }
 
     private void openBoutique(int page) {
         if (boutique != null && !boutique.closed()) return;

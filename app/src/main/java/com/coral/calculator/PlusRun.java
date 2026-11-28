@@ -137,6 +137,10 @@ final class PlusRun {
     static final int BOUTIQUE = 600;
     /** And the stairway down into a land's dungeon. */
     static final int STAIRS = 700;
+    /** (Economy) And Aelwyn, the elf merchant, at her wagon's counter in a village: she buys and sells curios. */
+    static final int ELF = 800;
+    /** (Economy) A signpost with a line of a village's lore, to be read: from here up, by the chapter. */
+    static final int SIGN = 1000;
     /**
      * A pot of black ink, which stands in the later lands and throws the black curse: how
      * often, for how long it swells before it does, from how far off it throws, and how
@@ -3710,6 +3714,12 @@ final class PlusRun {
         }
     }
 
+    /** (Economy: a chest holds a curio about one time in eight, more in a stash or a hideout. Kept out of the step's own method, which must stay small enough for the JIT to compile.) */
+    private void chestCurio() {
+        boolean secret = room >= 0 && (level.rooms.get(room)[0] == RunLevels.STASH || level.rooms.get(room)[0] == RunLevels.HIDEOUT);
+        if (lootRoll(100) < (secret ? 35 : 12) + RunArtifacts.lucky()) found.add(RunArtifacts.found(secret ? RunArtifacts.GREAT : RunArtifacts.CHEST, lootRoll(100), lootRoll(1000)));
+    }
+
     /** Something has fallen: it is let loose where it is, out of anything solid. */
     private void loose(Drop drop) {
         unstick(drop);
@@ -5768,6 +5778,7 @@ final class PlusRun {
         }
     }
 
+    // (Careful: this method is within 70 bytes of the JVM's limit of 8000 bytes of bytecode, past which the JIT never compiles it and a land's whole simulation runs five times slower, which turned a ten-minute test run into an hour. Put new rules in methods of their own and call them.)
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         // Stunned, she can do nothing for a moment.
         if (herStun > 0) left = right = jump = strike = false;
@@ -6173,11 +6184,7 @@ final class PlusRun {
                     chests++;
                     lastChest = item.length > 4 && item[4] > 0 ? item[4] : 10;
                     bonus += lastChest;
-                    // (Economy: a chest holds a curio about one time in eight, more in a stash or a hideout.)
-                    boolean secret = room >= 0 && (level.rooms.get(room)[0] == RunLevels.STASH || level.rooms.get(room)[0] == RunLevels.HIDEOUT);
-                    if (lootRoll(100) < (secret ? 35 : 12) + RunArtifacts.lucky()) {
-                        found.add(RunArtifacts.found(secret ? RunArtifacts.GREAT : RunArtifacts.CHEST, lootRoll(100), lootRoll(1000)));
-                    }
+                    chestCurio();
                     if (room >= 0 && level.rooms.get(room)[0] == RunLevels.STASH && (roomsDone & 1 << room) == 0) {
                         roomsDone |= 1 << room;
                         roomWins++;
