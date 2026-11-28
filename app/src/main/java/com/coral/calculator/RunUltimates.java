@@ -71,7 +71,7 @@ final class RunUltimates {
     }
     /** The word she shows as it begins (and the colour of its light, lit by each in its own way). */
     static final String[] SHOUT = {"", "RAMPAGE!", "TIME STOPS", "TIDE OF INK", "COLOSSUS!", "LEGION!", "ROSE BLOOM"};
-    static final int[] COLOURS = {0, 0xFFE0362F, 0xFFB9C8D8, 0xFF27348F, 0xFFFFC433, 0xFF9A6AE8, 0xFFFF6FA0};
+    static final int[] COLOURS = {0, 0xFFFF8FA0, 0xFFC4D2F0, 0xFF8FB0F0, 0xFFFFD27A, 0xFFB89AF0, 0xFFFFA0C0};
     /** The sound each begins with, and ends with ({@link RunAudio}). */
     static final String[] START_SOUND = {"", "ult_berserk", "ult_time", "ult_tide", "ult_titan", "ult_legion", "ult_bloom"};
     static final String[] END_SOUND = {"", "ult_berserk_end", "ult_time_end", "ult_tide_end", "ult_titan_end", "ult_legion_end", "ult_bloom_end"};

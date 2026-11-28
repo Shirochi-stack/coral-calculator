@@ -86,16 +86,16 @@ final class RunUltimateFx {
         float beat = .5f + .5f * (float) Math.sin(clock * (which == RunUltimates.BERSERK ? 14 : 5));
         switch (which) {
             case RunUltimates.BERSERK:
-                glow(canvas, x, y, tall * (.9f + .1f * beat), 0xFFFF5A1A, .45f);
+                glow(canvas, x, y, tall * (.9f + .1f * beat), 0xFFFFB8A0, .35f);
                 break;
             case RunUltimates.STILL:
-                glow(canvas, x, y, tall * .85f, 0xFFB0D0FF, .28f);
+                glow(canvas, x, y, tall * .85f, 0xFFD8E4FF, .24f);
                 break;
             case RunUltimates.TIDE:
-                glow(canvas, x, y, tall * 1.0f, 0xFF27348F, .5f);
+                glow(canvas, x, y, tall * 1.0f, 0xFF9DB4F0, .4f);
                 break;
             case RunUltimates.TITAN:
-                glow(canvas, x, y, tall * .9f, colour, .35f);
+                glow(canvas, x, y, tall * .9f, colour, .28f);
                 float feet = y + tall * .45f;
                 LINE.setColor(alpha(colour, .7f));
                 for (int wave = 0; wave < 2; wave++) {
@@ -107,10 +107,10 @@ final class RunUltimateFx {
                 }
                 break;
             case RunUltimates.LEGION:
-                glow(canvas, x, y, tall * .8f, colour, .3f);
+                glow(canvas, x, y, tall * .8f, colour, .24f);
                 break;
             default:
-                glow(canvas, x, y, tall * .9f, colour, .35f);
+                glow(canvas, x, y, tall * .9f, colour, .28f);
         }
     }
 
@@ -219,26 +219,26 @@ final class RunUltimateFx {
             switch (KIND[at]) {
                 case EMBER:
                     // A hot point with a trail below it: white-yellow at its heart, red as it goes out.
-                    glow(canvas, x, y, tile * .16f, 0xFFFF7A20, .7f * t);
-                    FILL.setColor(t > .5f ? 0xFFFFE9A0 : 0xFFFF6A1A);
+                    glow(canvas, x, y, tile * .16f, 0xFFFFB8A8, .6f * t);
+                    FILL.setColor(t > .5f ? 0xFFFFF6DC : 0xFFFFA9A0);
                     FILL.setAlpha(Math.round(255 * Math.min(1, t * 2)));
                     canvas.drawCircle(x, y, tile * .035f * (.5f + t), FILL);
                     break;
                 case SAND:
-                    FILL.setColor(0xFFF4DC9A);
+                    FILL.setColor(0xFFFFF1D2);
                     FILL.setAlpha(Math.round(220 * Math.min(1, Math.min(t * 3, (1 - t) * 6))));
                     canvas.drawCircle(x, y, tile * .03f, FILL);
                     break;
                 case DROP:
-                    FILL.setColor(0xFF161B4A);
+                    FILL.setColor(0xFFA9C0F2);
                     FILL.setAlpha(Math.round(255 * Math.min(1, t * 3)));
                     canvas.drawCircle(x, y, tile * .07f, FILL);
-                    FILL.setColor(0xFF9EE8FF);
+                    FILL.setColor(0xFFFFFFFF);
                     FILL.setAlpha(Math.round(200 * Math.min(1, t * 3)));
                     canvas.drawCircle(x - tile * .022f, y - tile * .025f, tile * .02f, FILL);
                     break;
                 case PEBBLE:
-                    FILL.setColor(0xFF7A6A58);
+                    FILL.setColor(0xFFD2C4B2);
                     FILL.setAlpha(Math.round(255 * Math.min(1, t * 3)));
                     canvas.drawRect(x - tile * .05f, y - tile * .05f, x + tile * .05f, y + tile * .05f, FILL);
                     break;
@@ -247,7 +247,7 @@ final class RunUltimateFx {
                     canvas.save();
                     canvas.rotate((float) Math.toDegrees(SPIN[at]), x, y);
                     BOX.set(x - tile * .1f, y - tile * .055f, x + tile * .1f, y + tile * .055f);
-                    FILL.setColor(at % 3 == 0 ? 0xFFFFD2E0 : at % 3 == 1 ? 0xFFFF7FAF : 0xFFE2406F);
+                    FILL.setColor(at % 3 == 0 ? 0xFFFFEAF1 : at % 3 == 1 ? 0xFFFFC0D4 : 0xFFF29CB8);
                     FILL.setAlpha(Math.round(235 * Math.min(1, Math.min(t * 3, (1 - t) * 8 + .3f))));
                     canvas.drawOval(BOX, FILL);
                     canvas.restore();
@@ -301,11 +301,11 @@ final class RunUltimateFx {
             float beat = .5f + .5f * (float) Math.sin(clock * (which == RunUltimates.BERSERK ? 12 : 3));
             switch (which) {
                 case RunUltimates.BERSERK:
-                    edge(canvas, width, height, 0xFFE81408, .5f + .2f * beat);
+                    edge(canvas, width, height, 0xFFFF9AA8, .38f + .15f * beat);
                     break;
                 case RunUltimates.STILL:
                     canvas.drawColor(alpha(0xFFC8DCFF, .08f));
-                    edge(canvas, width, height, 0xFF0A1030, .5f);
+                    edge(canvas, width, height, 0xFF48567E, .4f);
                     float r = Math.min(width, height) * .38f, cx = width / 2f, cy = height / 2f;
                     LINE.setColor(alpha(0xFFFFFFFF, .16f));
                     LINE.setStrokeWidth(r * .03f);
@@ -320,16 +320,16 @@ final class RunUltimateFx {
                     canvas.drawLine(cx, cy, cx + (float) Math.cos(hand / 12) * r * .5f, cy + (float) Math.sin(hand / 12) * r * .5f, LINE);
                     break;
                 case RunUltimates.TIDE:
-                    edge(canvas, width, height, 0xFF1B2152, .6f);
+                    edge(canvas, width, height, 0xFF6C84C8, .4f);
                     break;
                 case RunUltimates.TITAN:
-                    edge(canvas, width, height, 0xFFFFC433, .25f);
+                    edge(canvas, width, height, 0xFFFFD98A, .22f);
                     break;
                 case RunUltimates.LEGION:
-                    edge(canvas, width, height, 0xFF9A6AE8, .35f);
+                    edge(canvas, width, height, 0xFFC4A8F0, .3f);
                     break;
                 default:
-                    edge(canvas, width, height, 0xFFFF6FA0, .35f + .1f * beat);
+                    edge(canvas, width, height, 0xFFFFA8C4, .3f + .1f * beat);
             }
             bar(canvas, run, width, height, which);
         }
@@ -339,7 +339,7 @@ final class RunUltimateFx {
     /** The name of the ultimate that has begun, on a banner of its own: dark-backed, in a colour with a white edge, large, away from anything she says. It slides in, stays, and fades. */
     private static void banner(Canvas canvas, int width, int height, int which, float age) {
         float in = Math.min(1, age / .18f), out = Math.min(1, (1.9f - age) / .4f), show = Math.max(0, Math.min(in, out));
-        float tall = height * .13f, wide = Math.min(width * .5f, tall * 6.2f), cx = width * .56f, top = height * .25f - (1 - in) * tall * .5f;
+        float tall = height * .13f, wide = Math.min(width * .5f, tall * 6.2f), cx = width * .65f, top = height * .22f - (1 - in) * tall * .5f;
         float grow = .9f + .1f * in;
         FILL.setStyle(Paint.Style.FILL);
         FILL.setColor(alpha(0xFF0A0610, .78f * show));
@@ -357,8 +357,7 @@ final class RunUltimateFx {
         WORDS.setColor(alpha(0xFF000000, show));
         canvas.drawText(RunUltimates.SHOUT[which], cx, top + tall * .66f, WORDS);
         WORDS.setStyle(Paint.Style.FILL);
-        WORDS.setColor(alpha(which == RunUltimates.STILL ? 0xFFDDEBFF : which == RunUltimates.TIDE ? 0xFF8FB0FF : RunUltimates.COLOURS[which] | 0xFF000000, show));
-        if (which == RunUltimates.BERSERK) WORDS.setColor(alpha(0xFFFF5A3C, show));
+        WORDS.setColor(alpha(RunUltimates.COLOURS[which] | 0xFF000000, show));
         canvas.drawText(RunUltimates.SHOUT[which], cx, top + tall * .66f, WORDS);
     }
 
