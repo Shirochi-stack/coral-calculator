@@ -438,3 +438,31 @@ swim 0 88.0 63.0 127.5 140.0 127.5 147.0 131.5 169.0 131.5 194.0 145.9 159.0
 swim 1 101.0 49.0 145.0 166.0 145.0 173.0 140.0 164.0 140.0 180.0 155.3 157.6
 swim 2 109.0 30.0 103.0 100.0 103.0 107.0 99.5 95.0 99.5 135.0 120.8 79.0
 swim 3 none
+climb 0 none
+climb 1 none
+climb 2 none
+climb 3 none
+arm18 0 none
+arm18 1 none
+arm18 2 none
+arm18 3 none
+arm18 4 none
+arm18 5 none
+arm18 6 none
+arm18 7 240.0 40.0 258.0 151.0 258.0 158.0 254.0 147.0 254.0 177.0 269.3 135.0
+arm18 8 none
+arm18 9 none
+arm18 10 276.5 24.0 271.5 109.0 271.5 116.0 277.0 105.0 277.0 138.0 295.7 91.8
+arm18 11 none
+grip18 0 none
+grip18 1 none
+grip18 2 none
+grip18 3 none
+grip18 4 none
+grip18 5 none
+grip18 6 none
+grip18 7 none
+grip18 8 none
+grip18 9 none
+grip18 10 277.0 25.0 272.0 116.0 272.0 123.0 279.0 112.0 279.0 140.0 299.4 100.8
+grip18 11 none

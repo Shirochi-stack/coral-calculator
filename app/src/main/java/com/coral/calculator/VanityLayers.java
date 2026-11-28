@@ -25,7 +25,9 @@ final class VanityLayers {
             // Her moves: flips, air dash, ground pound, roll, cling, glide.
             {"moves", 8, 1, 256, 208},
             // Her swimming: two strokes, a dive, an ink shot.
-            {"swim", 4, 1, 256, 208}};
+            {"swim", 4, 1, 256, 208},
+            // Her climbing (hand over hand), and the thirteenth weapon class, knuckles: its frames, and the same with nothing in her hands.
+            {"climb", 4, 1, 256, 208}, {"arm18", 12, 1, 500, 248}, {"grip18", 12, 1, 500, 248}};
 
     static int[] geometry(String sheet) {
         for (Object[] one : SHEETS) {

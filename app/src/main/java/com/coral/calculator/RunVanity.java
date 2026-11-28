@@ -117,9 +117,7 @@ final class RunVanity {
     static final int[] TREATS = {3, 5, 0, 8, 6, 0, 0, 8, 8, 8, 6, 8, 6, 5, 3, 5, 5, 7, 6, 5, 7, 4};
     static final int[] QUEST = {-1, -1, 2, -1, -1, 0, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
     static final Style[] STYLES = {
-            new Style(0xFF5B4FA8, 0xFF9A8CE0, 0xFFF0E9FF, 0xFFFFE08A, STARS, false, false, false, 0),
-            new Style(0xFF1A1020, 0xFF4A2A5E, 0xFFB89AD0, 0xFFD8C8EC, DIAMONDS, false, false, true, 0xFFE0334A),
-            new Style(0xFF2B3A55, 0xFF5C7CB0, 0xFFEAF0FA, 0xFFE8C65A, PLAIN, false, true, true, 0xFFE8C65A),
+            new Style("pajama"), new Style("gothic"), new Style("tabard"),
             new Style("bunny"), new Style("maid"), new Style("idol"), new Style("swim1"), new Style("bunnyg"),
             new Style("bunnyi"), new Style("bunnyw"), new Style("maidp"), new Style("idolc"), new Style("swimf"), new Style("swims"), new Style("pajamac"),
             new Style("gothicm"), new Style("tabardsky"), new Style("mage"), new Style("yukata"), new Style("coat"), new Style("magical"), new Style("blazer")};
