@@ -10,7 +10,7 @@ final class RunUniques {
     private RunUniques() {}
 
     /** The first of their kinds, after Lucy; how many there are. */
-    static final int FIRST = RunLevels.LUCY + 1, COUNT = 87;
+    static final int FIRST = RunLevels.LUCY + 1, COUNT = 93;
     /** And the four of the lagoons, who swim: after the hidden bosses. */
     static final int WATER_FIRST = FIRST + 30, WATER_COUNT = 4;
     /** Of them, the six hidden bosses: after the twenty-four, one for each two chapters, each in the hideouts of its lands. */
@@ -54,6 +54,13 @@ final class RunUniques {
      */
     static final int CAST_FIRST = FIRST + 82, CAST_COUNT = 5;
     static final float CAST_TOUGHER = 5;
+    /**
+     * Six more hidden bosses, so that each chapter with hideouts has one of its own (the first six now in the odd chapters, these in
+     * the even ones from the third, and the last two chapters' by turns in the last): the Overdue Notice, the Papercut Queen, the Gilded Bookworm, the Wax Seal Tyrant, the Footnote King, the Last
+     * Librarian. Their pictures in the run's asset pack.
+     */
+    static final int HIDDEN2_FIRST = FIRST + 87, HIDDEN2_COUNT = 6;
+    static final String HIDDEN2_SHEET = "runart/uniques_hidden2.webp";
     /** What each of them is made of (see {@link PlusRun#resists}), or nought for those that stun. */
     static final int[] STATUS_MADE = {PlusRun.RESISTS_FIRE, PlusRun.RESISTS_COLD, PlusRun.RESISTS_INK, PlusRun.RESISTS_INK, 0, PlusRun.RESISTS_COLD,
             PlusRun.RESISTS_FIRE, PlusRun.RESISTS_INK, PlusRun.RESISTS_COLD, PlusRun.RESISTS_FIRE, PlusRun.RESISTS_INK, 0};
@@ -80,7 +87,8 @@ final class RunUniques {
             "Snowglobe Golem", "Ashen Scribe", "Smog Moth", "Thunder Clapper",
             "Shadow Self", "Hidden Reflection", "Shadow Archer", "The Imperfect Copy",
             "The Drowned Halgakos", "The Ashen Halgakos", "The Knight Who Stayed", "The Last Idol", "The Frozen Scholar", "The Hollow Maid", "The Blank Page",
-            "Shadow Chikuwa", "Shadow Rune", "Shadow Illya", "Shadow Tsubakieh", "Shadow Mawang"};
+            "Shadow Chikuwa", "Shadow Rune", "Shadow Illya", "Shadow Tsubakieh", "Shadow Mawang",
+            "The Overdue Notice", "The Papercut Queen", "The Gilded Bookworm", "The Wax Seal Tyrant", "The Footnote King", "The Last Librarian"};
     /** Each one's chapter (two to a chapter, in order) and way of fighting. */
     static final int[] WAY = {CHARGER, SHIELDER, MIMIC, GHOST, EXPLODER, SNIPER, CHARGER, BURROWER, SUMMONER, HEALER, MINIBOSS, SHIELDER, FORMATION, CHARGER,
             GHOST, MIMIC, SPLITTER, EXPLODER, SNIPER, MINIBOSS, SHIELDER, SUMMONER, HEALER, CHARGER, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN,
@@ -89,7 +97,8 @@ final class RunUniques {
             SNIPER, STAMPER, SNIPER, EXPLODER, CHARGER, SHIELDER, LEAPER, SPLITTER, STAMPER, SNIPER, BLINKER, BOUNCER,
             MIRROR, GHOST, SNIPER, KEEPER,
             MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS,
-            LEAPER, SNIPER, ORBITER, CHARGER, BLINKER};
+            LEAPER, SNIPER, ORBITER, CHARGER, BLINKER,
+            HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN};
     /** How many blows of health each has at the start of the game (it grows with the land), by way of fighting. */
     private static final float[] HEALTH = {4, 6, 4, 3, 2, 3, 4, 5, 4, 24, 1.5f, 6, 70, 4, 3, 3.5f, 4, 3, 3, 7, 4, 90, 7, 6, 7, 6, 8, 9, 8, 6, 7, 9, 8, 9};
     /** How wide and tall each is, in squares. */
@@ -99,14 +108,16 @@ final class RunUniques {
             .8f, 1.1f, .9f, .95f, 1.1f, 1.25f, 1, .9f, 1.3f, .9f, 1, 1,
             .7f, .7f, .7f, 1.3f,
             .8f, .8f, .8f, .8f, .8f, .8f, .8f,
-            .8f, .8f, .8f, .9f, 1.1f};
+            .8f, .8f, .8f, .9f, 1.1f,
+            2.2f, 1.8f, 2.4f, 2, 2, 1.7f};
     static final float[] TALL = {.8f, .85f, .7f, 1.15f, .75f, .85f, .95f, .95f, 1.25f, .75f, 1.5f, 1.35f, .7f, .8f, 1.2f, .85f, .75f, .9f, .75f, 1.45f, .8f, .85f, 1.05f, 1.05f,
             1.8f, 1.7f, 1.6f, 2.4f, 1.9f, 2.4f, .9f, .85f, .6f, 1.1f, .8f, .8f, .85f, .9f, .85f, 1.2f, 1.4f, 2.2f, 1.8f, 2.2f, 2.4f, 2, 2.6f,
             .8f, 1.05f, .7f, 1.2f, .9f, .8f, .85f, .95f, 1.1f, 1, 1.05f, 1.45f,
             .85f, .95f, .8f, .8f, .85f, 1.1f, .95f, .95f, 1.4f, 1.15f, .85f, .9f,
             1.4f, 1.4f, 1.4f, 2.4f,
             1.6f, 1.6f, 1.6f, 1.6f, 1.6f, 1.6f, 1.6f,
-            1.3f, 1.4f, 1.4f, 1.5f, 1.6f};
+            1.3f, 1.4f, 1.4f, 1.5f, 1.6f,
+            2, 2.4f, 1.8f, 2.2f, 2.2f, 2.5f};
     /** How fast each walks, squares a second. */
     static final float[] SPEED = {1.5f, .55f, 1.2f, .9f, 1.3f, .8f, 1.4f, 1.6f, .6f, .9f, 1.1f, .5f, 2.2f, 1.6f, 1, 1.4f, .8f, 1.2f, .9f, .9f, .7f, .7f, .9f, 1.7f,
             1.3f, 1.2f, 1.4f, .8f, 1.5f, 1.3f, 1.4f, 1.2f, 2.4f, .7f, 1.4f, 1.6f, 1.2f, 1, 2.2f, .6f, 3, 1.2f, 1.4f, 1.1f, 1.2f, 1.3f, 1.2f,
@@ -114,7 +125,8 @@ final class RunUniques {
             .9f, .6f, .8f, 1.3f, 1.6f, .5f, 1.2f, .8f, .55f, .8f, 1.4f, 1.2f,
             1.4f, 1.1f, .9f, 1.3f,
             1.2f, 1.1f, 1, 1.3f, .9f, 1.4f, 1.3f,
-            1.3f, .9f, 1.1f, 1.5f, 1.4f};
+            1.3f, .9f, 1.1f, 1.5f, 1.4f,
+            1.2f, 1.4f, 1.1f, 1, 1.3f, 1.2f};
 
     static boolean is(int kind) { return kind >= FIRST && kind < FIRST + COUNT; }
 
@@ -124,8 +136,8 @@ final class RunUniques {
 
     static int chapter(int kind) {
         int index = index(kind);
-        return index < 24 ? index / 2 : index < 30 ? (index - 24) * 2 : index < 34 ? 10 : index < 41 ? 11 : index < 47 ? (index - 41) * 2 + 1
-                : index < 59 ? LATER_CHAPTER + (index - 47) / 2 : index < 71 ? (index - 59) / 2 : 11;
+        return index < 24 ? index / 2 : index < 30 ? (index - 24) * 2 + 1 : index < 34 ? 10 : index < 41 ? 11 : index < 47 ? (index - 41) * 2 + 1
+                : index < 59 ? LATER_CHAPTER + (index - 47) / 2 : index < 71 ? (index - 59) / 2 : index < 87 ? 11 : Math.min(11, (index - 87) * 2 + 2);
     }
 
     /** Whether it is one of the twelve made of fire, frost and ink; and the first of a chapter's two of them (or -1 past the sixth chapter). */
@@ -191,6 +203,9 @@ final class RunUniques {
         // (The Copy cracks apart like the mirror she is; her shadows go as smoke does.)
         if (kind == COPY || echo(kind)) return PlusRun.DEFEAT_SHATTER;
         if (shadow(kind) || castShadow(kind)) return PlusRun.DEFEAT_FADE;
+        // (The later hidden bosses each as they are made: slips, paper, gold leaf, wax, marks, pages.)
+        if (hidden2(kind)) return new int[]{PlusRun.DEFEAT_CRUMPLE, PlusRun.DEFEAT_CRUMPLE, PlusRun.DEFEAT_PAGES, PlusRun.DEFEAT_MELT, PlusRun.DEFEAT_FADE,
+                PlusRun.DEFEAT_PAGES}[kind - HIDDEN2_FIRST];
         if (status(kind)) {
             int made = STATUS_MADE[kind - STATUS_FIRST];
             return made == PlusRun.RESISTS_FIRE ? PlusRun.DEFEAT_ASH : made == PlusRun.RESISTS_COLD ? PlusRun.DEFEAT_SHATTER : made == PlusRun.RESISTS_INK ? PlusRun.DEFEAT_MELT
@@ -208,10 +223,26 @@ final class RunUniques {
     /** Whether it is one of the hidden bosses; and the hidden boss of a chapter. */
     static boolean hidden(int kind) { return is(kind) && way(kind) == HIDDEN; }
 
-    static int hiddenOf(int chapter) { return HIDDEN_FIRST + Math.max(0, Math.min(11, chapter)) / 2; }
+    static int hiddenOf(int chapter) {
+        // (No land of the first chapter has a hideout, so the moth waits in the second's: the first six in the odd chapters, the later six in the
+        // even ones from the third, and the last chapter's two by turns.)
+        int at = Math.max(1, Math.min(11, chapter));
+        return at % 2 == 1 ? HIDDEN_FIRST + (at - 1) / 2 : HIDDEN2_FIRST + (at - 2) / 2;
+    }
+
+    /** The hidden boss in a land's hideout: its chapter's, but in the last chapter the Unwritten and the Last Librarian by turns. */
+    static int hiddenIn(int number) {
+        int chapter = RunLevels.chapterOf(number);
+        if (chapter >= 11) return number % 2 == 1 ? HIDDEN_FIRST + 5 : HIDDEN2_FIRST + 5;
+        return hiddenOf(chapter);
+    }
+    /** Whether it is one of the six later hidden bosses. */
+    static boolean hidden2(int kind) { return kind >= HIDDEN2_FIRST && kind < HIDDEN2_FIRST + HIDDEN2_COUNT; }
 
     /** What a hidden boss throws: the moth eraser crumbs, Quillon ink, the line full stops, the golem type, Marginalia doodles, the Unwritten pages. */
     static int hiddenShot(int kind) {
+        // (The later six: overdue slips, paper blades, gold flakes, molten wax, footnote marks, pale words.)
+        if (hidden2(kind)) return new int[]{PlusRun.SCROLL, PlusRun.KNIFE, PlusRun.DOT, PlusRun.BLOT_SHOT, PlusRun.STOP, PlusRun.FEATHER}[kind - HIDDEN2_FIRST];
         switch (kind - HIDDEN_FIRST) {
             case 0: return PlusRun.DOT;
             case 1: return PlusRun.BLOT_SHOT;
@@ -224,6 +255,13 @@ final class RunUniques {
 
     /** Its own Halgakos Rose piece, the first time it is beaten: an accessory, a pen, an armour, a hammer, an accessory, a sword. */
     static int signature(int kind) {
+        // (The later six's: an armour, a weapon, an accessory, an armour, an accessory, a weapon, of their own (even) chapters.)
+        if (hidden2(kind)) {
+            int boss = kind - HIDDEN2_FIRST;
+            int[] types = {RunLoot.ARMOUR, RunLoot.WEAPON, RunLoot.ACCESSORY, RunLoot.ARMOUR, RunLoot.ACCESSORY, RunLoot.WEAPON};
+            int[] bases = {12, 3, 15, 18, 9, 11};
+            return RunLoot.code(types[boss], Math.min(11, boss * 2 + 2), bases[boss], RunLoot.ROSE);
+        }
         int boss = kind - HIDDEN_FIRST;
         int[] types = {RunLoot.ACCESSORY, RunLoot.WEAPON, RunLoot.ARMOUR, RunLoot.WEAPON, RunLoot.ACCESSORY, RunLoot.WEAPON};
         int[] bases = {7, 6, 24, 8, 21, 0};

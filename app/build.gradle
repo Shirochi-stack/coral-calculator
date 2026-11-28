@@ -18,15 +18,15 @@ android {
         applicationId 'com.halgakos.calculator'
         minSdk 26
         targetSdk 36
-        versionCode 137
-        versionName '3.56.0'
+        versionCode 140
+        versionName '3.58.0'
     }
 
     // The outfits, and Plus run's other art kept out of the base module, are install-time asset packs; the debug APK carries them in the app itself.
-    assetPacks = [':vanity', ':runart', ':mirror']
+    assetPacks = [':vanity', ':runart', ':mirror', ':voices', ':films']
     sourceSets {
         debug {
-            assets.srcDirs += ['../vanity/src/main/assets', '../runart/src/main/assets', '../mirror/src/main/assets']
+            assets.srcDirs += ['../vanity/src/main/assets', '../runart/src/main/assets', '../mirror/src/main/assets', '../voices/src/main/assets', '../films/src/main/assets']
         }
     }
 

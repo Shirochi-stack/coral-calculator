@@ -244,11 +244,11 @@ final class RunGame {
             {"Her pets wait a fifth less between one thing and the next", "Her pets wait two fifths less"},
             {"A pet's blow counts twice on a big one", "And a pet takes a whole piece off a shield"},
             {"A third jump in the air, a flip: press jump again"},
-            {"In the air, double-tap a way (or Shift): a dash that way", "And the dash strikes whatever it goes through"},
+            {"In the air, the dash button over the arrows (or double-tap a way, or Shift): a dash the way she faces", "And the dash strikes whatever it goes through"},
             {"Whatever hurts her takes a blow of thorns", "Two blows of thorns", "Three blows of thorns"},
             {"Hold down in the air: she slams the ground with what she holds, even out of an air dash", "A wider slam that hits harder, and cracks two pieces off a shield",
                     "The widest slam: shields broken outright, and a shockwave along the ground"},
-            {"On the ground, double-tap a way (or Shift): a roll nothing hurts"},
+            {"On the ground, the dash button over the arrows (or double-tap a way, or Shift): a roll nothing hurts"},
             {"Against a wall in the air she clings: jump to kick off it"},
             {"Hold jump as she falls: she glides down slowly", "She glides slower, and so further", "Slower still, and every second and a half a gust lifts her"},
             {"Once a land, what would end her leaves half a heart"},
@@ -572,6 +572,17 @@ final class RunGame {
     /** The button that lets her down through a thin ledge, over the arrows; and whether it is held. */
     private final RectF downButton = new RectF();
     private boolean goDown;
+    /** The dash's own button, over the arrows between the two, once she has the roll or the dash in the air; and when it was last tapped. */
+    private final RectF dashButton = new RectF();
+    private float dashTapped = -9;
+    /** The ground pound's own button, shown only in the air, and when it was tapped. */
+    private final RectF poundButton = new RectF();
+    private float poundTapped = -9;
+
+    /** Whether the ground pound's button is up: in the air, with the move, where a pound could begin. */
+    private boolean poundShown() {
+        return finale == NO_FINALE && run != null && run.canPound();
+    }
     /** What a card that names something won is: plain, good, or rare. And where what was won flies from, in squares. */
     private int toastRarity;
     /** A toast's picture that is a thing found: this much and its number. */
@@ -4481,12 +4492,22 @@ final class RunGame {
                 right = tabs[volume].left - dp(6);
             }
         }
-        // The button that lets her down through a thin ledge, and that slams the ground from the air: with the strike and the jump, over the
-        // gap between them, so that the thumb that strikes rolls onto it. (The arrows' thumb has only the arrows.)
-        float downs = Math.max(dp(46), size * .66f), gap = (strikeButton.right + jumpButton.left) / 2;
-        downButton.set(gap - downs / 2, y - dp(10) - downs, gap + downs / 2, y - dp(10));
-        // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the down button.
-        float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, downButton.left - dp(8));
+        // The button that lets her down through a thin ledge: over the arrows and between them, where the thumb that holds them reaches it.
+        float downs = Math.max(dp(46), size * .66f), mid = (leftButton.right + rightButton.left) / 2;
+        downButton.set(mid - downs / 2, y - dp(10) - downs, mid + downs / 2, y - dp(10));
+        // The ground pound's own button, there only while she is in the air with the move: with the strike and the jump, over the gap
+        // between them, where the thumb that strikes rolls onto it.
+        float gap = (strikeButton.right + jumpButton.left) / 2;
+        poundButton.set(gap - downs / 2, y - dp(10) - downs, gap + downs / 2, y - dp(10));
+        // The dash, with the moves of the right thumb too. Upright, a third row: over the pound. On a wide screen, where the land is short and
+        // a third row would lie over too much of it, beside the pound instead, over the jump.
+        if (safe.width() > safe.height()) {
+            dashButton.set(poundButton.right + dp(10), poundButton.top, poundButton.right + dp(10) + downs, poundButton.bottom);
+        } else {
+            dashButton.set(poundButton.left, poundButton.top - dp(10) - downs, poundButton.right, poundButton.top - dp(10));
+        }
+        // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the pound's place.
+        float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, poundButton.left - dp(8));
         swapButton.set(swapRight - swaps, strikeButton.top - dp(12) - swaps, swapRight, strikeButton.top - dp(12));
         // Her active slots, in a row to the left of it, the first leftmost.
         float slotSide = Math.max(dp(40), size * .6f), slotGap = dp(6), slotsFrom = swapButton.left - between - 3 * slotSide - 2 * slotGap;
@@ -4495,8 +4516,8 @@ final class RunGame {
             slotPlaces[slot].set(slotLeft, swapButton.centerY() - slotSide / 2, slotLeft + slotSide, swapButton.centerY() + slotSide / 2);
         }
         turnTo(page);
-        // The stall in a land, or a door: its button over the jump, where her thumb already is, and over the down button too.
-        float stallBottom = Math.min(jumpButton.top - dp(14), downButton.top - dp(8));
+        // The stall in a land, or a door: its button over the jump, where her thumb already is, and over the pound's and the dash's places too.
+        float stallBottom = Math.min(jumpButton.top - dp(14), Math.min(poundButton.top, dashButton.top) - dp(8));
         stallButton.set(jumpButton.left, stallBottom - size, jumpButton.right, stallBottom);
         // The fifth button, on the right in the row with the rest, so that it never lies over her or over what she is about to walk into:
         // the ribbon that calls on a colour of hers, with a small one on its corner that chooses which.
@@ -5027,7 +5048,7 @@ final class RunGame {
         int kind = delveKind();
         String words = kind != RunDungeons.PLAIN ? RunDungeons.KIND_NAMES[kind] + ": " + RunDungeons.KIND_WORDS[kind]
                 : delveFloor == RunDungeons.floors(delve) - 1 ? "Its keeper waits at the end" : "Laid anew for this dive";
-        toast(RunDungeons.name(delve) + "  ·  floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve), words, 0);
+        toast(RunDungeons.name(delve) + "  ·  floor " + (delveFloor + 1), words, 0);
     }
 
     /** What she takes down to a floor: harder the deeper, harder again on a fierce floor; and what the blessings chosen give. */
@@ -5285,19 +5306,53 @@ final class RunGame {
         }
     }
 
-    /** Over the buttons along the foot of the screen, in the middle, in a dive: which floor of how many, and what it is like. */
-    private void drawDelveLabel(Canvas canvas, float middle, float top) {
+    /**
+     * At the top, under the pause button and against the right, in a dive: which floor (never of how many: how deep it goes is left to find
+     * out) and what it is like. Where it would run into what is shown along the top left, a row lower.
+     */
+    private void drawDelveLabel(Canvas canvas, float right, float top, float clearOf, float lower) {
         if (delve < 0) return;
         int kind = delveKind();
-        String words = "Floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve) + (kind == RunDungeons.PLAIN ? "" : "  ·  " + RunDungeons.KIND_NAMES[kind]);
-        text.setTextSize(dp(12));
-        float wide = text.measureText(words) + dp(24), left = middle - wide / 2;
-        box.set(left, top, left + wide, top + dp(22));
-        plate(canvas, box, dp(11), 235);
+        // The floor's number and nothing else: large, in gold on a dark edge, slanted like a chapter's number; under it, small, what the
+        // floor is like, if it is anything.
+        String number = String.valueOf(delveFloor + 1), sort = kind == RunDungeons.PLAIN ? "" : RunDungeons.KIND_NAMES[kind];
+        Typeface was = text.getTypeface();
+        text.setTypeface(FLOOR_FACE);
+        text.setTextSize(dp(44));
+        text.setTextAlign(Paint.Align.RIGHT);
+        float wide = text.measureText(number), x = right - dp(6);
+        if (x - wide < clearOf) top = lower;
+        float base = top + dp(40);
+        text.setStyle(Paint.Style.STROKE);
+        text.setStrokeJoin(Paint.Join.ROUND);
+        text.setStrokeWidth(dp(5));
+        text.setColor(0xFF2A1440);
+        text.setShadowLayer(dp(4), 0, dp(2), 0x99000000);
+        canvas.drawText(number, x, base, text);
+        text.clearShadowLayer();
+        text.setStyle(Paint.Style.FILL);
+        if (floorGold == null || floorGoldAt != base) {
+            floorGoldAt = base;
+            floorGold = new android.graphics.LinearGradient(0, base - dp(34), 0, base, 0xFFFFF3C2, 0xFFE0A21A, android.graphics.Shader.TileMode.CLAMP);
+        }
+        text.setShader(floorGold);
+        canvas.drawText(number, x, base, text);
+        text.setShader(null);
+        text.setTypeface(was);
+        if (!sort.isEmpty()) {
+            text.setTextSize(dp(11));
+            text.setColor(0xFFF1E4FF);
+            text.setShadowLayer(dp(2.5f), 0, dp(1), 0xE0200A33);
+            canvas.drawText(sort, x, base + dp(15), text);
+            text.clearShadowLayer();
+        }
         text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(0xFF6A3FA0);
-        canvas.drawText(words, left + dp(12), top + dp(15.5f), text);
     }
+
+    /** The face the floor's number is set in, and its gold, made again only when it moves. */
+    private static final Typeface FLOOR_FACE = Typeface.create(Typeface.SERIF, Typeface.BOLD_ITALIC);
+    private android.graphics.Shader floorGold;
+    private float floorGoldAt = -1;
 
     /** The cards of a dive: at the stairway, what the dungeon is and how she has done in it; between floors, the three blessings to choose from. */
     private void drawDelveCard(Canvas canvas) {
@@ -5318,7 +5373,7 @@ final class RunGame {
         }
         int floors = RunDungeons.floors(delve), next = RunDungeons.kindOf(delve, delveFloor + 1, delveDive);
         boolean keeperNext = delveFloor + 1 == floors - 1;
-        float top = card(canvas, "Floor " + (delveFloor + 1) + " of " + floors + " cleared", "Kept + " + delveKept + "  ·  choose a blessing for the rest of the dive", dp(92));
+        float top = card(canvas, "Floor " + (delveFloor + 1) + " cleared", "Kept + " + delveKept + "  ·  choose a blessing for the rest of the dive", dp(92));
         text.setTextAlign(Paint.Align.LEFT);
         for (int one = 0; one < 3; one++) {
             text.setColor(ink);
@@ -5362,6 +5417,12 @@ final class RunGame {
         number = land;
         blackRung = 0;
         delve = -1;
+        // (In a build made for testing, a land with a stairway can go straight down it, when asked.)
+        if (BuildConfig.DEBUG && session.tally("run_dive_now") != 0 && RunDungeons.inLand(land) >= 0) {
+            begin(land, true);
+            openStairs();
+            return;
+        }
         String[][] intro = RunStory.intro(land);
         // Where the story moves on, it is told as she stands at the start of the land, the first time.
         // It is told in the bubble at the top, a line after another, while she is already on her way: nothing waits for it.
@@ -5659,7 +5720,7 @@ final class RunGame {
             float screenX = (atX - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
             if (x < screenX - tile * .75f || x > screenX + tile * .75f || y < feet - tile * 1.6f || y > feet + tile * .1f) continue;
             // (Not where a button lies over them.)
-            if (stallButton.contains(x, y) || downButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y) || slotAt(x, y) >= 0) return false;
+            if (stallButton.contains(x, y) || downButton.contains(x, y) || dashButton.contains(x, y) || poundButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y) || slotAt(x, y) >= 0) return false;
             int stage = talkStage();
             session.keep("run_talk_" + stage, session.tally("run_talk_" + stage) | 1 << index);
             audio.play("tap", .5f);
@@ -6764,7 +6825,7 @@ final class RunGame {
         control(canvas, jumpButton, goJump, 270, false);
         control(canvas, downButton, goDown, 90, false);
         RectF where = strikeButton;
-        button(canvas, where, goStrike, CalculatorLayout.CORAL);
+        glass(canvas, where, goStrike, CalculatorLayout.CORAL);
         stroke.setColor(0xFFE9C96A);
         stroke.setStrokeWidth(dp(3));
         canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2 - dp(2), stroke);
@@ -7282,7 +7343,7 @@ final class RunGame {
         control(canvas, jumpButton, goJump, 270, false);
         control(canvas, downButton, goDown, 90, false);
         RectF where = strikeButton;
-        button(canvas, where, goStrike, CalculatorLayout.CORAL);
+        glass(canvas, where, goStrike, CalculatorLayout.CORAL);
         stroke.setColor(0xFFE9C96A);
         stroke.setStrokeWidth(dp(3));
         canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2 - dp(2), stroke);
@@ -7563,6 +7624,16 @@ final class RunGame {
                 speak(RunStory.STATUS_UNIQUES[which], true);
                 break;
             }
+            // And each of the six later hidden bosses, the first time she finds it.
+            for (PlusRun.Foe foe : run.foes()) {
+                if (captionLeft > 0) break;
+                if (foe.flat || !RunUniques.hidden2(foe.kind) || Math.abs(foe.x - run.x()) > 9 || Math.abs(foe.y - run.y()) > 5) continue;
+                int which = foe.kind - RunUniques.HIDDEN2_FIRST;
+                if (session.tally("run_hb2_" + which) != 0) continue;
+                session.keep("run_hb2_" + which, 1);
+                speak(RunStory.HIDDEN2[which], true);
+                break;
+            }
         }
         // Deep water, the first time: in blue she can swim in it; without it she cannot breathe.
         if (run != null && screen == PLAY && run.inWater() && captionLeft <= 0 && !audio.speaking()) {
@@ -7769,7 +7840,7 @@ final class RunGame {
             // Inside a building, the floor and what stands on it, with its prices, are kept above the buttons over the arrows and the jump,
             // as far as the screen is tall enough to show the whole of the room as well (in a wide screen the buttons are at its sides instead).
             if (in[0] == RunLevels.HOUSE) {
-                float buttons = Math.min(Math.min(stallButton.top, downButton.top), swapButton.top) - dp(8);
+                float buttons = Math.min(Math.min(stallButton.top, downButton.top), Math.min(swapButton.top, run.hasDash() ? dashButton.top : swapButton.top)) - dp(8);
                 ground = Math.max(ground, Math.min(in[11] + .5f + (height - buttons) / tile, in[12] - .5f + down));
             }
             level = ground - ceiling <= down ? ground - down : Math.max(ceiling, Math.min(ground - down, run.y() + PlusRun.TALL - down * .6f));
@@ -8526,8 +8597,9 @@ final class RunGame {
                 }
                 // And a card that says what it is and what to do in it: before anything in it begins, where something is about to.
                 if (kind == RunLevels.HOUSE) {
-                    int sort = here.rooms.get(in)[14];
-                    toast(sort == RunLevels.ELF ? "Aelwyn's Wagon" : sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.ELF ? "Curios to buy, and junk and curios to sell" : sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
+                    int sort = here.rooms.get(in)[14], owner = RunLevels.ownerOf(here.rooms.get(in));
+                    if (owner >= 0) toast(RunStory.NAMES[OWNER_NAME + owner] + "'s home", RunStory.NAMES[OWNER_NAME + owner] + " is in. Something here is dear to her: walk up to it", 0);
+                    else toast(sort == RunLevels.ELF ? "Aelwyn's Wagon" : sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.ELF ? "Curios to buy, and junk and curios to sell" : sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
                             : sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
                             : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
                             : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
@@ -9171,6 +9243,11 @@ final class RunGame {
                     openStairs();
                     return;
                 }
+                // (A keepsake in a home before the smiths too.)
+                if (keepsake(what)) {
+                    lookAtKeepsake(what - PlusRun.KEEPSAKE);
+                    return;
+                }
                 if (what >= PlusRun.SMITH) {
                     openSmith(what - PlusRun.SMITH, PLAY);
                     return;
@@ -9232,7 +9309,20 @@ final class RunGame {
                 pills("Back to the land", RESUME, "Guild counter", COUNTER);
                 return;
             }
-            doubleTap(event, action);
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && poundShown()
+                    && near(poundButton, event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                poundTapped = clock;
+                run.pound();
+            } else if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && finale == NO_FINALE && run.hasDash()
+                    && near(dashButton, event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                dashTapped = clock;
+                if (run.dash()) {
+                    audio.play("jump", .5f);
+                    buzz(false);
+                }
+            } else {
+                doubleTap(event, action);
+            }
             held(event);
             return;
         }
@@ -9648,6 +9738,9 @@ final class RunGame {
                     down = true;
                     continue;
                 }
+                // (A finger on the dash is on the dash, not on the arrow under it.)
+                if (finale == NO_FINALE && run != null && run.hasDash() && near(dashButton, x, y)) continue;
+                if (poundShown() && near(poundButton, x, y)) continue;
                 if (y < low) continue;
                 if (x < between) left = true;
                 else if (x < arrows) right = true;
@@ -9746,6 +9839,7 @@ final class RunGame {
             else if (what == PlusRun.BOUTIQUE) openBoutique(0);
             else if (what == PlusRun.ELF) openElf(false);
             else if (what == PlusRun.STAIRS) openStairs();
+            else if (keepsake(what)) lookAtKeepsake(what - PlusRun.KEEPSAKE);
             else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
             else {
                 counterFrom = PLAY;
@@ -9888,9 +9982,11 @@ final class RunGame {
                 float herAt = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herFeet = (run.y() + PlusRun.TALL - cameraY) * tile;
                 boolean over = herAt > downButton.left - tile * .6f && herAt < downButton.right + tile * .6f && herFeet > downButton.top - tile * .2f
                         && herFeet - tile * 1.7f < downButton.bottom;
-                if (!lets) canvas.saveLayerAlpha(downButton.left - dp(6), downButton.top - dp(6), downButton.right + dp(6), downButton.bottom + dp(8), over ? 36 : 105);
+                if (!lets) canvas.saveLayerAlpha(downButton.left - dp(6), downButton.top - dp(6), downButton.right + dp(6), downButton.bottom + dp(8), over ? 50 : 160);
                 control(canvas, downButton, goDown, 90, false);
                 if (!lets) canvas.restore();
+                if (finale == NO_FINALE && run.hasDash()) dashControl(canvas);
+                if (poundShown() || clock - poundTapped < .15f) poundControl(canvas);
                 // In the first land the arrows glow until she has moved, and the jump until she has jumped; and the palette, when she has
                 // been told of it, until she opens it.
                 if (number == 1 && !hintMoved) {
@@ -9936,9 +10032,10 @@ final class RunGame {
                         else if (what == PlusRun.SMITH + 1) gearIcon(canvas, RunGear.HELM, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .36f, SET_COLOURS[2]);
                         else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else if (what == PlusRun.STAIRS) stairsIn(canvas, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .52f);
+                        else if (keepsake(what) && keepsakes() != null) cell(canvas, keepsakes(), what - PlusRun.KEEPSAKE, RunLevels.OWNERS, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .1f, stallButton.height() * .5f, false);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
                         label(canvas, stallButton, what >= PlusRun.SIGN ? "Read" : what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.ELF ? "Shop" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.ELF ? "Shop" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -9955,7 +10052,7 @@ final class RunGame {
                 canvas.drawColor(0x8C000000);
                 if (screen == PAUSED) {
                     // (With her backpack to look into.)
-                    float inside = card(canvas, "Paused", (delve >= 0 ? RunDungeons.name(delve) + ", floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve)
+                    float inside = card(canvas, "Paused", (delve >= 0 ? RunDungeons.name(delve) + ", floor " + (delveFloor + 1)
                             : blackRung > 0 ? "The black arena, rung " + blackRung : RunStory.CHAPTERS[RunLevels.chapterOf(number)] + ", land " + number + "  ·  level " + RunLevels.levelOf(number))
                             + (hard() > 0 ? "  ·  harder by " + hard() : "") + (run != null && run.inked() ? "  ·  under black " + (int) Math.ceil(run.cursed()) + " s" : ""), dp(run != null && run.inked() ? 112 : 52));
                     // Black, and what it does to her, named.
@@ -10195,7 +10292,17 @@ final class RunGame {
         paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
                 : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
         // (Those of the dungeons are in a sheet of their own; and those of the later chapters in the run's asset pack.)
-        boolean status = RunUniques.status(foe.kind), later = RunUniques.later(foe.kind), delving = !later && !status && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        // (And the six later hidden bosses in a sheet of their own there too.)
+        boolean hidden2 = RunUniques.hidden2(foe.kind);
+        boolean status = RunUniques.status(foe.kind), later = RunUniques.later(foe.kind), delving = !hidden2 && !later && !status && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        if (hidden2 && hidden2Sheet == null && !hidden2Tried) {
+            hidden2Tried = true;
+            try (java.io.InputStream in = context.getAssets().open(RunUniques.HIDDEN2_SHEET)) {
+                hidden2Sheet = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                hidden2Sheet = null;
+            }
+        }
         if (status && statusSheet == null && !statusTried) {
             statusTried = true;
             try (java.io.InputStream in = context.getAssets().open(RunUniques.STATUS_SHEET)) {
@@ -10213,13 +10320,13 @@ final class RunGame {
                 laterSheet = null;
             }
         }
-        Bitmap sheet = status ? statusSheet : later ? laterSheet : delving ? delverSheet : uniqueSheet;
+        Bitmap sheet = hidden2 ? hidden2Sheet : status ? statusSheet : later ? laterSheet : delving ? delverSheet : uniqueSheet;
         if (sheet == null) {
             paint.setAlpha(255);
             return;
         }
-        int rows = status ? RunUniques.STATUS_COUNT : later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
-        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (status ? RunUniques.index(RunUniques.STATUS_FIRST) : later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
+        int rows = hidden2 ? RunUniques.HIDDEN2_COUNT : status ? RunUniques.STATUS_COUNT : later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
+        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (hidden2 ? RunUniques.index(RunUniques.HIDDEN2_FIRST) : status ? RunUniques.index(RunUniques.STATUS_FIRST) : later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
         if (!foe.flat) laterStrikes(canvas, foe, way, middle, feet);
         if (way == RunUniques.DROPPER && foe.turn == 0 && !foe.flat) {
             // The spider's thread, up out of sight.
@@ -10350,8 +10457,114 @@ final class RunGame {
             new android.graphics.ColorMatrixColorFilter(new float[]{.25f, .2f, .2f, 0, 10, .2f, .2f, .25f, 0, 8, .3f, .25f, .35f, 0, 30, 0, 0, 0, 1, 0}),
             null, new android.graphics.LightingColorFilter(0xFFFFE8F0, 0x00140810)};
 
-    private Bitmap laterSheet, statusSheet;
-    private boolean laterTried, statusTried;
+    /**
+     * The homes, each as whoever lives there keeps it: its inside, its cottage outside, and what is dear to her in it (all in the run's pack);
+     * the light that lies in each (its colour, and where its lamp or hearth is in the picture); and what each keepsake is called.
+     */
+    private static final int OWNER_NAME = 11;
+    private static final String[] OWNER_KEYS = {"somi", "inju", "boksun", "ttosun", "galpi", "yeseo", "nabi", "moru"};
+    private static final String[] KEEPSAKE_NAMES = {"Somi's ballot box", "Inju's golden stamp", "Boksun-halmeoni's rice cakes", "Ttosun's trophy", "Galpi's wind chime",
+            "Yeseo's card catalogue", "Nabi's kitten", "Moru's sword"};
+    private static final int[] HOME_LIGHT = {0xFFFFB0C8, 0xFFFFF0D0, 0xFFFF9A40, 0xFFFFD860, 0xFFC8A8FF, 0xFFD8E890, 0xFFFFE6A0, 0xFFFF7A2A};
+    private static final float[][] HOME_LAMP = {{.52f, .52f}, {.55f, .43f}, {.85f, .5f}, {.24f, .39f}, {.66f, .37f}, {.54f, .46f}, {.76f, .33f}, {.92f, .53f}};
+    /** How many pluses the chest a keepsake leaves holds. */
+    static final int KEEPSAKE_CHEST = 25;
+    private Bitmap homeInside, homesOut, keepsakeArt;
+    private int homeInsideOf = -1;
+    private boolean homesOutTried, keepsakesTried;
+
+    /** Whoever lives in the home whose cottage stands at a column of the land, or -1. */
+    private static int ownerAt(RunLevels.Level level, int column) {
+        for (int[] room : level.rooms) if (room[0] == RunLevels.HOUSE && room[1] == column) return RunLevels.ownerOf(room);
+        return -1;
+    }
+
+    private static boolean keepsake(int what) { return what >= PlusRun.KEEPSAKE && what < PlusRun.KEEPSAKE + RunLevels.OWNERS; }
+
+    private Bitmap runAsset(String path) {
+        try (java.io.InputStream in = context.getAssets().open(path)) {
+            return BitmapFactory.decodeStream(in);
+        } catch (java.io.IOException ignored) {
+            return null;
+        }
+    }
+
+    private Bitmap keepsakes() {
+        if (keepsakeArt == null && !keepsakesTried) {
+            keepsakesTried = true;
+            keepsakeArt = runAsset("runart/home_keepsakes.webp");
+        }
+        return keepsakeArt;
+    }
+
+    private Bitmap homesOut() {
+        if (homesOut == null && !homesOutTried) {
+            homesOutTried = true;
+            homesOut = runAsset("runart/homes_out.webp");
+        }
+        return homesOut;
+    }
+
+    /** The inside of whoever's home, one kept at a time. */
+    private Bitmap homeInside(int owner) {
+        if (homeInsideOf != owner) {
+            if (homeInside != null) homeInside.recycle();
+            homeInside = runAsset("runart/home_" + OWNER_KEYS[owner] + ".webp");
+            homeInsideOf = owner;
+        }
+        return homeInside;
+    }
+
+    /** A keepsake looked at: she says what it is, its owner answers; and the first time, a chest by it. */
+    private void lookAtKeepsake(int owner) {
+        speak(RunStory.KEEPSAKES[owner], true);
+        talk.add(RunStory.KEEPSAKE_REPLIES[owner]);
+        int seen = session.tally("run_keepsakes");
+        if ((seen >> owner & 1) != 0) return;
+        session.keep("run_keepsakes", seen | 1 << owner);
+        for (int[] item : run.items()) {
+            if (item[0] != PlusRun.SPOT || item[4] != PlusRun.KEEPSAKE + owner) continue;
+            // (Put down where she stands, so that it opens for her at once.)
+            run.keepsakeChest((int) (run.x() + PlusRun.WIDE / 2), item[2], KEEPSAKE_CHEST);
+            break;
+        }
+        audio.play("unlock", .7f);
+        toast(KEEPSAKE_NAMES[owner], RunStory.NAMES[OWNER_NAME + owner] + " leaves you a chest  ·  " + Integer.bitCount(seen | 1 << owner) + " of " + RunLevels.OWNERS + " keepsakes", 0);
+    }
+
+    /** A keepsake, standing where it is kept; one not yet looked at glints. */
+    private void drawKeepsake(Canvas canvas, int[] item) {
+        Bitmap art = keepsakes();
+        if (art == null) return;
+        int owner = item[4] - PlusRun.KEEPSAKE;
+        float x = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+        if ((session.tally("run_keepsakes") >> owner & 1) == 0) {
+            float pulse = .5f + .5f * (float) Math.sin(clock * 3 + owner);
+            glowAt(canvas, x, feet - tile * .55f, tile * (.75f + .15f * pulse), 0xFFFFE08A, Math.round(70 + 80 * pulse));
+        }
+        paint.setAlpha(255);
+        cell(canvas, art, owner, RunLevels.OWNERS, x, feet + tile * .03f, tile * 1.2f, false);
+    }
+
+    /** The light in a home: its lamp or hearth glowing (a hearth flickers), and motes drifting up in it. */
+    private void drawHomeLight(Canvas canvas, int owner, float left, float top, float wide, float tall) {
+        int colour = HOME_LIGHT[owner];
+        boolean hearth = owner == 2 || owner == 7;
+        float flicker = hearth ? .82f + .18f * (float) Math.sin(clock * 9.3f) * (float) Math.sin(clock * 4.1f + 1) : .92f + .08f * (float) Math.sin(clock * 1.7f);
+        glowAt(canvas, left + wide * HOME_LAMP[owner][0], top + tall * HOME_LAMP[owner][1], tall * (hearth ? .34f : .26f) * flicker, colour, Math.round(150 * flicker));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(colour);
+        for (int mote = 0; mote < 14; mote++) {
+            float speed = .03f + (mote * 37 % 11) / 220f, phase = (clock * speed + mote * .137f) % 1f;
+            float mx = left + wide * ((mote * .0731f + .05f * (float) Math.sin(clock * .4f + mote)) % 1f), my = top + tall * (.85f - .7f * phase);
+            paint.setAlpha(Math.round(110 * (float) Math.sin(phase * Math.PI)));
+            canvas.drawCircle(mx, my, tile * (.025f + (mote % 3) * .01f), paint);
+        }
+        paint.setAlpha(255);
+    }
+
+    private Bitmap laterSheet, statusSheet, hidden2Sheet;
+    private boolean laterTried, statusTried, hidden2Tried;
 
     /**
      * What the later chapters' creatures do, drawn about them: the strikethrough's line, red as it is raised and bold as it strikes; the
@@ -10698,17 +10911,13 @@ final class RunGame {
         int next = run.nextUp();
         RectF where = swapButton;
         boolean held = swapFinger >= 0;
-        paint.setStyle(Paint.Style.FILL);
-        // (It lies over the ground she walks on, as the button that lets her down does: so it is faint until it is touched.)
-        paint.setColor(held ? CalculatorLayout.CORAL : cardColor);
-        paint.setAlpha(held ? 235 : 150);
-        canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2, paint);
-        paint.setColor(Color.BLACK);
-        paint.setAlpha(held ? 255 : 200);
+        // (It lies over the ground she walks on, as the button that lets her down does: so it is see-through until it is touched.)
+        glass(canvas, where, held, CalculatorLayout.CORAL);
+        paint.setAlpha(held ? 255 : 225);
         boolean upright = next != PlusRun.GUN && next != PlusRun.BOOK && next < PlusRun.TABLET;
         thing(canvas, next, where.centerX(), where.centerY(), where.height() * (upright ? .62f : .5f), upright ? 35 : 0, false, false);
         // Two small arrows on its corner: this changes one thing for another.
-        stroke.setColor(held ? Color.WHITE : 0xFF8A5A33);
+        stroke.setColor(Color.WHITE);
         stroke.setStrokeWidth(dp(1.8f));
         float cx = where.right - dp(9), cy = where.top + dp(9), arm = dp(5);
         canvas.drawLine(cx - arm, cy - dp(2), cx + arm, cy - dp(2), stroke);
@@ -11242,7 +11451,10 @@ final class RunGame {
                 cell(canvas, props, decor[0] - 200, 16, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 2.5f, false);
                 paint.setAlpha(255);
             } else if (decor[0] >= 100) pieceTall(canvas, four, decor[0] - 100, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 1.3f, false);
-            else pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
+            else if (decor[0] < 3 && ownerAt(level, decor[1]) >= 0 && homesOut() != null) {
+                // (A home's cottage, as whoever lives there keeps it.)
+                cell(canvas, homesOut(), ownerAt(level, decor[1]), RunLevels.OWNERS, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
         }
         for (int column = first; column <= last; column++) {
             float left = (column - cameraX) * tile;
@@ -11553,6 +11765,7 @@ final class RunGame {
                 else if (item[4] == PlusRun.ELF) drawElf(canvas, item);
                 else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] == PlusRun.STAIRS) drawStairs(canvas, item);
+                else if (keepsake(item[4])) drawKeepsake(canvas, item);
                 else if (item[4] >= PlusRun.SMITH) drawSmith(canvas, item);
                 else drawBoard(canvas, item);
                 continue;
@@ -12075,6 +12288,10 @@ final class RunGame {
             }
             inside = lookArt;
         }
+        // (A home is as whoever lives there keeps it, where the run's pack has her picture.)
+        int owner = RunLevels.ownerOf(run.level().rooms.get(run.room()));
+        Bitmap kept = owner >= 0 ? homeInside(owner) : null;
+        if (kept != null) inside = kept;
         // A cellar's picture fills the screen. One of the eight is as tall as its place: its wall, with what stands along it, from
         // the ceiling to the floor, and the picture's own floor out of sight under the floor she walks on; and it goes by as she does.
         float tall = look < 0 ? height : tile * RunLevels.ROOM_TALL / .66f, top = look < 0 ? 0 : (run.level().rooms.get(run.room())[12] - cameraY) * tile;
@@ -12094,6 +12311,7 @@ final class RunGame {
             canvas.drawBitmap(inside, null, target, paint);
             canvas.restore();
         }
+        if (kept != null) drawHomeLight(canvas, owner, -drift, top, wide, tall);
     }
 
     /** One colour with so much of another in it. */
@@ -12684,9 +12902,12 @@ final class RunGame {
     /** Something that helps, by its kind: what lay about in the first volume, what her friends hold out in the second, and the ribbons. */
     private void help(Canvas canvas, int kind, float x, float y, float size) {
         if (kind >= PlusRun.PET) {
-            // A pet that lies waiting: it sits there, and hops now and then.
-            float hop = Math.abs((float) Math.sin(clock * 3 + x)) * size * .12f;
-            cell(canvas, petArt(kind - PlusRun.PET), (int) (clock * 1.2f) % 4 == 0 ? 5 : 0, 6, x, y + size * .62f - hop, size * 1.5f, false);
+            // A pet that lies waiting: it sits there, and hops now and then, one hop at a time. (Timed by where it lies in the land, not where
+            // it is on the screen: by the screen, it jittered as the view moved along.)
+            float beat = clock * 1.2f + (x / tile + cameraX) * .37f, phase = beat - (float) Math.floor(beat);
+            boolean hopping = (int) Math.floor(beat) % 4 == 0;
+            float hop = hopping ? (float) Math.sin(phase * Math.PI) * size * .14f : 0;
+            cell(canvas, petArt(kind - PlusRun.PET), hopping ? 5 : 0, 6, x, y + size * .62f - hop, size * 1.5f, false);
             return;
         }
         if (kind == PlusRun.KEY) {
@@ -14907,7 +15128,7 @@ final class RunGame {
         drawStatusChips(canvas, x + dp(divine ? 336 : 232) + (run.inked() ? dp(76) : 0), under);
         if (anySlot) drawSlots(canvas);
         drawBreath(canvas, x, under + dp(26));
-        drawDelveLabel(canvas, safe.centerX(), leftButton.top - dp(30));
+        drawDelveLabel(canvas, pauseButton.right, pauseButton.bottom + dp(8), x + dp(divine ? 440 : 232), under + dp(30));
         under += dp(30);
         if (run.pet() >= 0) {
             float face = dp(run.herd().size() > 2 ? 30 : 42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
@@ -15425,9 +15646,121 @@ final class RunGame {
         return round;
     }
 
+    /**
+     * The see-through body of a button she plays with: no disc, only a soft shade that deepens towards the middle (so what is drawn on it
+     * reads over sky or cave alike), a thin ring of light round its edge, and, while it is held, a wash of its colour and a little smaller.
+     */
+    private float glass(Canvas canvas, RectF where, boolean held, int colour) {
+        float x = where.centerX(), y = where.centerY(), round = where.width() / 2 * (held ? .93f : 1);
+        paint.setStyle(Paint.Style.FILL);
+        if (held) {
+            paint.setColor(colour);
+            paint.setAlpha(150);
+            canvas.drawCircle(x, y, round, paint);
+        } else {
+            paint.setColor(Color.BLACK);
+            for (int ring = 0; ring < 4; ring++) {
+                paint.setAlpha(14);
+                canvas.drawCircle(x, y, round * (1 - ring * .2f), paint);
+            }
+        }
+        stroke.setColor(Color.BLACK);
+        stroke.setAlpha(45);
+        stroke.setStrokeWidth(dp(3));
+        canvas.drawCircle(x, y, round - dp(1), stroke);
+        stroke.setColor(Color.WHITE);
+        stroke.setAlpha(held ? 255 : 200);
+        stroke.setStrokeWidth(dp(1.6f));
+        canvas.drawCircle(x, y, round - dp(1), stroke);
+        stroke.setAlpha(255);
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+        return round;
+    }
+
+    /** Whether a finger is on a small round button, or near enough to it to mean it. */
+    private boolean near(RectF where, float x, float y) {
+        return x > where.left - dp(8) && x < where.right + dp(8) && y > where.top - dp(10) && y < where.bottom + dp(4);
+    }
+
+    /**
+     * The dash's button: two chevrons and the lines of the air she leaves, pointing the way she faces. Lit when a dash would go now (a roll
+     * on the ground, the one dash of a jump in the air), dim in its place when it would not, and coral for a moment when tapped.
+     */
+    private void dashControl(Canvas canvas) {
+        RectF where = dashButton;
+        boolean ready = run.canDash(), held = clock - dashTapped < .15f;
+        if (!ready && !held) canvas.saveLayerAlpha(where.left - dp(6), where.top - dp(6), where.right + dp(6), where.bottom + dp(8), 120);
+        float round = glass(canvas, where, held, CalculatorLayout.CORAL), reach = round * .26f;
+        canvas.save();
+        canvas.translate(where.centerX(), where.centerY());
+        if (run.facingLeft()) canvas.scale(-1, 1);
+        for (int pass = 0; pass < 2; pass++) {
+            canvas.save();
+            if (pass == 0) canvas.translate(0, dp(1.5f));
+            stroke.setColor(pass == 0 ? Color.BLACK : Color.WHITE);
+            stroke.setAlpha(pass == 0 ? 70 : 255);
+            stroke.setStrokeWidth(where.width() * .075f);
+            for (int chevron = 0; chevron < 2; chevron++) {
+                float at = chevron * reach * 1.1f;
+                path.reset();
+                path.moveTo(at - reach * .5f, -reach);
+                path.lineTo(at + reach * .5f, 0);
+                path.lineTo(at - reach * .5f, reach);
+                canvas.drawPath(path, stroke);
+            }
+            stroke.setStrokeWidth(where.width() * .05f);
+            canvas.drawLine(-reach * 2.3f, -reach * .55f, -reach * 1.2f, -reach * .55f, stroke);
+            canvas.drawLine(-reach * 2.6f, reach * .55f, -reach * 1.2f, reach * .55f, stroke);
+            canvas.restore();
+        }
+        stroke.setAlpha(255);
+        canvas.restore();
+        if (!ready && !held) canvas.restore();
+    }
+
+    /** The ground pound's button, up while she is in the air: a heavy arrow down onto a line of ground, with cracks going out from it. */
+    private void poundControl(Canvas canvas) {
+        RectF where = poundButton;
+        boolean held = clock - poundTapped < .15f;
+        float round = glass(canvas, where, held, 0xFFFF8A3D), reach = round * .34f;
+        canvas.save();
+        canvas.translate(where.centerX(), where.centerY());
+        for (int pass = 0; pass < 2; pass++) {
+            canvas.save();
+            if (pass == 0) canvas.translate(0, dp(1.5f));
+            int colour = pass == 0 ? Color.BLACK : Color.WHITE;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(colour);
+            paint.setAlpha(pass == 0 ? 70 : 255);
+            path.reset();
+            path.moveTo(-reach * .32f, -reach * 1.05f);
+            path.lineTo(reach * .32f, -reach * 1.05f);
+            path.lineTo(reach * .32f, reach * .05f);
+            path.lineTo(reach * .75f, reach * .05f);
+            path.lineTo(0, reach * .75f);
+            path.lineTo(-reach * .75f, reach * .05f);
+            path.lineTo(-reach * .32f, reach * .05f);
+            path.close();
+            canvas.drawPath(path, paint);
+            stroke.setColor(colour);
+            stroke.setAlpha(pass == 0 ? 70 : 255);
+            stroke.setStrokeWidth(where.width() * .055f);
+            canvas.drawLine(-reach * 1.25f, reach * 1.05f, reach * 1.25f, reach * 1.05f, stroke);
+            stroke.setStrokeWidth(where.width() * .035f);
+            canvas.drawLine(-reach * .9f, reach * .7f, -reach * 1.3f, reach * .35f, stroke);
+            canvas.drawLine(reach * .9f, reach * .7f, reach * 1.3f, reach * .35f, stroke);
+            canvas.restore();
+        }
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+        stroke.setAlpha(255);
+        canvas.restore();
+    }
+
     /** A round button with an arrowhead in it pointing some way round; pink, when the arrows have been turned about on her. */
     private void control(Canvas canvas, RectF where, boolean held, float turn, boolean charmed) {
-        float reach = button(canvas, where, held, charmed ? 0xFFFF6FB5 : CalculatorLayout.CORAL) * .3f;
+        float reach = glass(canvas, where, held, charmed ? 0xFFFF6FB5 : CalculatorLayout.CORAL) * .3f;
         path.reset();
         path.moveTo(-reach * .5f, -reach);
         path.lineTo(reach * .6f, 0);
@@ -15435,8 +15768,13 @@ final class RunGame {
         canvas.save();
         canvas.translate(where.centerX(), where.centerY());
         canvas.rotate(turn);
-        stroke.setColor(held ? Color.WHITE : charmed ? 0xFFE8479A : 0xFF3A3F45);
-        stroke.setStrokeWidth(where.width() * .085f);
+        // A dark edge under a white arrowhead, so it shows on bright ground as well as dark.
+        stroke.setColor(Color.BLACK);
+        stroke.setAlpha(70);
+        stroke.setStrokeWidth(where.width() * .125f);
+        canvas.drawPath(path, stroke);
+        stroke.setColor(held ? Color.WHITE : charmed ? 0xFFFF9BD0 : Color.WHITE);
+        stroke.setStrokeWidth(where.width() * .08f);
         canvas.drawPath(path, stroke);
         canvas.restore();
     }
@@ -15445,7 +15783,7 @@ final class RunGame {
     private void strikeControl(Canvas canvas) {
         RectF where = strikeButton;
         int weapon = run.weapon();
-        button(canvas, where, goStrike, CalculatorLayout.CORAL);
+        glass(canvas, where, goStrike, CalculatorLayout.CORAL);
         boolean upright = weapon != PlusRun.GUN && weapon != PlusRun.BOOK;
         paint.setAlpha(255);
         boolean casts = run.has(PlusRun.RED) || run.has(PlusRun.BLUE), both = run.has(PlusRun.RED) && run.has(PlusRun.BLUE), white = run.white();
@@ -15493,8 +15831,10 @@ final class RunGame {
         if (weapon == PlusRun.GUN || weapon == PlusRun.BOOK) {
             text.setTextSize(dp(12));
             text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(goStrike ? Color.WHITE : 0xFF292B2A);
+            text.setColor(Color.WHITE);
+            text.setShadowLayer(dp(2), 0, dp(1), Color.BLACK);
             canvas.drawText(String.valueOf(weapon == PlusRun.GUN ? run.rounds() : run.books()), where.centerX(), where.bottom - dp(8), text);
+            text.clearShadowLayer();
         }
         if (weapon >= 0 && perks.levels[weapon] > 0) {
             // How far the smith has worked on it: its level, on the button's corner.

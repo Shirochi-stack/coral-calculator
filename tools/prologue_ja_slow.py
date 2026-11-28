@@ -118,7 +118,7 @@ def picture(f):
     import cv2
     from PIL import Image
 
-    src = ROOT / "app" / "src" / "main" / "res" / "raw" / "run_film_prologue.mp4"
+    src = ROOT / "films" / "src" / "main" / "assets" / "films" / "run_film_prologue.mp4"
     box = av.open(str(src))
     video = box.streams.video[0]
     fps = float(video.average_rate)

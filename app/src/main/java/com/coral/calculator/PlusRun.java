@@ -137,8 +137,13 @@ final class PlusRun {
     static final int BOUTIQUE = 600;
     /** And the stairway down into a land's dungeon. */
     static final int STAIRS = 700;
+    /** And in a home, what is dear to whoever lives there (by who, from Somi): looked at, it is talked about, and the first time leaves a chest. */
+    static final int KEEPSAKE = 800;
+
+    /** What she has looked at a keepsake for: a chest put down by it, so much in it, the first time. */
+    void keepsakeChest(int column, int row, int much) { items.add(new int[]{CHEST, column, row, 0, much}); }
     /** (Economy) And Aelwyn, the elf merchant, at her wagon's counter in a village: she buys and sells curios. */
-    static final int ELF = 800;
+    static final int ELF = 900;
     /** (Economy) A signpost with a line of a village's lore, to be read: from here up, by the chapter. */
     static final int SIGN = 1000;
     /**
@@ -1161,6 +1166,26 @@ final class PlusRun {
      * A dash: in the air, once until she lands, a burst the way she faces with no falling; on the ground, a dodge roll, a moment in
      * which nothing hurts her. Whether she did.
      */
+    /** Whether she has either move at all, the roll or the dash in the air: whether a button for them is worth showing. */
+    boolean hasDash() { return perks.roll || perks.airDash; }
+
+    /** Whether a dash now would go: a roll on the ground, or the one dash of a jump in the air. */
+    boolean canDash() {
+        return state == PLAYING && (onGround ? perks.roll && rollLeft <= 0 : perks.airDash && !dashUsed && !climbing);
+    }
+
+    /** Whether a ground pound could begin now: in the air, with the move, not on a ladder or in water, and not already pounding. */
+    boolean canPound() {
+        return state == PLAYING && perks.pound && !onGround && !climbing && !inWater && poundPhase == 0;
+    }
+
+    /** The pound's own button: as if down were held in the air, for the next step. */
+    void pound() {
+        if (canPound()) poundWanted = true;
+    }
+
+    private boolean poundWanted;
+
     boolean dash() {
         if (state != PLAYING) return false;
         float way = facingLeft ? -1 : 1;
@@ -5931,12 +5956,13 @@ final class PlusRun {
         if (airDashLeft > 0) speedDown = 0;
         // The ground pound: held down in the air, with the move, she gathers herself for a moment, still in the air, and slams down with what
         // she holds; out of an air dash too, which it cuts short. (Without it, holding down only brings her down faster.)
-        if (perks.pound && down && !onGround && !climbing && !inWater && poundPhase == 0) {
+        if (perks.pound && (down || poundWanted) && !onGround && !climbing && !inWater && poundPhase == 0) {
             poundPhase = 1;
             poundWind = POUND_WIND;
             airDashLeft = 0;
             aerialLeft = 0;
         }
+        poundWanted = false;
         if (poundPhase != 0 && (onGround || climbing || inWater)) poundPhase = 0;
         if (poundPhase == 1) {
             speedDown = 0;

@@ -219,6 +219,10 @@ final class RunLevels {
 
     /** The insides of homes: six of them, after the buildings' own; which one a home has goes by the land and which room it is. */
     static final int HOME_LOOKS = 6, HOME_LOOK = 14;
+    /** Those who may live in a home, from Somi to Moru; and whoever lives in a home (from Somi), or -1 for a room that is not one. */
+    static final int OWNERS = 8;
+
+    static int ownerOf(int[] room) { return room.length > 15 && room[0] == HOUSE ? room[15] : -1; }
 
     /** The diary pages there are to find, one at a time, in the homes; and what a home's secret is, if it has one: 0 a hidden room, 1 a loose floorboard, 2 a diary page out on its table, -1 none. */
     static int homeSecret(int number, int room) { return Math.floorMod(number * 5 + room * 3, 4) - 1; }
@@ -2156,7 +2160,7 @@ final class RunLevels {
             ledge(from + 7, FLOOR - 3, 4);
             ledge(from + 16, FLOOR - 5, 4);
             ledge(to - 10, FLOOR - 3, 4);
-            level.foes.add(new int[]{RunUniques.hiddenOf(chapterOf(number)), to - 5, FLOOR - 1, 1, 0, 2});
+            level.foes.add(new int[]{RunUniques.hiddenIn(number), to - 5, FLOOR - 1, 1, 0, 2});
             pluses(from + 3, from + 6, FLOOR - 1);
             level.rooms.add(new int[]{HIDEOUT, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], 0, FLOOR, ceiling, -1, 0});
         }
@@ -2214,7 +2218,7 @@ final class RunLevels {
          * something for her, and a few pluses on the floor.
          */
         void house(int[] want) {
-            int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL;
+            int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL, owner = -1;
             wall(2);
             int from = at;
             open(sort == PET_SHOP ? 19 : sort == GUILD_HALL || sort == MARKET || sort == BOUTIQUE || sort == ELF ? 16 : sort == SMITHY ? 18 : sort == HOME ? 19 : 14);
@@ -2269,6 +2273,7 @@ final class RunLevels {
                 }
                 level.items.add(new int[]{GIVES[who - SOMI], from + 8, FLOOR - 1, who});
                 pluses(from + 3, from + 6, FLOOR - 1);
+                owner = who - SOMI;
                 // And its secret, if it has one: a false wall at its far end with a little room behind it, a chest and a diary page in it; a loose
                 // floorboard with a chest under it; or a diary page left out.
                 int secret = homeSecret(number, level.rooms.size()), page = Math.floorMod(number * 31 + level.rooms.size() * 17 + number / 7, DIARY_PAGES);
@@ -2282,9 +2287,12 @@ final class RunLevels {
                 } else if (secret == 2) {
                     level.items.add(new int[]{PlusRun.DIARY, from + 12, FLOOR - 1, 0, page});
                 }
+                // And what is dear to whoever lives there, to be walked up to and looked at.
+                level.items.add(new int[]{PlusRun.SPOT, from + 11, FLOOR - 1, 0, PlusRun.KEEPSAKE + owner});
             }
             int look = sort == HOME ? HOME_LOOK + Math.floorMod(number * 3 + level.rooms.size(), HOME_LOOKS) : sort == BOUTIQUE ? HOME_LOOK + 1 : sort == ELF ? HOME_LOOK + 2 : LOOKS + sort;
-            level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, look, sort});
+            // (A home's sixteenth number is whoever lives in it, from Somi; -1 for any other building.)
+            level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, look, sort, owner});
         }
 
         /** Some columns of a place off the land: floor under them, ceiling over them, and nothing between. */

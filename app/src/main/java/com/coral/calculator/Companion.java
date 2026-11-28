@@ -112,7 +112,7 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         @Override public void onDisplayRemoved(int displayId) {}
         @Override public void onDisplayChanged(int displayId) { screenChanged(); }
     };
-    private final Runnable refit = this::refit;
+    private final Runnable refit = this::refit, refitLate = this::refit;
     /** The room and scale she was last placed for; many display changes alter neither. */
     private final Rect placedBounds = new Rect();
     private float placedDensity;
@@ -486,6 +486,9 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
 
     private void refit() {
         sync();
+        // A game or prank over the whole screen is fitted to it again first: while one is up she is out of her own window, and it was that
+        // window alone that used to be refitted, so a game begun upright stayed upright-sized after the screen turned.
+        if (stage != null && stageParams != null) fitStage();
         if (sprite == null) return;
         if (!bounds().equals(placedBounds) || app.getResources().getDisplayMetrics().density != placedDensity) relayout();
     }
@@ -504,7 +507,10 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
     /** Folding, unfolding and turning all change the room she has; wait for it to settle. */
     void screenChanged() {
         handler.removeCallbacks(refit);
+        handler.removeCallbacks(refitLate);
         handler.postDelayed(refit, 150);
+        // And once more a little later, for a screen whose new size is only told after the change itself (as some foldables do).
+        handler.postDelayed(refitLate, 600);
         // The screen coming back on is one of these changes: she starts moving again.
         if (sprite != null) sprite.keepMoving();
     }
@@ -1400,9 +1406,28 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         start(new Intent(app, CompanionSettingsActivity.class));
     }
 
+    /**
+     * Opens one of the app's screens from over another app, always in the app's one task: the one already open is brought forward and the
+     * screen goes on top of it; with none open, the calculator goes first, under it, as when the app is opened from its icon. (A task begun
+     * by her on a screen of its own would be a second one, and Android shows only the newest of an app's tasks in the recent apps: the game
+     * left in the other could then be reached only through her.)
+     */
     private void start(Intent intent) {
         try {
-            app.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            ActivityManager manager = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
+            java.util.List<ActivityManager.AppTask> tasks = manager.getAppTasks();
+            boolean calculator = intent.getComponent() != null && MainActivity.class.getName().equals(intent.getComponent().getClassName());
+            if (!tasks.isEmpty()) {
+                tasks.get(0).moveToFront();
+                app.startActivity(intent);
+            } else if (calculator) {
+                app.startActivity(intent);
+            } else {
+                Intent root = new Intent(app, MainActivity.class).setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(MainActivity.UNDER, true);
+                app.startActivities(new Intent[]{root, intent});
+            }
         } catch (RuntimeException blocked) {
             Toast.makeText(app, "Open Halgakos from your home screen", Toast.LENGTH_SHORT).show();
         }
