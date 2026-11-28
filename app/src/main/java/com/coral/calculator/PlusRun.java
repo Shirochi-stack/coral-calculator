@@ -137,6 +137,11 @@ final class PlusRun {
     static final int BOUTIQUE = 600;
     /** And the stairway down into a land's dungeon. */
     static final int STAIRS = 700;
+    /** And in a home, what is dear to whoever lives there (by who, from Somi): looked at, it is talked about, and the first time leaves a chest. */
+    static final int KEEPSAKE = 800;
+
+    /** What she has looked at a keepsake for: a chest put down by it, so much in it, the first time. */
+    void keepsakeChest(int column, int row, int much) { items.add(new int[]{CHEST, column, row, 0, much}); }
     /**
      * A pot of black ink, which stands in the later lands and throws the black curse: how
      * often, for how long it swells before it does, from how far off it throws, and how

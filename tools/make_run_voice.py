@@ -1,7 +1,7 @@
 """
 Records everything that is said in Plus run.
 
-    python tools/make_run_voice.py [--only NAME ...] [--again] [--prune]
+    python tools/make_run_voice.py [--only NAME ...] [--again] [--prune] [--pack]
 
 Reads every line out of RunStory.java: its name, its words, who says it and the scene it is
 said in. Each is spoken by Inworld's hosted text to speech, the service the Halgakos AI
@@ -14,7 +14,9 @@ like a sulk. What it chose is printed beside each line.
 Nothing in that project is run or changed; only its key is read, from its .env, by name, and
 it is never printed. Each recording is trimmed, levelled, brought down to 24 kHz and saved as
 res/raw/run_v_NAME.ogg. A line that already has its recording is skipped unless --again;
---prune removes recordings of lines that are no longer in the story.
+--prune removes recordings of lines that are no longer in the story. With --pack a new recording goes into the voices
+asset pack (voices/src/main/assets/voices/run_v_NAME.ogg) instead, to keep the base module small; RunAudio plays it from there,
+and a line recorded in either place counts as recorded.
 
 Needs requests, numpy, scipy and soundfile.
 """
@@ -36,6 +38,7 @@ import soundfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STORY = ROOT / "app" / "src" / "main" / "java" / "com" / "coral" / "calculator" / "RunStory.java"
 RAW = ROOT / "app" / "src" / "main" / "res" / "raw"
+PACK = ROOT / "voices" / "src" / "main" / "assets" / "voices"
 PROJECT = pathlib.Path(r"C:\Users\ADMIN\Dev\Halgakos-AI")
 URL = "https://api.inworld.ai/tts/v1/voice:stream"
 MODEL = "inworld-tts-2"
@@ -238,13 +241,14 @@ def main():
     parser.add_argument("--only", nargs="*")
     parser.add_argument("--again", action="store_true")
     parser.add_argument("--prune", action="store_true")
+    parser.add_argument("--pack", action="store_true")
     args = parser.parse_args()
     lines = story()
     names = [name for name, _, _, _ in lines]
     if len(set(names)) != len(names):
         raise SystemExit("two lines share a name")
     if args.prune:
-        for old in RAW.glob("run_v_*.ogg"):
+        for old in list(RAW.glob("run_v_*.ogg")) + list(PACK.glob("run_v_*.ogg")):
             if old.stem[len("run_v_"):] not in names:
                 old.unlink()
                 print("removed", old.name)
@@ -252,10 +256,12 @@ def main():
     if not key:
         raise SystemExit("no key for the voice")
     RAW.mkdir(parents=True, exist_ok=True)
+    PACK.mkdir(parents=True, exist_ok=True)
     made = failed = 0
     for name, text, who, scene in lines:
-        target = RAW / f"run_v_{name}.ogg"
-        if (args.only and name not in args.only) or (target.exists() and not args.again):
+        target = (PACK if args.pack else RAW) / f"run_v_{name}.ogg"
+        had = (RAW / f"run_v_{name}.ogg").exists() or (PACK / f"run_v_{name}.ogg").exists()
+        if (args.only and name not in args.only) or (had and not args.again):
             continue
         error = None
         for attempt in range(4):
@@ -274,7 +280,7 @@ def main():
         soundfile.write(target, sound, RATE_OUT, format="OGG", subtype="VORBIS")
         made += 1
         print("ok", name, who, f"{len(sound) / RATE_OUT:.1f}s", "|", (chosen or "no direction chosen")[:110].encode("ascii", "replace").decode(), flush=True)
-    print("lines", len(lines), "made", made, "failed", failed, "have", sum(1 for name in names if (RAW / f"run_v_{name}.ogg").exists()))
+    print("lines", len(lines), "made", made, "failed", failed, "have", sum(1 for name in names if (RAW / f"run_v_{name}.ogg").exists() or (PACK / f"run_v_{name}.ogg").exists()))
     if failed:
         sys.exit(1)
 

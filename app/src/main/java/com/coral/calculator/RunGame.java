@@ -8446,8 +8446,9 @@ final class RunGame {
                 }
                 // And a card that says what it is and what to do in it: before anything in it begins, where something is about to.
                 if (kind == RunLevels.HOUSE) {
-                    int sort = here.rooms.get(in)[14];
-                    toast(sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
+                    int sort = here.rooms.get(in)[14], owner = RunLevels.ownerOf(here.rooms.get(in));
+                    if (owner >= 0) toast(RunStory.NAMES[OWNER_NAME + owner] + "'s home", RunStory.NAMES[OWNER_NAME + owner] + " is in. Something here is dear to her: walk up to it", 0);
+                    else toast(sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
                             : sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
                             : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
                             : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
@@ -9073,6 +9074,11 @@ final class RunGame {
                     openStairs();
                     return;
                 }
+                // (A keepsake in a home before the smiths too.)
+                if (keepsake(what)) {
+                    lookAtKeepsake(what - PlusRun.KEEPSAKE);
+                    return;
+                }
                 if (what >= PlusRun.SMITH) {
                     openSmith(what - PlusRun.SMITH, PLAY);
                     return;
@@ -9646,6 +9652,7 @@ final class RunGame {
             else if (what == PlusRun.DEALER) openMarket();
             else if (what == PlusRun.BOUTIQUE) openBoutique(0);
             else if (what == PlusRun.STAIRS) openStairs();
+            else if (keepsake(what)) lookAtKeepsake(what - PlusRun.KEEPSAKE);
             else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
             else {
                 counterFrom = PLAY;
@@ -9835,9 +9842,10 @@ final class RunGame {
                         else if (what == PlusRun.SMITH + 1) gearIcon(canvas, RunGear.HELM, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .36f, SET_COLOURS[2]);
                         else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else if (what == PlusRun.STAIRS) stairsIn(canvas, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .52f);
+                        else if (keepsake(what) && keepsakes() != null) cell(canvas, keepsakes(), what - PlusRun.KEEPSAKE, RunLevels.OWNERS, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .1f, stallButton.height() * .5f, false);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
                         label(canvas, stallButton, what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -10258,6 +10266,112 @@ final class RunGame {
     private static final android.graphics.ColorFilter[] COPY_VARIANTS = {null,
             new android.graphics.ColorMatrixColorFilter(new float[]{.25f, .2f, .2f, 0, 10, .2f, .2f, .25f, 0, 8, .3f, .25f, .35f, 0, 30, 0, 0, 0, 1, 0}),
             null, new android.graphics.LightingColorFilter(0xFFFFE8F0, 0x00140810)};
+
+    /**
+     * The homes, each as whoever lives there keeps it: its inside, its cottage outside, and what is dear to her in it (all in the run's pack);
+     * the light that lies in each (its colour, and where its lamp or hearth is in the picture); and what each keepsake is called.
+     */
+    private static final int OWNER_NAME = 11;
+    private static final String[] OWNER_KEYS = {"somi", "inju", "boksun", "ttosun", "galpi", "yeseo", "nabi", "moru"};
+    private static final String[] KEEPSAKE_NAMES = {"Somi's ballot box", "Inju's golden stamp", "Boksun-halmeoni's rice cakes", "Ttosun's trophy", "Galpi's wind chime",
+            "Yeseo's card catalogue", "Nabi's kitten", "Moru's sword"};
+    private static final int[] HOME_LIGHT = {0xFFFFB0C8, 0xFFFFF0D0, 0xFFFF9A40, 0xFFFFD860, 0xFFC8A8FF, 0xFFD8E890, 0xFFFFE6A0, 0xFFFF7A2A};
+    private static final float[][] HOME_LAMP = {{.52f, .52f}, {.55f, .43f}, {.85f, .5f}, {.24f, .39f}, {.66f, .37f}, {.54f, .46f}, {.76f, .33f}, {.92f, .53f}};
+    /** How many pluses the chest a keepsake leaves holds. */
+    static final int KEEPSAKE_CHEST = 25;
+    private Bitmap homeInside, homesOut, keepsakeArt;
+    private int homeInsideOf = -1;
+    private boolean homesOutTried, keepsakesTried;
+
+    /** Whoever lives in the home whose cottage stands at a column of the land, or -1. */
+    private static int ownerAt(RunLevels.Level level, int column) {
+        for (int[] room : level.rooms) if (room[0] == RunLevels.HOUSE && room[1] == column) return RunLevels.ownerOf(room);
+        return -1;
+    }
+
+    private static boolean keepsake(int what) { return what >= PlusRun.KEEPSAKE && what < PlusRun.KEEPSAKE + RunLevels.OWNERS; }
+
+    private Bitmap runAsset(String path) {
+        try (java.io.InputStream in = context.getAssets().open(path)) {
+            return BitmapFactory.decodeStream(in);
+        } catch (java.io.IOException ignored) {
+            return null;
+        }
+    }
+
+    private Bitmap keepsakes() {
+        if (keepsakeArt == null && !keepsakesTried) {
+            keepsakesTried = true;
+            keepsakeArt = runAsset("runart/home_keepsakes.webp");
+        }
+        return keepsakeArt;
+    }
+
+    private Bitmap homesOut() {
+        if (homesOut == null && !homesOutTried) {
+            homesOutTried = true;
+            homesOut = runAsset("runart/homes_out.webp");
+        }
+        return homesOut;
+    }
+
+    /** The inside of whoever's home, one kept at a time. */
+    private Bitmap homeInside(int owner) {
+        if (homeInsideOf != owner) {
+            if (homeInside != null) homeInside.recycle();
+            homeInside = runAsset("runart/home_" + OWNER_KEYS[owner] + ".webp");
+            homeInsideOf = owner;
+        }
+        return homeInside;
+    }
+
+    /** A keepsake looked at: she says what it is, its owner answers; and the first time, a chest by it. */
+    private void lookAtKeepsake(int owner) {
+        speak(RunStory.KEEPSAKES[owner], true);
+        talk.add(RunStory.KEEPSAKE_REPLIES[owner]);
+        int seen = session.tally("run_keepsakes");
+        if ((seen >> owner & 1) != 0) return;
+        session.keep("run_keepsakes", seen | 1 << owner);
+        for (int[] item : run.items()) {
+            if (item[0] != PlusRun.SPOT || item[4] != PlusRun.KEEPSAKE + owner) continue;
+            // (Put down where she stands, so that it opens for her at once.)
+            run.keepsakeChest((int) (run.x() + PlusRun.WIDE / 2), item[2], KEEPSAKE_CHEST);
+            break;
+        }
+        audio.play("unlock", .7f);
+        toast(KEEPSAKE_NAMES[owner], RunStory.NAMES[OWNER_NAME + owner] + " leaves you a chest  ·  " + Integer.bitCount(seen | 1 << owner) + " of " + RunLevels.OWNERS + " keepsakes", 0);
+    }
+
+    /** A keepsake, standing where it is kept; one not yet looked at glints. */
+    private void drawKeepsake(Canvas canvas, int[] item) {
+        Bitmap art = keepsakes();
+        if (art == null) return;
+        int owner = item[4] - PlusRun.KEEPSAKE;
+        float x = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+        if ((session.tally("run_keepsakes") >> owner & 1) == 0) {
+            float pulse = .5f + .5f * (float) Math.sin(clock * 3 + owner);
+            glowAt(canvas, x, feet - tile * .55f, tile * (.75f + .15f * pulse), 0xFFFFE08A, Math.round(70 + 80 * pulse));
+        }
+        paint.setAlpha(255);
+        cell(canvas, art, owner, RunLevels.OWNERS, x, feet + tile * .03f, tile * 1.2f, false);
+    }
+
+    /** The light in a home: its lamp or hearth glowing (a hearth flickers), and motes drifting up in it. */
+    private void drawHomeLight(Canvas canvas, int owner, float left, float top, float wide, float tall) {
+        int colour = HOME_LIGHT[owner];
+        boolean hearth = owner == 2 || owner == 7;
+        float flicker = hearth ? .82f + .18f * (float) Math.sin(clock * 9.3f) * (float) Math.sin(clock * 4.1f + 1) : .92f + .08f * (float) Math.sin(clock * 1.7f);
+        glowAt(canvas, left + wide * HOME_LAMP[owner][0], top + tall * HOME_LAMP[owner][1], tall * (hearth ? .34f : .26f) * flicker, colour, Math.round(150 * flicker));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(colour);
+        for (int mote = 0; mote < 14; mote++) {
+            float speed = .03f + (mote * 37 % 11) / 220f, phase = (clock * speed + mote * .137f) % 1f;
+            float mx = left + wide * ((mote * .0731f + .05f * (float) Math.sin(clock * .4f + mote)) % 1f), my = top + tall * (.85f - .7f * phase);
+            paint.setAlpha(Math.round(110 * (float) Math.sin(phase * Math.PI)));
+            canvas.drawCircle(mx, my, tile * (.025f + (mote % 3) * .01f), paint);
+        }
+        paint.setAlpha(255);
+    }
 
     private Bitmap laterSheet, statusSheet, hidden2Sheet;
     private boolean laterTried, statusTried, hidden2Tried;
@@ -11132,7 +11246,10 @@ final class RunGame {
                 cell(canvas, props, decor[0] - 200, 16, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 2.5f, false);
                 paint.setAlpha(255);
             } else if (decor[0] >= 100) pieceTall(canvas, four, decor[0] - 100, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 1.3f, false);
-            else pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
+            else if (decor[0] < 3 && ownerAt(level, decor[1]) >= 0 && homesOut() != null) {
+                // (A home's cottage, as whoever lives there keeps it.)
+                cell(canvas, homesOut(), ownerAt(level, decor[1]), RunLevels.OWNERS, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
         }
         for (int column = first; column <= last; column++) {
             float left = (column - cameraX) * tile;
@@ -11441,6 +11558,7 @@ final class RunGame {
                 else if (item[4] == PlusRun.BOUTIQUE) drawKeeper(canvas, item);
                 else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] == PlusRun.STAIRS) drawStairs(canvas, item);
+                else if (keepsake(item[4])) drawKeepsake(canvas, item);
                 else if (item[4] >= PlusRun.SMITH) drawSmith(canvas, item);
                 else drawBoard(canvas, item);
                 continue;
@@ -11963,6 +12081,10 @@ final class RunGame {
             }
             inside = lookArt;
         }
+        // (A home is as whoever lives there keeps it, where the run's pack has her picture.)
+        int owner = RunLevels.ownerOf(run.level().rooms.get(run.room()));
+        Bitmap kept = owner >= 0 ? homeInside(owner) : null;
+        if (kept != null) inside = kept;
         // A cellar's picture fills the screen. One of the eight is as tall as its place: its wall, with what stands along it, from
         // the ceiling to the floor, and the picture's own floor out of sight under the floor she walks on; and it goes by as she does.
         float tall = look < 0 ? height : tile * RunLevels.ROOM_TALL / .66f, top = look < 0 ? 0 : (run.level().rooms.get(run.room())[12] - cameraY) * tile;
@@ -11982,6 +12104,7 @@ final class RunGame {
             canvas.drawBitmap(inside, null, target, paint);
             canvas.restore();
         }
+        if (kept != null) drawHomeLight(canvas, owner, -drift, top, wide, tall);
     }
 
     /** One colour with so much of another in it. */
