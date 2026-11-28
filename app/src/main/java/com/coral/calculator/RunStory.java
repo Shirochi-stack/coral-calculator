@@ -560,6 +560,7 @@ final class RunStory {
     /** Her line with the game's name in it: the first time the map is opened, and now and then as a land begins. */
     static final String[][] TITLE_LINE = {
             {"title1", "A sloppy copy? Not on my page Sloppy~♡", "H", PLAYER + "Her signature line, the game's own name in it: a translator who will not stand for careless copies. Confident, punchy, proud, a playful wink at the end."},
+            {"title2", "Queen of Sloppies? Every sloppy copy bows to me, page after page Sloppy~♡", "H", PLAYER + "The game's new name, Halgakos: The Queen of Sloppies. Every sloppy copy is a sloppy, and she rules them all, with endless pages still to climb. Regal, proud, smug, a teasing wink at the end."},
     };
 
     /** The first time a key is pressed in the first land: she says which keys. */
@@ -575,20 +576,25 @@ final class RunStory {
             {"skill4", "My tree got redrawn! Every point came back, so spend them Sloppy~♡", "H", PLAYER + "Her skill tree has just been redrawn into a great new web of regions and routes, and every point she had spent has come back to her to spend again. Delighted, a little bossy, eager to explore it."},
     };
 
+    /** Black is put on her, and weighs on her. */
+    static final String[][] BLACKENED = {
+            {"blk1", "Ugh, black ink all over me! Everything's heavy and dark Sloppy~♡", "H", PLAYER + "A cursed black ribbon has just soaked her in ink: she feels heavy, half blind, weak and dripping. Disgusted, sulky, shivering, but defiant."},
+    };
+
     /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
     static final String[][] LATER_UNIQUES = {
-            {"u2a", "A newspaper bug! Don't let it roll you flat, Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
-            {"u2b", "It shouts the headlines at us. So loud, Sloppy~♡", "H", PLAYER + "A little town crier with a megaphone mouth is shouting words at them. Hands over ears, cross, playful."},
-            {"u2c", "That line can stretch! Keep your distance, Sloppy~♡", "H", PLAYER + "A snake made of a ruled notebook line lashes out from far away. Alarmed, advising."},
-            {"u2d", "It crosses things out. Jump over the line, Sloppy~♡", "H", PLAYER + "An ink knight draws a long red line along the ground ahead to strike through. Urgent, bossy tip."},
-            {"u2e", "Sticky tongue! It wants to pull us in, Sloppy~♡", "H", PLAYER + "A fat glue-pot toad shoots a sticky tongue that pulls you in. Grossed out, giggly."},
-            {"u2f", "Ew, smudges everywhere. Don't step in them, Sloppy~♡", "H", PLAYER + "An ink smudge slime leaves sticky smears that slow you down. Disgusted, fussy."},
-            {"u2g", "A mirror crab! Hit it from behind, Sloppy~♡", "H", PLAYER + "A crab with a mirror shell bounces shots back; you must hit it from behind. Clever, pleased with herself."},
-            {"u2h", "It copies everything we do. Rude, Sloppy~♡", "H", PLAYER + "A ghostly page echoes every attack back at them. Offended, pouty."},
-            {"u2i", "Its sand slows time down. Hurry, Sloppy~♡", "H", PLAYER + "A little hourglass creature slows time around it. Impatient, hurrying."},
-            {"u2j", "It hides in its shell. Wait till it peeks out, Sloppy~♡", "H", PLAYER + "A hermit crab in a scroll shell hides, then pops out to jab. Patient, sly."},
-            {"u2k", "A baby dragon! Cute, but it breathes fire, Sloppy~♡", "H", PLAYER + "A chubby golden dragon hatchling on a hoard of books breathes fire. Charmed, then cautious."},
-            {"u2l", "Stay out of that lantern's light, Sloppy~♡", "H", PLAYER + "A stone sentinel with a lantern head sweeps a burning beam of light. Low, tense warning."},
+            {"u2a", "A newspaper bug! Don't let it roll you flat Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
+            {"u2b", "It shouts the headlines at us. So loud Sloppy~♡", "H", PLAYER + "A little town crier with a megaphone mouth is shouting words at them. Hands over ears, cross, playful."},
+            {"u2c", "That line can stretch! Keep your distance Sloppy~♡", "H", PLAYER + "A snake made of a ruled notebook line lashes out from far away. Alarmed, advising."},
+            {"u2d", "It crosses things out. Jump over the line Sloppy~♡", "H", PLAYER + "An ink knight draws a long red line along the ground ahead to strike through. Urgent, bossy tip."},
+            {"u2e", "Sticky tongue! It wants to pull us in Sloppy~♡", "H", PLAYER + "A fat glue-pot toad shoots a sticky tongue that pulls you in. Grossed out, giggly."},
+            {"u2f", "Ew, smudges everywhere. Don't step in them Sloppy~♡", "H", PLAYER + "An ink smudge slime leaves sticky smears that slow you down. Disgusted, fussy."},
+            {"u2g", "A mirror crab! Hit it from behind Sloppy~♡", "H", PLAYER + "A crab with a mirror shell bounces shots back; you must hit it from behind. Clever, pleased with herself."},
+            {"u2h", "It copies everything we do. Rude Sloppy~♡", "H", PLAYER + "A ghostly page echoes every attack back at them. Offended, pouty."},
+            {"u2i", "Its sand slows time down. Hurry Sloppy~♡", "H", PLAYER + "A little hourglass creature slows time around it. Impatient, hurrying."},
+            {"u2j", "It hides in its shell. Wait till it peeks out Sloppy~♡", "H", PLAYER + "A hermit crab in a scroll shell hides, then pops out to jab. Patient, sly."},
+            {"u2k", "A baby dragon! Cute, but it breathes fire Sloppy~♡", "H", PLAYER + "A chubby golden dragon hatchling on a hoard of books breathes fire. Charmed, then cautious."},
+            {"u2l", "Stay out of that lantern's light Sloppy~♡", "H", PLAYER + "A stone sentinel with a lantern head sweeps a burning beam of light. Low, tense warning."},
     };
 
     /** Her moves from the counter: the second wind, which leaves her half a heart once a land. */
@@ -1297,6 +1303,8 @@ final class RunStory {
         groups.add(DUNGEONS);
         groups.add(SMITH_QUESTS);
         groups.add(KNUCKLES);
+        groups.add(LATER_UNIQUES);
+        groups.add(BLACKENED);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
