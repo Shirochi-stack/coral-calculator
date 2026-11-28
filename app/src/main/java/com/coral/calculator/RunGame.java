@@ -4222,6 +4222,8 @@ final class RunGame {
         float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
         float across = Math.min(dp(66), tall);
         cringeButton.set(safe.right - dp(14) - across, foot - tall, safe.right - dp(14), foot);
+        // (The test sandbox's pill sits just under the button that goes on, at its right end, clear of the title's line and the volume tabs.)
+        labButton.set(goButton.right - dp(116), goButton.bottom + dp(6), goButton.right, goButton.bottom + dp(30));
     }
 
     void close() {
