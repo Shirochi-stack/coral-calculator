@@ -17,7 +17,10 @@ final class RunAudio {
     private static final String[] EFFECTS = {"jump", "plus", "squish", "hurt", "spring", "flag", "win", "lose", "star", "tap",
             "blow", "fall", "page", "throw", "slash", "shot", "pick", "clang", "buff", "bread", "pop",
             "charm", "combo", "buy", "no", "flap", "bat", "heart", "form", "door", "quake",
-            "crumble", "censor", "fire", "splash", "parry", "unlock"};
+            "crumble", "censor", "fire", "splash", "parry", "unlock",
+            // (The ultimates', each for its beginning and its end: see RunUltimates.)
+            "ult_berserk", "ult_berserk_end", "ult_time", "ult_time_end", "ult_tide", "ult_tide_end", "ult_titan", "ult_titan_end", "ult_legion",
+            "ult_legion_end", "ult_bloom", "ult_bloom_end"};
 
     private final Context context;
     private final SoundPool pool;

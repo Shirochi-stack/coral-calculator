@@ -2568,6 +2568,11 @@ final class PlusRun {
         }
         if (more > 0) energy = Math.min(ENERGY_MOST, energy + more);
         frenzyLeft = FRENZY_LASTS;
+        // In the rose bloom, what she beats bursts into roses (a moment later, so that the chain is seen going), up to so many links.
+        if (ultNow == RunUltimates.BLOOM && bloomLinks < RunUltimates.BLOOM_CHAIN) {
+            bloomLinks++;
+            petals.add(new float[]{foeX, foeY - .6f, RunUltimates.BLOOM_LINK});
+        }
     }
 
     /**
@@ -2683,7 +2688,7 @@ final class PlusRun {
         boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
         float more = 1 + (perks.skills.stats[RunSkills.ATK] + skillOf(RunSkills.E_ATK_PCT) + (minded ? intelligence() : 0) + perks.mightPct + metered()
                 + (hp * 3 <= maxHp() ? skillOf(RunSkills.E_LAST_STAND) : 0) - (inked() ? curseWeak() : 0) + (white() ? Math.max(0, skillOf(RunSkills.E_WHITE)) : 0)) / 100f;
-        return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
+        return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * ultMight() * (divineLeft > 0 ? 3 : 1)));
     }
 
     /** Her intelligence: the tree's, with its percent, and what an active called on adds to that. */
@@ -2814,13 +2819,23 @@ final class PlusRun {
     /** She calls on an active skill: if it is there, rested, and she has the energy. Whether she did. */
     boolean callOn(int slot) {
         RunSkills.Notable skill = active(slot);
-        if (skill == null || activeRest[slot] > 0 || !canSpend(ACTIVE_COST) || state != PLAYING) return false;
-        spend(ACTIVE_COST);
-        activeLeft[slot] = ACTIVE_LASTS;
-        activeRest[slot] = ACTIVE_REST;
+        if (skill == null || activeRest[slot] > 0 || !canSpend(activeCost(slot)) || state != PLAYING) return false;
+        // (An ultimate is one at a time: not while another is going, nor while she is spent from berserk.)
+        if (skill.ultimate > 0 && (ultNow != 0 || exhaust > 0)) return false;
+        spend(activeCost(slot));
+        activeLeft[slot] = activeLasts(slot);
+        activeRest[slot] = activeRests(slot);
         activesUsed++;
+        if (skill.ultimate > 0) began(skill.ultimate);
         return true;
     }
+
+    /** What the active in a slot costs in energy, how long it lasts, and how long it rests after: an ultimate's own, or every other active's. */
+    float activeCost(int slot) { return active(slot) != null && active(slot).ultimate > 0 ? RunUltimates.COST : ACTIVE_COST; }
+
+    float activeLasts(int slot) { return active(slot) != null && active(slot).ultimate > 0 ? RunUltimates.LASTS[active(slot).ultimate] : ACTIVE_LASTS; }
+
+    float activeRests(int slot) { return active(slot) != null && active(slot).ultimate > 0 ? RunUltimates.REST[active(slot).ultimate] : ACTIVE_REST; }
 
     /** What the actives called on just now add to one of the tree's effects. */
     private int activeEffect(int effect) {
@@ -2867,6 +2882,354 @@ final class PlusRun {
             if (activeRest[slot] > 0) activeRest[slot] -= seconds;
         }
         if (divineLeft > 0) divineLeft -= seconds;
+    }
+
+    // Ultimates: the last active of six branches, each a way of playing of its own while it lasts (the numbers and the words are in RunUltimates).
+
+    /** The ultimate going now (as {@link RunUltimates} numbers them), or 0; and the one that was going a moment ago, to see one end. */
+    private int ultNow, ultSeen;
+    /** Counts that only go up, for showing: ultimates begun and ended, and which were last. */
+    private int ultStarts, ultEnds, lastUltimate, lastEnded;
+    /** How long she is spent for after berserk; how many blows of its own the ultimate has landed on bosses this time; and HP berserk has taken from them. */
+    private float exhaust;
+    private int ultBossHits, bossLeeched;
+    /** Berserk: swings in a row that cleaved, how long since the last, and swings and HP given back, in all. */
+    private int cleaveCombo, cleaves, leeched;
+    private float cleaveGap = 9;
+    /** The stilled hour: blows held where they fell, as {creature, how it was dealt}; whether they are being let go now; and counts of those held and those let go. */
+    private final List<Object[]> held = new ArrayList<>();
+    private boolean releasing;
+    private int heldBlows, releases, releasedBlows;
+    /** The tide: which way she goes, whether she is up against something and must rise, whom she has swept through, and how many she struck. */
+    private float tideWay;
+    private boolean tideStuck;
+    private final java.util.Set<Foe> tideHit = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    private int tideStrikes;
+    /** The giant: how far she has walked since her last step, steps taken, and creatures crushed. */
+    private float stride;
+    private int titanSteps, crushed;
+    /** The legion: where she has been for the last second or so, a sample every step of the game, and how many strikes the echoes have made. */
+    private static final int TRAIL = 120;
+    private final float[] trailX = new float[TRAIL], trailY = new float[TRAIL];
+    private final boolean[] trailLeft = new boolean[TRAIL];
+    private int trailAt, echoStrikes;
+    /** The bloom: bursts of roses waiting to go off, as {x, y, wait}; how many links of the chain there have been this time and in all; and HP given back so far. */
+    private final List<float[]> petals = new ArrayList<>();
+    private int bloomLinks, blooms;
+    private float bloomHeal;
+    private boolean ultActing;
+
+    int ultimate() { return ultNow; }
+    boolean ultimateOn(int which) { return ultNow == which; }
+    int ultimateStarts() { return ultStarts; }
+    int ultimateEnds() { return ultEnds; }
+    int lastUltimate() { return lastUltimate; }
+    int lastEnded() { return lastEnded; }
+    float exhausted() { return exhaust; }
+    int cleaves() { return cleaves; }
+    int leeched() { return leeched; }
+    int heldBlows() { return heldBlows; }
+    int releases() { return releases; }
+    int releasedBlows() { return releasedBlows; }
+    int tideStrikes() { return tideStrikes; }
+    int titanSteps() { return titanSteps; }
+    int crushed() { return crushed; }
+    int echoStrikes() { return echoStrikes; }
+    int blooms() { return blooms; }
+    int ultimateBossHits() { return ultBossHits; }
+    float tideWay() { return tideWay; }
+
+    /** How much longer the ultimate going now lasts, or 0. */
+    float ultimateLeft() {
+        float most = 0;
+        for (int slot = 0; slot < SLOTS; slot++) if (active(slot) != null && active(slot).ultimate > 0) most = Math.max(most, activeLeft[slot]);
+        return most;
+    }
+
+    /** How many blows are held on a creature, in the stilled hour, to land when time runs again. */
+    int heldOn(Foe foe) {
+        int count = 0;
+        for (Object[] one : held) if (one[0] == foe) count++;
+        return count;
+    }
+
+    /** How big she is: one, or the giant's two and a half. */
+    float size() { return ultNow == RunUltimates.TITAN ? RunUltimates.TITAN_SIZE : 1; }
+
+    /** The echoes' places while the legion is about: {x, y, 1 if she faces left} of each, or null. */
+    float[] echoAt(int echo) {
+        if (ultNow != RunUltimates.LEGION || echo < 0 || echo >= RunUltimates.ECHOES) return null;
+        int back = Math.min(TRAIL - 1, Math.round((echo + 1) * RunUltimates.ECHO_LAG / STEP));
+        int at = (trailAt - back + TRAIL * 2) % TRAIL;
+        // (Spread to either side of the path, so that standing still they are three, not one.)
+        float[] sides = {-1.3f, 1.3f, -2.5f};
+        return new float[]{trailX[at] + sides[echo], trailY[at], trailLeft[at] ? 1 : 0};
+    }
+
+    /** How fast time goes for a creature: all of it, but in the stilled hour a sixth (a boss, six tenths). */
+    private float foeRate(Foe foe) { return ultNow != RunUltimates.STILL ? 1 : RunLevels.boss(foe.kind) ? RunUltimates.STILL_BOSS_RATE : RunUltimates.STILL_RATE; }
+
+    /** How much harder berserk and the giant make her blows land on ordinary creatures. (A boss takes a blow as one, whatever it counts for.) */
+    private float ultMight() { return ultNow == RunUltimates.BERSERK ? RunUltimates.BERSERK_MIGHT : ultNow == RunUltimates.TITAN ? RunUltimates.TITAN_MIGHT : 1; }
+
+    /** How long she waits between one strike and the next, as many times over: faster in berserk, slower after it. */
+    private float ultRest() { return exhaust > 0 ? RunUltimates.EXHAUSTED_REST : ultNow == RunUltimates.BERSERK ? RunUltimates.BERSERK_REST : 1; }
+
+    /** Whether she is in a rage: she cannot guard, takes more, and is not thrown back by a hurt. */
+    private boolean raging() { return ultNow == RunUltimates.BERSERK; }
+
+    /** An ultimate is called on: what it does as it begins. */
+    private void began(int which) {
+        ultNow = ultSeen = which;
+        ultStarts++;
+        lastUltimate = which;
+        ultBossHits = 0;
+        bossLeeched = 0;
+        float middle = x + WIDE / 2;
+        switch (which) {
+            case RunUltimates.BERSERK:
+                cleaveCombo = 0;
+                cleaveGap = 9;
+                break;
+            case RunUltimates.STILL:
+                held.clear();
+                break;
+            case RunUltimates.TIDE:
+                // She breaks as a wave: every creature near enough, on the screen, is ink-poisoned as it comes; and she goes the way she faces.
+                tideWay = facingLeft ? -1 : 1;
+                tideStuck = false;
+                tideHit.clear();
+                for (Foe foe : new ArrayList<>(foes)) {
+                    if (foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET) continue;
+                    if (Math.abs(foe.x + foe.wide() / 2 - middle) <= RunUltimates.TIDE_REACH) poison(foe);
+                }
+                break;
+            case RunUltimates.TITAN:
+                stride = 0;
+                break;
+            case RunUltimates.LEGION:
+                for (int at = 0; at < TRAIL; at++) {
+                    trailX[at] = x;
+                    trailY[at] = y;
+                    trailLeft[at] = facingLeft;
+                }
+                break;
+            default:
+                petals.clear();
+                bloomLinks = 0;
+                bloomHeal = 0;
+        }
+    }
+
+    /** One ends: what it leaves behind. */
+    private void ended(int which) {
+        ultEnds++;
+        lastEnded = which;
+        float middle = x + WIDE / 2;
+        switch (which) {
+            case RunUltimates.BERSERK:
+                exhaust = RunUltimates.EXHAUSTED_LASTS;
+                break;
+            case RunUltimates.STILL:
+                release();
+                break;
+            case RunUltimates.TIDE:
+                // She forms again in a burst of ink, and a pool of it, and is clear of anything for a moment.
+                ultBlast(middle, y + TALL * .5f, RunUltimates.TIDE_REFORM, INKED);
+                if (puddles.size() < 12) puddles.add(new float[]{middle, y + TALL, POOL_LASTS});
+                safe = Math.max(safe, .8f);
+                break;
+            case RunUltimates.TITAN:
+                // She shrinks, and the ground jumps once more.
+                stagger(RunUltimates.TITAN_QUAKE * 1.3f);
+                titanSteps++;
+                break;
+            case RunUltimates.LEGION:
+                break;
+            default:
+                petals.clear();
+                ultBlast(middle, y + TALL * .5f, RunUltimates.BLOOM_WIDE * 1.4f, REAPED);
+                blooms++;
+        }
+    }
+
+    /** What an ultimate does as time goes: seen to begin and to end, and its own rule each step. */
+    private void ultimates(float seconds) {
+        int now = 0;
+        for (int slot = 0; slot < SLOTS && now == 0; slot++) if (active(slot) != null && active(slot).ultimate > 0 && activeLeft[slot] > 0) now = active(slot).ultimate;
+        int was = ultSeen;
+        ultNow = ultSeen = now;
+        if (was != 0 && was != now) ended(was);
+        if (exhaust > 0) exhaust -= seconds;
+        cleaveGap += seconds;
+        trailAt = (trailAt + 1) % TRAIL;
+        trailX[trailAt] = x;
+        trailY[trailAt] = y;
+        trailLeft[trailAt] = facingLeft;
+        if (now != RunUltimates.STILL && !held.isEmpty()) release();
+        float middle = x + WIDE / 2;
+        if (now == RunUltimates.TIDE) {
+            // Whatever she passes through is struck twice and ink-poisoned, once each; a boss is struck once, if he is open to it, and not poisoned.
+            for (Foe foe : new ArrayList<>(foes)) {
+                if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || tideHit.contains(foe)) continue;
+                if (Math.abs(foe.x + foe.wide() / 2 - middle) > foe.wide() / 2 + 1 || foe.y > y + TALL + .6f || foe.y + foe.tall() < y - .6f) continue;
+                tideHit.add(foe);
+                boolean boss = RunLevels.boss(foe.kind);
+                if (!boss) poison(foe);
+                if (ultStrike(foe, INKED, 1) && !boss) ultStrike(foe, INKED, 1);
+                tideStrikes++;
+            }
+        } else if (now == RunUltimates.TITAN) {
+            // Whatever she walks into is crushed (not a boss); the cracks and false walls in her way break; and each step shakes the ground.
+            float half = WIDE * RunUltimates.TITAN_SIZE / 2, top = y + TALL - TALL * RunUltimates.TITAN_SIZE;
+            for (Foe foe : new ArrayList<>(foes)) {
+                if (foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.struck <= .35f) continue;
+                if (Math.abs(foe.x + foe.wide() / 2 - middle) > half + foe.wide() / 2 || foe.y > y + TALL || foe.y + foe.tall() < top) continue;
+                ultStrike(foe, LANDED, RunUltimates.TITAN_CRUSH);
+                crushed++;
+            }
+            crack(middle - half, middle + half, top, y + TALL);
+            breakSecrets(middle - half, middle + half, top, y + TALL);
+            if (onGround) {
+                stride += Math.abs(speedAcross) * seconds;
+                if (stride >= RunUltimates.TITAN_STRIDE) {
+                    stride -= RunUltimates.TITAN_STRIDE;
+                    titanSteps++;
+                    stagger(RunUltimates.TITAN_QUAKE);
+                }
+            }
+        } else if (now == RunUltimates.BLOOM) {
+            bloomHeal += RunUltimates.BLOOM_HEAL * seconds;
+            if (bloomHeal >= 1) {
+                int back = (int) bloomHeal;
+                bloomHeal -= back;
+                if (hp > 0 && hp < maxHp()) {
+                    hp = Math.min(maxHp(), hp + back);
+                    regenAge = 0;
+                }
+            }
+            for (int index = petals.size() - 1; index >= 0; index--) {
+                float[] link = petals.get(index);
+                if ((link[2] -= seconds) > 0) continue;
+                petals.remove(index);
+                blooms++;
+                ultBlast(link[0], link[1], RunUltimates.BLOOM_WIDE, REAPED);
+            }
+        }
+    }
+
+    /** The giant's step: every creature on the ground near her is knocked off its feet for a moment. (Bosses stand firm.) */
+    private void stagger(float reach) {
+        float middle = x + WIDE / 2;
+        for (Foe foe : foes) {
+            if (foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || RunLevels.flier(foe.kind)) continue;
+            if (Math.abs(foe.x + foe.wide() / 2 - middle) > reach || Math.abs(foe.y + foe.tall() - y - TALL) > 1.6f) continue;
+            foe.dazed = Math.max(foe.dazed, RunUltimates.TITAN_DAZE);
+            foe.stunned = Math.max(foe.stunned, RunUltimates.TITAN_DAZE);
+            foe.popped = 0;
+        }
+    }
+
+    /**
+     * One of an ultimate's own blows on a creature: the blow is a share of a whole one; and on one who waits at the end, it lands only when he
+     * is open to it, and only so many times in all (see {@link RunUltimates#BOSS_HITS}). Whether it landed.
+     */
+    private boolean ultStrike(Foe foe, int by, float share) {
+        if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET) return false;
+        if (RunLevels.boss(foe.kind)) {
+            if (!open(foe) || ultBossHits >= RunUltimates.BOSS_HITS) return false;
+            ultBossHits++;
+        }
+        boolean acting = ultActing;
+        float was = blowScale;
+        ultActing = true;
+        blowScale = share;
+        beat(foe, by);
+        blowScale = was;
+        ultActing = acting;
+        return true;
+    }
+
+    /** A burst of some width, dealt with ultStrike to all within it, a boss at most so many times in all. */
+    private void ultBlast(float atX, float atY, float wide, int by) {
+        booms.add(new float[]{atX, atY, wide, by, 0});
+        for (Foe foe : new ArrayList<>(foes)) {
+            float across = foe.x + foe.wide() / 2 - atX, down = foe.y + foe.tall() / 2 - atY;
+            if (foe.flat || absent(foe) || foe.dazed > 0 || across * across + down * down > wide * wide) continue;
+            ultStrike(foe, by, 1);
+        }
+    }
+
+    /** Berserk: a blow of hers landed; it gives back HP (one, from a boss, and no more than so many in all). */
+    private void leech(boolean waits) {
+        if (ultNow != RunUltimates.BERSERK || hp <= 0 || hp >= maxHp()) return;
+        int back = RunUltimates.BERSERK_LEECH;
+        if (waits) {
+            if (bossLeeched >= RunUltimates.BOSS_LEECH_MOST) return;
+            back = 1;
+            bossLeeched++;
+        }
+        hp = Math.min(maxHp(), hp + back);
+        leeched += back;
+        regenAge = 0;
+    }
+
+    /** Berserk: a strike cleaves all round her, wider with each in a row, and her next is ready the sooner. */
+    private void cleave() {
+        cleaveCombo = cleaveGap < 1 ? Math.min(RunUltimates.CLEAVE_COMBO_MOST, cleaveCombo + 1) : 1;
+        cleaveGap = 0;
+        cleaves++;
+        ultBlast(x + WIDE / 2, y + TALL * .5f, RunUltimates.CLEAVE_WIDE + RunUltimates.CLEAVE_GROWS * (cleaveCombo - 1), weapon == UNARMED ? PLAIN : blowOf(weapon));
+    }
+
+    /** The legion: each echo strikes where it stands, with a copy of what she threw or a swing of what she swings. */
+    private void echoesStrike(int before, int made) {
+        for (int echo = 0; echo < RunUltimates.ECHOES; echo++) {
+            float[] at = echoAt(echo);
+            if (at == null) return;
+            echoStrikes++;
+            if (made > before) {
+                for (int index = before; index < made; index++) {
+                    Shot shot = shots.get(index);
+                    if (!shot.hers || shot.pets) continue;
+                    Shot copy = twin(shot, 0);
+                    copy.x += at[0] - x;
+                    copy.y += at[1] - y;
+                }
+            } else if (weapon != UNARMED && weapon >= 0 && weapon < RunArms.COUNT) {
+                float reach = reachGear(weapon, perks.levels[weapon]), middle = at[0] + WIDE / 2, bottom = at[1] + TALL, top = bottom - Math.max(1, areaGear(weapon, perks.levels[weapon]));
+                float from = facingLeft ? middle - reach : middle - .3f, to = facingLeft ? middle + .3f : middle + reach;
+                for (Foe foe : new ArrayList<>(foes)) {
+                    if (foe.flat || absent(foe) || foe.x >= to || foe.x + foe.wide() <= from || foe.y >= bottom || foe.y + foe.tall() <= top) continue;
+                    ultStrike(foe, blowOf(weapon), RunUltimates.ECHO_BLOW);
+                }
+            }
+        }
+    }
+
+    /** The stilled hour: a blow on an ordinary creature is held where it fell, to land when time runs again. Whether it was held. */
+    private boolean holds(Foe foe, int by) {
+        if (RunLevels.boss(foe.kind) || foe.flat || absent(foe) || foe.kind == RunLevels.TARGET) return false;
+        if (thingOf(by) == UNARMED && by != LANDED && by != PLUNGED) return false;
+        if (held.size() >= RunUltimates.STILL_QUEUE) return false;
+        held.add(new Object[]{foe, by});
+        heldBlows++;
+        return true;
+    }
+
+    /** Time runs again: every blow that was held lands, together. */
+    private void release() {
+        if (held.isEmpty()) return;
+        releasing = true;
+        List<Object[]> now = new ArrayList<>(held);
+        held.clear();
+        for (Object[] one : now) {
+            Foe foe = (Foe) one[0];
+            if (!foe.flat) beat(foe, (Integer) one[1]);
+        }
+        releasing = false;
+        releases++;
+        releasedBlows += now.size();
     }
 
     float energy() { return energy; }
@@ -3271,9 +3634,9 @@ final class PlusRun {
     }
 
     /** How far a thing she fights with reaches, and how wide it bursts, and how many it goes through, with what she wears. */
-    private float reachGear(int kind, int level) { return RunArms.reach(kind, level) * (1 + gear(RunLoot.REACH) / 100f); }
+    private float reachGear(int kind, int level) { return RunArms.reach(kind, level) * (1 + gear(RunLoot.REACH) / 100f) * size(); }
 
-    private float areaGear(int kind, int level) { return RunArms.area(kind, level) * (1 + gear(RunLoot.AREA) / 100f); }
+    private float areaGear(int kind, int level) { return RunArms.area(kind, level) * (1 + gear(RunLoot.AREA) / 100f) * size(); }
 
     private int piercesGear(int kind, int level) { return RunArms.pierces(kind, level) + gear(RunLoot.PIERCE); }
 
@@ -5132,6 +5495,12 @@ final class PlusRun {
                 activeRest[slot] = 0;
             }
         }
+        // (An ultimate taken out of its slot ends where it stands.)
+        if (ultNow != 0 && ultimateLeft() <= 0) {
+            int was = ultNow;
+            ultNow = ultSeen = 0;
+            ended(was);
+        }
     }
 
     void grant(Perks now) {
@@ -5773,6 +6142,9 @@ final class PlusRun {
         scatter(seconds);
         wearing(seconds);
         actives(seconds);
+        ultimates(seconds);
+        // (As a wave of ink she cannot strike.)
+        if (ultNow == RunUltimates.TIDE) strike = false;
         // The moment of the black ribbon: nothing else moves.
         if (moment > 0) {
             momentous(seconds);
@@ -5846,7 +6218,8 @@ final class PlusRun {
         }
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
-        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy() * (inked() ? curseSlow() : 1) * (herChill > 0 ? CHILLED : 1);
+        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy() * (inked() ? curseSlow() : 1) * (herChill > 0 ? CHILLED : 1)
+                * (exhaust > 0 ? RunUltimates.EXHAUSTED_RUN : 1);
         float fast = rush > 0 ? run * 1.3f : run, leap = (rush > 0 ? LEAP * 1.1f : LEAP) * (inked() ? CURSE_JUMP : 1);
         if (has(YELLOW)) fast = run * (mastered ? 2.1f : 1.7f);
         float wanted = left == right ? 0 : left ? -fast : fast;
@@ -6021,8 +6394,16 @@ final class PlusRun {
             wet = true;
         }
 
+        // As a wave of ink she sweeps along the way she faced, rising over whatever stops her.
+        if (ultNow == RunUltimates.TIDE) {
+            speedAcross = tideWay * RunUltimates.TIDE_SPEED;
+            speedDown = tideStuck ? -7 : 0;
+            facingLeft = tideWay < 0;
+        }
+        float beforeAcross = x;
         // A belt carries her along with it.
         moveAcross((speedAcross + (under == RunLevels.BELT_RIGHT ? BELT : under == RunLevels.BELT_LEFT ? -BELT : 0)) * seconds);
+        if (ultNow == RunUltimates.TIDE) tideStuck = Math.abs(x - beforeAcross) < seconds * RunUltimates.TIDE_SPEED * .25f;
         moveDown(speedDown * seconds);
         // A few steps into the place where someone waits, the way back shuts behind her, and they come.
         if (!locked && opening <= 0 && level.arena >= 0 && x + WIDE / 2 >= level.arena + 2.5f && x + WIDE / 2 < level.gate && standing()) lock();
@@ -6210,7 +6591,7 @@ final class PlusRun {
         aerialStrike(seconds, strike);
         {
             int haste = Math.min(80, gear(RunLoot.HASTE) + (frenzyLeft > 0 ? Math.max(0, skillOf(RunSkills.E_FRENZY)) : 0) + (has(YELLOW) ? Math.max(0, skillOf(RunSkills.E_YELLOW)) : 0));
-            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= restOf(weapon) * (1 - haste / 100f)
+            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= restOf(weapon) * (1 - haste / 100f) * ultRest()
                     && aerialLeft <= 0 && !(onGround && skyborne());
             if (used) {
                 // (What the tree does to every use: a charge for a rest before it, more of what is thrown, a swing that strikes again.)
@@ -6222,6 +6603,9 @@ final class PlusRun {
                 use();
                 sweeping = false;
                 afterUse(before, rested);
+                // (The ultimates that change a strike: berserk cleaves all round her, and the echoes strike with her.)
+                if (ultNow == RunUltimates.BERSERK) cleave();
+                else if (ultNow == RunUltimates.LEGION) echoesStrike(before, shots.size());
             }
             // Held, a tablet-book opens its panel and a ring of keys goes out in a fan: once for each hold. (With the white that is truly
             // hers the hold is her beam's.)
@@ -6280,7 +6664,7 @@ final class PlusRun {
                 break;
             }
         }
-        for (Foe foe : foes) move(foe, seconds);
+        for (Foe foe : foes) move(foe, seconds * foeRate(foe));
         pets(seconds);
         secrets(seconds);
         if (!born.isEmpty()) {
@@ -6821,6 +7205,8 @@ final class PlusRun {
      * touches them and whatever they had in the air is gone.
      */
     private void beat(Foe foe, int by) {
+        // In the stilled hour a blow on an ordinary creature is held where it fell, to land with the rest when time runs again.
+        if (ultNow == RunUltimates.STILL && !releasing && holds(foe, by)) return;
         with = by;
         beat(foe);
         with = PLAIN;
@@ -6982,7 +7368,10 @@ final class PlusRun {
             return;
         }
         foe.struck = 0;
-        if (hers) landed(foe, waits);
+        if (hers) {
+            landed(foe, waits);
+            leech(waits);
+        }
         boolean stun = hers && !waits && chance(skillOf(RunSkills.E_STUN));
         // (What it was dealt with, for how the blow is seen: a cut, a splash of ink, a thud, a sparkle; and, below, whether it was the last.)
         float[] hit = new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0, flavourOf(with), 0, 0, 0, 0};
@@ -7882,9 +8271,11 @@ final class PlusRun {
     float blastWide() { return RunArms.burst(BOOK, perks.levels[BOOK]); }
 
     /** Moves on everything in the air, and sees what it has met. Returns whether she was hurt by it. */
-    private boolean fly(float seconds) {
+    private boolean fly(float step) {
         for (int index = shots.size() - 1; index >= 0; index--) {
             Shot shot = shots.get(index);
+            // (In the stilled hour what creatures throw goes at a sixth of its speed; what she throws, at its own.)
+            float seconds = shot.hers || ultNow != RunUltimates.STILL ? step : step * RunUltimates.STILL_RATE;
             shot.x += shot.across * seconds;
             shot.y += shot.down * seconds;
             shot.age += seconds;
@@ -8093,8 +8484,9 @@ final class PlusRun {
      * ball of ink takes one hurt for her. Returns whether anything came of it.
      */
     private boolean hurt(boolean fell, int costs) {
-        if (!fell && (notes > 0 || worn[BLACK] > 0)) return false;
-        if (!fell && gearTakes()) {
+        // (As a wave of ink, or in the rose bloom, nothing hurts her. In a rage she cannot guard: no dodge, no shrug, no shield bar, no ink ball.)
+        if (!fell && (notes > 0 || worn[BLACK] > 0 || ultNow == RunUltimates.TIDE || ultNow == RunUltimates.BLOOM)) return false;
+        if (!fell && !raging() && gearTakes()) {
             safe = SAFE * perks.mercy;
             return true;
         }
@@ -8102,7 +8494,7 @@ final class PlusRun {
         if (!fell) costs = Math.max(1, costs + bite - perks.defence);
         // Three colours and more are a prism, through which whatever lands on her lands by half.
         if (!fell && named(PRISM)) costs = (costs + 1) / 2;
-        if (shield) {
+        if (shield && !(raging() && !fell)) {
             if (--inkLeft <= 0) shield = false;
             spared++;
             safe = SAFE * perks.mercy;
@@ -8115,6 +8507,8 @@ final class PlusRun {
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
             int lost = costs * HALF;
             if (!fell) lost = Math.max(Math.max(1, lost / 10), lost - perks.skills.stats[RunSkills.DEF] - lost * defencePercent() / 100);
+            // (In a rage a hurt costs half as much again.)
+            if (!fell && raging()) lost = Math.round(lost * RunUltimates.BERSERK_HURT);
             hp -= lost;
             lastLost = lost;
         }
@@ -8182,6 +8576,8 @@ final class PlusRun {
             wet = false;
             return true;
         }
+        // In a rage nothing throws her back: she goes on where she was.
+        if (raging()) return true;
         // A flinch: a step back from it, if there is ground to step back onto.
         flinch = .2f;
         float way = knock != 0 ? knock : speedAcross != 0 ? -Math.signum(speedAcross) : facingLeft ? 1 : -1;

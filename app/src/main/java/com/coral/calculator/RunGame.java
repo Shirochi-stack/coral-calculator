@@ -10390,7 +10390,7 @@ final class RunGame {
             audio.play("tap", .3f);
         } else if (asked == RunTree.TAKE) {
             java.util.BitSet taken = skillsTaken();
-            if (!RunSkills.canTake(taken, id) || skillPoints() - RunSkills.spent(taken) <= 0) {
+            if (!RunSkills.canTake(taken, id) || skillPoints() - RunSkills.spent(taken) < RunSkills.costOf(id)) {
                 audio.play("no", .5f);
                 return;
             }

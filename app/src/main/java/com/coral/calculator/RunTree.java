@@ -156,7 +156,7 @@ final class RunTree {
     static float size(RunSkills.Node node) {
         if (node.type == RunSkills.CENTRE) return 0;
         if (node.type == RunSkills.START) return 1.25f;
-        if (node.type == RunSkills.NOTABLE) return RunSkills.keystone(node) ? 1.05f : .8f;
+        if (node.type == RunSkills.NOTABLE) return RunSkills.grand(node) ? 1.05f : .8f;
         return node.type == RunSkills.ROOT ? .58f : .38f;
     }
 
@@ -672,9 +672,12 @@ final class RunTree {
             act.setEmpty();
         } else {
             act.set(card.left + pad, buttonTop, card.right - pad, buttonTop + dp(40));
-            String word = !can ? "Take one next to it first" : left <= 0 ? "No points left: her next level gives one" : "Take it  ·  1 point";
-            button(canvas, act, word, can && left > 0, 0xFFE0475A);
-            if (!can || left <= 0) act.setEmpty();
+            int cost = RunSkills.costOf(on);
+            String needs = RunSkills.ultimateNeeds(facts.taken, on);
+            String word = needs != null ? needs : !can ? "Take one next to it first" : left < cost ? (left <= 0 ? "No points left: her next level gives one" : "It costs " + cost + " points: she has " + left)
+                    : "Take it  ·  " + cost + (cost == 1 ? " point" : " points");
+            button(canvas, act, word, can && left >= cost, 0xFFE0475A);
+            if (!can || left < cost) act.setEmpty();
         }
     }
 
