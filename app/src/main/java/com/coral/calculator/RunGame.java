@@ -503,6 +503,15 @@ final class RunGame {
     private final int[] mapPerRow = new int[3];
     /** Whether the screen is short and wide (a phone on its side): the map's tabs are put up beside the line under its name. */
     private boolean mapShort;
+    // The map on its side is a long page that is scrolled: the lands are large enough to put a thumb on, and the chapters are as many as there are, one under another.
+    // Each land keeps the place it has with the page at the top (landBase), and lands[] is that place moved up by how far the page has been scrolled, so that
+    // everything that draws or touches a land goes on using lands[] as it always did.
+    private final RectF[] landBase = new RectF[RunLevels.TOTAL];
+    private final RectF mapWindow = new RectF();
+    private final float[] mapLong = new float[3], mapBand = new float[3];
+    private boolean mapWide, mapPressed, mapDragging, mapCaught;
+    private float mapScroll, mapFling, mapBottomRow, mapDownX, mapDownY, mapDownScroll, mapLastY, mapSpeed;
+    private long mapLastAt;
     private final RectF[] tabs = {new RectF(), new RectF(), new RectF()}, tabs3 = {new RectF(), new RectF(), new RectF()}, stallWares = {new RectF(), new RectF(), new RectF(), new RectF()};
     private final RectF stallButton = new RectF();
     /** Which volume's lands the map shows; and from where the counter was opened, to go back there. */
@@ -745,7 +754,10 @@ final class RunGame {
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
         stroke.setStrokeJoin(Paint.Join.ROUND);
-        for (int index = 0; index < lands.length; index++) lands[index] = new RectF();
+        for (int index = 0; index < lands.length; index++) {
+            lands[index] = new RectF();
+            landBase[index] = new RectF();
+        }
         for (int index = 0; index < wares.length; index++) wares[index] = new RectF();
         // A chapter in which everything asked was done before there were medals has its medal now.
         for (int chapter = 0; chapter < RunLevels.ALL_CHAPTERS; chapter++) medal(chapter, false);
@@ -4348,38 +4360,43 @@ final class RunGame {
         // (On a screen wider than it is tall, the width is used: its chapters side by side, each in rows of its own, the lands as large as fit.)
         float room = safe.height() - dp(92) - dp(150) - dp(44);
         for (int volume = 0; volume < 3; volume++) mapPerRow[volume] = eachOf(volume);
-        mapShort = safe.width() > safe.height() * 1.15f && safe.height() < dp(460);
+        mapWide = safe.width() > safe.height() * 1.15f;
+        mapShort = mapWide && safe.height() < dp(460);
         float mapTop = mapShort ? dp(94) : dp(136);
-        for (int volume = 0; volume < 3 && safe.width() > safe.height() * 1.15f; volume++) {
+        // The window the lands are seen through, on its side: from under the tabs to over the button that goes on, which is pinned at the foot.
+        mapBottomRow = mapShort ? dp(50) : dp(66);
+        mapWindow.set(safe.left, safe.top + mapTop, safe.right, safe.bottom - dp(16) - mapBottomRow - dp(8));
+        for (int volume = 0; volume < 3 && mapWide; volume++) {
+            // On its side the chapters are one under another, as long as the page needs, and the lands are as large as the width lets them be:
+            // about a quarter of the screen's height (but never under seventy-two across), and a chapter that is too many for one row is in two.
             int each = eachOf(volume), from = firstOf(volume), chapters = (lastOf(volume) - from) / each;
-            float gap = dp(7), colGap = dp(22), label = dp(24), bandGap = dp(10), roomH = safe.height() - mapTop - dp(74), availW = safe.width() - dp(36);
-            float best = 0;
-            int bestCols = 1, bestPer = each;
-            for (int cols = 1; cols <= chapters; cols++) {
-                for (int per : new int[]{each, (each + 1) / 2, (each + 2) / 3}) {
-                    int rows = (each + per - 1) / per, bands = (chapters + cols - 1) / cols;
-                    float colW = (availW - colGap * (cols - 1)) / cols;
-                    if (colW < dp(110)) continue;
-                    float side = Math.min(dp(84), Math.min((colW - gap * (per - 1)) / per, (roomH / bands - label - bandGap - gap * (rows - 1)) / rows));
-                    if (side > best + dp(1)) {
-                        best = side;
-                        bestCols = cols;
-                        bestPer = per;
-                    }
+            float gap = dp(9), label = dp(30), bandGap = dp(14), availW = safe.width() - dp(36);
+            float want = Math.min(dp(120), Math.max(dp(72), safe.height() * .26f));
+            int per = each;
+            float fit = (availW - gap * (per - 1)) / per;
+            if (fit < want * .9f && each > 3) {
+                int fewer = (each + 1) / 2;
+                float fitFewer = (availW - gap * (fewer - 1)) / fewer;
+                if (fitFewer > fit) {
+                    per = fewer;
+                    fit = fitFewer;
                 }
             }
-            float side = Math.max(dp(22), best);
-            int cols = bestCols, per = bestPer, rows = (each + per - 1) / per;
+            float side = Math.max(dp(22), Math.min(want, fit));
+            int rows = (each + per - 1) / per;
             mapPerRow[volume] = per;
-            float blockW = per * side + gap * (per - 1), blockH = label + rows * side + gap * (rows - 1) + bandGap;
-            float left = safe.centerX() - (cols * blockW + colGap * (cols - 1)) / 2, top = safe.top + mapTop;
+            float blockW = per * side + gap * (per - 1), bandH = label + rows * side + gap * (rows - 1) + bandGap;
+            float left = safe.centerX() - blockW / 2, top = mapWindow.top + dp(4);
             for (int index = 0; index < lastOf(volume) - from; index++) {
-                int chapter = index / each, at = index % each, col = chapter % cols, band = chapter / cols;
-                float x = left + col * (blockW + colGap) + at % per * (side + gap), down = top + band * blockH + label + at / per * (side + gap);
+                int chapter = index / each, at = index % each;
+                float x = left + at % per * (side + gap), down = top + chapter * bandH + label + at / per * (side + gap);
                 lands[from + index].set(x, down, x + side, down + side);
             }
+            mapBand[volume] = bandH;
+            mapLong[volume] = Math.max(0, chapters * bandH - bandGap + dp(8) - mapWindow.height());
         }
-        for (int volume = 0; volume < 3 && safe.width() <= safe.height() * 1.15f; volume++) {
+        for (int volume = 0; volume < 3 && !mapWide; volume++) {
+            mapLong[volume] = 0;
             int each = eachOf(volume), from = firstOf(volume);
             float gap = volume == 0 ? dp(8) : dp(5);
             float side = Math.max(dp(22), Math.min(dp(54), Math.min((safe.width() - dp(28) - gap * (each - 1)) / each, room / RunLevels.CHAPTERS - dp(34))));
@@ -4389,6 +4406,7 @@ final class RunGame {
                 lands[from + index].set(x, down, x + side, down + side);
             }
         }
+        for (int index = 0; index < lands.length; index++) landBase[index].set(lands[index]);
         // (The tabs leave room at the end of their row for the buttons that open her skill tree and her backpack.)
         float tab = Math.min(dp(132), (safe.width() - dp(44) - dp(84) - dp(52)) / 2);
         tabs[0].set(safe.left + dp(18), safe.top + dp(80), safe.left + dp(18) + tab, safe.top + dp(114));
@@ -4470,22 +4488,132 @@ final class RunGame {
         int from = firstOf(volume), last = lastOf(volume) - 1;
         float lowest = 0, leftmost = Float.MAX_VALUE, rightmost = 0;
         for (int index = from; index <= last; index++) {
-            lowest = Math.max(lowest, lands[index].bottom);
-            leftmost = Math.min(leftmost, lands[index].left);
-            rightmost = Math.max(rightmost, lands[index].right);
+            lowest = Math.max(lowest, landBase[index].bottom);
+            leftmost = Math.min(leftmost, landBase[index].left);
+            rightmost = Math.max(rightmost, landBase[index].right);
         }
+        // The page opens on the chapter she has got to: its name at the top if it fits with its lands, and if not, so that her land is in view.
+        mapScroll = 0;
+        mapFling = 0;
+        int reached = open();
+        if (mapWide && mapLong[volume] > 0 && reached > from && reached <= last + 1) {
+            int each = eachOf(volume);
+            float chapterTop = landBase[from + (reached - 1 - from) / each * each].top - dp(30) - mapWindow.top - dp(4);
+            float landEnd = landBase[reached - 1].bottom + dp(10) - mapWindow.bottom;
+            mapScroll = Math.max(chapterTop, landEnd);
+        }
+        scrollMap(0);
         float under = lowest + dp(16);
-        // (In landscape, clear of the way into the gallery at the foot on the right.)
-        if (safe.width() > safe.height() * 1.15f) rightmost = Math.min(rightmost, safe.right - dp(14) - dp(66) - dp(12));
-        goButton.set(leftmost, under, rightmost, under + dp(48));
+        if (!mapWide) {
+            goButton.set(leftmost, under, rightmost, under + dp(48));
+        } else {
+            // On its side the button that goes on is pinned at the foot, in a row with the way into the gallery on the right; as wide as
+            // the lands, but not more than a thumb has any use for, and clear of the gallery.
+            float foot = safe.bottom - dp(16), across = Math.min(dp(66), mapBottomRow);
+            cringeButton.set(safe.right - dp(14) - across, foot - mapBottomRow, safe.right - dp(14), foot);
+            float wide = Math.min(rightmost - leftmost, dp(460)), middle = (leftmost + rightmost) / 2;
+            float right = Math.min(middle + wide / 2, cringeButton.left - dp(12));
+            goButton.set(right - wide, foot - dp(48), right, foot);
+        }
         text.setTextSize(dp(26));
         float from0 = safe.left + dp(18) + text.measureText("Plus run") + dp(12), to = soundButton.left - dp(8);
         shopButton.set(Math.max(from0, to - dp(160)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
         // The way into the gallery: her cringing face with its name under it, at the foot of the map on the right, across from her
         // and clear of what she says. Where there is little room under the lands it is smaller, and loses its name before its face.
-        float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
-        float across = Math.min(dp(66), tall);
-        cringeButton.set(safe.right - dp(14) - across, foot - tall, safe.right - dp(14), foot);
+        if (!mapWide) {
+            float foot = safe.bottom - dp(16), tall = Math.min(dp(78), Math.max(dp(46), foot - goButton.bottom - dp(10)));
+            float across = Math.min(dp(66), tall);
+            cringeButton.set(safe.right - dp(14) - across, foot - tall, safe.right - dp(14), foot);
+        }
+    }
+
+    /** How long the map's page is, past what shows: nothing, unless the screen is on its side and its lands are more than the window holds. */
+    private float mapLength() { return mapWide ? mapLong[page] : 0; }
+
+    /** The page is scrolled by this much more (down is positive), and no further than its ends; the lands go where that puts them. */
+    private void scrollMap(float by) {
+        mapScroll = Math.max(0, Math.min(mapLength(), mapScroll + by));
+        for (int index = firstOf(page); index < lastOf(page); index++) lands[index].set(landBase[index]);
+        for (int index = firstOf(page); index < lastOf(page); index++) lands[index].offset(0, -mapScroll);
+    }
+
+    /** Whether a point is on the lands' window, where a drag turns the page: a land can be touched only there. */
+    private boolean onMapWindow(float x, float y) { return mapWide && mapWindow.contains(x, y); }
+
+    /**
+     * A touch on the map's page, when it is scrolled. It may be the start of a drag, so nothing is started by it going down: a land is
+     * chosen when the finger comes up, if it has not moved more than a thumb's slop, and a page that was still sliding is only stopped.
+     * Whether the touch was the page's.
+     */
+    private boolean mapTouch(MotionEvent event) {
+        int action = event.getActionMasked();
+        float x = event.getX(), y = event.getY();
+        if (action == MotionEvent.ACTION_DOWN) {
+            mapPressed = onMapWindow(x, y);
+            if (!mapPressed) return false;
+            mapCaught = mapFling != 0;
+            mapFling = 0;
+            mapDragging = false;
+            mapDownX = x;
+            mapDownY = y;
+            mapDownScroll = mapScroll;
+            mapLastY = y;
+            mapLastAt = event.getEventTime();
+            mapSpeed = 0;
+            return true;
+        }
+        if (!mapPressed) return false;
+        if (action == MotionEvent.ACTION_MOVE) {
+            if (!mapDragging && Math.abs(y - mapDownY) > dp(10)) mapDragging = true;
+            if (mapDragging) {
+                scrollMap(mapDownScroll + (mapDownY - y) - mapScroll);
+                long now = event.getEventTime();
+                if (now > mapLastAt) {
+                    // (How fast the finger is going, blended with how fast it went, so that a flick is one smooth speed.)
+                    float speed = (mapLastY - y) * 1000f / (now - mapLastAt);
+                    mapSpeed = mapSpeed * .6f + speed * .4f;
+                    mapLastY = y;
+                    mapLastAt = now;
+                }
+            }
+            return true;
+        }
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            mapPressed = false;
+            if (action == MotionEvent.ACTION_UP && !mapDragging) {
+                if (!mapCaught) pickLand(mapDownX, mapDownY);
+            } else if (mapDragging && action == MotionEvent.ACTION_UP && event.getEventTime() - mapLastAt < 90 && Math.abs(mapSpeed) > dp(120)) {
+                mapFling = Math.max(-dp(6000), Math.min(dp(6000), mapSpeed));
+            }
+            mapDragging = false;
+            return true;
+        }
+        return true;
+    }
+
+    /** A land chosen on the map: played, or, from a gate, warped to; nothing if it is not open yet. */
+    private void pickLand(float x, float y) {
+        for (int index = firstOf(page); index < lastOf(page); index++) {
+            if (!lands[index].contains(x, y) || index + 1 > open()) continue;
+            if (warping) {
+                buzz(false);
+                warpTo(index + 1);
+            } else {
+                audio.play("tap", .5f);
+                buzz(false);
+                play(index + 1);
+            }
+            return;
+        }
+    }
+
+    /** The page, let go while sliding, slows as it goes and stops at its ends. */
+    private void slideMap(float seconds) {
+        if (mapFling == 0) return;
+        float before = mapScroll;
+        scrollMap(mapFling * seconds);
+        mapFling *= (float) Math.exp(-3.4f * seconds);
+        if (Math.abs(mapFling) < dp(14) || mapScroll == before) mapFling = 0;
     }
 
     void close() {
@@ -4591,6 +4719,7 @@ final class RunGame {
         delve = -1;
         audio.hush();
         screen = MAP;
+        turnTo(page);
         session.refresh();
         news();
     }
@@ -7347,6 +7476,7 @@ final class RunGame {
 
     void advance(float seconds) {
         clock += seconds;
+        if (screen == MAP) slideMap(seconds);
         sayNews(seconds);
         if (captionLeft > 0) captionLeft -= seconds;
         if (refused > 0) refused -= seconds;
@@ -9254,6 +9384,8 @@ final class RunGame {
             shopTouch(action, x, y);
             return;
         }
+        // The map on its side is a page to scroll: its lands are chosen as the finger comes up, not as it goes down.
+        if (screen == MAP && mapWide && mapTouch(event)) return;
         if (action != MotionEvent.ACTION_DOWN) return;
         if (screen == STORY) {
             // A touch turns the page.
@@ -9272,7 +9404,7 @@ final class RunGame {
                 turnTo(tabOf(0).contains(x, y) ? 0 : tabOf(1).contains(x, y) ? 1 : 2);
             } else {
                 for (int index = firstOf(page); index < lastOf(page); index++) {
-                    if (lands[index].contains(x, y) && index + 1 <= open()) {
+                    if (lands[index].contains(x, y) && !mapWide && index + 1 <= open()) {
                         buzz(false);
                         warpTo(index + 1);
                         return;
@@ -9315,7 +9447,7 @@ final class RunGame {
             } else {
                 int first = firstOf(page), last = lastOf(page);
                 for (int index = first; index < last; index++) {
-                    if (lands[index].contains(x, y) && index + 1 <= open()) {
+                    if (lands[index].contains(x, y) && !mapWide && index + 1 <= open()) {
                         audio.play("tap", .5f);
                         buzz(false);
                         play(index + 1);
@@ -9699,6 +9831,20 @@ final class RunGame {
      * is Back, which the stage gives as Back. Whether the key was one of the game's.
      */
     boolean key(int keyCode, boolean down) {
+        // On the map, on its side, the arrows (and W and S) and Page Up and Page Down scroll the page, Home and End take it to its ends.
+        if (screen == MAP && mapLength() > 0 && !treeOpen && !packOpen && !bagOpen && !huntsOpen && !smithOpen && !marketOpen && !fanOpen) {
+            int way = keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN || keyCode == android.view.KeyEvent.KEYCODE_S ? 1
+                    : keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP || keyCode == android.view.KeyEvent.KEYCODE_W ? -1
+                    : keyCode == android.view.KeyEvent.KEYCODE_PAGE_DOWN ? 3 : keyCode == android.view.KeyEvent.KEYCODE_PAGE_UP ? -3
+                    : keyCode == android.view.KeyEvent.KEYCODE_MOVE_END ? 99 : keyCode == android.view.KeyEvent.KEYCODE_MOVE_HOME ? -99 : 0;
+            if (way != 0) {
+                if (down) {
+                    mapFling = 0;
+                    scrollMap(way * mapWindow.height() / 3);
+                }
+                return true;
+            }
+        }
         int does = RunKeys.of(keyCode);
         if (does == 0 || does == RunKeys.BACK) return false;
         int fresh = keys.press(keyCode, down);
@@ -9797,6 +9943,12 @@ final class RunGame {
         }
         if (packOpen && turned != 0) {
             inventory.wheel(turned);
+            return true;
+        }
+        // On the map, on its side, the wheel scrolls the page.
+        if (screen == MAP && mapLength() > 0 && turned != 0 && !bagOpen && !huntsOpen && !smithOpen && !marketOpen && !fanOpen) {
+            mapFling = 0;
+            scrollMap(-turned * dp(72));
             return true;
         }
         return false;
@@ -16391,6 +16543,7 @@ final class RunGame {
         // Over the lands opened from a gate: which of them have gates she has found, lit; and what choosing does.
         for (int index = firstOf(page); index < lastOf(page); index++) {
             if (starsOf(index + 1) <= 0 || index + 1 >= RunLevels.OPEN_TO) continue;
+            if (mapWide && (lands[index].bottom < mapWindow.top || lands[index].top > mapWindow.bottom)) continue;
             float beat = .5f + .5f * (float) Math.sin(clock * 3 + index * .4f);
             stroke.setColor(0xFF8E6BFF);
             stroke.setAlpha(Math.round(150 + 100 * beat));
@@ -16468,39 +16621,45 @@ final class RunGame {
         }
         int firstShown = firstOf(page), lastShown = lastOf(page);
         int each = eachOf(page);
+        // (On its side the lands are seen through a window, and the page slides under it: nothing of it is drawn over the tabs or the button at the foot.)
+        canvas.save();
+        if (mapWide) canvas.clipRect(mapWindow);
         for (int index = firstShown; index < lastShown; index++) {
             RectF where = lands[index];
+            // (The chapter's name, its levels and the corners of its lands grow with its lands.)
+            float grown = mapWide ? Math.min(1.5f, Math.max(1, where.width() / dp(64))) : 1;
+            float corner = Math.max(dp(13), where.width() * .15f);
+            if (mapWide && (where.bottom < mapWindow.top || where.top - dp(36) > mapWindow.bottom)) continue;
             int land = index + 1, got = starsOf(land);
             if ((index - firstShown) % each == 0) {
                 text.setTextAlign(Paint.Align.LEFT);
                 text.setColor(land <= open ? ink : soft);
-                text.setTextSize(dp(14));
+                text.setTextSize(dp(14) * grown);
                 // (As wide as its row of lands, and no wider: in landscape another chapter stands beside it.)
                 float block = lands[Math.min(lastShown - 1, index + mapPerRow[page] - 1)].right - where.left;
-                text.setTextSize(dp(14));
-                if (text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) > block) text.setTextSize(dp(14) * block / text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]));
-                canvas.drawText(RunStory.CHAPTERS[RunLevels.chapterOf(land)], where.left, where.top - dp(8), text);
+                if (text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) > block) text.setTextSize(dp(14) * grown * block / text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]));
+                canvas.drawText(RunStory.CHAPTERS[RunLevels.chapterOf(land)], where.left, where.top - dp(8) * grown, text);
                 // The levels of its lands: how tough they are.
                 float named = text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]);
                 // (The levels she would be in them, having played her way there: what her level is measured against.)
                 int low = RunLoot.recommended(land), high = RunLoot.recommended(Math.min(RunLevels.TOTAL, land + each - 1));
                 text.setColor(soft);
-                text.setTextSize(dp(11.5f));
+                text.setTextSize(dp(11.5f) * grown);
                 String levels = low == high ? "level " + low : "levels " + low + " to " + high;
-                if (named + dp(26) + text.measureText(levels) <= block) canvas.drawText(levels, where.left + named + dp(26), where.top - dp(8), text);
+                if (named + dp(26) + text.measureText(levels) <= block) canvas.drawText(levels, where.left + named + dp(26), where.top - dp(8) * grown, text);
                 text.setColor(land <= open ? ink : soft);
-                text.setTextSize(dp(14));
+                text.setTextSize(dp(14) * grown);
                 if (session.tally("run_medal_" + RunLevels.chapterOf(land)) != 0) {
                     paint.setAlpha(255);
-                    art(canvas, STAR_ART, where.left + text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) + dp(12), where.top - dp(4), dp(16), false);
+                    art(canvas, STAR_ART, where.left + text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) + dp(12) * grown, where.top - dp(4) * grown - dp(2) * (grown - 1), dp(16) * grown, false);
                 }
             }
             boolean reached = land <= open;
-            plate(canvas, where, dp(13), reached ? 245 : 110);
+            plate(canvas, where, corner, reached ? 245 : 110);
             if (land == open && got == 0) {
                 stroke.setColor(CalculatorLayout.CORAL);
-                stroke.setStrokeWidth(dp(2.5f));
-                canvas.drawRoundRect(where, dp(13), dp(13), stroke);
+                stroke.setStrokeWidth(dp(2.5f) * grown);
+                canvas.drawRoundRect(where, corner, corner, stroke);
             }
             // The lands where someone waits at the end are marked in her colour.
             int boss = RunLevels.bossOf(land);
@@ -16548,6 +16707,18 @@ final class RunGame {
             RectF where = lands[index];
             stairsIn(canvas, where.right - where.width() * .15f, where.top + where.width() * .15f, where.width() * .3f);
             if ((session.tally("run_dungeons") >> dungeon & 1) != 0) artIn(canvas, STAR_ART, where.right - where.width() * .07f, where.top + where.width() * .27f, where.width() * .2f);
+        }
+        canvas.restore();
+        // A thin bar down the side of the window while the page is longer than it, to show where in it she is.
+        if (mapLength() > 0) {
+            float track = mapWindow.height() - dp(16), shown = track * mapWindow.height() / (mapWindow.height() + mapLength());
+            float at = mapWindow.top + dp(8) + (track - shown) * mapScroll / mapLength();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(ink);
+            paint.setAlpha(70);
+            canvas.drawRoundRect(safe.right - dp(8), at, safe.right - dp(5), at + shown, dp(1.5f), dp(1.5f), paint);
+            paint.setAlpha(255);
+            paint.setColor(Color.BLACK);
         }
         // Under the lands, on with the furthest land she has reached: the button a thumb finds first.
         paint.setStyle(Paint.Style.FILL);
