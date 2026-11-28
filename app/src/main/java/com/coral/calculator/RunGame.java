@@ -3251,6 +3251,43 @@ final class RunGame {
         return true;
     }
 
+    /** A sheet of her own, from the runart pack, in her form's colour and dressed as she is: where what she wears has it. Whether it was drawn. */
+    private boolean drawExtra(Canvas canvas, String name, int count, int frame, float feetX, float feetY, float tall, boolean leftward) {
+        if (!vanityCovers(name)) return false;
+        Bitmap art = moveArt(name);
+        if (art == null) return false;
+        android.util.SparseArray<Bitmap> forms = moveForms.get(name);
+        if (forms == null) moveForms.put(name, forms = new android.util.SparseArray<>());
+        frame(canvas, dressed(name, formed(art, forms)), frame, count, feetX, feetY, tall, leftward);
+        return true;
+    }
+
+    /** The ink gun fired on the move: the run with the gun aimed out in front (a splash at its tip in every other step), and the same aim going up and coming down. */
+    private boolean drawGunWalk(Canvas canvas, float feetX, float feetY, float tall, boolean leftward) {
+        if (sinceUse >= .22f || run.onGround() && !run.running()) return false;
+        int frame = !run.onGround() ? (run.speedDown() < 3 ? 4 : 5) : (int) (clock * 11) % 4;
+        return drawExtra(canvas, "gun_walk", 6, frame, feetX, feetY, tall, leftward);
+    }
+
+    /**
+     * The greatsword's charge: held, it is braced with the blade drawn back and glowing (two pictures, a pulse); walked with, it is a slow heavy walk with the
+     * blade dragging low behind her; and let go, a spinning slam (four pictures) in place of her ordinary swing. Whether she was drawn so.
+     */
+    private boolean drawGreatCharge(Canvas canvas, float feetX, float feetY, float tall, boolean leftward) {
+        int frame;
+        if (greatAge < .5f) {
+            frame = greatAge < .1f ? 6 : greatAge < .2f ? 7 : greatAge < .32f ? 8 : 9;
+        } else if (run.heldFor() > .12f && run.onGround()) {
+            frame = run.running() ? 2 + (int) (clock * 6) % 4 : (int) (clock * 3) % 2;
+        } else {
+            return false;
+        }
+        return drawExtra(canvas, "great_charge", 10, frame, feetX, feetY, tall, leftward);
+    }
+
+    private float greatAge = 9;
+    private int seenGreats;
+
     /** How long after landing a pound she is seen in its impact, and then rising; how long the aerial strike's wind-up shows, and each of its strikes. */
     static final float SMASH_IMPACT = .14f, SMASH_AFTER = .34f, AERIAL_WIND = .1f, AERIAL_BEAT = .1f;
 
@@ -5463,7 +5500,8 @@ final class RunGame {
         seenJumps = seenLandings = seenCollected = seenFlattened = seenHurts = seenSprings = seenFlags = seenBlows = 0;
         seenStrikes = seenPicked = seenThrown = seenTurned = seenTaken = seenSpared = seenCharms = seenFlaps = seenSwings = seenBonus = 0;
         seenFormed = seenDoors = seenQuakes = seenParried = seenCensors = seenEntrances = seenSpecials = seenPhases = seenUnlocks = seenWiped = 0;
-        seenUppercuts = seenHaymakers = 0;
+        seenUppercuts = seenHaymakers = seenGreats = 0;
+        greatAge = 9;
         uppercutAge = haymakerAge = 9;
         java.util.Arrays.fill(remarked, false);
         java.util.Arrays.fill(saidForm, false);
@@ -7617,6 +7655,16 @@ final class RunGame {
         // Held, the button that changes what she holds opens her backpack, and the land waits.
         if (screen == PLAY && swapFinger >= 0 && !packOpen && (swapHeld += seconds) >= .35f) openPack(PLAY);
         sinceHeavy += seconds;
+        // (In a build made for testing, she can be walked right with the strike held, to be looked at.)
+        if (BuildConfig.DEBUG && screen == PLAY && session.tally("run_walk") != 0) {
+            goRight = session.tally("run_walk") == 1;
+            goStrike = true;
+        }
+        greatAge += seconds;
+        if (run != null && run.greats() != seenGreats) {
+            seenGreats = run.greats();
+            greatAge = 0;
+        }
         panelAge += seconds;
         if (toastLeft <= 0 && !toasts.isEmpty() && roomCardAge < 0 && roomResultAge < 0
                 && (run == null || run.wavePhase() == 0 || run.wavePhase() == PlusRun.FOUGHT && sincePhase > 1)) {
@@ -13852,12 +13900,20 @@ final class RunGame {
             weaponAura(canvas, weapon, feetX + (leftward ? -1 : 1) * tall * .32f, feetY - tall * .5f, tall);
             if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == MAIN_GO || pose == MAIN_HEAVY)) frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon >= PlusRun.TABLET) {
+            if (weapon == PlusRun.GREATSWORD && drawGreatCharge(canvas, feetX, feetY, tall, leftward)) {
+                paint.setAlpha(255);
+                return;
+            }
             int pose = beaming ? (run.beam() > 0 ? MAIN_HEAVY : MAIN_GATHER) : sinceHeavy < .3f ? MAIN_HEAVY : sinceHeavy < .5f ? MAIN_SETTLE
                     : run.heldFor() > .12f ? MAIN_GATHER : sinceUse < .09f ? MAIN_BACK : sinceUse < .26f ? MAIN_GO
                     : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
             weaponAura(canvas, weapon, feetX + (leftward ? -1 : 1) * tall * .32f, feetY - tall * .5f, tall);
             if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward)) frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon != PlusRun.UNARMED) {
+            if (weapon == PlusRun.GUN && drawGunWalk(canvas, feetX, feetY, tall, leftward)) {
+                paint.setAlpha(255);
+                return;
+            }
             int pose = sinceUse < .22f || run.swinging() >= 0 ? ARMED_USE : !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL)
                     : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
             if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == ARMED_USE)) frame(canvas, herArmed(weapon), pose, ARMED_FRAMES, feetX, feetY, tall, leftward);
