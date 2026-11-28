@@ -554,7 +554,9 @@ final class RunLevels {
             for (int column : taken) clear &= Math.abs(column - spot[0]) >= 9;
             for (int[] foe : level.foes) if (uniqueSpec(foe)) clear &= Math.abs(foe[1] - spot[0]) >= 9;
             if (!clear) continue;
-            int kind = first + random.nextInt(2);
+            // (From the sixth chapter on, the chapter's two later ones as well: four to choose from.)
+            int later = RunUniques.laterOf(chapter), pick = random.nextInt(later < 0 ? 2 : 4);
+            int kind = pick < 2 ? first + pick : later + pick - 2;
             if (RunUniques.way(kind) == RunUniques.MINIBOSS) kind = kind == first ? first + 1 : first;
             taken.add(spot[0]);
             if (RunUniques.flies(kind)) {

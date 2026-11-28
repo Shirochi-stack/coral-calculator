@@ -6715,6 +6715,17 @@ final class RunGame {
                 }
             }
         }
+        // Each of the later chapters' creatures, the first time she comes near one: she says what to look out for.
+        if (run != null && screen == PLAY && captionLeft <= 0 && !audio.speaking()) {
+            for (PlusRun.Foe foe : run.foes()) {
+                if (foe.flat || !RunUniques.later(foe.kind) || Math.abs(foe.x - run.x()) > 8 || Math.abs(foe.y - run.y()) > 5) continue;
+                int which = foe.kind - RunUniques.LATER_FIRST;
+                if (session.tally("run_u2_" + which) != 0) continue;
+                session.keep("run_u2_" + which, 1);
+                speak(RunStory.LATER_UNIQUES[which], true);
+                break;
+            }
+        }
         // Deep water, the first time: in blue she can swim in it; without it she cannot breathe.
         if (run != null && screen == PLAY && run.inWater() && captionLeft <= 0 && !audio.speaking()) {
             boolean blue = run.has(PlusRun.BLUE);
@@ -9262,7 +9273,7 @@ final class RunGame {
             seenHeals = run.heals();
         }
         int frame = foe.flat ? 5 : foe.mode == 1 ? 2 : foe.mode == 2 ? 3 : foe.struck < .2f ? 4
-                : way == RunUniques.MIMIC && foe.turn == 0 ? 0 : (int) (clock * 5 + foe.x) % 2;
+                : way == RunUniques.MIMIC && foe.turn == 0 ? 0 : way == RunUniques.HERMIT && foe.turn == 1 ? 2 : (int) (clock * 5 + foe.x) % 2;
         float tall = Math.max(foe.tall(), foe.wide() * .9f) * tile * 1.4f;
         if (way == RunUniques.BURROWER && foe.unseen && !foe.flat) {
             // Under the ground: a mound of earth moving along.
@@ -9288,12 +9299,25 @@ final class RunGame {
         }
         paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
                 : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
-        // (Those of the dungeons are in a sheet of their own.)
-        boolean delving = RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        // (Those of the dungeons are in a sheet of their own; and those of the later chapters in the run's asset pack.)
+        boolean later = RunUniques.later(foe.kind), delving = !later && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
         if (delving && delverSheet == null) delverSheet = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_delvers);
-        Bitmap sheet = delving ? delverSheet : uniqueSheet;
-        int rows = delving ? RunUniques.COUNT - RunUniques.SHEET_ROWS : RunUniques.SHEET_ROWS;
-        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (delving ? RunUniques.SHEET_ROWS : 0);
+        if (later && laterSheet == null && !laterTried) {
+            laterTried = true;
+            try (java.io.InputStream in = context.getAssets().open(RunUniques.LATER_SHEET)) {
+                laterSheet = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                laterSheet = null;
+            }
+        }
+        Bitmap sheet = later ? laterSheet : delving ? delverSheet : uniqueSheet;
+        if (sheet == null) {
+            paint.setAlpha(255);
+            return;
+        }
+        int rows = later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
+        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
+        if (!foe.flat) laterStrikes(canvas, foe, way, middle, feet);
         if (way == RunUniques.DROPPER && foe.turn == 0 && !foe.flat) {
             // The spider's thread, up out of sight.
             stroke.setColor(0xCCE8E4F0);
@@ -9314,6 +9338,56 @@ final class RunGame {
                 float qx = (at[0] - cameraX) * tile, qy = (at[1] - cameraY) * tile;
                 thing(canvas, PlusRun.PEN, qx, qy, tile * .55f, (float) Math.toDegrees(foe.clock * 2.4f + one * Math.PI * 2 / 3) + 90, false, false);
             }
+        }
+    }
+
+    private Bitmap laterSheet;
+    private boolean laterTried;
+
+    /**
+     * What the later chapters' creatures do, drawn about them: the strikethrough's line, red as it is raised and bold as it strikes; the
+     * serpent's lash and the toad's tongue; the sand-glass's slow time; the sentinel's beam, faint as it gathers and bright as it sweeps.
+     */
+    private void laterStrikes(Canvas canvas, PlusRun.Foe foe, int way, float middle, float feet) {
+        float dir = foe.leftward ? -1 : 1, mid = (foe.y + foe.tall() * .5f - cameraY) * tile, front = middle + dir * foe.wide() * .45f * tile;
+        if (way == RunUniques.LINER && foe.mode >= 1 && foe.mode <= 2) {
+            boolean striking = foe.mode == 2;
+            stroke.setColor(striking ? 0xFFFF2A3A : 0xAAFF5A6A);
+            stroke.setStrokeWidth(tile * (striking ? .16f : .05f));
+            if (!striking) stroke.setPathEffect(new android.graphics.DashPathEffect(new float[]{tile * .3f, tile * .2f}, clock * tile * 2));
+            canvas.drawLine(front, mid, front + dir * PlusRun.LINE * tile, mid, stroke);
+            stroke.setPathEffect(null);
+        } else if ((way == RunUniques.LASHER || way == RunUniques.PULLER) && foe.mode == 2) {
+            float reach = way == RunUniques.LASHER ? PlusRun.LASH : PlusRun.TONGUE, through = (float) Math.sin(Math.min(1, 1 - foe.act / .45f) * Math.PI);
+            stroke.setColor(way == RunUniques.LASHER ? 0xFF4C7BE8 : 0xFFF4EEDF);
+            stroke.setStrokeWidth(tile * (way == RunUniques.LASHER ? .14f : .12f));
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            float y = way == RunUniques.LASHER ? (foe.y + foe.tall() * .7f - cameraY) * tile : mid;
+            canvas.drawLine(front, y, front + dir * reach * tile * Math.max(.15f, through), y, stroke);
+            stroke.setStrokeCap(Paint.Cap.BUTT);
+        } else if (way == RunUniques.HOURGLASS) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFFFD27A);
+            paint.setAlpha(Math.round(28 + 14 * (float) Math.sin(clock * 3)));
+            canvas.drawCircle(middle, mid, PlusRun.SAND_REACH * tile, paint);
+            stroke.setColor(0x66FFC44A);
+            stroke.setStrokeWidth(tile * .04f);
+            canvas.drawCircle(middle, mid, PlusRun.SAND_REACH * tile, stroke);
+            paint.setAlpha(255);
+        } else if (way == RunUniques.SWEEPER && foe.mode >= 1 && foe.mode <= 2) {
+            float[] from = PlusRun.lantern(foe);
+            float lx = (from[0] - cameraX) * tile, ly = (from[1] - cameraY) * tile, angle = PlusRun.beamAngle(foe), reach = PlusRun.SWEEP_REACH * tile;
+            path.reset();
+            path.moveTo(lx, ly);
+            for (float side = -.09f; side <= .091f; side += .045f) {
+                path.lineTo(lx + dir * (float) Math.cos(angle + side) * reach, ly - (float) Math.sin(angle + side) * reach);
+            }
+            path.close();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFFFFF1A8);
+            paint.setAlpha(foe.mode == 2 ? 150 : 45);
+            canvas.drawPath(path, paint);
+            paint.setAlpha(255);
         }
     }
 
@@ -13838,6 +13912,12 @@ final class RunGame {
             paint.setColor(Color.WHITE);
             paint.setAlpha(Math.round(90 * show));
             canvas.drawOval(x - tile * .45f * show, y - tile * .04f, x - tile * .1f * show, y + tile * .01f, paint);
+        }
+        for (float[] smear : run.smears()) {
+            float x = (smear[0] - cameraX) * tile, y = (smear[1] - cameraY) * tile, show = Math.min(1, smear[2] / .8f);
+            paint.setColor(0xFF2E2A33);
+            paint.setAlpha(Math.round(190 * show));
+            canvas.drawOval(x - tile * .75f, y - tile * .08f, x + tile * .75f, y + tile * .08f, paint);
         }
         paint.setColor(Color.BLACK);
         paint.setAlpha(255);

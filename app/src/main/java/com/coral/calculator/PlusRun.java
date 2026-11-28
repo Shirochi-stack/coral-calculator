@@ -1097,8 +1097,10 @@ final class PlusRun {
     /** How many times what a sign gives one of them gives: experience, and the chance of a drop. */
     static final int UNIQUE_XP = 3;
     /** How long each way of fighting winds up before it strikes; and how long its strike lasts. */
-    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f, .8f, .7f, .55f, .45f, .5f, .7f, .4f, .9f, .5f, .7f},
-            STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f, .45f, .45f, .35f, .6f, .7f, .1f, .8f, .2f, .35f, .5f};
+    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f, .8f, .7f, .55f, .45f, .5f, .7f, .4f, .9f, .5f, .7f,
+            .6f, .8f, .55f, .9f, .7f, .7f, .5f, .6f, .8f, .35f, .8f, .9f},
+            STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f, .45f, .45f, .35f, .6f, .7f, .1f, .8f, .2f, .35f, .5f,
+            1.6f, .3f, .4f, .25f, .5f, .35f, .35f, .2f, .3f, .4f, 1.1f, 2.2f};
     /** Wind-ups begun, things they made (minions, shots, heals), and how many came apart. */
     private int windUps, uniqueShots, calledUp, heals, halves;
 
@@ -1140,9 +1142,11 @@ final class PlusRun {
             if (foe.act <= 0) {
                 foe.mode = 3;
                 boolean big = way == RunUniques.MINIBOSS || way == RunUniques.HIDDEN || way == RunUniques.KEEPER;
-                foe.act = way == RunUniques.BURROWER ? 1.6f : big ? .6f - .15f * phase3(foe) : .8f;
+                foe.act = way == RunUniques.BURROWER ? 1.6f : way == RunUniques.ROLLER ? 1.4f : big ? .6f - .15f * phase3(foe) : .8f;
                 foe.wait = way == RunUniques.SUMMONER ? 6 : way == RunUniques.HEALER ? 4 : way == RunUniques.SNIPER ? 2.2f : big ? 1.4f - .4f * phase3(foe)
-                        : way == RunUniques.ORBITER ? 3.5f : way == RunUniques.BLINKER ? 2.6f : way == RunUniques.STAMPER ? 2.2f : way == RunUniques.BOUNCER ? 1.2f : 1.6f;
+                        : way == RunUniques.ORBITER ? 3.5f : way == RunUniques.BLINKER ? 2.6f : way == RunUniques.STAMPER ? 2.2f : way == RunUniques.BOUNCER ? 1.2f
+                        : way == RunUniques.SWEEPER ? 2.6f : way == RunUniques.LINER || way == RunUniques.BREATHER || way == RunUniques.HERALD ? 2.2f
+                        : way == RunUniques.HOURGLASS || way == RunUniques.ECHOER ? 2.4f : 1.6f;
             }
             return;
         }
@@ -1408,9 +1412,184 @@ final class PlusRun {
                 }
                 break;
             }
+            case RunUniques.REFLECTOR:
+                // The crab turns round to her only slowly, its mirror shell to the front: from behind, before it has turned, it can be hit.
+                if (near && level_ < 1.4f) {
+                    if (toLeft != foe.leftward) {
+                        if ((foe.toX += seconds) > CRAB_TURNS) {
+                            foe.leftward = toLeft;
+                            foe.toX = 0;
+                        }
+                        break;
+                    }
+                    foe.toX = 0;
+                    if (away < 1.9f && foe.wait <= 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.ROLLER:
+                // The pillbug walks at her, curls up, and bowls along the ground; off a wall it comes back once, and after it is dizzy a while.
+            case RunUniques.LASHER:
+                // The serpent comes near enough and whips its whole length at her, from well out of arm's reach.
+            case RunUniques.LINER:
+                // Strikethrough raises its ruler, a red line along it the length of the way ahead, and strikes it through: jump it.
+            case RunUniques.PULLER:
+                // The toad swells and shoots its tongue: what it catches is pulled in to it.
+            case RunUniques.BREATHER: {
+                float reach = way == RunUniques.ROLLER ? 7 : way == RunUniques.LASHER ? LASH : way == RunUniques.LINER ? LINE : way == RunUniques.PULLER ? TONGUE
+                        : way == RunUniques.BREATHER ? 4 : 1.9f;
+                if (near && level_ < (way == RunUniques.LINER ? 1.2f : 1.4f)) {
+                    foe.leftward = toLeft;
+                    if (away < reach && foe.wait <= 0) windUp(foe, way);
+                    else if (away > (way == RunUniques.LASHER ? 2 : way == RunUniques.BREATHER ? 2.5f : .5f)) walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            }
+            case RunUniques.HERALD:
+                // The herald keeps a few squares off and shouts the headlines at her: rings of words that wave as they go.
+                foe.leftward = toLeft;
+                if (near && away < 3) {
+                    foe.leftward = !toLeft;
+                    walk(foe, speed, false);
+                    foe.leftward = toLeft;
+                } else if (away < 9 && level_ < 2.5f && foe.wait <= 0) {
+                    windUp(foe, way);
+                } else if (near) {
+                    walk(foe, speed * .6f, false);
+                }
+                break;
+            case RunUniques.SMEARER:
+                // The smudge leaves a smear wherever it goes, that she wades through at half her pace; near her, it splats.
+                if ((foe.fromX -= seconds) <= 0 && smears.size() < 24 && !foe.crowd) {
+                    smears.add(new float[]{middle, foe.ground + foe.tall(), SMEAR_LASTS});
+                    foe.fromX = 1.1f;
+                }
+                if (near && level_ < 1.4f) {
+                    foe.leftward = toLeft;
+                    if (away < 1.8f && foe.wait <= 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.ECHOER: {
+                // The echo floats a little way off, at her height; whatever she does near it, it answers in kind.
+                float wantX = x + WIDE / 2 + (toLeft ? 4 : -4), wantY = y - .3f + (float) Math.sin(foe.clock * 2) * .3f;
+                foe.leftward = toLeft;
+                if (away < 13) driftBy(foe, Math.max(-speed, Math.min(speed, wantX - middle)), Math.max(-speed, Math.min(speed, wantY - foe.y)));
+                if (strikes != foe.did) {
+                    foe.did = strikes;
+                    if (away < 9 && level_ < 4 && foe.wait <= 0) windUp(foe, way);
+                }
+                break;
+            }
+            case RunUniques.HOURGLASS:
+                // Time runs slow about the sand-glass: near it she goes at half her pace; and it throws sand.
+                if (near && level_ < 2) {
+                    foe.leftward = toLeft;
+                    if (away < 5 && foe.wait <= 0) windUp(foe, way);
+                    else if (away > 1.5f) walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.HERMIT:
+                // The hermit pulls into its scroll when she comes near, where nothing from in front of it tells; then it pops out and jabs, and
+                // is open a moment after.
+                if (foe.turn == 1) {
+                    if ((foe.toX -= seconds) <= 0) {
+                        foe.turn = 0;
+                        foe.leftward = toLeft;
+                        windUp(foe, way);
+                    }
+                    break;
+                }
+                if (near && level_ < 1.4f) {
+                    foe.leftward = toLeft;
+                    if (away < 3.5f && foe.wait <= 0) {
+                        foe.turn = 1;
+                        foe.toX = HIDES;
+                    } else {
+                        walk(foe, speed, false);
+                    }
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.SWEEPER:
+                // The sentinel's lantern sweeps a beam up from the ground ahead to over its head: out of the light, she is safe.
+                if (away < 11 && level_ < 4) {
+                    foe.leftward = toLeft;
+                    if (away < SWEEP_REACH && foe.wait <= 0) windUp(foe, way);
+                    else if (away > 4) walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .4f, true);
+                }
+                break;
             default:
                 walk(foe, speed, true);
         }
+    }
+
+    // The later chapters' creatures
+
+    /** How far the serpent lashes, the strikethrough's line, and the toad's tongue reach; the sentinel's beam; the sand-glass's slow time; how long the hermit hides; how long a smear lies; how slow she goes in one; and how long the crab takes to turn round. */
+    static final float LASH = 3.4f, LINE = 9, TONGUE = 6, SWEEP_REACH = 7.5f, SAND_REACH = 3.2f, HIDES = 1.4f, SMEAR_LASTS = 6, SLOWED = .5f, CRAB_TURNS = .8f;
+    /** The smears a smudge has left: where each lies, the height of the ground under it, and how much longer it lies. */
+    private final List<float[]> smears = new ArrayList<>();
+    /** Counts that only go up: shots sent back by a mirror shell, and pulls by a tongue. */
+    private int mirrored, tongued;
+
+    List<float[]> smears() { return smears; }
+    int mirrored() { return mirrored; }
+    int tongued() { return tongued; }
+
+    /** Whether one of them, striking, reaches her in front of it: so far ahead of its middle, and at its height. */
+    private boolean inFront(Foe foe, float middle, float reach, float slack) {
+        float ahead = (x + WIDE / 2 - middle) * (foe.leftward ? -1 : 1);
+        return ahead > -.3f && ahead < reach + foe.wide() / 2 && y < foe.y + foe.tall() + slack && y + TALL > foe.y - slack;
+    }
+
+    /** What one of them lands on her when its strike reaches her: a hurt, as its touch would be. Whether anything came of it. */
+    private boolean zap(Foe foe) {
+        if (safe > 0 || offIt > 0) return false;
+        cause = STRUCK;
+        knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
+        return hurt(false, 2 + RunUniques.bite(foe.kind, level.number));
+    }
+
+    /** Where the sentinel's beam points, in radians up from level ahead of it: low at first, up over its head by the end of its sweep. */
+    static float beamAngle(Foe foe) {
+        float through = foe.mode == 2 ? 1 - Math.max(0, foe.act) / STRIKE[RunUniques.SWEEPER] : 0;
+        return -.45f + through * 1.6f;
+    }
+
+    /** Where the beam comes from: the lantern at the top of the sentinel. */
+    static float[] lantern(Foe foe) { return new float[]{foe.x + foe.wide() / 2 + (foe.leftward ? -.2f : .2f), foe.y + foe.tall() * .2f}; }
+
+    /** Whether the beam is on her now. */
+    private boolean inBeam(Foe foe) {
+        float[] from = lantern(foe);
+        float dx = (x + WIDE / 2 - from[0]) * (foe.leftward ? -1 : 1), dy = from[1] - (y + TALL * .5f), far = (float) Math.hypot(dx, dy);
+        if (dx < 0 || far > SWEEP_REACH) return false;
+        // (She is a body, not a point: the nearer, the wider the angle she takes up.)
+        float angle = (float) Math.atan2(dy, dx), wide = (float) Math.atan2(TALL * .5f, Math.max(.5f, far));
+        return Math.abs(angle - beamAngle(foe)) < wide;
+    }
+
+    /** How fast she goes for what is about her: half her pace in a smear or by a sand-glass. */
+    private float slowedBy() {
+        float middle = x + WIDE / 2, feet = y + TALL;
+        if (onGround) for (float[] smear : smears) if (Math.abs(smear[0] - middle) < .9f && Math.abs(smear[1] - feet) < .35f) return SLOWED;
+        for (Foe foe : foes) {
+            if (foe.flat || absent(foe) || !RunUniques.is(foe.kind) || RunUniques.way(foe.kind) != RunUniques.HOURGLASS) continue;
+            if (Math.hypot(foe.x + foe.wide() / 2 - middle, foe.y + foe.tall() / 2 - y - TALL / 2) < SAND_REACH) return SLOWED;
+        }
+        return 1;
     }
 
     // The dungeons' creatures
@@ -1805,6 +1984,40 @@ final class PlusRun {
                 }
                 break;
             }
+            case RunUniques.ROLLER:
+                foe.turn = 0;
+                break;
+            case RunUniques.LASHER:
+            case RunUniques.LINER:
+            case RunUniques.PULLER:
+            case RunUniques.SWEEPER:
+                // (Each strike reaches her once at most.)
+                foe.did = 0;
+                break;
+            case RunUniques.HERALD:
+                for (int one = 0; one < 3; one++) shoot(SAYING, false, middle, cy - .5f + one * .5f, (toLeft ? -1 : 1) * (4.5f + one * .6f), 0, 2.4f);
+                uniqueShots += 3;
+                break;
+            case RunUniques.SMEARER:
+                for (int drop = 0; drop < 6; drop++) {
+                    double angle = Math.PI + drop * Math.PI / 5;
+                    shoot(BLOT_SHOT, false, middle, cy, (float) Math.cos(angle) * 5, (float) Math.sin(angle) * 5, .32f);
+                }
+                uniqueShots += 6;
+                break;
+            case RunUniques.ECHOER: {
+                float toX = x + WIDE / 2 - middle, toY = y + TALL * .45f - cy, far = Math.max(.5f, (float) Math.hypot(toX, toY));
+                for (int one = -1; one <= 1; one += 2) shoot(SCROLL, false, middle, cy, toX / far * 6.5f - one * toY / far * 1.2f, toY / far * 6.5f + one * toX / far * 1.2f, 2);
+                uniqueShots += 2;
+                break;
+            }
+            case RunUniques.HOURGLASS:
+                for (int one = 0; one < 5; one++) {
+                    double angle = -.6 + one * .2;
+                    shoot(DOT, false, middle, cy, (toLeft ? -1 : 1) * (float) Math.cos(angle) * 6, (float) Math.sin(angle) * 6, 1.4f);
+                }
+                uniqueShots += 5;
+                break;
             case RunUniques.MINIBOSS:
                 // From its second phase on, three knives as well, fanned.
                 if (phase3(foe) >= 1) {
@@ -1884,6 +2097,57 @@ final class PlusRun {
             case RunUniques.FORMATION:
                 foe.y += speed * 5;
                 if (foe.y + foe.tall() > y + TALL) foe.y = y + TALL - foe.tall();
+                break;
+            case RunUniques.ROLLER:
+                // Off a wall it comes back the other way, once.
+                if (!walk(foe, speed * 5, false)) {
+                    if (foe.turn++ < 1) foe.leftward = !foe.leftward;
+                    else foe.act = 0;
+                }
+                break;
+            case RunUniques.LASHER:
+                if (foe.did == 0 && inFront(foe, middle, LASH, .6f)) {
+                    foe.did = 1;
+                    if (zap(foe)) return;
+                }
+                break;
+            case RunUniques.LINER: {
+                float line = foe.y + foe.tall() * .5f, ahead = (x + WIDE / 2 - middle) * (foe.leftward ? -1 : 1);
+                if (foe.did == 0 && y < line && y + TALL > line && ahead > -.3f && ahead < LINE) {
+                    foe.did = 1;
+                    if (zap(foe)) return;
+                }
+                break;
+            }
+            case RunUniques.PULLER:
+                if (foe.did == 0 && inFront(foe, middle, TONGUE, .5f)) {
+                    // Caught: pulled in to it, whatever she was doing.
+                    foe.did = 1;
+                    speedAcross = (middle < x + WIDE / 2 ? -1 : 1) * 13;
+                    flinch = .3f;
+                    tongued++;
+                }
+                break;
+            case RunUniques.REFLECTOR:
+                walk(foe, speed * 3, false);
+                break;
+            case RunUniques.HERMIT:
+                walk(foe, speed * 4, false);
+                break;
+            case RunUniques.BREATHER:
+                // A stream of fire, a puff at a time.
+                if ((foe.fromX -= seconds) <= 0) {
+                    foe.fromX = .12f;
+                    float way2 = foe.leftward ? -1 : 1, wobble = ((foe.clock * 7.3f) % 1 - .5f) * 1.6f;
+                    shoot(FIRE, false, middle + way2 * foe.wide() * .45f, foe.y + foe.tall() * .45f, way2 * 8, wobble, .45f);
+                    uniqueShots++;
+                }
+                break;
+            case RunUniques.SWEEPER:
+                if (foe.did == 0 && inBeam(foe)) {
+                    foe.did = 1;
+                    if (zap(foe)) return;
+                }
                 break;
             default:
                 break;
@@ -3487,6 +3751,7 @@ final class PlusRun {
         bite = other.bite;
         for (float[] boom : other.booms) booms.add(boom.clone());
         for (float[] fire : other.fires) fires.add(fire.clone());
+        for (float[] smear : other.smears) smears.add(smear.clone());
         weapon = other.weapon;
         rounds = other.rounds;
         owned = other.owned;
@@ -4864,7 +5129,7 @@ final class PlusRun {
         }
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
-        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f);
+        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy();
         float fast = rush > 0 ? run * 1.3f : run, leap = rush > 0 ? LEAP * 1.1f : LEAP;
         if (has(YELLOW)) fast = run * (mastered ? 2.1f : 1.7f);
         float wanted = left == right ? 0 : left ? -fast : fast;
@@ -5844,6 +6109,12 @@ final class PlusRun {
         }
         boolean waits = RunLevels.boss(foe.kind);
         int phase = waits ? phase(foe) : 0;
+        if (!waits && RunUniques.is(foe.kind) && RunUniques.way(foe.kind) == RunUniques.HERMIT && foe.turn == 1 && with != SURE && with != LANDED && with != PLUNGED) {
+            clangs++;
+            clangX = foe.x + foe.wide() / 2;
+            clangY = foe.y + foe.tall() * .5f;
+            return;
+        }
         foeX = foe.x + foe.wide() / 2;
         foeY = foe.y + foe.tall();
         if (waits) blows++;
@@ -6508,6 +6779,7 @@ final class PlusRun {
             for (float[] box : again) sweep((int) box[0], box[1], box[2], box[3], box[4]);
         }
         for (int index = splashes.size() - 1; index >= 0; index--) if ((splashes.get(index)[2] += seconds) > .5f) splashes.remove(index);
+        for (int index = smears.size() - 1; index >= 0; index--) if ((smears.get(index)[2] -= seconds) <= 0) smears.remove(index);
         for (int index = 0; index < shots.size(); index++) {
             Shot wave = shots.get(index);
             if (wave.kind != SLASH || !wave.wipes) continue;
@@ -6817,6 +7089,15 @@ final class PlusRun {
                         shot.hers = false;
                         shot.across = -shot.across;
                         shot.left = 1.2f;
+                        turned++;
+                    } else if (RunUniques.is(foe.kind) && RunUniques.way(foe.kind) == RunUniques.REFLECTOR && foe.mode != 3 && !foe.flat && (shot.across > 0) == foe.leftward
+                            && !RunLevels.boss(foe.kind)) {
+                        // The cross-reference crab's mirror shell: what comes at its front goes back at her. From behind, it tells.
+                        shot.hers = false;
+                        shot.across = -shot.across;
+                        shot.down = -shot.down * .5f;
+                        shot.left = 1.2f;
+                        mirrored++;
                         turned++;
                     } else if (foe.kind == RunLevels.SLIME && (shot.kind == FIRE || shot.kind == STEAM) && foe.size < 1.2f) {
                         // A slime drinks fire, and steam: it is not beaten by it but grows on it, half as big again, and takes two blows after.
