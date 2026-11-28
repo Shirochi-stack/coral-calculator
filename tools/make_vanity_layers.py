@@ -66,6 +66,11 @@ for _path in sorted(RUNART.glob("halgakos_aerial_*.webp")) + sorted(RUNART.glob(
     _key = _path.stem[len("halgakos_"):]
     SHEETS[_key] = (4, 1, _size[0] // 4, _size[1])
     LATEST.append(_key)
+# And two of her own moves, after those (so that the grids drawn before are the same grids still): the ink gun fired on the move, and the greatsword's charge.
+for _key, (_frames, _wide, _tall) in (("gun_walk", (6, 304, 248)), ("great_charge", (10, 500, 248))):
+    if (RUNART / ("halgakos_%s.webp" % _key)).exists():
+        SHEETS[_key] = (_frames, 1, _wide, _tall)
+        LATEST.append(_key)
 
 
 def sheet_file(name):
