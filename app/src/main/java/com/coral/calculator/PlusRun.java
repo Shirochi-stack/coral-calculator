@@ -361,6 +361,35 @@ final class PlusRun {
     /** From how quick a sip she walks as she drinks, rather than creeping. */
     static final int QUICK_SIP_WALKS = RunSkills.QUICK_SIP_WALKS;
 
+    /** The merchant's moment and the potions' (kept out of once(), which is near the JIT's limit): whether she is drinking. */
+    private boolean mixtures(float seconds, boolean jump) {
+        lilithTick(seconds);
+        potionTick(seconds, jump);
+        return drinking >= 0;
+    }
+
+    /** How fast she runs for her potions: a quarter faster under featherfoot; creeping as she drinks, unless she sips quickly enough to walk. */
+    private float potionPace() { return (potionOn[RunPotions.SWIFT] > 0 ? 1.25f : 1) * (drinking >= 0 && quickSip() < QUICK_SIP_WALKS ? .3f : 1); }
+
+    /** Under the gilded elixir every plus is worth two. */
+    private void gilded() { if (potionOn[RunPotions.RICHES] > 0) bonus++; }
+
+    /** A potion or a gift for the merchant, touched: picked up (whether it was one). */
+    private boolean pickMixture(int[] item, int index) {
+        if (item[0] != POTION && item[0] != GIFT) return false;
+        items.remove(index);
+        if (item[0] == POTION) {
+            potionsFound++;
+            lastPotionFound = item.length > 4 ? item[4] : 0;
+        } else {
+            gifts++;
+            lastGift = item.length > 4 ? item[4] : 0;
+        }
+        tookX = item[1] + .5f;
+        tookY = item[2] + .5f;
+        return true;
+    }
+
     /** Whether a hurt stops a drink: a hard one always; a light one unless the tree steadies her hands. */
     void drinkHurt(boolean hard) {
         if (drinking >= 0 && (hard || steadyHands() <= 0)) stopDrink();
@@ -968,8 +997,7 @@ final class PlusRun {
                 pluses.remove(index);
                 collected++;
                 if (gem > 0) bonus += GEM_FACTOR - 1;
-                // (Under the gilded elixir every plus is worth two.)
-                if (potionOn[RunPotions.RICHES] > 0) bonus++;
+                gilded();
                 plusX = plus[0] + .5f;
                 plusY = plus[1] + .5f;
             }
@@ -6191,13 +6219,8 @@ final class PlusRun {
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         // Stunned, she can do nothing for a moment.
         if (herStun > 0) left = right = jump = strike = false;
-        lilithTick(seconds);
-        potionTick(seconds, jump);
-        // (Drinking, she cannot strike; nor jump, which would have stopped it.)
-        if (drinking >= 0) {
-            strike = false;
-            jump = false;
-        }
+        // (The merchant and potions, each moment; drinking, she cannot strike, nor jump, which would have stopped it.)
+        if (mixtures(seconds, jump)) strike = jump = false;
         for (Foe foe : foes) {
             if (foe.flat && !foe.dropped) {
                 foe.dropped = true;
@@ -6281,8 +6304,7 @@ final class PlusRun {
         }
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
-        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * (potionOn[RunPotions.SWIFT] > 0 ? 1.25f : 1)
-                * (drinking >= 0 && quickSip() < QUICK_SIP_WALKS ? .3f : 1) * slowedBy() * (inked() ? curseSlow() : 1) * (herChill > 0 ? CHILLED : 1);
+        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * potionPace() * slowedBy() * (inked() ? curseSlow() : 1) * (herChill > 0 ? CHILLED : 1);
         float fast = rush > 0 ? run * 1.3f : run, leap = (rush > 0 ? LEAP * 1.1f : LEAP) * (inked() ? CURSE_JUMP : 1);
         if (has(YELLOW)) fast = run * (mastered ? 2.1f : 1.7f);
         float wanted = left == right ? 0 : left ? -fast : fast;
@@ -6472,8 +6494,7 @@ final class PlusRun {
                 pluses.remove(index);
                 collected++;
                 if (gem > 0) bonus += GEM_FACTOR - 1;
-                // (Under the gilded elixir every plus is worth two.)
-                if (potionOn[RunPotions.RICHES] > 0) bonus++;
+                gilded();
                 plusX = plus[0] + .5f;
                 plusY = plus[1] + .5f;
             }
@@ -6573,22 +6594,7 @@ final class PlusRun {
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST && item[0] != FORM + WHITE) continue;
-                if (item[0] == POTION) {
-                    items.remove(index);
-                    potionsFound++;
-                    lastPotionFound = item.length > 4 ? item[4] : 0;
-                    tookX = item[1] + .5f;
-                    tookY = item[2] + .5f;
-                    continue;
-                }
-                if (item[0] == GIFT) {
-                    items.remove(index);
-                    gifts++;
-                    lastGift = item.length > 4 ? item[4] : 0;
-                    tookX = item[1] + .5f;
-                    tookY = item[2] + .5f;
-                    continue;
-                }
+                if (pickMixture(item, index)) continue;
                 if (item[0] == DIARY) {
                     items.remove(index);
                     diaries++;
