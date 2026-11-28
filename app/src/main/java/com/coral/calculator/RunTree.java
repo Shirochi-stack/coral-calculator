@@ -629,7 +629,8 @@ final class RunTree {
         List<RunSkills.Node> nodes = RunSkills.tree();
         if (on < 0 || on >= nodes.size()) return;
         RunSkills.Node node = nodes.get(on);
-        float wide = Math.min(safe.width() - dp(20), dp(480)), pad = dp(14), iconSide = dp(54);
+        // (Wider across a landscape screen, where it is short: the card must leave the tree in sight.)
+        float wide = Math.min(safe.width() - dp(20), safe.width() > safe.height() * 1.5f ? dp(760) : dp(480)), pad = dp(14), iconSide = dp(54);
         float textRoom = wide - pad * 3 - iconSide;
         List<String> lines = wrap(RunSkills.does(node), textRoom, dp(13));
         RunSkills.Notable notable = RunSkills.notableAt(on);

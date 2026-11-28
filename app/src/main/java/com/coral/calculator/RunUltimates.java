@@ -51,31 +51,24 @@ final class RunUltimates {
     /** The most blows of its own that an ultimate lands on one who waits at the end, in one calling on. */
     static final int BOSS_HITS = 4;
 
-    /** What each does, in plain words, for its card in the tree. */
+    /** What each does, in plain words and few of them, for its card in the tree (the card must fit a short, wide screen). */
     static String does(int which) {
         switch (which) {
-            case BERSERK: return "Her blows land twice as hard, come two and a half times as fast and give back HP, and every swing cleaves all round her, wider with every strike; "
-                    + "nothing knocks her back. But she cannot guard (no dodge, no shrug, no shield, no ink ball) and a hurt costs half as much again, and when it ends she is spent for "
-                    + (int) EXHAUSTED_LASTS + " seconds: slow, and slower to strike. A boss feels the blows as one each, and gives back little";
-            case STILL: return "The world slows to a sixth: creatures, what they throw, all of it. She does not. Every blow she lands is held where it fell, marked with a clock, and when "
-                    + "time runs again they all land together. A boss is only slowed to six tenths, and takes his blows as they come";
-            case TIDE: return "She becomes a wave of ink and sweeps across the land, nothing able to touch her: every creature on the screen is ink-poisoned as she breaks, and every one she "
-                    + "passes through is struck twice. Then she forms again in a burst of ink. She cannot strike while she is ink. A boss is struck once, and not poisoned";
-            case TITAN: return "She grows two and a half times as big, her blows reach that much further and land half as hard again; whatever she walks into is crushed, every step "
-                    + "shakes the ground and staggers every creature near, and the cracks and false walls in her way break open. Bosses are not staggered, and take her blows as one each";
-            case LEGION: return "Three echoes of her follow her path a moment behind and strike whenever she strikes, from where they stand: three more of every swing and every shot. "
-                    + "They take no hurts and give none. A boss can only be struck so many times by them";
-            case BLOOM: return "A rose blooms round her: nothing hurts her, and she heals as it grows. Every creature she beats bursts into roses that beat what is near, and what those beat "
-                    + "bursts in turn, in a chain of up to " + BLOOM_CHAIN + ". It ends in one last bloom. A boss is struck by the roses only so many times";
+            case BERSERK: return "Her blows land twice as hard and 2.5 times as fast, each gives HP back, every strike cleaves all round her, and nothing knocks her back. But she cannot guard, hurts cost half as much again, and she is spent for 3 seconds after. A boss takes each blow as one";
+            case STILL: return "The world slows to a sixth; she does not. Her blows are held where they fall, marked with a clock, and all land together when time runs again. A boss is only slowed to 60% and takes blows as they come";
+            case TIDE: return "She becomes a wave of ink nothing can touch and sweeps the land: all on the screen are ink-poisoned, all she passes through are struck twice, then she forms again in a burst. She cannot strike as ink. A boss is struck once, not poisoned";
+            case TITAN: return "She grows 2.5 times as big: her blows reach that far and hit half as hard again, she crushes what she walks into, every step shakes and staggers the creatures near, and false walls break. A boss is not staggered";
+            case LEGION: return "Three echoes follow her path and strike whenever she strikes, from where they stand: three more of every swing and shot. They take no hurts. A boss can be struck only so many times by them";
+            case BLOOM: return "Nothing can hurt her, and she heals. Every creature she beats bursts into roses that beat what is near, chaining up to " + BLOOM_CHAIN + " times, then one last bloom. A boss is struck by the roses only so many times";
             default: return "";
         }
     }
 
     /** The line a card says under it: what calling it on costs. */
     static String costs(int which) {
-        return "Ultimate: " + (int) COST + " energy, " + (int) LASTS[which] + " seconds, then " + (int) REST[which] + " seconds to rest; one at a time. It costs " + POINTS + " points to take, and needs both of the " + RunSkills.CLASSES[BRANCH[which]].toLowerCase(java.util.Locale.ROOT) + "' actives first";
+        return "Ultimate: " + (int) COST + " energy, " + (int) LASTS[which] + " s, rests " + (int) REST[which] + " s, " + POINTS + " points; needs both "
+                + RunSkills.CLASSES[BRANCH[which]].toLowerCase(java.util.Locale.ROOT) + "' actives";
     }
-
     /** The word she shows as it begins (and the colour of its light, lit by each in its own way). */
     static final String[] SHOUT = {"", "RAMPAGE!", "TIME STOPS", "TIDE OF INK", "COLOSSUS!", "LEGION!", "ROSE BLOOM"};
     static final int[] COLOURS = {0, 0xFFE0362F, 0xFFB9C8D8, 0xFF27348F, 0xFFFFC433, 0xFF9A6AE8, 0xFFFF6FA0};
