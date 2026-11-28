@@ -1065,6 +1065,8 @@ final class PlusRun {
     static final float AERIAL_SINK = .45f, AERIAL_HOLD = .16f;
     static final int[] AERIAL_TIMES = {0, 1, 1, 2};
     private float aerialLeft, aerialHeld, aerialTick, aerialAge = 9;
+    /** Whether the hold that began an aerial strike is still held, after it has run out. */
+    private boolean aerialHolding;
     private int aerialsUsed, aerials, aerialHits;
 
     boolean aerialOn() { return aerialLeft > 0; }
@@ -1273,6 +1275,7 @@ final class PlusRun {
     /** The aerial strike, as time goes: begun by holding the strike in the air, ended by letting go, landing, or its time running out. */
     private void aerialStrike(float seconds, boolean strike) {
         aerialAge += seconds;
+        if (!strike) aerialHolding = false;
         boolean free = !onGround && !climbing && !inWater && !clinging && poundPhase == 0;
         if (onGround || climbing || clinging || inWater) aerialsUsed = 0;
         if (aerialLeft > 0) {
@@ -1305,6 +1308,7 @@ final class PlusRun {
                 aerialAge = 0;
                 aerialsUsed++;
                 aerials++;
+                aerialHolding = true;
             }
         } else if (!strike) {
             aerialHeld = 0;
@@ -3998,6 +4002,7 @@ final class PlusRun {
         aerialTick = other.aerialTick;
         aerialAge = other.aerialAge;
         aerialsUsed = other.aerialsUsed;
+        aerialHolding = other.aerialHolding;
         dashUsed = other.dashUsed;
         windUsed = other.windUsed;
         clinging = other.clinging;
@@ -5943,8 +5948,8 @@ final class PlusRun {
             // hers the hold is her beam's.)
             // (The Mother Tongue's Quill is held for its wave, whatever kind it is.)
             boolean quill = RunLoot.ultimate(perks.item) && weapon == RunArms.kindOf(perks.item);
-            if (aerialLeft > 0) {
-                // (The aerial strike has the hold: and what it held for is not let go into a special after it.)
+            if (aerialLeft > 0 || aerialHolding) {
+                // (The aerial strike has the hold, to its end: what it held for is not gathered into a special after it.)
                 heldFor = 0;
                 heavied = true;
             } else if (weapon != UNARMED && (RunArms.heavy(weapon) || quill) && strike && !mastered && !(onGround && skyborne())) {
@@ -6964,7 +6969,7 @@ final class PlusRun {
             float reach = reachOf(HAMMER), from = facingLeft ? x - reach : x + WIDE, quake = level >= 1 ? 3.4f : 2.6f;
             sweep(HAMMERED, from, from + reach, y + TALL - 1.4f, y + TALL);
             sweep(HAMMERED, x - quake, x + WIDE + quake, y + TALL - .7f, y + TALL + .2f);
-            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, 0, 0});
+            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, HAMMERED, 0});
             quakesMade++;
             swing = SWING;
             swungWith = HAMMER;
@@ -7026,7 +7031,7 @@ final class PlusRun {
             greats++;
             float wide = 2.5f + (level >= 2 ? .8f : 0);
             sweep(GREAT, x - wide, x + WIDE + wide, y + TALL - 2, y + TALL + .2f);
-            booms.add(new float[]{x + WIDE / 2, y + TALL, wide, 0, 0});
+            booms.add(new float[]{x + WIDE / 2, y + TALL, wide, GREAT, 0});
             quakesMade++;
             return true;
         }
@@ -7057,7 +7062,7 @@ final class PlusRun {
             float quake = level >= 2 ? 6.5f : 5;
             speedDown = Math.min(speedDown, -7);
             sweep(HAMMERED, x - quake, x + WIDE + quake, y + TALL - 1, y + TALL + .3f);
-            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, 0, 0});
+            booms.add(new float[]{x + WIDE / 2, y + TALL, quake, HAMMERED, 0});
             quakesMade++;
             return true;
         }

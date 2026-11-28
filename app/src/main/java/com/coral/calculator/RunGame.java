@@ -3122,8 +3122,7 @@ final class RunGame {
     // The ground pound and the aerial strike, seen
 
     /** The things she may hold, by the names their pictures go by; and the pictures of the ground pound's four (wind-up, drop, impact, rising) and the aerial strike's four, from the runart pack. */
-    static final String[] MOVE_KINDS = {"pen", "knife", "book", "brush", "sword", "gun", "tablet", "keys", "katana", "lance", "cannon", "whip", "greatsword", "staff",
-            "mace", "hammer", "wand", "scythe", "knuckles"};
+    static final String[] MOVE_KINDS = RunArms.MOVE_KINDS;
     static final int MOVE_FRAMES = 4;
     private final java.util.Map<String, Bitmap> moveSheets = new java.util.HashMap<>();
     private final java.util.Map<String, android.util.SparseArray<Bitmap>> moveForms = new java.util.HashMap<>();
