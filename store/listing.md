@@ -1,14 +1,16 @@
 # Google Play listing
 
-What is entered in Play Console for Halgakos: Sloppy Copy (`com.halgakos.calculator`). The graphics are in this folder; `python tools/make_art.py` rebuilds the icon and the feature graphic.
+What is entered in Play Console for Halgakos: The Queen of Sloppies (`com.halgakos.calculator`). The graphics are in this folder; `python tools/make_art.py` rebuilds the icon and the feature graphic.
 
 ## Store listing
 
 **App name** (30 characters at most)
 
 ```
-Halgakos: Sloppy Copy
+Halgakos: Queen of Sloppies
 ```
+
+(The game's own title is "Halgakos: The Queen of Sloppies". Play allows 30 characters, so the listing drops "The". Play still shows "Halgakos: Sloppy Copy" until this is sent for review.)
 
 **Short description** (80 characters at most)
 

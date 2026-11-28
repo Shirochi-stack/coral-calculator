@@ -135,6 +135,8 @@ final class RunGame {
     private final RectF swapButton = new RectF(), gearButton = new RectF(), packButton = new RectF(), packAct = new RectF(), packCard = new RectF();
     private final RectF[] packRows = new RectF[RunArms.COUNT];
     private boolean packOpen;
+    /** Her inventory, drawn and touched by its own class. */
+    private final RunInventoryUi inventory = new RunInventoryUi(this);
     /**
      * The board of hunts, open over the guild hall: its card; for each hunt on it the button
      * that takes it on or hands it in, and the one that gives it up, which asks once before
@@ -285,12 +287,12 @@ final class RunGame {
 
     private final PlayStage stage;
     private final Context context;
-    private final boolean dark, haptics;
-    private final PlaySession session;
+    final boolean dark, haptics;
+    final PlaySession session;
     private final CompanionPrefs names;
-    private final RunAudio audio;
+    final RunAudio audio;
     private final Random random = new Random();
-    private final float density;
+    final float density;
     private final Bitmap pet, jump, lose, art, portrait;
     private final Bitmap[] armed = new Bitmap[ARMED.length], cast = new Bitmap[CAST.length], faces = new Bitmap[FACES.length];
     private final Bitmap[] laterCast = new Bitmap[LATER_CAST.length], dyedArmed = new Bitmap[ARMED.length];
@@ -474,11 +476,11 @@ final class RunGame {
     private final float[] artWide = new float[ART_COUNT], artTall = new float[ART_COUNT];
     private Bitmap sky;
     private int skyOf = -1;
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-    private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+    final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
+    final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Rect source = new Rect();
-    private final RectF target = new RectF(), safe = new RectF(), box = new RectF();
+    final RectF target = new RectF(), safe = new RectF(), box = new RectF();
     private final RectF leftButton = new RectF(), rightButton = new RectF(), jumpButton = new RectF(), strikeButton = new RectF();
     private final RectF pauseButton = new RectF(), closeButton = new RectF(), soundButton = new RectF(), shopButton = new RectF(), goButton = new RectF();
     private final RectF[] pills = {new RectF(), new RectF(), new RectF()};
@@ -496,16 +498,16 @@ final class RunGame {
     private int page, counterFrom = MAP;
     private final RectF[] wares = new RectF[UP_NAMES.length];
     private final Path path = new Path();
-    private final int cardColor, ink, soft;
+    final int cardColor, ink, soft;
 
     private int width, height;
     private float tile;
     private int screen = MAP;
-    private float clock;
+    float clock;
 
     // The run
     private int number = 1;
-    private PlusRun run;
+    PlusRun run;
     private PlusRun.Perks perks = new PlusRun.Perks();
     private float cameraX, cameraY;
     private boolean goLeft, goRight, goJump, goStrike;
@@ -809,7 +811,7 @@ final class RunGame {
 
     private int herLevel() { return RunLoot.levelAt(herXp()); }
 
-    private PlusRun.Perks kept() {
+    PlusRun.Perks kept() {
         PlusRun.Perks kept = new PlusRun.Perks();
         kept.hearts = PlusRun.HEARTS + bought(0);
         kept.lives = PlusRun.LIVES + bought(7);
@@ -896,6 +898,19 @@ final class RunGame {
             kept.item = hand;
             kept.pack |= 1 << kind;
             kept.main = kind;
+        }
+        // Her inventory's places: the main weapon may be any weapon of her backpack, and there is a secondary one, which a swap changes it for.
+        kept.itemMain = kept.item;
+        int mainEntry = RunInventory.main(session);
+        if (hand == 0 && RunInventory.plain(mainEntry) && (RunInventory.owned(session) >> RunInventory.kindOf(mainEntry) & 1) != 0) {
+            kept.main = RunInventory.kindOf(mainEntry);
+            kept.pack |= 1 << kept.main;
+        }
+        int secondEntry = RunInventory.second(session);
+        if (secondEntry != 0) {
+            kept.second = RunInventory.kindOf(secondEntry);
+            kept.pack |= 1 << kept.second;
+            if (!RunInventory.plain(secondEntry)) kept.itemSecond = secondEntry;
         }
         // And how much harder she has chosen to have it, at the black market.
         kept.harder = hard();
@@ -1510,7 +1525,7 @@ final class RunGame {
     // The smithy
 
     /** How far a thing to fight with has been worked on; what she has had made to wear, as bits; what of it she has on; and what she has of the three a smith works with. */
-    private int forged(int kind) { return Math.max(0, Math.min(RunArms.LEVELS, session.tally("run_w_" + kind))); }
+    int forged(int kind) { return Math.max(0, Math.min(RunArms.LEVELS, session.tally("run_w_" + kind))); }
     private int gearMade() { return session.tally("run_gear"); }
     private int gearOn() { return RunGear.sound(session.tally("run_gear_on"), gearMade()); }
     private int[] stuff() { return new int[]{session.tally("run_mat_0"), session.tally("run_mat_1"), session.tally("run_mat_2")}; }
@@ -1530,7 +1545,7 @@ final class RunGame {
     private boolean sisters() { return smithFrom == PLAY && number >= RunLevels.SISTERS_FROM; }
 
     /** One of the three is walked up to: her work is looked at, and the land waits. The first time, she says who she is. From the map: only what she wears, to put on. */
-    private void openSmith(int who, int from) {
+    void openSmith(int who, int from) {
         int roses = session.tally("run_roses");
         if (RunCraft.roses(roses) != roses) {
             session.keep("run_roses", RunCraft.roses(roses));
@@ -1748,7 +1763,7 @@ final class RunGame {
     }
 
     /** A button of the smithy's: filled where it can be used, grey where it cannot. */
-    private void smithButton(Canvas canvas, RectF where, String word, boolean can, int colour) {
+    void smithButton(Canvas canvas, RectF where, String word, boolean can, int colour) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(can ? colour : dark ? 0xFF2F3336 : 0xFFEDEEEE);
         canvas.drawRoundRect(where, where.height() / 2, where.height() / 2, paint);
@@ -2826,7 +2841,7 @@ final class RunGame {
     static int iconOf(int code) { return RunLoot.iconOf(code); }
 
     /** One of the pictures in the sheet, as a square of a size about a place. */
-    private void drawIcon(Canvas canvas, int index, float x, float y, float size) {
+    void drawIcon(Canvas canvas, int index, float x, float y, float size) {
         if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
         int column = index % LOOT_COLUMNS, row = index / LOOT_COLUMNS;
         source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
@@ -2840,10 +2855,10 @@ final class RunGame {
     }
 
     /** A rarity's colour, the rose's changing as it is looked at. */
-    private int rarityColour(int rarity) { return rarity == RunLoot.ROSE ? RunLoot.rose(clock) : RunLoot.COLOURS[Math.max(0, Math.min(RunLoot.ROSE, rarity))]; }
+    int rarityColour(int rarity) { return rarity == RunLoot.ROSE ? RunLoot.rose(clock) : RunLoot.COLOURS[Math.max(0, Math.min(RunLoot.ROSE, rarity))]; }
 
     /** A thing found in a frame of its rarity: a tile tinted with it and a rim of it, glowing from gold up; and its picture in it. Or an empty frame. */
-    private void lootFrame(Canvas canvas, int code, RectF where, boolean picked) {
+    void lootFrame(Canvas canvas, int code, RectF where, boolean picked) {
         float round = where.width() * .2f;
         paint.setStyle(Paint.Style.FILL);
         if (code == 0) {
@@ -3492,7 +3507,7 @@ final class RunGame {
                 : pays == RunLevels.LASTING ? "longer treats" : pays == RunLevels.QUICKER ? "quicker colours" : "a white ribbon";
     }
 
-    private float dp(float value) { return value * density; }
+    float dp(float value) { return value * density; }
 
     private Bitmap armed(int weapon) {
         if (armed[weapon] == null) armed[weapon] = BitmapFactory.decodeResource(context.getResources(), ARMED[weapon]);
@@ -3724,7 +3739,7 @@ final class RunGame {
     /** The colour a picture of her is to be drawn in at this moment. */
     private int drawn() { return drawnAs != NO_LOOK ? drawnAs : run == null || screen == MAP || screen == SHOP ? 0 : look; }
 
-    private Bitmap herPet() {
+    Bitmap herPet() {
         Bitmap[] set = looks.get(drawn());
         return dressed("pet", set != null ? set[0] : pet);
     }
@@ -4008,7 +4023,7 @@ final class RunGame {
             return true;
         }
         if (packOpen) {
-            packOpen = false;
+            if (!inventory.back()) packOpen = false;
             audio.play("tap", .3f);
             return true;
         }
@@ -4258,6 +4273,11 @@ final class RunGame {
             counterFrom = MAP;
             screen = SHOP;
         }
+        // (And her inventory, for looking at it.)
+        if (BuildConfig.DEBUG && screen == MAP && video == null && session.tally("run_inv") > 0) {
+            session.keep("run_inv", 0);
+            openPack(MAP);
+        }
         if (!galleryNews && !petNews || video != null || shelf != null && !shelf.closed()) return;
         boolean free = screen == MAP || screen == PLAY && finale == NO_FINALE && !talking && captionLeft <= 0 && personLeft <= 0;
         if (!free || audio.speaking()) return;
@@ -4271,7 +4291,7 @@ final class RunGame {
         speak(galleryWords, screen == PLAY);
     }
 
-    private void buzz(boolean strongly) {
+    void buzz(boolean strongly) {
         if (haptics) stage.performHapticFeedback(strongly ? HapticFeedbackConstants.LONG_PRESS : HapticFeedbackConstants.KEYBOARD_TAP);
     }
 
@@ -5493,7 +5513,7 @@ final class RunGame {
     private final java.util.Map<Integer, Bitmap> glows = new java.util.HashMap<>();
     private Bitmap vignette;
 
-    private void glowAt(Canvas canvas, float x, float y, float radius, int colour, int alpha) {
+    void glowAt(Canvas canvas, float x, float y, float radius, int colour, int alpha) {
         if (BuildConfig.DEBUG && (session.tally("run_fxoff") & 4) != 0) return;
         Bitmap glow = glows.get(colour);
         if (glow == null) {
@@ -8356,11 +8376,7 @@ final class RunGame {
             return;
         }
         if (packOpen) {
-            if (action == MotionEvent.ACTION_DOWN) packTouch(x, y);
-            return;
-        }
-        if (bagOpen) {
-            if (action == MotionEvent.ACTION_DOWN) bagTouch(x, y);
+            inventory.touch(event);
             return;
         }
         if (huntsOpen) {
@@ -8951,6 +8967,10 @@ final class RunGame {
         int fresh = keys.press(keyCode, down);
         if (down) keyed = true;
         boolean sheet = packOpen || bagOpen || huntsOpen || smithOpen || marketOpen || fanOpen || treeOpen;
+        if (packOpen) {
+            inventory.key(fresh, keyCode);
+            return true;
+        }
         if (screen == PLAY && run != null && !sheet) {
             // (Once the story being told as the land begins is over: said over it, it would not be heard.)
             if (fresh != 0 && number == 1 && session.tally("run_keys_said") == 0) keysHintDue = true;
@@ -9037,10 +9057,11 @@ final class RunGame {
             shopScroll = Math.max(0, Math.min(shopMax, shopScroll - turned * dp(64)));
             return true;
         }
-        if (!bagOpen || turned == 0) return false;
-        bagPage = Math.max(0, bagPage + (turned < 0 ? 1 : -1));
-        audio.play("page", .4f);
-        return true;
+        if (packOpen && turned != 0) {
+            inventory.wheel(turned);
+            return true;
+        }
+        return false;
     }
 
     /** Everything let go: the window has gone from the front, or the land is left. */
@@ -9053,6 +9074,7 @@ final class RunGame {
 
     void draw(Canvas canvas) {
         if (width == 0) return;
+        if (run != null && screen == PLAY) perks.item = RunInventory.itemFor(perks, run.weapon());
         if (BuildConfig.DEBUG && run != null && screen == PLAY) {
             long now = System.nanoTime();
             frames++;
@@ -9242,15 +9264,14 @@ final class RunGame {
                     thing(canvas, run.weapon() == PlusRun.UNARMED ? PlusRun.TABLET : run.weapon(), packButton.left + dp(26), packButton.centerY(), dp(26), 0, false, false);
                     text.setColor(ink);
                     text.setTextAlign(Paint.Align.LEFT);
-                    fitted(canvas, "Backpack  \u203A", packButton.left + dp(50), packButton.centerY() + dp(5.5f), dp(15.5f), packButton.width() - dp(64));
+                    fitted(canvas, "Inventory  \u203A", packButton.left + dp(50), packButton.centerY() + dp(5.5f), dp(15.5f), packButton.width() - dp(64));
                 } else {
                     drawResult(canvas);
                 }
             }
         }
         // Her backpack, over whatever is there.
-        if (packOpen) drawPack(canvas);
-        if (bagOpen) drawBag(canvas);
+        if (packOpen) inventory.draw(canvas);
         if (huntsOpen) drawHunts(canvas);
         if (smithOpen) drawSmithy(canvas);
         if (marketOpen) drawMarket(canvas);
@@ -9749,60 +9770,38 @@ final class RunGame {
         paint.setColor(Color.BLACK);
     }
 
-    // Her bag
+    // Her inventory (her backpack and her bag as one): see RunInventory and RunInventoryUi
 
-    /** Her bag is opened, from where her backpack was. */
-    private void openBag(int from) {
-        bagOpen = true;
-        bagFrom = from;
-        bagOn = -1;
-        bagSlot = -1;
-        bagPage = 0;
+    /** Her inventory is opened: from a land, where the land waits; from the pause; or from the map. */
+    private void openPack(int from) {
+        packOpen = true;
+        packFrom = from;
+        swapFinger = -1;
+        inventory.open(from != MAP && run != null);
         goLeft = goRight = goJump = goStrike = false;
         jumpPressed = strikePressed = false;
         audio.play("page", .6f);
     }
 
-    private static final String[] BAG_TABS = {"All", "Weapons", "Armour", "Accessories"};
-
-    /** What is in it, as places in it, for the tab: the rarest first, and of one rarity the latest found first. */
-    private int[] bagOrder(List<Integer> bag) {
-        List<Integer> places = new ArrayList<>();
-        for (int index = 0; index < bag.size(); index++) if (bagTab == 0 || RunLoot.type(bag.get(index)) == bagTab - 1) places.add(index);
-        places.sort((one, other) -> {
-            int rare = Integer.compare(RunLoot.rarity(bag.get(other)), RunLoot.rarity(bag.get(one)));
-            return rare != 0 ? rare : Integer.compare(other, one);
-        });
-        int[] order = new int[places.size()];
-        for (int index = 0; index < order.length; index++) order[index] = places.get(index);
-        return order;
+    /** Her inventory is closed, or sent on to the smithy's account of what she wears. */
+    void closePack() {
+        packOpen = false;
+        audio.play("tap", .3f);
     }
+
+    void openSmithOfWorn() { openSmith(RunGear.PULMU, MAP); }
+
+    /** Her bag is her inventory now: opened from where either was. */
+    private void openBag(int from) { openPack(from); }
 
     /** The weapon found that she has taken in hand, or 0; kept as the number of the thing. */
-    private int handCode() {
-        String note = session.note("run_hand");
-        try {
-            int code = note == null || note.isEmpty() ? 0 : Integer.parseInt(note.trim());
-            return code != 0 && RunLoot.type(code) == RunLoot.WEAPON ? code : 0;
-        } catch (NumberFormatException ignored) {
-            return 0;
-        }
-    }
-
-    /** A weapon found is taken in hand: kept, and in a land put in her hands at once. */
-    private void takeInHand(int code) {
-        session.keepNote("run_hand", String.valueOf(code));
-        perks = kept();
-        if (run != null) run.hold(code);
-        audio.play("unlock", .8f);
-        buzz(true);
-    }
+    private int handCode() { return RunInventory.hand(session); }
 
     /** What she wears, as it is kept. */
-    private RunLoot.Worn wornNow() { return RunLoot.worn(session.note("run_worn")); }
+    RunLoot.Worn wornNow() { return RunLoot.worn(session.note("run_worn")); }
 
     /** What she wears is changed: kept, and felt at once in a land. */
-    private void wearNow(RunLoot.Worn worn) {
+    void wearNow(RunLoot.Worn worn) {
         session.keepNote("run_worn", RunLoot.note(worn));
         perks = kept();
         if (run != null) run.wear(worn);
@@ -9810,497 +9809,36 @@ final class RunGame {
         buzz(false);
     }
 
-    /** How many of a thing she is wearing. */
-    private static int wearing(RunLoot.Worn worn, int code) { return (worn.armour == code ? 1 : 0) + (worn.first == code ? 1 : 0) + (worn.second == code ? 1 : 0); }
-
-    /** The thing looked at: a worn slot's, or the bag's. */
-    private int bagLooked(List<Integer> bag, RunLoot.Worn worn) {
-        if (bagSlot >= 0) return bagSlot == 0 ? worn.armour : bagSlot == 1 ? worn.first : worn.second;
-        return bagOn >= 0 && bagOn < bag.size() ? bag.get(bagOn) : 0;
-    }
-
-    private void bagTouch(float x, float y) {
-        List<Integer> bag = RunLoot.bag(session.note("run_bag"));
-        RunLoot.Worn worn = wornNow();
-        for (int slot = 0; slot < 3; slot++) {
-            if (bagSlots[slot] != null && bagSlots[slot].contains(x, y)) {
-                bagSlot = slot;
-                bagOn = -1;
-                audio.play("tap", .5f);
-                return;
-            }
-        }
-        for (int tab = 0; tab < 4; tab++) {
-            if (bagTabs[tab] != null && bagTabs[tab].contains(x, y)) {
-                bagTab = tab;
-                bagPage = 0;
-                audio.play("tap", .5f);
-                return;
-            }
-        }
-        for (int cell = 0; cell < bagCells.length; cell++) {
-            if (bagCells[cell] == null || bagCells[cell].isEmpty() || !bagCells[cell].contains(x, y) || cell >= bagShown.length) continue;
-            bagOn = bagShown[cell];
-            bagSlot = -1;
-            audio.play("tap", .5f);
-            return;
-        }
-        if (!bagPrev.isEmpty() && bagPrev.contains(x, y)) {
-            bagPage = Math.max(0, bagPage - 1);
-            audio.play("page", .4f);
-            return;
-        }
-        if (!bagNext.isEmpty() && bagNext.contains(x, y)) {
-            bagPage++;
-            audio.play("page", .4f);
-            return;
-        }
-        if (!bagAct.isEmpty() && bagAct.contains(x, y)) {
-            int code = bagLooked(bag, worn), type = RunLoot.type(code);
-            if (type == RunLoot.WEAPON) {
-                takeInHand(code);
-                return;
-            }
-            if (bagSlot >= 0) {
-                // Taken off.
-                wearNow(new RunLoot.Worn(bagSlot == 0 ? 0 : worn.armour, bagSlot == 1 ? 0 : worn.first, bagSlot == 2 ? 0 : worn.second));
-                bagSlot = -1;
-            } else if (type == RunLoot.ARMOUR) {
-                wearNow(new RunLoot.Worn(code, worn.first, worn.second));
-            } else if (type == RunLoot.ACCESSORY) {
-                // Into an empty place; with both full, in place of the less rare of the two.
-                boolean firstFree = worn.first == 0, secondFree = worn.second == 0;
-                boolean intoFirst = firstFree || !secondFree && RunLoot.rarity(worn.first) <= RunLoot.rarity(worn.second);
-                wearNow(intoFirst ? new RunLoot.Worn(worn.armour, code, worn.second) : new RunLoot.Worn(worn.armour, worn.first, code));
-            }
-            return;
-        }
-        if (!bagCard.contains(x, y)) {
-            bagOpen = false;
-            audio.play("tap", .3f);
-        }
-    }
-
     /**
-     * Her bag: what she wears at its head, an armour and two accessories, with what a set of them adds; tabs for what is in it; the things
-     * themselves, each in a frame of its rarity, a page at a time; and the card of the one looked at: what it is, for which class, what it
-     * does, and a button that puts it on or takes it off. Weapons found are kept for when they can be held.
+     * The main or the secondary weapon is changed (kept already): what she keeps is made again, and in a land she is told of it. The weapon given
+     * as {@code hold} (an entry of RunInventory) is put in her hands at once, if she can hold it.
      */
-    private void drawBag(Canvas canvas) {
-        canvas.drawColor(0x99000000);
-        List<Integer> bag = RunLoot.bag(session.note("run_bag"));
-        RunLoot.Worn worn = wornNow();
-        // Wide: three columns, what she wears and the tabs, the things, and the card. Tall: all in one column.
-        boolean side = safe.width() > safe.height() * 1.15f;
-        float pad = dp(14), wide = Math.min(safe.width() - dp(24), dp(side ? 900 : 440));
-        float columnWide = side ? (wide - pad * 4) / 3 : wide - pad * 2;
-        int columns = 5, rows = 4;
-        float slot = side ? Math.min(dp(58), (columnWide - dp(20)) / 3) : dp(58);
-        float headTall = dp(30) + dp(16) + slot + dp(10) + (side ? dp(46) + dp(70) : dp(38)), detailTall = dp(226), cell, tall;
-        if (side) {
-            tall = Math.min(safe.height() - dp(16), pad * 2 + Math.max(headTall, Math.max(dp(30) + detailTall, dp(30) + columnWide / columns * rows + dp(34))));
-            cell = Math.min(columnWide / columns, (tall - pad * 2 - dp(30) - dp(34)) / rows);
-        } else {
-            float room = safe.height() - dp(16) - pad * 2 - headTall - dp(34) - detailTall;
-            cell = Math.min(columnWide / columns, room / rows);
-            tall = pad * 2 + headTall + cell * rows + dp(34) + detailTall;
-        }
-        float left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
-        bagCard.set(left, top, left + wide, top + tall);
-        plate(canvas, bagCard, dp(22), 255);
-        float x = left + pad, y = top + pad;
-        text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(ink);
-        text.setTypeface(Typeface.DEFAULT_BOLD);
-        fitted(canvas, "Bag", x, y + dp(18), dp(20), dp(80));
-        text.setTypeface(Typeface.DEFAULT);
-        text.setColor(soft);
-        text.setTextAlign(Paint.Align.RIGHT);
-        fitted(canvas, bag.size() + " of " + RunLoot.BAG + " found", side ? x + columnWide : left + wide - pad, y + dp(17), dp(12), columnWide - dp(70));
-        y += dp(30);
-        // What she wears.
-        text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(soft);
-        fitted(canvas, "Wearing", x, y + dp(11), dp(11.5f), dp(120));
-        y += dp(16);
-        String[] slotNames = {"Armour", "Accessory", "Accessory"};
-        int[] wornCodes = {worn.armour, worn.first, worn.second};
-        for (int index = 0; index < 3; index++) {
-            if (bagSlots[index] == null) bagSlots[index] = new RectF();
-            bagSlots[index].set(x + index * (slot + dp(10)), y, x + index * (slot + dp(10)) + slot, y + slot);
-            lootFrame(canvas, wornCodes[index], bagSlots[index], bagSlot == index);
-            if (wornCodes[index] == 0) {
-                text.setTextAlign(Paint.Align.CENTER);
-                text.setColor(soft);
-                fitted(canvas, slotNames[index], bagSlots[index].centerX(), bagSlots[index].centerY() + dp(4), dp(10.5f), slot - dp(8));
-            } else {
-                // Its slot named under it, so an accessory is never taken for something else.
-                text.setTextAlign(Paint.Align.CENTER);
-                text.setColor(soft);
-                fitted(canvas, slotNames[index], bagSlots[index].centerX(), bagSlots[index].bottom + dp(10), dp(9.5f), slot);
+    void weaponsChanged(int hold) {
+        perks = kept();
+        if (run != null) {
+            run.grant(perks);
+            if (hold != 0) {
+                if (RunInventory.plain(hold)) run.switchTo(RunInventory.kindOf(hold));
+                else run.hold(hold);
             }
         }
-        // What a set adds: beside the slots, or under them when wide.
-        String setWords = worn.set >= 2 ? RunLoot.THEMES[Math.min(11, RunLoot.theme(worn.armour))] + " set of three: +1 shield, 10% harder blows, life back"
-                : worn.set == 1 ? RunLoot.THEMES[Math.min(11, RunLoot.theme(worn.armour))] + " set of two: +1 shield piece" : "Armour and an accessory of one chapter make a set";
-        text.setTextAlign(Paint.Align.LEFT);
-        float setX = side ? x : x + 3 * (slot + dp(10)), setY = side ? y + slot + dp(32) : y + dp(16);
-        List<String> setLines = wrapSized(setWords, x + columnWide - setX, dp(11.5f));
-        text.setColor(worn.set > 0 ? 0xFF3F7FC4 : soft);
-        for (int line = 0; line < Math.min(4, setLines.size()); line++) canvas.drawText(setLines.get(line), setX, setY + line * dp(14), text);
-        y += slot + dp(22) + (side ? dp(46) : 0);
-        // Tabs: in a row, or two rows of two when wide.
-        int across = side ? 2 : 4;
-        float tabWide = (columnWide - dp(6) * (across - 1)) / across;
-        for (int tab = 0; tab < 4; tab++) {
-            if (bagTabs[tab] == null) bagTabs[tab] = new RectF();
-            float tx = x + (tab % across) * (tabWide + dp(6)), ty = y + (tab / across) * dp(34);
-            bagTabs[tab].set(tx, ty, tx + tabWide, ty + dp(28));
-            smithButton(canvas, bagTabs[tab], BAG_TABS[tab], bagTab == tab, CalculatorLayout.CORAL);
-        }
-        y += side ? dp(70) : dp(38);
-        float gridX = side ? left + pad * 2 + columnWide : x, gridY = side ? top + pad + dp(30) : y;
-        // The things, a page at a time.
-        int[] order = bagOrder(bag);
-        int perPage = columns * rows, pages = Math.max(1, (order.length + perPage - 1) / perPage);
-        bagPage = Math.min(bagPage, pages - 1);
-        bagShown = new int[Math.max(0, Math.min(perPage, order.length - bagPage * perPage))];
-        for (int index = 0; index < bagCells.length; index++) {
-            if (bagCells[index] == null) bagCells[index] = new RectF();
-            bagCells[index].setEmpty();
-        }
-        float gridLeft = gridX + (columnWide - cell * columns) / 2;
-        for (int index = 0; index < bagShown.length; index++) {
-            int place = order[bagPage * perPage + index];
-            bagShown[index] = place;
-            float cx = gridLeft + (index % columns) * cell, cy = gridY + (index / columns) * cell;
-            bagCells[index].set(cx + dp(3), cy + dp(3), cx + cell - dp(3), cy + cell - dp(3));
-            int code = bag.get(place);
-            lootFrame(canvas, code, bagCells[index], place == bagOn && bagSlot < 0);
-            // Worn: a small mark.
-            if (wearing(worn, code) > 0) {
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(CalculatorLayout.CORAL);
-                canvas.drawCircle(bagCells[index].right - cell * .1f, bagCells[index].top + cell * .1f, cell * .07f, paint);
-                paint.setColor(Color.BLACK);
-            }
-        }
-        if (order.length == 0) {
-            text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(soft);
-            fitted(canvas, bagTab == 0 ? "Nothing yet: creatures drop things now and then" : "None of these yet", gridX + columnWide / 2, gridY + cell * rows / 2, dp(13), columnWide);
-        }
-        float pagesY = gridY + cell * rows + dp(4);
-        bagPrev.setEmpty();
-        bagNext.setEmpty();
-        if (pages > 1) {
-            float middle = gridX + columnWide / 2;
-            text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(ink);
-            fitted(canvas, (bagPage + 1) + " / " + pages, middle, pagesY + dp(19), dp(13), dp(80));
-            if (bagPage > 0) {
-                bagPrev.set(middle - dp(100), pagesY + dp(2), middle - dp(44), pagesY + dp(28));
-                smithButton(canvas, bagPrev, "‹", true, 0xFF8A5A33);
-            }
-            if (bagPage < pages - 1) {
-                bagNext.set(middle + dp(44), pagesY + dp(2), middle + dp(100), pagesY + dp(28));
-                smithButton(canvas, bagNext, "›", true, 0xFF8A5A33);
-            }
-        }
-        // The card of the one looked at: the third column when wide, else under the things.
-        float cardX = side ? left + pad * 3 + columnWide * 2 : x, cardY = side ? top + pad + dp(30) : pagesY + dp(34);
-        drawBagCard(canvas, bagLooked(bag, worn), worn, bag, cardX, cardY, columnWide, top + tall - pad);
+        audio.play("unlock", .8f);
+        buzz(true);
     }
 
-    /** Words wrapped at a size. */
-    private List<String> wrapSized(String words, float wide, float size) {
-        text.setTextSize(size);
-        return wrap(words, wide);
-    }
-
-    /** The card of a thing in her bag, or of one she wears: its picture, its name in its rarity's colour, what it is and for whom, what it does, and its button. */
-    private void drawBagCard(Canvas canvas, int code, RunLoot.Worn worn, List<Integer> bag, float x, float y, float wide, float bottom) {
-        bagAct.setEmpty();
-        if (code == 0) {
-            text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(soft);
-            fitted(canvas, bagSlot >= 0 ? "Nothing worn here: pick something from the bag" : "Tap something to see what it does", x + wide / 2, y + dp(40), dp(12.5f), wide);
-            return;
-        }
-        int rarity = RunLoot.rarity(code), type = RunLoot.type(code);
-        RectF picture = new RectF(x, y, x + dp(64), y + dp(64));
-        lootFrame(canvas, code, picture, false);
-        float words = x + dp(76);
-        text.setTextAlign(Paint.Align.LEFT);
-        text.setTypeface(Typeface.DEFAULT_BOLD);
-        text.setColor(rarity == RunLoot.WHITE ? ink : mixed(rarityColour(rarity), dark ? Color.WHITE : Color.BLACK, dark ? .1f : .25f));
-        fitted(canvas, RunLoot.name(code), words, y + dp(18), dp(15), wide - dp(76));
-        text.setTypeface(Typeface.DEFAULT);
-        // Which slot it goes in, in a small coloured tag over its picture.
-        String slotWord = type == RunLoot.WEAPON ? "WEAPON" : type == RunLoot.ARMOUR ? "ARMOUR" : "ACCESSORY";
-        text.setTextSize(dp(9.5f));
-        float tagWide = text.measureText(slotWord) + dp(10);
-        RectF tag = new RectF(x + dp(32) - tagWide / 2, y + dp(56), x + dp(32) + tagWide / 2, y + dp(70));
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(type == RunLoot.WEAPON ? 0xFFB46A2A : type == RunLoot.ARMOUR ? 0xFF3F7FC4 : 0xFF8E5BE8);
-        canvas.drawRoundRect(tag, dp(7), dp(7), paint);
-        paint.setColor(Color.BLACK);
-        text.setColor(Color.WHITE);
-        text.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText(slotWord, tag.centerX(), tag.bottom - dp(3.5f), text);
-        text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(soft);
-        int[] does = RunLoot.does(code);
-        String kind = type == RunLoot.WEAPON ? "Weapon" : type == RunLoot.ARMOUR ? "Armour  ·  leans to " + (RunLoot.leansTo(RunLoot.base(code)) == RunLoot.ANY ? "every class"
-                : RunLoot.CLASS_NAMES[RunLoot.leansTo(RunLoot.base(code))]) : "Accessory  ·  " + (does[0] == RunLoot.ANY ? "any weapon" : "for " + RunLoot.CLASS_NAMES[does[0]]);
-        fitted(canvas, RunLoot.RARITIES[rarity] + "  ·  " + kind, words, y + dp(37), dp(11.5f), wide - dp(76));
-        if (type != RunLoot.WEAPON && does[0] != RunLoot.ANY) {
-            fitted(canvas, RunLoot.CLASS_HOLDS[does[0]], words, y + dp(54), dp(10.5f), wide - dp(76));
-        } else if (type == RunLoot.ARMOUR && RunLoot.leansTo(RunLoot.base(code)) != RunLoot.ANY) {
-            fitted(canvas, RunLoot.CLASS_HOLDS[RunLoot.leansTo(RunLoot.base(code))], words, y + dp(54), dp(10.5f), wide - dp(76));
-        }
-        float line = y + dp(86);
-        text.setTextSize(dp(12.5f));
-        if (type == RunLoot.WEAPON) {
-            text.setColor(ink);
-            int usedAs = RunArms.kindOf(code);
-            String used = RunArms.NAMES[usedAs] + ": " + (RunArms.itemBlows(code) > 0 ? "+" + RunArms.itemBlows(code) + (RunArms.itemBlows(code) == 1 ? " blow" : " blows") + ", " : "")
-                    + Math.round((RunArms.itemReach(code) - 1) * 100) + "% further, " + Math.round((1 - RunArms.itemRest(code)) * 100) + "% quicker"
-                    + (usedAs == PlusRun.GUN && RunArms.machine(code) ? ". A machine gun" : "") + (usedAs == RunArms.WAND ? ". Its element: " + RunArms.ELEMENTS[RunArms.element(code)] : "") + ". ";
-            for (String one : wrapSized((RunLoot.addition(code) ? "The plus-book she began with, before she had a book of her own: found again. " : "")
-                    + used + RunArms.does(usedAs), wide, dp(12.5f))) {
-                canvas.drawText(one, x, line, text);
-                line += dp(16.5f);
-            }
-        } else {
-            for (int pair = 0; pair * 2 + 2 < does.length; pair++) {
-                int effect = does[1 + pair * 2];
-                boolean leaning = type == RunLoot.ARMOUR && effect == RunLoot.POWER;
-                text.setColor(pair == 0 ? CalculatorLayout.CORAL : ink);
-                String said = RunLoot.said(effect, does[2 + pair * 2]) + (leaning ? " (" + (RunLoot.leansTo(RunLoot.base(code)) == RunLoot.ANY ? "every class"
-                        : RunLoot.CLASS_NAMES[RunLoot.leansTo(RunLoot.base(code))]) + ")" : "");
-                fitted(canvas, "•  " + said, x, line, dp(12.5f), wide);
-                line += dp(17);
-            }
-            // What more it would do at a better rarity.
-            if (type == RunLoot.ACCESSORY && rarity < RunLoot.RED && RunLoot.base(code) != RunLoot.ROSE_OF_HALGAKOS) {
-                text.setColor(soft);
-                fitted(canvas, rarity < RunLoot.GOLD ? "Gold and better do more besides" : "Red and better do more besides", x, line, dp(11), wide);
-                line += dp(15);
-            }
-        }
-        // The button.
-        bagAct.set(x, bottom - dp(40), x + wide, bottom);
-        boolean worn1 = bagSlot >= 0;
-        boolean canWear = type != RunLoot.WEAPON && !worn1 && wearing(worn, code) < count(bag, code) && (type == RunLoot.ARMOUR || wearing(worn, code) < 2);
-        if (type == RunLoot.WEAPON) {
-            boolean held = handCode() == code;
-            smithButton(canvas, bagAct, held ? "In her hands" : "Take it in hand", !held, CalculatorLayout.CORAL);
-            if (held) bagAct.setEmpty();
-            return;
-        }
-        if (worn1) {
-            smithButton(canvas, bagAct, "Take it off", true, 0xFF8A5A33);
-        } else if (canWear) {
-            smithButton(canvas, bagAct, type == RunLoot.ARMOUR && worn.armour != 0 ? "Wear it in place of what she has on" : "Wear it", true, CalculatorLayout.CORAL);
-        } else {
-            String why = type == RunLoot.WEAPON ? "Held from the smiths' next work" : "She is wearing it";
-            smithButton(canvas, bagAct, why, false, CalculatorLayout.CORAL);
-            bagAct.setEmpty();
-        }
-    }
-
-    private static int count(List<Integer> bag, int code) {
-        int count = 0;
-        for (int one : bag) if (one == code) count++;
-        return count;
-    }
-
-    /** Her backpack is opened: from a land, where the land waits; from the pause; or from the map. */
-    private void openPack(int from) {
-        packOpen = true;
-        packFrom = from;
-        swapFinger = -1;
-        packOn = from == MAP ? kept().main : run.weapon() != PlusRun.UNARMED ? run.weapon() : PlusRun.TABLET;
-        goLeft = goRight = goJump = goStrike = false;
-        jumpPressed = strikePressed = false;
-        audio.play("page", .6f);
-    }
-
-    /** What is in it: in a land, what she has there; on the map, what is kept. */
-    private int packed() { return packFrom == MAP || run == null ? kept().pack | 1 << kept().main : run.owned(); }
-
-    private void packTouch(float x, float y) {
-        int owned = packed();
-        for (int kind = 0; kind < RunArms.COUNT; kind++) {
-            if ((owned >> kind & 1) == 0 || packRows[kind] == null || !packRows[kind].contains(x, y)) continue;
-            audio.play("tap", .5f);
-            packOn = kind;
-            return;
-        }
-        if (!packWear.isEmpty() && packWear.contains(x, y)) {
-            packOpen = false;
-            openSmith(RunGear.PULMU, MAP);
-            return;
-        }
-        if (packBag.contains(x, y)) {
-            packOpen = false;
-            openBag(packFrom);
-            return;
-        }
-        if (!packAct.isEmpty() && packAct.contains(x, y)) {
-            // In a land: what is looked at is taken in hand. On the map: it is what she begins every land with.
-            if (packFrom == MAP) {
-                for (int index = 0; index < RunArms.MAINS.length; index++) if (RunArms.MAINS[index] == packOn) session.keep("run_main", index);
-                perks = kept();
-                audio.play("unlock");
-            } else if (run.switchTo(packOn)) {
-                packOpen = false;
-            }
-            buzz(false);
-            return;
-        }
-        if (!packCard.contains(x, y)) {
-            packOpen = false;
-            audio.play("tap", .3f);
-        }
-    }
+    /** What her backpack holds, as bits of kinds: in a land what she has there; on the map what is kept. */
+    int packedKinds(boolean inLand) { return !inLand || run == null ? kept().pack | 1 << kept().main : run.owned(); }
 
     /** A figure as it is written: without a nought after its point. */
-    private static String figure(float value) {
+    static String figure(float value) {
         String written = String.format(java.util.Locale.US, "%.1f", value);
         return written.endsWith(".0") ? written.substring(0, written.length() - 2) : written;
     }
 
-    /**
-     * Her backpack: a row for each thing in it, with its picture, its name and how far it
-     * reaches and how fast it is, to compare one with another; and under the rows the card
-     * of the one that is looked at: its figures, which are the rules' own, what it does,
-     * what it is good for, and a button that takes it in hand or, on the map, makes it
-     * what she begins every land with.
-     */
-    private void drawPack(Canvas canvas) {
-        canvas.drawColor(0x99000000);
-        int owned = packed(), count = Integer.bitCount(owned), main = kept().main;
-        boolean inLand = packFrom != MAP && run != null;
-        float wide = Math.min(safe.width() - dp(24), dp(430)), row = Math.max(dp(count > 8 ? 30 : 40), Math.min(dp(52), (safe.height() - dp(350)) / Math.max(1, count))), pad = dp(16);
-        float tall = pad + dp(30) + count * row + dp(10) + dp(234) + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
-        packCard.set(left, top, left + wide, top + tall);
-        plate(canvas, packCard, dp(22), 255);
-        text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(ink);
-        text.setTypeface(Typeface.DEFAULT_BOLD);
-        fitted(canvas, "Backpack", left + pad, top + pad + dp(18), dp(20), wide - pad * 2);
-        text.setTypeface(Typeface.DEFAULT);
-        text.setColor(soft);
-        text.setTextAlign(Paint.Align.RIGHT);
-        packWear.setEmpty();
-        // Her bag of what she has found: in a land and from the map. From the map, also a button to what the smiths made her.
-        float bagRight = left + wide - pad;
-        if (!inLand) {
-            packWear.set(left + wide - pad - dp(132), top + pad - dp(2), left + wide - pad, top + pad + dp(26));
-            smithButton(canvas, packWear, "What she wears  ›", true, 0xFF3F7FC4);
-            bagRight = packWear.left - dp(8);
-        }
-        packBag.set(bagRight - dp(78), top + pad - dp(2), bagRight, top + pad + dp(26));
-        smithButton(canvas, packBag, "Bag  ›", true, 0xFFB46A2A);
-        text.setTextAlign(Paint.Align.RIGHT);
-        float y = top + pad + dp(30);
-        for (int kind = 0; kind < RunArms.COUNT; kind++) {
-            if ((owned >> kind & 1) == 0) {
-                packRows[kind] = null;
-                continue;
-            }
-            if (packRows[kind] == null) packRows[kind] = new RectF();
-            RectF at = packRows[kind];
-            at.set(left + dp(8), y, left + wide - dp(8), y + row - dp(4));
-            boolean on = kind == packOn, held = inLand ? run.weapon() == kind : main == kind, empty = inLand && !run.usable(kind);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(on ? (dark ? 0xFF44292E : 0xFFFCE9EB) : dark ? 0xFF2C3033 : 0xFFF5F6F7);
-            canvas.drawRoundRect(at, dp(14), dp(14), paint);
-            if (on) {
-                stroke.setColor(CalculatorLayout.CORAL);
-                stroke.setStrokeWidth(dp(2));
-                canvas.drawRoundRect(at, dp(14), dp(14), stroke);
-            }
-            paint.setColor(Color.BLACK);
-            paint.setAlpha(empty ? 90 : 255);
-            boolean upright = kind != PlusRun.GUN && kind != PlusRun.BOOK && kind < PlusRun.TABLET;
-            thing(canvas, kind, at.left + dp(26), at.centerY(), at.height() * (upright ? .8f : .62f), upright ? 35 : 0, false, false);
-            paint.setAlpha(255);
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setColor(ink);
-            text.setTypeface(Typeface.DEFAULT_BOLD);
-            fitted(canvas, RunArms.NAMES[kind], at.left + dp(52), at.centerY() - dp(2), dp(15), at.width() * .42f);
-            text.setTypeface(Typeface.DEFAULT);
-            text.setColor(soft);
-            int level = perks.levels[kind];
-            fitted(canvas, "reach " + figure(RunArms.reach(kind, level)) + "  \u00B7  " + figure(RunArms.pace(kind, level)) + " a second", at.left + dp(52), at.centerY() + dp(14), dp(11.5f),
-                    at.width() - dp(60));
-            // What marks it: in her hands; what she begins with; or empty.
-            String mark = empty ? "empty" : held ? (inLand ? "in hand" : "begins with") : RunArms.main(kind) ? "hers" : "";
-            if (!mark.isEmpty()) {
-                text.setTextAlign(Paint.Align.RIGHT);
-                text.setColor(held ? CalculatorLayout.CORAL : soft);
-                fitted(canvas, mark, at.right - dp(12), at.centerY() + dp(4), dp(12), dp(80));
-            }
-            y += row;
-        }
-        // The card of the one that is looked at.
-        packAct.setEmpty();
-        if (packOn < 0 || (owned >> packOn & 1) == 0) return;
-        int kind = packOn, level = perks.levels[kind];
-        boolean boosted = inLand && run.boost() > 0 && run.weapon() == kind, swung = RunArms.way(kind) == RunArms.SWUNG;
-        y += dp(10);
-        text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(ink);
-        text.setTypeface(Typeface.DEFAULT_BOLD);
-        fitted(canvas, RunArms.NAMES[kind] + "  \u00B7  level " + (level + 1), left + pad, y + dp(14), dp(15.5f), wide - pad * 2);
-        text.setTypeface(Typeface.DEFAULT);
-        // Its figures: the rules' own. Stronger for a find, the changed ones, marked.
-        float reach = RunArms.reach(kind, level) * (boosted && !swung ? RunArms.BOOST_FAR : 1) + (boosted && swung ? RunArms.BOOST_SWING : 0);
-        float bite = RunArms.bite(kind, level) + (boosted ? RunArms.BOOST_BITE : 0);
-        String up = boosted ? " \u2191" : "";
-        int blows = RunArms.blows(kind, level);
-        String first = "Power: " + blows + (blows == 1 ? " blow" : " blows") + "  ·  reach " + figure(reach) + up + " squares  ·  " + figure(RunArms.pace(kind, level)) + " a second";
-        String second = "Shield: " + figure(bite) + up + (bite == 1 ? " piece" : " pieces") + " a blow"
-                + (RunArms.area(kind, level) > 0 ? "  \u00B7  " + (kind == PlusRun.BOOK || kind == PlusRun.CANNON ? "burst " : "sweep ") + figure(RunArms.area(kind, level)) + " squares" : "")
-                + (kind == PlusRun.TABLET ? "  ·  panel " + figure(RunArms.panelWide(level)) + " by " + figure(RunArms.panelTall(level)) + ", " + figure(RunArms.PANEL_BITE) + " pieces" : "")
-                + (kind == PlusRun.KEYS ? "  ·  fan of " + RunArms.fan(level) : "");
-        int holds = RunArms.holds(kind, perks.shots);
-        String third = holds == 0 ? "No end to it" : kind == PlusRun.GUN ? (inLand ? run.rounds() + " shots left of " : "Holds ") + holds + (inLand ? "" : " shots")
-                : (inLand ? run.books() + " left of " : "") + holds + " to a land";
-        text.setColor(CalculatorLayout.CORAL);
-        fitted(canvas, first, left + pad, y + dp(34), dp(12.5f), wide - pad * 2);
-        fitted(canvas, second, left + pad, y + dp(52), dp(12.5f), wide - pad * 2);
-        text.setColor(soft);
-        fitted(canvas, third + (boosted ? "  \u00B7  stronger for " + (int) Math.ceil(run.boost()) + " s more" : ""), left + pad, y + dp(70), dp(12.5f), wide - pad * 2);
-        // What it does, and what it is good for: no more than four lines of it.
-        text.setColor(ink);
-        text.setTextSize(dp(12.5f));
-        // (With what the smith has made of it, a step at a time.)
-        StringBuilder told = new StringBuilder(RunArms.does(kind));
-        for (int step = 1; step <= level; step++) told.append(' ').append(RunArms.step(kind, step));
-        List<String> lines = wrap(told + " " + RunArms.goodFor(kind), wide - pad * 2);
-        for (int index = 0; index < Math.min(6, lines.size()); index++) canvas.drawText(lines.get(index), left + pad, y + dp(92) + index * dp(16.5f), text);
-        // The button: take it in hand; or begin every land with it.
-        boolean can = inLand ? run.weapon() != kind && run.usable(kind) : RunArms.main(kind) && main != kind;
-        if (can) {
-            packAct.set(left + pad, top + tall - pad - dp(40), left + wide - pad, top + tall - pad);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(CalculatorLayout.CORAL);
-            canvas.drawRoundRect(packAct, dp(20), dp(20), paint);
-            paint.setColor(Color.BLACK);
-            text.setColor(Color.WHITE);
-            text.setTextAlign(Paint.Align.CENTER);
-            fitted(canvas, inLand ? "Take it in hand" : "Begin every land with it", packAct.centerX(), packAct.centerY() + dp(5.5f), dp(15.5f), packAct.width() - dp(24));
-        } else {
-            text.setColor(soft);
-            text.setTextAlign(Paint.Align.CENTER);
-            String why = inLand ? (run.weapon() == kind ? "It is in her hands" : "Empty: find more for it") : main == kind ? "She begins every land with it" : "Found in the lands: taken in hand there";
-            fitted(canvas, why, left + wide / 2, top + tall - pad - dp(14), dp(12.5f), wide - pad * 2);
-        }
-        text.setTextAlign(Paint.Align.LEFT);
+    /** Words wrapped at a size. */
+    List<String> wrapSized(String words, float wide, float size) {
+        text.setTextSize(size);
+        return wrap(words, wide);
     }
 
     /** The button that changes what she holds, with a picture of what a tap on it would put in her hands; and, as it is held, a ring that closes. */
@@ -10691,7 +10229,7 @@ final class RunGame {
      * round by some degrees. All but the ink gun are drawn standing on end, point up, so a
      * quarter turn lays one flat with its point to the right; mirrored, to the left.
      */
-    private void thing(Canvas canvas, int kind, float x, float y, float tall, float degrees, boolean mirrored, boolean byTheHandle) {
+    void thing(Canvas canvas, int kind, float x, float y, float tall, float degrees, boolean mirrored, boolean byTheHandle) {
         if (kind >= RunArms.GREATSWORD) {
             int held = perks != null ? perks.item : 0;
             int index = held != 0 && RunArms.kindOf(held) == kind ? iconOf(held) : kind == RunArms.KNUCKLES ? RunLoot.KNUCKLE_ICONS : RunArms.baseOf(kind) * 12;
@@ -11698,7 +11236,7 @@ final class RunGame {
     }
 
     /** One colour with so much of another in it. */
-    private static int mixed(int one, int other, float much) {
+    static int mixed(int one, int other, float much) {
         return Color.rgb(Math.round(Color.red(one) + (Color.red(other) - Color.red(one)) * much), Math.round(Color.green(one) + (Color.green(other) - Color.green(one)) * much),
                 Math.round(Color.blue(one) + (Color.blue(other) - Color.blue(one)) * much));
     }
@@ -14316,7 +13854,7 @@ final class RunGame {
     }
 
     /** A white card, as the companion's own popups are, with a soft edge to lift it off the screen. */
-    private void plate(Canvas canvas, RectF where, float radius, int alpha) {
+    void plate(Canvas canvas, RectF where, float radius, int alpha) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0x33000000);
         canvas.drawRoundRect(where.left, where.top + dp(2), where.right, where.bottom + dp(3), radius, radius, paint);
@@ -15052,7 +14590,7 @@ final class RunGame {
         }
     }
 
-    private List<String> wrap(String words, float wide) {
+    List<String> wrap(String words, float wide) {
         List<String> lines = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         for (String word : words.split(" ")) {
@@ -15068,7 +14606,7 @@ final class RunGame {
     }
 
     /** Writes a line no wider than there is room for: smaller, if that is what it takes. */
-    private void fitted(Canvas canvas, String words, float x, float y, float size, float room) {
+    void fitted(Canvas canvas, String words, float x, float y, float size, float room) {
         if (words.contains("+ ") && PLUS_AMOUNT.matcher(words).find()) {
             plusFitted(canvas, words, x, y, size, room);
             return;
@@ -16070,7 +15608,7 @@ final class RunGame {
             text.setColor(ink);
             fitted(canvas, "What she fights with", left + dp(16), under + dp(26), dp(16), across - dp(32));
             text.setColor(soft);
-            fitted(canvas, "What she finds in the lands is kept in her backpack.", left + dp(16), under + dp(46), dp(12.5f), across - dp(32));
+            fitted(canvas, "What she finds in the lands is kept in her inventory.", left + dp(16), under + dp(46), dp(12.5f), across - dp(32));
             fitted(canvas, "The smith, in the towns, will work on each of them.", left + dp(16), under + dp(63), dp(12.5f), across - dp(32));
             armsAct.set(left + dp(16), under + dp(74), left + across - dp(16), under + dp(108));
             paint.setStyle(Paint.Style.FILL);
@@ -16079,7 +15617,7 @@ final class RunGame {
             paint.setColor(Color.BLACK);
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(Color.WHITE);
-            fitted(canvas, "Open her backpack  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
+            fitted(canvas, "Open her inventory  \u203A", armsAct.centerX(), armsAct.centerY() + dp(5), dp(14.5f), armsAct.width() - dp(24));
         } else if (counterTab == VANITY_TAB) {
             end = drawVanityTab(canvas, left, under, across, bank);
         }
