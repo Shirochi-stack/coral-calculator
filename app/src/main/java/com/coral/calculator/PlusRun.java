@@ -2098,7 +2098,7 @@ final class PlusRun {
         int before = shots.size();
         strikesBy(foe, way, middle, toLeft);
         // (What one made of fire, frost or ink throws is fire, frost or ink: it burns, chills or poisons her.)
-        int made = RunUniques.status(foe.kind) ? resists(foe.kind) : 0;
+        int made = RunUniques.status(foe.kind) ? resists(foe.kind) : RunUniques.shadow(foe.kind) ? BLINDS : 0;
         if (made != 0) for (int index = before; index < shots.size(); index++) if (!shots.get(index).hers) shots.get(index).afflicts = made;
         // The ink bomb beetle's burst is an ink explosion: a pool, and ink-poison on what is near (her too).
         if (made == RESISTS_INK && way == RunUniques.EXPLODER) {
@@ -2238,7 +2238,7 @@ final class PlusRun {
                     uniqueShots += many;
                     // In its last third, two of its dungeon's own, one each side.
                     if (phase >= 2 && foe.did < 6) {
-                        int dungeon = (RunUniques.index(foe.kind) - RunUniques.index(RunUniques.KEEPER_FIRST)) * 4 + foe.did / 2 % 4;
+                        int dungeon = RunUniques.copy(foe.kind) ? RunDungeons.MIRROR : (RunUniques.index(foe.kind) - RunUniques.index(RunUniques.KEEPER_FIRST)) * 4 + foe.did / 2 % 4;
                         int[] kinds = RunDungeons.delvers(dungeon);
                         for (int side = -1; side <= 1; side += 2) {
                             int kind = kinds[(foe.did + side + 1) % kinds.length];
@@ -3139,6 +3139,8 @@ final class PlusRun {
     /** A touch of one: fire burns her, frost chills her, ink poisons her (whatever shrugs one off is made of it); and a few stun. */
     private void afflictedBy(Foe foe) {
         // (Only those made to: the twelve made of fire, frost and ink, the candle wisp and the rime flake. The rest bite as they always have.)
+        // Her own shadows' touch blinds her for a moment.
+        if (RunUniques.shadow(foe.kind) || RunUniques.copy(foe.kind)) blindHer();
         if (!RunUniques.status(foe.kind) && foe.kind != RunLevels.WISP && foe.kind != RunLevels.RIME) return;
         int made = resists(foe.kind);
         if ((made & RESISTS_FIRE) != 0) burnHer();
@@ -3147,8 +3149,24 @@ final class PlusRun {
         if (RunUniques.is(foe.kind) && RunUniques.stuns(foe.kind)) stunHer();
     }
 
+    /** What her shadows do to her: blind her, for so long. */
+    static final int BLINDS = 8;
+    static final float HER_BLIND = 2.5f;
+    private float herBlind;
+    private int herBlinds;
+
+    float herBlind() { return herBlind; }
+    int herBlinds() { return herBlinds; }
+
+    /** Blinds her for a moment: all but a little way round her is dark (not in white). */
+    void blindHer() {
+        if (white()) return;
+        if (herBlind <= 0) herBlinds++;
+        herBlind = HER_BLIND;
+    }
+
     /** Clears all of it: a white ribbon. */
-    void cleanseHer() { herBurn = herChill = herPoison = herStun = 0; }
+    void cleanseHer() { herBurn = herChill = herPoison = herStun = herBlind = 0; }
 
     /** What burns, chills, poisons and stuns her, as time goes. */
     private void afflictions(float seconds) {
@@ -3156,6 +3174,7 @@ final class PlusRun {
         if (stunGuard > 0) stunGuard -= seconds;
         if (herStun > 0) herStun -= seconds;
         if (herChill > 0) herChill -= seconds;
+        if (herBlind > 0) herBlind -= seconds;
         if (herBurn > 0) {
             herBurn -= seconds;
             if ((herBurnTick += seconds) >= HER_BURN_EVERY) {
@@ -4254,6 +4273,7 @@ final class PlusRun {
         herChill = other.herChill;
         herPoison = other.herPoison;
         herStun = other.herStun;
+        herBlind = other.herBlind;
         stunGuard = other.stunGuard;
         herBurnTick = other.herBurnTick;
         herPoisonTick = other.herPoisonTick;
@@ -8015,6 +8035,7 @@ final class PlusRun {
                         if ((shot.afflicts & RESISTS_FIRE) != 0) burnHer();
                         if ((shot.afflicts & RESISTS_COLD) != 0) chillHer();
                         if ((shot.afflicts & RESISTS_INK) != 0) poisonHer();
+                        if ((shot.afflicts & BLINDS) != 0) blindHer();
                     }
                     if (took) return true;
                 }

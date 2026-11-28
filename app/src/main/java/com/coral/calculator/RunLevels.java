@@ -1836,7 +1836,8 @@ final class RunLevels {
             if (!clear) continue;
             int kind = kinds[random.nextInt(kinds.length)];
             // (One in five is one of its chapter's own; never its mini-boss, nor its hornets.)
-            if (random.nextInt(5) == 0) {
+            // (Never in the mirror: only her shadows live there.)
+            if (random.nextInt(5) == 0 && dungeon != RunDungeons.MIRROR) {
                 int own = chapterFirst + random.nextInt(2), status = RunUniques.statusOf(Math.min(11, level.chapter));
                 // (And in the first six chapters' dungeons, every other time, one of its two made of fire, frost and ink.)
                 if (status >= 0 && spot[0] % 2 == 0) own = status + own - chapterFirst;

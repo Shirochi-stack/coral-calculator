@@ -23,10 +23,10 @@ android {
     }
 
     // The outfits, and Plus run's other art kept out of the base module, are install-time asset packs; the debug APK carries them in the app itself.
-    assetPacks = [':vanity', ':runart']
+    assetPacks = [':vanity', ':runart', ':mirror']
     sourceSets {
         debug {
-            assets.srcDirs += ['../vanity/src/main/assets', '../runart/src/main/assets']
+            assets.srcDirs += ['../vanity/src/main/assets', '../runart/src/main/assets', '../mirror/src/main/assets']
         }
     }
 
