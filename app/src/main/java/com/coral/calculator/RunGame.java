@@ -10924,6 +10924,11 @@ final class RunGame {
             paint.setColorFilter(null);
             if (foe.x + foe.wide() < first - 9 || foe.x > last + 9) continue;
             float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, feet = (foe.y + foe.tall() - cameraY) * tile;
+            // Crouched to leap up to her ledge: lit red-gold and pulsing, so that it is seen coming.
+            if (foe.leaping == 1 && !foe.flat) {
+                float pulse = .5f + .5f * (float) Math.sin(clock * 24);
+                glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * (.8f + .2f * pulse), 0xFFFF6A3A, Math.round(150 + 90 * pulse));
+            }
             if (!RunLevels.boss(foe.kind)) {
                 // Gold glows faintly; black ink has a dark aura that breathes.
                 if (!foe.flat && (foe.tier == PlusRun.RED_TIER || foe.tier == PlusRun.PURPLE_TIER)) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * .95f, TIER_BARS[foe.tier], 70);

@@ -2003,8 +2003,7 @@ public class PlusRunTest {
         PlusRun run = shutIn(RunLevels.GUARD_LAND, true);
         PlusRun.Foe guard = waiting(run);
         for (int step = 0; step < 60 * 20 && !pressable(run, guard); step++) park(run);
-        touch(run, guard);
-        touch(run, guard);
+        for (int piece = 0; piece < PlusRun.strength(RunLevels.GUARD); piece++) touch(run, guard);
         assertEquals(PlusRun.BARE, run.guard(guard));
         for (int step = 0; step < 60 * 3; step++) park(run);
         assertFalse(run.open(guard));
@@ -2048,11 +2047,11 @@ public class PlusRunTest {
         assertEquals(1, late.thrownBack());
         assertEquals(PlusRun.strength(RunLevels.ZERO) + 2, Math.round(last.shieldMost));
         assertTrue(late.opens(last) < 2 && late.forms(last) < 1.5f);
-        // The Guild Guard and Penchok-jipsa, the first anyone meets, are as they began to the end: two pieces, as long a while, and no throwing back.
+        // The Guild Guard and Penchok-jipsa, the first anyone meets, are as they began to the end: three pieces, as long a while, and no throwing back.
         for (int land : new int[]{RunLevels.GUARD_LAND, RunLevels.BUTLER_LAND}) {
             PlusRun first = shutIn(land, true);
             PlusRun.Foe early = waiting(first);
-            assertEquals(2, PlusRun.strength(early.kind));
+            assertEquals(3, PlusRun.strength(early.kind));
             float opens = first.opens(early), forms = first.forms(early);
             for (int step = 0; step < 60 * 400 && first.phase(early) < 2; step++) {
                 if (pressable(first, early)) touch(first, early);
@@ -2060,7 +2059,7 @@ public class PlusRunTest {
             }
             assertEquals(2, first.phase(early));
             for (int step = 0; step < 60 * 20 && (first.absent(early) || first.forming(early) || first.open(early)); step++) park(first);
-            assertEquals("land " + land, 2, Math.round(early.shieldMost));
+            assertEquals("land " + land, PlusRun.strength(early.kind), Math.round(early.shieldMost));
             assertEquals("land " + land, opens, first.opens(early), 0);
             assertEquals("land " + land, forms, first.forms(early), 0);
             for (int step = 0; step < 60 * 60 && early.left > 1; step++) {
@@ -2949,6 +2948,64 @@ public class PlusRunTest {
     private static int floorOf(PlusRun run) { return RunLevels.top(run.level(), run.level().arena + 3); }
 
     /** The first of those who wait in a run that still stands. */
+    /**
+     * No spot in a fight with one who waits is safe: stood still on the highest ledge of the place she is shut in, and on the furthest one
+     * from where she waits, a hurt comes within eight seconds of her being there.
+     */
+    @Test public void noLedgeInAPlaceWhereSomeoneWaitsIsSafe() {
+        StringBuilder safe = new StringBuilder(), took = new StringBuilder();
+        int checked = 0, leaps = 0;
+        for (int land = 1; land <= RunLevels.TOTAL; land++) {
+            if (RunLevels.bossOf(land) < 0 || RunLevels.level(land).arena < 0) continue;
+            for (int which = 0; which < 2; which++) {
+                RunLevels.Level level = RunLevels.level(land);
+                PlusRun run = shutIn(level, false);
+                PlusRun.Foe boss = waiting(run);
+                // (Once she is there.)
+                for (int step = 0; step < 60 * 6 && boss != null && (run.absent(boss) || boss.enter > 0 || boss.flourish > 0); step++) run.step(STEP, false, false, false);
+                if (boss == null) continue;
+                int[] spot = ledge(level, boss, which == 1);
+                if (spot == null) continue;
+                run.place(spot[0] + (1 - PlusRun.WIDE) / 2, spot[1] - PlusRun.TALL - .02f);
+                int hurts = run.hurts();
+                float gone = 0;
+                while (gone < 8 && run.hurts() == hurts && run.state() == PlusRun.PLAYING) {
+                    run.step(STEP, false, false, false);
+                    gone += STEP;
+                }
+                checked++;
+                leaps += run.bossLeaps();
+                took.append(" ").append(land).append(which == 0 ? "h" : "f").append(":").append(Math.round(gone * 10) / 10f);
+                if (run.hurts() == hurts) safe.append(" land ").append(land).append(which == 0 ? " highest" : " furthest").append(" at ").append(spot[0]).append(",").append(spot[1]);
+            }
+        }
+        System.out.println("REACH seconds to a hurt" + took + "  (leaps " + leaps + ")");
+        assertTrue(checked >= 20);
+        assertEquals("safe:" + safe, "", safe.toString());
+    }
+
+    /** The highest ledge in the place she is shut in (or the one furthest from whoever waits, raised over the floor), with room to stand on it. */
+    private static int[] ledge(RunLevels.Level level, PlusRun.Foe boss, boolean furthest) {
+        int floor = RunLevels.top(level, level.arena + 3), best = -1, bestRow = 99;
+        float far = -1;
+        for (int column = level.arena + 1; column < level.gate - 1; column++) {
+            for (int row = 3; row < level.land.length; row++) {
+                char here = level.land[row][column];
+                boolean stands = here == RunLevels.BLOCK || here == RunLevels.LEDGE || here == RunLevels.THIN;
+                if (!stands || level.land[row - 1][column] != RunLevels.AIR || level.land[row - 2][column] != RunLevels.AIR || level.land[row - 3][column] != RunLevels.AIR) continue;
+                if (row >= floor) break;
+                float away = Math.abs(column - boss.x);
+                if (furthest ? away > far : row < bestRow) {
+                    best = column;
+                    bestRow = row;
+                    far = away;
+                }
+                break;
+            }
+        }
+        return best < 0 ? null : new int[]{best, bestRow};
+    }
+
     private static PlusRun.Foe waiting(PlusRun run) {
         for (PlusRun.Foe foe : run.foes()) if (RunLevels.boss(foe.kind) && !foe.flat) return foe;
         return null;
