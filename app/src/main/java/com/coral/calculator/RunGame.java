@@ -929,6 +929,7 @@ final class RunGame {
         kept.slotted = RunSkills.slotted(taken, skillSlots());
         // What she wears of what she has found.
         kept.worn = RunLoot.worn(session.note("run_worn"));
+        RunArtifacts.refresh(session);
         // The weapon found that she has taken in hand: in her backpack as its kind, and what she begins every land with.
         int hand = handCode();
         if (hand != 0) {
@@ -1530,6 +1531,76 @@ final class RunGame {
     }
 
     private Bitmap boutiqueHouse, keeperArt;
+
+    /** (Economy) Aelwyn at the counter of her wagon, in the villages of the third, fifth... chapters: her eight pictures, one after another, and a mark over her. */
+    private Bitmap elfHouse, elfArt;
+    private boolean elfTried;
+
+    private void loadElf() {
+        if (elfTried) return;
+        elfTried = true;
+        for (int which = 0; which < 2; which++) {
+            try (java.io.InputStream in = context.getAssets().open(which == 0 ? "runart/elf_idle.webp" : "runart/elf_stall.webp")) {
+                if (which == 0) elfArt = BitmapFactory.decodeStream(in);
+                else elfHouse = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException missing) {
+                // (Without the pack she is not drawn.)
+            }
+        }
+    }
+
+    /** (Economy) A signpost in a village: a post and a board, and a mark over it; read, it says a line of the village's lore. */
+    private void drawSign(Canvas canvas, int[] item) {
+        float x = (item[1] + .5f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF7A5230);
+        canvas.drawRect(x - tile * .05f, floor - tile * 1.1f, x + tile * .05f, floor, paint);
+        paint.setColor(0xFFC99A5B);
+        canvas.drawRoundRect(x - tile * .42f, floor - tile * 1.35f, x + tile * .42f, floor - tile * .85f, tile * .08f, tile * .08f, paint);
+        paint.setColor(0xFF5A3A1E);
+        for (int line = 0; line < 3; line++) canvas.drawRect(x - tile * .3f, floor - tile * 1.25f + line * tile * .12f, x + tile * (.3f - line * .08f), floor - tile * 1.2f + line * tile * .12f, paint);
+        paint.setColor(Color.BLACK);
+        mark(canvas, x, floor - tile * 1.75f, "Read", 0xFF8A5A33, false);
+    }
+
+    /** (Economy) What a signpost says: the chapter's village's name and a line of lore. */
+    private void readSign(int chapter) {
+        int which = Math.max(0, Math.min(RunWorldLore.SIGNS.length - 1, chapter));
+        toast(RunLevels.VILLAGES[Math.min(RunLevels.VILLAGES.length - 1, which)], RunWorldLore.SIGNS[which], 0);
+        audio.play("page", .6f);
+    }
+
+    /** (Economy) Paper butterflies over a village: a few, drifting about on their own paths. */
+    private void drawButterflies(Canvas canvas, int from, int row, int span) {
+        paint.setStyle(Paint.Style.FILL);
+        int[] colours = {0xFFFF8FB8, 0xFF6FD0C0, 0xFFFFD25A, 0xFFB79CFF, 0xFFFFA06A, 0xFF8FD0FF};
+        for (int index = 0; index < 6; index++) {
+            float t = clock * (.25f + index * .03f) + index * 1.9f;
+            float bx = from + 3 + ((index * 7.3f + t * 2.2f) % (span - 4)) + (float) Math.sin(t * 3) * .8f;
+            float by = row - 1.4f - (float) Math.abs(Math.sin(t * 1.3f + index)) * 1.3f;
+            float x = (bx - cameraX) * tile, y = (by - cameraY) * tile, flap = .25f + .75f * Math.abs((float) Math.sin(clock * (13 + index) + index));
+            paint.setColor(colours[index]);
+            canvas.drawOval(x - tile * .13f * flap - tile * .02f, y - tile * .09f, x - tile * .02f, y + tile * .05f, paint);
+            canvas.drawOval(x + tile * .02f, y - tile * .09f, x + tile * .13f * flap + tile * .02f, y + tile * .05f, paint);
+            paint.setColor(0xFF3B2F2F);
+            canvas.drawRect(x - tile * .012f, y - tile * .07f, x + tile * .012f, y + tile * .05f, paint);
+        }
+        paint.setColor(Color.BLACK);
+    }
+
+    private void drawElf(Canvas canvas, int[] item) {
+        loadElf();
+        float x = (item[1] + 1.6f - cameraX) * tile, floor = (item[2] + 1 - cameraY) * tile, feet = floor - tile * .12f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF2F7F76);
+        canvas.drawRect(x - tile * 1.3f, feet - tile * .5f, x + tile * 1.3f, floor, paint);
+        paint.setColor(0xFFF2E3C2);
+        canvas.drawRect(x - tile * 1.35f, feet - tile * .55f, x + tile * 1.35f, feet - tile * .43f, paint);
+        paint.setColor(Color.BLACK);
+        paint.setAlpha(255);
+        if (elfArt != null) cell(canvas, elfArt, RunMerchants.frameAt(clock), 8, x, feet - tile * .5f, tile * 1.75f, false);
+        mark(canvas, x, feet - tile * 2.45f, "Shop", 0xFF2F8F7A, false);
+    }
 
     /** Tulle at her counter, in the boutique of a village: her six pictures, one after another (she never moves between them), and a mark over her. */
     private void drawKeeper(Canvas canvas, int[] item) {
@@ -2910,6 +2981,16 @@ final class RunGame {
 
     /** One of the pictures in the sheet, as a square of a size about a place. */
     void drawIcon(Canvas canvas, int index, float x, float y, float size) {
+        // (Economy: curios and the named weapons have a sheet of their own, in the runart pack.)
+        if (RunEconomyArt.extra(index)) {
+            android.graphics.Bitmap extra = RunEconomyArt.sheet(context, index);
+            if (extra != null) {
+                RunEconomyArt.source(index, source);
+                target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+                canvas.drawBitmap(extra, source, target, paint);
+            }
+            return;
+        }
         if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
         int column = index % LOOT_COLUMNS, row = index / LOOT_COLUMNS;
         source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
@@ -4335,6 +4416,7 @@ final class RunGame {
         boolean reshaped = shelf != null && !shelf.closed() && (width != this.width || height != this.height);
         if (reshaped) shelf.close();
         if (boutique != null && !boutique.closed() && (width != this.width || height != this.height)) boutique.close();
+        if (merchants != null && !merchants.closed() && (width != this.width || height != this.height)) merchants.close();
         this.width = width;
         this.height = height;
         safe.set(insets);
@@ -4619,6 +4701,7 @@ final class RunGame {
     void close() {
         if (shelf != null) shelf.close();
         if (boutique != null) boutique.close();
+        if (merchants != null) merchants.close();
         audio.close();
     }
 
@@ -4628,6 +4711,7 @@ final class RunGame {
         if (video != null) video.skip();
         if (shelf != null) shelf.close();
         if (boutique != null) boutique.close();
+        if (merchants != null) merchants.close();
         if (screen == PLAY) pause();
         audio.hush();
     }
@@ -4637,6 +4721,11 @@ final class RunGame {
         // A clip being watched is what Back ends, as a tap does.
         if (video != null) {
             video.skip();
+            return true;
+        }
+        // Aelwyn's wagon: Back is out of it, to her counter.
+        if (merchants != null && !merchants.closed()) {
+            merchants.close();
             return true;
         }
         // The boutique: Back is out of it, to the counter.
@@ -5714,6 +5803,7 @@ final class RunGame {
         for (int sort : RunLevels.townOf(number)) {
             if (sort == RunLevels.GACHA) words.append(", ribbon gacha");
             if (sort == RunLevels.BOUTIQUE) words.append(", Tulle and Thread");
+            if (sort == RunLevels.ELF) words.append(", Aelwyn's wagon");
             if (sort == RunLevels.MARKET) words.append(", black market");
         }
         return words.append(" · the arch is a portal").toString();
@@ -8671,7 +8761,7 @@ final class RunGame {
                 if (kind == RunLevels.HOUSE) {
                     int sort = here.rooms.get(in)[14], owner = RunLevels.ownerOf(here.rooms.get(in));
                     if (owner >= 0) toast(RunStory.NAMES[OWNER_NAME + owner] + "'s home", RunStory.NAMES[OWNER_NAME + owner] + " is in. Something here is dear to her: walk up to it", 0);
-                    else toast(sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
+                    else toast(sort == RunLevels.ELF ? "Aelwyn's Wagon" : sort == RunLevels.BOUTIQUE ? "Tulle & Thread" : LOOK_NAMES[RunLevels.LOOKS + sort], sort == RunLevels.ELF ? "Curios to buy, and junk and curios to sell" : sort == RunLevels.BOUTIQUE ? "Outfits, ears and horns, pictures and Tulle's quests"
                             : sort == RunLevels.PET_SHOP ? "Walk up to a pet to look at it; Nabi keeps the shop"
                             : sort == RunLevels.GUILD_HALL ? "Hunts on the board; the counter at Inju's desk"
                             : sort == RunLevels.SMITHY ? (number >= RunLevels.SISTERS_FROM ? "Moru forges, Pulmu makes armour, Sutdol trades" : "Moru forges, and makes what is worn")
@@ -8763,6 +8853,15 @@ final class RunGame {
         // Things to keep, picked up: into her bag, and named in a card in the colour of what they are.
         while (seenFound < run.found().size()) {
             int code = run.found().get(seenFound++);
+            // (Economy: a curio goes to her curios, not her bag.)
+            if (RunArtifacts.is(code)) {
+                RunArtifacts.add(session, RunArtifacts.idOf(code), 1);
+                int curio = RunArtifacts.rarity(RunArtifacts.idOf(code));
+                toast(RunLoot.RARITIES[curio] + " curio: " + RunArtifacts.name(RunArtifacts.idOf(code)), RunArtifacts.flavour(RunArtifacts.idOf(code)) + "  ·  worth " + RunArtifacts.value(RunArtifacts.idOf(code)), LOOT_PICTURE + code);
+                toastRarity = curio >= RunLoot.GOLD ? 2 : curio >= RunLoot.BLUE ? 1 : 0;
+                audio.play(curio >= RunLoot.GOLD ? "unlock" : "tap", 1);
+                continue;
+            }
             session.keepNote("run_bag", RunLoot.note(RunLoot.add(RunLoot.bag(session.note("run_bag")), code)));
             int rarity = RunLoot.rarity(code);
             toast(RunLoot.RARITIES[rarity] + ": " + RunLoot.name(code), "In her bag  ·  " + RunLoot.TYPES[RunLoot.type(code)]
@@ -8782,6 +8881,7 @@ final class RunGame {
             audio.play("page", .8f);
             buzz(false);
         }
+        passiveProcs();
         // A loose floorboard comes up: what was under it is there.
         if (run.lifted() != seenLifted) {
             seenLifted = run.lifted();
@@ -9276,6 +9376,10 @@ final class RunGame {
                 audio.play("tap", .5f);
                 buzz(false);
                 idle();
+                if (what >= PlusRun.SIGN) {
+                    readSign(what - PlusRun.SIGN);
+                    return;
+                }
                 if (what == PlusRun.BOARD) {
                     openHunts();
                     return;
@@ -9290,6 +9394,10 @@ final class RunGame {
                 }
                 if (what == PlusRun.BOUTIQUE) {
                     openBoutique(0);
+                    return;
+                }
+                if (what == PlusRun.ELF) {
+                    openElf(false);
                     return;
                 }
                 // (A dungeon's stairway, or the mirror, before the smiths: its number is past theirs.)
@@ -9902,10 +10010,12 @@ final class RunGame {
             int what = run.spot();
             audio.play("tap", .5f);
             idle();
-            if (what == PlusRun.BOARD) openHunts();
+            if (what >= PlusRun.SIGN) readSign(what - PlusRun.SIGN);
+            else if (what == PlusRun.BOARD) openHunts();
             else if (what == PlusRun.MACHINE) crank();
             else if (what == PlusRun.DEALER) openMarket();
             else if (what == PlusRun.BOUTIQUE) openBoutique(0);
+            else if (what == PlusRun.ELF) openElf(false);
             else if (what == PlusRun.STAIRS) openStairs();
             else if (keepsake(what)) lookAtKeepsake(what - PlusRun.KEEPSAKE);
             else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
@@ -10098,7 +10208,8 @@ final class RunGame {
                         int what = run.spot();
                         button(canvas, stallButton, false, 0xFF8A5A33);
                         paint.setAlpha(255);
-                        if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
+                        if (what >= PlusRun.SIGN) artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
+                        else if (what < 100) cell(canvas, petArt(what), 0, 6, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .16f, stallButton.height() * .62f, false);
                         else if (what == PlusRun.BOARD) pieceIn(canvas, four, SCROLL_PICTURE, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else if (what == PlusRun.MACHINE) pieceIn(canvas, two, RIBBON_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .5f, 0);
                         else if (what == PlusRun.SMITH) thing(canvas, PlusRun.SWORD, stallButton.centerX(), stallButton.centerY() - dp(6), stallButton.height() * .5f, 35, false, false);
@@ -10107,8 +10218,8 @@ final class RunGame {
                         else if (what == PlusRun.STAIRS) stairsIn(canvas, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .52f);
                         else if (keepsake(what) && keepsakes() != null) cell(canvas, keepsakes(), what - PlusRun.KEEPSAKE, RunLevels.OWNERS, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .1f, stallButton.height() * .5f, false);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
-                        label(canvas, stallButton, what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                        label(canvas, stallButton, what >= PlusRun.SIGN ? "Read" : what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.ELF ? "Shop" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -10901,11 +11012,21 @@ final class RunGame {
     // Her inventory (her backpack and her bag as one): see RunInventory and RunInventoryUi
 
     /** Her inventory is opened: from a land, where the land waits; from the pause; or from the map. */
-    private void openPack(int from) {
+    /** (Economy) Pluses into her bank (what a sale brings), what she has to spend in words, and her pack opened at a merchant, to sell. */
+    void bankAdd(int pluses) { session.keep("run_bank", bank() + pluses); }
+
+    String purseWords() { return "She has + " + bank(); }
+
+    /** (Economy) Whether she stands at a merchant's counter (Aelwyn's): the inventory she opens from the pause card then has the Sell buttons. */
+    private boolean atMerchant() { return run != null && run.spot() == PlusRun.ELF; }
+
+    private void openPack(int from) { openPack(from, atMerchant()); }
+
+    private void openPack(int from, boolean sell) {
         packOpen = true;
         packFrom = from;
         swapFinger = -1;
-        inventory.open(from != MAP && run != null);
+        inventory.open(from != MAP && run != null, sell);
         goLeft = goRight = goJump = goStrike = false;
         jumpPressed = strikePressed = false;
         audio.play("page", .6f);
@@ -11485,6 +11606,7 @@ final class RunGame {
         if (shake > 0) canvas.translate((random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4), (random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4));
         paint.setAlpha(255);
         // What stands in its villages, behind everything else.
+        if (level.town > 0 && !level.decor.isEmpty()) drawButterflies(canvas, level.town, level.decor.get(0)[2], RunLevels.townWide(RunLevels.townOf(level.number).length));
         for (int[] decor : level.decor) {
             if (decor[1] < first - 4 || decor[1] > last + 4) continue;
             // Over a hundred, it is something of the fourth sheet: a chest in a stash.
@@ -11492,7 +11614,11 @@ final class RunGame {
                 drawVillagePiece(canvas, decor, level);
                 continue;
             }
-            if (decor[0] == 307) {
+            if (decor[0] == 308) {
+                // (Aelwyn's wagon: a picture of its own, in the runart pack.)
+                loadElf();
+                if (elfHouse != null) cell(canvas, elfHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
+            } else if (decor[0] == 307) {
                 // (The vanity boutique: a picture of its own.)
                 if (boutiqueHouse == null) boutiqueHouse = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_vanity_shop);
                 cell(canvas, boutiqueHouse, 0, 1, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
@@ -11819,8 +11945,10 @@ final class RunGame {
                 continue;
             }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
-                if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
+                if (item[4] >= PlusRun.SIGN) drawSign(canvas, item);
+                else if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
                 else if (item[4] == PlusRun.BOUTIQUE) drawKeeper(canvas, item);
+                else if (item[4] == PlusRun.ELF) drawElf(canvas, item);
                 else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] == PlusRun.STAIRS) drawStairs(canvas, item);
                 else if (keepsake(item[4])) drawKeepsake(canvas, item);
@@ -12624,6 +12752,10 @@ final class RunGame {
             } else if (sort == RunLevels.SMITHY) {
                 canvas.drawRect(x - round * .5f, y - round * .5f, x + round * .5f, y - round * .1f, paint);
                 canvas.drawRect(x - round * .1f, y - round * .1f, x + round * .1f, y + round * .65f, paint);
+            } else if (sort == RunLevels.ELF) {
+                // (A coin purse, for the elf's wagon.)
+                canvas.drawCircle(x, y + round * .15f, round * .45f, paint);
+                canvas.drawRect(x - round * .2f, y - round * .45f, x + round * .2f, y - round * .1f, paint);
             } else if (sort == RunLevels.BOUTIQUE) {
                 // (A coat hanger, for the boutique.)
                 path.reset();
@@ -13913,7 +14045,43 @@ final class RunGame {
     }
 
     /** Halgakos as she is at this moment of the run, her feet at a place: empty-handed, or carrying what she fights with; tinted by what afflicts her. */
+    /** (Economy) Gear of gold and better shows: a glow about her and sparks, in the look of what she holds or wears; and what a passive does as it goes off. */
+    private float auraAt;
+    private int seenProcs;
+
+    private void gearAura(Canvas canvas, float feetX, float feetY, float tall, boolean leftward) {
+        if (!vfxStarted) {
+            Vfx.init(context);
+            vfxStarted = true;
+        }
+        PlusRun.Perks p = run.perks();
+        int held = RunInventory.itemFor(p, run.weapon());
+        int best = RunWeaponFx.best(held, p.worn.armour, p.worn.first, p.worn.second);
+        if (best < 0) return;
+        RunWeaponFx.Style style = held != 0 && RunWeapons.named(held) && RunLoot.rarity(held) >= RunLoot.GOLD ? RunWeaponFx.of(held) : new RunWeaponFx.Style(Vfx.SPARKLE, best == RunLoot.ROSE ? RunLoot.rose(clock) : RunLoot.COLOURS[best]);
+        float pulse = .5f + .5f * (float) Math.sin(clock * 3.2f);
+        Vfx.glow(canvas, feetX, feetY - tall * .5f, tall * (.5f + .1f * (best - RunLoot.GOLD)), style.colour, RunWeaponFx.glow(best, pulse));
+        if (clock - auraAt > RunWeaponFx.every(best)) {
+            auraAt = clock;
+            float side = leftward ? -1 : 1, across = feetX / tile + cameraX, down = feetY / tile + cameraY;
+            float spread = (random.nextFloat() - .5f) * .9f;
+            vfx(style.effect == Vfx.POISON ? Vfx.SPARKLE : style.effect, across + side * (.35f + spread * .4f), down - tall / tile * (.35f + random.nextFloat() * .45f), .7f + .12f * (best - RunLoot.GOLD), 0, style.colour, 0);
+        }
+    }
+
+    private void passiveProcs() {
+        if (run.passiveProcs() == seenProcs) return;
+        seenProcs = run.passiveProcs();
+        int kind = run.passiveKind();
+        PlusRun.Perks p = run.perks();
+        int rarity = kind == RunWeaponPassives.NOVA ? RunLoot.rarity(p.worn.armour) : RunLoot.rarity(RunInventory.itemFor(p, run.weapon()));
+        int tint = RunWeaponFx.of(RunInventory.itemFor(p, run.weapon())).colour;
+        vfx(RunWeaponFx.procEffect(kind), run.passiveX(), run.passiveY(), RunWeaponFx.procSize(kind) + (rarity >= RunLoot.ROSE ? .6f : 0), kind == RunWeaponPassives.ARC ? random.nextFloat() * 360 : 0, kind == RunWeaponPassives.NOVA ? Vfx.WHITE : tint, 0);
+        audio.play(kind == RunWeaponPassives.BURST || kind == RunWeaponPassives.NOVA ? "unlock" : "star", .5f);
+    }
+
     private void her(Canvas canvas, float feetX, float feetY, float tall, int weapon, boolean leftward, int alpha) {
+        gearAura(canvas, feetX, feetY, tall, leftward);
         android.graphics.ColorFilter tint = run.herBurn() > 0 ? BURNT_TINT : run.herChill() > 0 ? CHILLED_TINT : run.herPoison() > 0 ? POISONED_TINT : null;
         if (tint != null) paint.setColorFilter(tint);
         herDrawn(canvas, feetX, feetY, tall, weapon, leftward, alpha);
@@ -14540,13 +14708,20 @@ final class RunGame {
         canvas.rotate((float) Math.toDegrees(angle));
         canvas.scale(scale, scale);
         canvas.translate(-hx, -hy);
-        if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
-        int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
-        source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        // (Economy: a named weapon's picture is in the weapons' own sheet.)
+        android.graphics.Bitmap sheet = RunEconomyArt.extra(icon) ? RunEconomyArt.sheet(context, icon) : null;
+        if (sheet == null && !RunEconomyArt.extra(icon)) {
+            if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
+            sheet = lootIcons;
+            int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
+            source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        } else if (sheet != null) {
+            RunEconomyArt.source(icon, source);
+        }
         target.set(0, 0, LOOT_ICON, LOOT_ICON);
         int was = paint.getAlpha();
         paint.setAlpha(alpha);
-        canvas.drawBitmap(lootIcons, source, target, paint);
+        if (sheet != null) canvas.drawBitmap(sheet, source, target, paint);
         paint.setAlpha(was);
         canvas.restore();
     }
@@ -17063,6 +17238,26 @@ final class RunGame {
 
     /** The boutique is laid over the game, with the game's voice and sounds lent to it. */
     private void openBoutique() { openBoutique(0); }
+
+    /** (Economy) Aelwyn's wagon is laid over the game, with the game's voice lent to it; Sell opens the pack in its sell mode. */
+    private RunMerchants merchants;
+
+    private void openElf(boolean sell) {
+        if (merchants != null && !merchants.closed()) return;
+        audio.hush();
+        int[] edges = {Math.round(safe.left), Math.round(safe.top), Math.round(width - safe.right), Math.round(height - safe.bottom)};
+        merchants = RunMerchants.over(stage, session, dark, edges, new RunMerchants.Host() {
+            @Override public void say(String name) { audio.say(name); }
+
+            @Override public boolean speaking() { return audio.speaking(); }
+
+            @Override public void hush() { audio.hush(); }
+
+            @Override public void play(String effect) { audio.play(effect, .5f); }
+
+            @Override public void closed() { }
+        }, Math.max(0, number));
+    }
 
     private void openBoutique(int page) {
         if (boutique != null && !boutique.closed()) return;

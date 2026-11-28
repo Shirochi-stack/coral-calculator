@@ -38,6 +38,7 @@ import soundfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STORY = ROOT / "app" / "src" / "main" / "java" / "com" / "coral" / "calculator" / "RunStory.java"
 RAW = ROOT / "app" / "src" / "main" / "res" / "raw"
+MORE_STORIES = [ROOT / "app" / "src" / "main" / "java" / "com" / "coral" / "calculator" / "RunMerchantStory.java"]
 PACK = ROOT / "voices" / "src" / "main" / "assets" / "voices"
 PROJECT = pathlib.Path(r"C:\Users\ADMIN\Dev\Halgakos-AI")
 URL = "https://api.inworld.ai/tts/v1/voice:stream"
@@ -85,8 +86,10 @@ VOICES = {
     "d": ("Camille", .95, 1.06),
     # Lucy, the Dragon of Lost Words.
     "e": ("upbeat-bee-0979__design-voice-ac8b681f", 1.0, 1.0),  # a voice designed as a bratty little sister ("Lucy 02"), the user's pick of twelve
+    # Aelwyn, the elf merchant of the villages: a voice designed as a warm, quick, sly young travelling shopkeeper (kept in the Inworld account as "Aelwyn").
+    "g": ("upbeat-bee-0979__design-voice-e234a3af", 1.0, 1.0),
     # The Mother Tongue.
-    "f": ("upbeat-bee-0979__design-voice-53058b3d", 1.0, 1.0),  # a voice designed as a cold, regal queen, the user's pick of seventeen
+    "f":("upbeat-bee-0979__design-voice-53058b3d", 1.0, 1.0),  # a voice designed as a cold, regal queen, the user's pick of seventeen
 }
 # Who each of the others is, said before the scene of every line of hers, so that she sounds like herself whatever the moment.
 MANNER = {
@@ -120,6 +123,7 @@ MANNER = {
     "c": "Pulmu is a young dwarf armourer, Moru's sister: a loud, sunny, warm young woman's voice, laughing easily, big-hearted, in clear American English. ",
     "e": "Lucy is a small dragon child, a bratty little-sister type, voiced like a Japanese anime voice actress playing a cheeky, spoiled little girl: high, loud and sing-song, taunting, quick to pout and quick to cry, in clear American English. Sounds written in her lines are performed, never read out as words: 'Bleh!' is her sticking her tongue out with a short, rude raspberry; 'Ow!' is a real yelp of pain; 'Hmph!' is a huffy snort; 'Nyeh-nyeh' is a sing-song taunt. ",
     "f": "The Mother Tongue is a vast, ancient elder dragon and a mother: a grand, cold, regal woman's voice, low and unhurried, perfectly composed, certain that she knows best, never shouting, in clear English. ",
+    "g": "Aelwyn is a young elf merchant who travels every land with her wagon of curios: a warm, bright, quick, slightly husky voice with a smile in it, playful and sly when she bargains, never shrill, in clear American English. ",
     "d": "Sutdol is a young dwarf jeweller-smith, Moru's sister: a calm, level, exact young woman's voice, quiet and dry, never old or deep, in clear American English. ",
 }
 RATE_IN, RATE_OUT = 48000, 24000
@@ -145,6 +149,9 @@ def story():
     player = re.search(r'PLAYER = "([^"]+)"', text).group(1)
     fast = re.search(r'FAST = "([^"]+)"', text).group(1)
     found = re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Za-z0-9])",\s*(PLAYER \+ )?"([^"]+)"( \+ FAST)?\}', text)
+    # (The merchants' lines, in the same form, are in a file of their own.)
+    for more in MORE_STORIES:
+        found += re.findall(r'\{"([a-z0-9]+)",\s*"([^"]+)",\s*"([A-Za-z0-9])",\s*(PLAYER \+ )?"([^"]+)"( \+ FAST)?\}', more.read_text(encoding="utf-8"))
     return [(name, words, who, MANNER.get(who, "") + (player if with_player else "") + scene + (fast if quick else ""))
             for name, words, who, with_player, scene, quick in found]
 

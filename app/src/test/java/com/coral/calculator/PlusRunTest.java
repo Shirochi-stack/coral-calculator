@@ -4619,7 +4619,7 @@ public class PlusRunTest {
     }
 
     @Test public void everyVillageHasTwoBuildingsSheCanGoIntoOfDifferentSortsAndNothingInThemHurtsHer() {
-        boolean[] sorts = new boolean[8];
+        boolean[] sorts = new boolean[9];
         int shops = 0, halls = 0, homes = 0, smithies = 0, markets = 0, gachas = 0;
         PlusRun inShop = null, inHall = null, inSmithy = null, inMarket = null;
         int[] shop = null, hall = null, smithy = null, market = null;
@@ -4636,11 +4636,11 @@ public class PlusRunTest {
                 houses++;
                 built.add(one);
                 int sort = one[14];
-                assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.GACHA || sort == RunLevels.BOUTIQUE);
+                assertTrue("land " + number, sort >= RunLevels.PET_SHOP && sort <= RunLevels.GACHA || sort == RunLevels.BOUTIQUE || sort == RunLevels.ELF);
                 sorts[sort] = true;
                 // (A home has one of the six insides of homes; every other building its own.)
                 if (sort == RunLevels.HOME) assertTrue(one[13] >= RunLevels.HOME_LOOK && one[13] < RunLevels.HOME_LOOK + RunLevels.HOME_LOOKS);
-                else assertEquals(sort == RunLevels.BOUTIQUE ? RunLevels.HOME_LOOK + 1 : RunLevels.LOOKS + sort, one[13]);
+                else assertEquals(sort == RunLevels.BOUTIQUE ? RunLevels.HOME_LOOK + 1 : sort == RunLevels.ELF ? RunLevels.HOME_LOOK + 2 : RunLevels.LOOKS + sort, one[13]);
                 // Its door is on the ground of the land, where a building stands to be looked at; the land's own squares there are as they were.
                 assertEquals("land " + number, one[2], RunLevels.top(level, one[1]));
                 assertEquals("land " + number, RunLevels.AIR, level.land[one[2] - 1][one[1]]);
@@ -4702,6 +4702,12 @@ public class PlusRunTest {
                         inHall = new PlusRun(level);
                         hall = one;
                     }
+                } else if (sort == RunLevels.ELF) {
+                    // Aelwyn's wagon: her counter, in the middle of it, in the villages of the even chapters after the first.
+                    assertTrue(RunLevels.elfHere(number));
+                    assertEquals(1, spots.size());
+                    assertEquals(PlusRun.ELF, spots.get(0)[4]);
+                    assertEquals(0, givers);
                 } else if (sort == RunLevels.BOUTIQUE) {
                     // Tulle's boutique, in Rosemarrow's village: her counter, in the middle of it.
                     assertEquals(RunLevels.BOUTIQUE_CHAPTER, level.chapter);
