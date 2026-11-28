@@ -1733,6 +1733,17 @@ final class RunLevels {
      * the last floor a hall before the way out where its keeper stands. It is drawn as its land is, and as hard as its land, more deeply
      * down, as {@link RunDungeons#deeper} says.
      */
+    /** The first column from one on (within a dozen) whose ground is level with its neighbours' and open over it; -1 if none. */
+    static int flatNear(Level level, int from) {
+        for (int column = Math.max(1, from); column < Math.min(level.columns - 2, from + 12); column++) {
+            int ground = top(level, column);
+            if (ground <= 3 || ground >= level.land.length || top(level, column - 1) != ground || top(level, column + 1) != ground) continue;
+            if (level.land[ground - 1][column] != AIR || level.land[ground - 2][column] != AIR) continue;
+            return column;
+        }
+        return -1;
+    }
+
     static Level dungeon(int dungeon, int floor, long dive) {
         int number = RunDungeons.land(dungeon), chapter = chapterOf(number), sort = RunDungeons.kindOf(dungeon, floor, dive);
         boolean last = floor >= RunDungeons.floors(dungeon) - 1;
@@ -1799,6 +1810,13 @@ final class RunLevels {
         for (int flag : level.flags) level.weapons.add(new int[]{(number + floor + dungeon + 3) % PlusRun.GUN, flag + 1, top(level, flag + 1) - 1});
         level.foes.addAll(draft.lodgers);
         delve(level, dungeon, floor, sort, hall, hallFloor, random);
+        // The Vampire Merchant's stall on some floors, a little past the flag; and on some a gift for her, further on.
+        if (!level.flags.isEmpty()) {
+            int flag = level.flags.get(0), stall = flatNear(level, flag + 3), gift = RunLilith.giftOn(dungeon, floor, dive);
+            if (stall >= 0 && RunLilith.appearsOn(dungeon, floor, dive)) level.items.add(new int[]{PlusRun.SPOT, stall, top(level, stall) - 1, 0, PlusRun.LILITH});
+            int lies = flatNear(level, flag + 9);
+            if (gift >= 0 && lies >= 0) level.items.add(new int[]{PlusRun.GIFT, lies, top(level, lies) - 1, 0, gift});
+        }
         return level;
     }
 

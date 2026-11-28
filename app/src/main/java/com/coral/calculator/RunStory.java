@@ -26,12 +26,12 @@ final class RunStory {
     /** The second volume, which falls on her head as the first did. */
     static final String SEQUEL = "Volume Two";
     /** The full names of those who speak, by their letter. */
-    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZabcdef";
+    static final String SPEAKERS = "HCRITMGJKYNSUBOPEAWLDFQVXZabcdefh";
     static final String[] NAMES = {"Halgakos", "Chikuwa", "Rune", "Illya", "Tsubakieh", "The Mawang", "Gokhae", "Miri", "Gari", "Yeobaek",
             "Nuri-yeowang",
             "Somi", "Inju", "Boksun-halmeoni", "Ttosun", "Galpi", "Yeseo", "Nabi", "Moru", "Altteul",
             "The Guild Guard", "Penchok-jipsa", "Byeoru", "Jupan", "Sumbi", "The Brake Pads", "The Straight-Ahead Party", "The Old Book",
-            "Pulmu", "Sutdol", "Lucy", "The Mother Tongue"};
+            "Pulmu", "Sutdol", "Lucy", "The Mother Tongue", "The Vampire Merchant"};
 
     private static final String PLAYER = "She is talking to the player who controls her in a platform game, whom she calls Sloppy. ";
 
@@ -670,6 +670,49 @@ final class RunStory {
             {"hkr5", "Footnote one: that card is yours now. Footnote two: please put the drawer back.", "E", "The careful footnote girl lets a visitor keep a card from her catalogue, then asks her to tidy up. Precise, earnest, a touch flustered."},
             {"hkr6", "Nya, shh! She only just fell asleep. Here, a treat for being quiet, nya.", "A", "The playful cat girl whispers so as not to wake a kitten, and rewards her guest. Whispering, purring, mischievous."},
             {"hkr7", "That flower's nothing. Don't tell anyone. Here. For keeping quiet.", "W", "The gruff young smith, embarrassed, waves off the flower on her sword and bribes her guest to keep the secret. Flat, gruff, flustered."},
+    };
+    /**
+     * The Vampire Merchant (h), at her stall in the dungeons: her greeting the first time, then by how she feels about Halgakos (cold, wary,
+     * warm, fond, devoted, beloved); her three warnings, each colder, and the fight; what she says when, too strong yet to be beaten, she
+     * laughs and goes, when she is spared, and when she is finished; and to gifts she likes and does not, to what is bought, and to too
+     * little to buy it with. Her name is never said in them. Halgakos's answers (H) after. Her voice waits for its approval: her lines are
+     * read by tools/make_run_voice.py, but are not among the groups the game checks for recordings until they are recorded.
+     */
+    static final String[][] MERCHANT = {
+            {"lil0", "Welcome, little cat. My wares are rare, and my patience rarer. Do look, but touch with coin.", "h", "An elegant, teasing vampire noblewoman, passing as an ordinary merchant, greets a cat-eared girl at her candlelit stall deep in a dungeon. Velvet, amused, guarded."},
+            {"lil1", "You again. Buy something, or let the dark have you. I'm not particular.", "h", "The vampire merchant, cold and bored, addresses a customer she does not like. Icy, clipped, dismissive."},
+            {"lil2", "Ah, the little cat. Mind the candles, and mind your manners.", "h", "The vampire merchant greets a wary acquaintance. Cool, dry, faintly amused."},
+            {"lil3", "There you are. I set something aside for you. Don't let it go to your head.", "h", "The vampire merchant greets a customer she has grown to like, pretending not to care. Warm under a cool surface, teasing."},
+            {"lil4", "I heard your footsteps three floors up. I'd know them anywhere now.", "h", "The vampire merchant, fond, admits she listens for her favourite visitor. Soft, playful, a little wistful."},
+            {"lil5", "Stay a little longer tonight. It has been so long since anyone chose to.", "h", "The lonely vampire merchant, devoted, asks her visitor to stay. Tender, hushed, aching."},
+            {"lil6", "My little cat. Every candle down here burns for you now.", "h", "The vampire merchant, fully in love, greets her beloved. Warm, glowing, gently teasing, intimate but tasteful."},
+    };
+    static final String[][] MERCHANT_WARN = {
+            {"liw1", "Careful, little cat. My wares aren't free.", "h", "The vampire merchant, amused, after being struck once by mistake. Light, teasing, a hint of warning."},
+            {"liw2", "That's twice. I don't forgive a third.", "h", "The vampire merchant, struck a second time, her smile cooling. Cool, measured, dangerous."},
+            {"liw3", "Last chance. Lower your weapon.", "h", "The vampire merchant, struck a third time, eyes glowing red. Cold, quiet, deadly serious."},
+            {"liw4", "You wish to dance with something that cannot die? Then let us dance until dawn.", "h", "The vampire merchant rises from her stall to fight, blood magic swirling and bats around her. Thrilled, menacing, grand."},
+            {"liw5", "Is that all? I have outlived kingdoms, little cat. Run along, before I grow bored.", "h", "The immortal vampire merchant, unhurt and mending, laughs at a fighter far too weak and lets her go. Amused, contemptuous, a little sad."},
+            {"liw6", "You held back. Why? No one has held back for me in centuries.", "h", "The vampire merchant, beaten down, is spared by her opponent and is shaken by it. Stunned, soft, vulnerable."},
+            {"liw7", "So this is how it ends. Remember my wares, at least.", "h", "The vampire merchant's last words as she fades into a swarm of bats. Quiet, bitter, resigned, lonely."},
+    };
+    static final String[][] MERCHANT_GIFT = {
+            {"lig1", "For me? How unexpectedly sweet. I shall keep it somewhere the centuries can't reach.", "h", "The vampire merchant receives a gift she loves. Surprised, touched, trying to stay composed."},
+            {"lig2", "Thoughtful. I suppose you may keep coming back.", "h", "The vampire merchant receives a gift she likes. Pleased, understated, teasing."},
+            {"lig3", "Garlic. Truly? I shall pretend that was a joke.", "h", "The vampire merchant is handed a garlic bun as a gift. Offended, dry, icy humour."},
+            {"lig4", "A mirror. How cruel. There is no one in it to look at.", "h", "The vampire merchant is handed a mirror; she has no reflection. Hurt, quiet, bitter."},
+            {"lig5", "Sunlight in a charm. I'll put it somewhere very, very far from me.", "h", "The vampire merchant is handed a sun charm. Wary, sardonic, mildly alarmed."},
+    };
+    static final String[][] MERCHANT_SHOP = {
+            {"lis1", "A fine choice. Drink it slowly; it was brewed by moonlight.", "h", "The vampire merchant sells a potion. Smooth, pleased, elegant."},
+            {"lis2", "For you, I'll lower the price. Don't tell the others I have a heart.", "h", "The vampire merchant gives her favourite customer a discount. Warm, sly, teasing."},
+            {"lis3", "Not enough coin. Come back richer, little cat.", "h", "The vampire merchant turns away a customer who cannot pay. Cool, amused."},
+    };
+    static final String[][] MERCHANT_ANSWERS = {
+            {"lia0", "A vampire with a shop. In a dungeon. Of course there is Sloppy~♡", "H", PLAYER + "She meets a vampire merchant at a candlelit stall deep in a dungeon for the first time. Wry, intrigued, cheeky."},
+            {"lia1", "Oops. Didn't mean that. Mostly Sloppy~♡", "H", PLAYER + "She has accidentally hit the vampire merchant and gets a warning. Sheepish, mischievous."},
+            {"lia2", "She can't even be hurt. Note to self: be nicer Sloppy~♡", "H", PLAYER + "The immortal vampire merchant laughed off her attacks and left. Rattled, rueful, joking."},
+            {"lia3", "I couldn't do it. Nobody should be that alone Sloppy~♡", "H", PLAYER + "She chose to spare the vampire merchant at the last moment. Soft, sad, sure."},
     };
     /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
     static final String[][] LATER_UNIQUES = {
@@ -1398,6 +1441,7 @@ final class RunStory {
         groups.add(HIDDEN2);
         groups.add(KEEPSAKES);
         groups.add(KEEPSAKE_REPLIES);
+        groups.add(MERCHANT_ANSWERS);
         groups.add(MIRROR);
         groups.add(ECHOES);
         groups.add(ECHO_ANSWERS);

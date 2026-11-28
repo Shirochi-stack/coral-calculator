@@ -13,7 +13,8 @@ import org.junit.Test;
 public class RunHidden2Test {
     @Test public void theyAreHiddenBossesAfterTheShadowCast() {
         assertEquals(RunUniques.CAST_FIRST + RunUniques.CAST_COUNT, RunUniques.HIDDEN2_FIRST);
-        assertEquals(RunUniques.FIRST + RunUniques.COUNT, RunUniques.HIDDEN2_FIRST + RunUniques.HIDDEN2_COUNT);
+        assertEquals(RunUniques.LILITH, RunUniques.HIDDEN2_FIRST + RunUniques.HIDDEN2_COUNT);
+        assertEquals(RunUniques.FIRST + RunUniques.COUNT, RunUniques.LILITH + 1);
         String[] names = {"The Overdue Notice", "The Papercut Queen", "The Gilded Bookworm", "The Wax Seal Tyrant", "The Footnote King", "The Last Librarian"};
         for (int at = 0; at < RunUniques.HIDDEN2_COUNT; at++) {
             int kind = RunUniques.HIDDEN2_FIRST + at;

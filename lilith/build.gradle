@@ -1,0 +1,12 @@
+plugins {
+    id 'com.android.asset-pack'
+}
+
+// The Vampire Merchant's art (her chibi sheets, portraits and pictures), kept out of the base module. Delivered with the install; the
+// debug build (the GitHub APK) carries the same files, see app/build.gradle.
+assetPack {
+    packName = 'lilith'
+    dynamicDelivery {
+        deliveryType = 'install-time'
+    }
+}

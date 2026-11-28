@@ -79,7 +79,7 @@ public class RunSecretsTest {
     }
 
     @Test public void aHiddenBossDropsThreeThingsGoldOrBetterAndHasItsOwnRose() {
-        assertEquals(93, RunUniques.COUNT);
+        assertEquals(94, RunUniques.COUNT);
         Set<Integer> signatures = new HashSet<>();
         for (int at = 0; at < 12; at++) {
             int kind = at < 6 ? RunUniques.HIDDEN_FIRST + at : RunUniques.HIDDEN2_FIRST + at - 6;

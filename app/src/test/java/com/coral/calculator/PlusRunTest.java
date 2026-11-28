@@ -7675,7 +7675,7 @@ public class PlusRunTest {
         assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length
                 // (The two lines about sloppy copies in the lands, her line with the game's name in it, and the keys.)
                 + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length + RunStory.SECRETS.length + RunStory.WATER.length + RunStory.DUNGEONS.length + RunStory.SMITH_QUESTS.length + RunStory.KNUCKLES.length
-                + RunStory.LATER_UNIQUES.length + RunStory.BLACKENED.length + RunStory.STATUS_UNIQUES.length + RunStory.HIDDEN2.length + RunStory.KEEPSAKES.length + RunStory.KEEPSAKE_REPLIES.length + RunStory.MIRROR.length + RunStory.ECHOES.length + RunStory.ECHO_ANSWERS.length + RunStory.CAST_SHADOWS.length, lines);
+                + RunStory.LATER_UNIQUES.length + RunStory.BLACKENED.length + RunStory.STATUS_UNIQUES.length + RunStory.HIDDEN2.length + RunStory.KEEPSAKES.length + RunStory.KEEPSAKE_REPLIES.length + RunStory.MERCHANT_ANSWERS.length + RunStory.MIRROR.length + RunStory.ECHOES.length + RunStory.ECHO_ANSWERS.length + RunStory.CAST_SHADOWS.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.

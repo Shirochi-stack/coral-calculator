@@ -263,6 +263,10 @@ def main():
         had = (RAW / f"run_v_{name}.ogg").exists() or (PACK / f"run_v_{name}.ogg").exists()
         if (args.only and name not in args.only) or (had and not args.again):
             continue
+        if who not in VOICES:
+            # (A speaker whose voice is still waiting to be chosen, such as the Vampire Merchant's, h: her lines wait with it.)
+            print("waiting", name, who, flush=True)
+            continue
         error = None
         for attempt in range(4):
             try:

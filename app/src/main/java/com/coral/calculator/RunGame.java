@@ -214,7 +214,7 @@ final class RunGame {
     private static final int[] SPEAKER_COLOURS = {CalculatorLayout.CORAL, 0xFFD2452F, 0xFF3F7FC4, 0xFFE8779A, 0xFF7A5A9A, 0xFF6B2A3A,
             0xFF6A3FA0, 0xFFC9892B, 0xFF4A5560, 0xFF5E8FA6, 0xFF2E9E6E, 0xFF7D7FD0, 0xFF394A8C, 0xFFB5651D, 0xFF6B7A2A, 0xFF5B4BB5, 0xFF2F8F5B,
             0xFFC0392B, 0xFFB8860B, 0xFF1E9C8B, 0xFF5C7FA8, 0xFF4A4A5A, 0xFF3F8F5A, 0xFFE08A2B, 0xFFE0662F, 0xFF7A8088, 0xFFC0392B, 0xFF8A5A33,
-            0xFFC8552B, 0xFF7A4B8A, 0xFF2FA89A, 0xFFB9862C};
+            0xFFC8552B, 0xFF7A4B8A, 0xFF2FA89A, 0xFFB9862C, 0xFFB0213A};
     private static final int JUMP_FRAMES = 6;
     /** The six frames of her losing: hit, knocked into the air, falling, sitting dazed, sulking, and crying. */
     private static final int LOSE_FRAMES = 6, HIT = 0, TUMBLE = 1, DROP = 2, DAZED = 3, SULK = 4, CRY = 5;
@@ -456,7 +456,7 @@ final class RunGame {
     private Bitmap rideArt, motherArt, pagesSky;
     private boolean goBreath;
     private int seenRideHits, seenRideHurts, seenRideBeams, seenRideStages, seenRideSent, seenRidePuffs, seenRideChips, seenRideOpens;
-    private static final int LUCY_FACE = 30, MOTHER_FACE = 31;
+    private static final int LUCY_FACE = 30, MOTHER_FACE = 31, MERCHANT_FACE = 32;
     private static final String[] READ = {"Onii-tan", "...wait for me", "Onii-tan!", "...read it to me", "Onii-tan...", "...don't change it"};
     private final Bitmap[] lucyArt = new Bitmap[3], whiteArt = new Bitmap[2];
     private int finale, unmadeSaid;
@@ -4525,6 +4525,11 @@ final class RunGame {
             audio.play("tap", .3f);
             return true;
         }
+        if (merchantOpen) {
+            merchantOpen = false;
+            audio.play("tap", .3f);
+            return true;
+        }
         if (fanOpen) {
             fanOpen = false;
             idle();
@@ -7453,6 +7458,8 @@ final class RunGame {
                 }
             }
         }
+        // The Vampire Merchant: struck, given to, met, fought.
+        if (run != null && screen == PLAY) merchantWatch(seconds);
         // Each of the later chapters' creatures, the first time she comes near one: she says what to look out for.
         if (run != null && screen == PLAY && captionLeft <= 0 && !audio.speaking()) {
             for (PlusRun.Foe foe : run.foes()) {
@@ -7566,7 +7573,7 @@ final class RunGame {
             // Going up in the teleporter's light, the land waits.
         } else if (screen == PLAY && video != null) {
             // A film played over the land, after it was cleared: the land waits under it.
-        } else if (screen == PLAY && (fanOpen || packOpen || huntsOpen || smithOpen || marketOpen)) {
+        } else if (screen == PLAY && (fanOpen || packOpen || huntsOpen || smithOpen || marketOpen || merchantOpen || merchantAsking())) {
             // The land waits while she chooses.
         } else if (screen == PLAY && roomCardAge >= 0 && roomCardAge < 2.4f && roomHolds()) {
             roomCardAge += seconds;
@@ -9009,6 +9016,14 @@ final class RunGame {
             if (action == MotionEvent.ACTION_DOWN) marketTouch(x, y);
             return;
         }
+        if (merchantAsking()) {
+            if (action == MotionEvent.ACTION_DOWN) merchantAskTouch(x, y);
+            return;
+        }
+        if (merchantOpen) {
+            if (action == MotionEvent.ACTION_DOWN) merchantTouch(x, y);
+            return;
+        }
         if (screen == PLAY) {
             if (action == MotionEvent.ACTION_DOWN && pauseButton.contains(x, y)) {
                 audio.play("tap", .5f);
@@ -9072,6 +9087,10 @@ final class RunGame {
                 // (A dungeon's stairway, or the mirror, before the smiths: its number is past theirs.)
                 if (what == PlusRun.STAIRS) {
                     openStairs();
+                    return;
+                }
+                if (what == PlusRun.LILITH) {
+                    openMerchant();
                     return;
                 }
                 // (A keepsake in a home before the smiths too.)
@@ -9652,6 +9671,7 @@ final class RunGame {
             else if (what == PlusRun.DEALER) openMarket();
             else if (what == PlusRun.BOUTIQUE) openBoutique(0);
             else if (what == PlusRun.STAIRS) openStairs();
+            else if (what == PlusRun.LILITH) openMerchant();
             else if (keepsake(what)) lookAtKeepsake(what - PlusRun.KEEPSAKE);
             else if (what >= PlusRun.SMITH) openSmith(what - PlusRun.SMITH, PLAY);
             else {
@@ -9842,10 +9862,11 @@ final class RunGame {
                         else if (what == PlusRun.SMITH + 1) gearIcon(canvas, RunGear.HELM, stallButton.centerX(), stallButton.centerY() - dp(8), stallButton.width() * .36f, SET_COLOURS[2]);
                         else if (what == PlusRun.SMITH + 2) gearIcon(canvas, RunGear.CHARM, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .36f, 0xFFE0A21A);
                         else if (what == PlusRun.STAIRS) stairsIn(canvas, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .52f);
+                        else if (what == PlusRun.LILITH && merchantSheet() != null) cell(canvas, merchantSheet(), 0, MERCHANT_FRAMES, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .22f, stallButton.height() * .62f, false);
                         else if (keepsake(what) && keepsakes() != null) cell(canvas, keepsakes(), what - PlusRun.KEEPSAKE, RunLevels.OWNERS, stallButton.centerX(), stallButton.centerY() + stallButton.height() * .1f, stallButton.height() * .5f, false);
                         else artIn(canvas, STAR_ART, stallButton.centerX(), stallButton.centerY() - dp(7), stallButton.width() * .42f);
                         label(canvas, stallButton, what < 100 ? ((session.tally("run_pet_own") >> what & 1) != 0 ? "Pets" : "Buy") : what == PlusRun.BOARD ? "Hunts" : what == PlusRun.SMITH ? "Forge" : what == PlusRun.SMITH + 1 ? "Armour"
-                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
+                                : what == PlusRun.SMITH + 2 ? "Trade" : what == PlusRun.STAIRS ? "Go down" : keepsake(what) ? "Look" : what == PlusRun.LILITH ? "Merchant" : what == PlusRun.DEALER ? "Market" : what == PlusRun.BOUTIQUE ? "Boutique" : what == PlusRun.MACHINE ? (run.canRoll() ? "+ " + run.gachaCost() : "Roll")
                                 : what == 100 + PETS_TAB ? "Pets" : "Counter");
                     } else if (run.petOffer() >= 0) {
                         button(canvas, stallButton, false, 0xFF8A5A33);
@@ -9906,6 +9927,8 @@ final class RunGame {
         if (huntsOpen) drawHunts(canvas);
         if (smithOpen) drawSmithy(canvas);
         if (marketOpen) drawMarket(canvas);
+        if (merchantOpen) drawMerchantPanel(canvas);
+        if (merchantAsking()) drawMerchantAsk(canvas);
         if (treeOpen) drawTree(canvas);
         // A toast that comes while one of those is open: over it, at the top.
         if (run != null && screen == PLAY && overlaid()) drawToastCard(canvas, safe.top + dp(8));
@@ -9965,7 +9988,7 @@ final class RunGame {
     }
 
     /** Whether a card is open over the land, under which a toast would be hidden: the smithy, the backpack, the bag, the hunts, the market, the tree. */
-    private boolean overlaid() { return smithOpen || packOpen || bagOpen || huntsOpen || marketOpen || treeOpen; }
+    private boolean overlaid() { return smithOpen || packOpen || bagOpen || huntsOpen || marketOpen || treeOpen || merchantOpen || merchantAsking(); }
 
     // Creatures' shields
 
@@ -10102,6 +10125,11 @@ final class RunGame {
         paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
                 : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
         // (Those of the dungeons are in a sheet of their own; and those of the later chapters in the run's asset pack.)
+        if (foe.kind == RunUniques.LILITH) {
+            drawMerchantFighting(canvas, foe, middle, feet, turned);
+            paint.setAlpha(255);
+            return;
+        }
         // (And the six later hidden bosses in a sheet of their own there too.)
         boolean hidden2 = RunUniques.hidden2(foe.kind);
         boolean status = RunUniques.status(foe.kind), later = RunUniques.later(foe.kind), delving = !hidden2 && !later && !status && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
@@ -10373,6 +10401,430 @@ final class RunGame {
         paint.setAlpha(255);
     }
 
+    // The Vampire Merchant (see RunLilith): her stall on some floors of the dungeons, her temper, her gifts, her wares, and the fight.
+
+    /** Her sheets (six pictures in a row: idle, blink, curtsy, pleased, cold, blood magic), fanged and not; her portraits; and what is kept of her. */
+    private static final int MERCHANT_FRAMES = 6, M_IDLE = 0, M_BLINK = 1, M_CURTSY = 2, M_PLEASED = 3, M_COLD = 4, M_MAGIC = 5;
+    private Bitmap merchantFanged, merchantSoft, merchantFace;
+    private String merchantFaceOf = "";
+    private boolean merchantTried, merchantOpen;
+    private final RunLilith.Temper merchantTemper = new RunLilith.Temper();
+    private final RunLilith.Store merchantStore = new RunLilith.Store() {
+        @Override public int get(String key) { return session.tally(key); }
+
+        @Override public void put(String key, int value) { session.keep(key, value); }
+    };
+    private int seenMerchantBlows, seenGifts, merchantGreeted = -1, merchantTab;
+    private float merchantPleased = 9, merchantCurtsy = 9, merchantMockAge = -1;
+    private String merchantSaid = "";
+    private final RectF merchantCard = new RectF(), merchantAct = new RectF(), merchantYes = new RectF(), merchantNo = new RectF();
+    private final RectF[] merchantTabs = {new RectF(), new RectF(), new RectF()}, merchantRows = new RectF[RunLilith.GIFT_KINDS];
+    /** Her draughts, small to large: what each mends of a hundred, and what each costs before she likes Halgakos. */
+    static final String[] DRAUGHTS = {"Little crimson draught", "Draught of the night", "Grand moonlit draught"};
+    static final int[] DRAUGHT_MENDS = {25, 50, 100}, DRAUGHT_PRICE = {30, 70, 150};
+
+    private void merchantArt() {
+        if (merchantTried) return;
+        merchantTried = true;
+        merchantFanged = runAsset("lilith/chibi.webp");
+        merchantSoft = runAsset("lilith/chibi_soft.webp");
+    }
+
+    /** Whether she shows her fangs just now: when warned or fighting, and when she is merely warm (and playful); not when she passes as an ordinary merchant, nor when she is tender. */
+    private boolean merchantShowsFangs() {
+        int face = merchantTemper.face(clock), tier = RunLilith.tier(RunLilith.affinity(merchantStore));
+        return face != RunLilith.Temper.CALM_FACE || run != null && run.lilithFighting() || tier == RunLilith.WARM;
+    }
+
+    private Bitmap merchantSheet() {
+        merchantArt();
+        Bitmap soft = merchantShowsFangs() ? null : merchantSoft;
+        return soft != null ? soft : merchantFanged;
+    }
+
+    /** Her portrait as she shows herself: fanged, soft (as an ordinary merchant, or beloved) or shy (fond, devoted). */
+    private Bitmap merchantPortrait() {
+        int tier = RunLilith.tier(RunLilith.affinity(merchantStore));
+        String which = merchantShowsFangs() && tier != RunLilith.FOND && tier != RunLilith.DEVOTED || merchantTemper.face(clock) != RunLilith.Temper.CALM_FACE ? "fangs"
+                : tier == RunLilith.FOND || tier == RunLilith.DEVOTED ? "shy" : "soft";
+        if (!which.equals(merchantFaceOf)) {
+            if (merchantFace != null) merchantFace.recycle();
+            merchantFace = runAsset("lilith/portrait_" + which + ".webp");
+            merchantFaceOf = which;
+        }
+        return merchantFace;
+    }
+
+    /** Each moment: blows at her stall (warnings, then the fight), gifts picked up, her greeting, and how a fight with her ends. */
+    private void merchantWatch(float seconds) {
+        merchantPleased += seconds;
+        merchantCurtsy += seconds;
+        if (run.merchantBlows() > seenMerchantBlows) {
+            seenMerchantBlows = run.merchantBlows();
+            int stage = merchantTemper.struck(merchantStore, clock);
+            audio.play("clang", .6f);
+            if (stage == RunLilith.Temper.FIGHT) {
+                if (run.lilithFights()) {
+                    speak(RunStory.MERCHANT_WARN[3], true);
+                    toast(merchantName() + " fights", "She cannot die, and mends as she fights", 0);
+                    merchantOpen = false;
+                }
+            } else {
+                speak(RunStory.MERCHANT_WARN[stage - 1], true);
+                if (stage == RunLilith.Temper.AMUSED && session.tally("run_lil_oops") == 0) {
+                    session.keep("run_lil_oops", 1);
+                    talk.add(RunStory.MERCHANT_ANSWERS[1]);
+                }
+            }
+        }
+        if (run.gifts() > seenGifts) {
+            seenGifts = run.gifts();
+            int gift = Math.max(0, Math.min(RunLilith.GIFT_KINDS - 1, run.lastGift()));
+            session.keep(RunLilith.HAVE + gift, session.tally(RunLilith.HAVE + gift) + 1);
+            audio.play("pick", .6f);
+            toast(RunLilith.GIFTS[gift], "For " + merchantName() + ", if she is met", 0);
+        }
+        // Met: the first time, her greeting and Halgakos's word; after, once a floor, as she feels.
+        if (delve >= 0 && captionLeft <= 0 && !audio.speaking() && merchantGreeted != delveFloor) {
+            for (int[] item : run.items()) {
+                if (item[0] != PlusRun.SPOT || item[4] != PlusRun.LILITH || Math.abs(item[1] - run.x()) > 7 || Math.abs(item[2] - run.y()) > 4) continue;
+                merchantGreeted = delveFloor;
+                merchantCurtsy = 0;
+                if (session.tally(RunLilith.MET) == 0) {
+                    session.keep(RunLilith.MET, 1);
+                    speak(RunStory.MERCHANT[0], true);
+                    talk.add(RunStory.MERCHANT_ANSWERS[0]);
+                } else {
+                    speak(RunStory.MERCHANT[1 + RunLilith.tier(RunLilith.affinity(merchantStore))], true);
+                }
+                break;
+            }
+        }
+        // Too strong yet to be beaten, she laughs, and after a moment goes.
+        if (run.lilithMocks() && merchantMockAge < 0) {
+            merchantMockAge = 0;
+            speak(RunStory.MERCHANT_WARN[4], true);
+            talk.add(RunStory.MERCHANT_ANSWERS[2]);
+        }
+        if (merchantMockAge >= 0) {
+            merchantMockAge += seconds;
+            if (merchantMockAge > 2.5f) {
+                merchantMockAge = -1;
+                run.lilithEnds(false);
+                toast(merchantName() + " is gone", "Too strong for you yet. Her stall with her", 0);
+            }
+        }
+    }
+
+    /** What she is called: the Vampire Merchant, until the wedding. */
+    private String merchantName() { return session.tally(RunLilith.ROUTE) == RunLilith.WED ? RunLilith.NAME : "The Vampire Merchant"; }
+
+    private boolean merchantAsking() { return run != null && run.lilithAsks(); }
+
+    private void openMerchant() {
+        merchantOpen = true;
+        merchantSaid = "";
+        goLeft = goRight = goJump = goStrike = false;
+        jumpPressed = strikePressed = false;
+        audio.play("page", .6f);
+    }
+
+    /** Her stall: a velvet counter with her draughts on it, and her by it, turned to Halgakos, as she feels; her name and her hearts over her. */
+    private void drawMerchant(Canvas canvas, int[] item) {
+        float x = (item[1] + .5f - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
+        if (x < -tile * 4 || x > width + tile * 4) return;
+        boolean turned = run.x() + PlusRun.WIDE / 2 > item[1] + .5f;
+        float counter = turned ? x - tile * 1.9f : x + tile * .5f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFF2A1420);
+        canvas.drawRect(counter, feet - tile * .72f, counter + tile * 1.4f, feet, paint);
+        paint.setColor(0xFF8A1A2E);
+        canvas.drawRect(counter - tile * .08f, feet - tile * .8f, counter + tile * 1.48f, feet - tile * .6f, paint);
+        paint.setColor(0xFFD8B04A);
+        canvas.drawRect(counter - tile * .08f, feet - tile * .62f, counter + tile * 1.48f, feet - tile * .58f, paint);
+        int[] bottles = {0xFFD0203A, 0xFF7A3FD0, 0xFF3FA06A};
+        for (int one = 0; one < 3; one++) {
+            float bx = counter + tile * (.28f + one * .42f), by = feet - tile * .8f;
+            glowAt(canvas, bx, by - tile * .14f, tile * .22f, bottles[one], 90);
+            paint.setColor(bottles[one]);
+            canvas.drawCircle(bx, by - tile * .12f, tile * .1f, paint);
+            paint.setColor(0xFFE8E0D0);
+            canvas.drawRect(bx - tile * .03f, by - tile * .3f, bx + tile * .03f, by - tile * .2f, paint);
+        }
+        Bitmap sheet = merchantSheet();
+        int face = merchantTemper.face(clock);
+        int frame = face >= RunLilith.Temper.COOLER ? M_COLD : merchantPleased < 2.2f ? M_PLEASED : merchantCurtsy < 1.3f ? M_CURTSY : (int) (clock / 3.1f) % 4 == 3 && clock % 3.1f < .25f ? M_BLINK : M_IDLE;
+        paint.setAlpha(255);
+        if (face >= RunLilith.Temper.COOLER) glowAt(canvas, x, feet - tile * 1.1f, tile * 1.4f, 0xFFB0213A, face == RunLilith.Temper.COLD_FACE ? 150 : 80);
+        if (sheet != null) cell(canvas, sheet, frame, MERCHANT_FRAMES, x, feet + tile * .03f, tile * 2.1f, turned);
+        boolean near = Math.abs(run.x() - item[1]) < 5;
+        mark(canvas, x, feet - tile * 2.25f, merchantName(), 0xFFB0213A, near);
+        if (near) merchantHearts(canvas, x, feet - tile * 3.5f, tile * .26f);
+    }
+
+    /** Her hearts: five, filled by halves as she likes Halgakos. */
+    private void merchantHearts(Canvas canvas, float middle, float y, float each) {
+        int halves = RunLilith.halfHearts(RunLilith.affinity(merchantStore));
+        for (int one = 0; one < 5; one++) {
+            float cx = middle + (one - 2) * each * 2.25f;
+            heartShape(canvas, cx, y, each, dark ? 0xFF4A2A32 : 0xFFF2CDD4, 1);
+            if (halves >= one * 2 + 2) heartShape(canvas, cx, y, each, 0xFFE0304A, 1);
+            else if (halves == one * 2 + 1) heartShape(canvas, cx, y, each, 0xFFE0304A, .5f);
+        }
+    }
+
+    /** A heart, so much of it from the left filled. */
+    private void heartShape(Canvas canvas, float cx, float cy, float size, int colour, float filled) {
+        canvas.save();
+        if (filled < 1) canvas.clipRect(cx - size, cy - size, cx - size + size * 2 * filled, cy + size);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(colour);
+        float r = size * .5f;
+        canvas.drawCircle(cx - r * .9f, cy - r * .3f, r, paint);
+        canvas.drawCircle(cx + r * .9f, cy - r * .3f, r, paint);
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(cx - r * 1.85f, cy - r * .05f);
+        path.lineTo(cx, cy + size * .95f);
+        path.lineTo(cx + r * 1.85f, cy - r * .05f);
+        path.close();
+        canvas.drawPath(path, paint);
+        canvas.restore();
+    }
+
+    /** A gift for her, lying on a floor: a little wrapped box in its colour, bobbing. */
+    private void drawGift(Canvas canvas, int[] item) {
+        int[] colours = {0xFFC81E3A, 0xFFB8D0F0, 0xFFF0E2C0, 0xFF6A3A22, 0xFFF4F0F4, 0xFFE8D8A8, 0xFFF0C030, 0xFFC8D0D8};
+        int gift = Math.max(0, Math.min(colours.length - 1, item.length > 4 ? item[4] : 0));
+        float x = (item[1] + .5f - cameraX) * tile, y = (item[2] + .6f - cameraY) * tile + (float) Math.sin(clock * 3 + item[1]) * tile * .06f, s = tile * .26f;
+        glowAt(canvas, x, y, tile * .55f, colours[gift], 90);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(colours[gift]);
+        canvas.drawRoundRect(x - s, y - s, x + s, y + s, s * .2f, s * .2f, paint);
+        paint.setColor(0xFFB0213A);
+        canvas.drawRect(x - s * .15f, y - s, x + s * .15f, y + s, paint);
+        canvas.drawRect(x - s, y - s * .15f, x + s, y + s * .15f, paint);
+        canvas.drawCircle(x - s * .3f, y - s * 1.1f, s * .3f, paint);
+        canvas.drawCircle(x + s * .3f, y - s * 1.1f, s * .3f, paint);
+    }
+
+    /** Her, fighting: blood-red light about her, her blood magic when she strikes, cold between; and her bats, going round. */
+    private void drawMerchantFighting(Canvas canvas, PlusRun.Foe foe, float middle, float feet, boolean turned) {
+        merchantArt();
+        Bitmap sheet = merchantFanged;
+        int alpha = foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : 255;
+        float tall = foe.tall() * tile * 1.25f;
+        glowAt(canvas, middle, feet - tall * .45f, tall * .85f, 0xFFB0213A, Math.round(alpha * (.5f + .2f * (float) Math.sin(clock * 5))));
+        for (int bat = 0; bat < 4 && !foe.flat; bat++) {
+            double turn = clock * 2.2f + bat * Math.PI / 2;
+            float bx = middle + (float) Math.cos(turn) * tall * .55f, by = feet - tall * (.6f + .25f * (float) Math.sin(turn * 1.3f));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xFF1A0C14);
+            float flap = (float) Math.abs(Math.sin(clock * 14 + bat)) * tile * .16f + tile * .04f;
+            canvas.drawOval(bx - tile * .07f, by - tile * .05f, bx + tile * .07f, by + tile * .05f, paint);
+            canvas.drawOval(bx - tile * .22f, by - flap, bx - tile * .05f, by + tile * .03f, paint);
+            canvas.drawOval(bx + tile * .05f, by - flap, bx + tile * .22f, by + tile * .03f, paint);
+        }
+        if (sheet == null) return;
+        paint.setAlpha(alpha);
+        int frame = foe.mode == 1 || foe.mode == 2 ? M_MAGIC : (int) (clock * 2) % 2 == 0 ? M_COLD : M_IDLE;
+        cell(canvas, sheet, frame, MERCHANT_FRAMES, middle, feet + tile * .04f, tall, turned);
+        paint.setAlpha(255);
+    }
+
+    /** Her stall, opened: her portrait, her name and hearts and how she feels; her draughts, the gifts Halgakos has for her, and a word with her. */
+    private void drawMerchantPanel(Canvas canvas) {
+        canvas.drawColor(0x99000000);
+        int affinity = RunLilith.affinity(merchantStore), grudge = session.tally(RunLilith.GRUDGE), tier = RunLilith.tier(affinity);
+        float wide = Math.min(safe.width() - dp(24), dp(430)), pad = dp(16), body = dp(420);
+        float tall = pad + dp(118) + body + pad, left = safe.centerX() - wide / 2, top = Math.max(safe.top + dp(8), safe.centerY() - tall / 2);
+        merchantCard.set(left, top, left + wide, top + tall);
+        plate(canvas, merchantCard, dp(22), 255);
+        Bitmap face = merchantPortrait();
+        float faceTall = dp(108);
+        if (face != null) {
+            float faceWide = faceTall * .62f;
+            int sideOf = Math.round(face.getHeight() * .36f);
+            source.set(face.getWidth() / 2 - Math.round(sideOf * .31f), 0, face.getWidth() / 2 + Math.round(sideOf * .31f), sideOf);
+            target.set(left + pad, top + pad, left + pad + faceWide, top + pad + faceTall);
+            paint.setAlpha(255);
+            canvas.drawBitmap(face, source, target, paint);
+        }
+        float words = left + pad + faceTall * .62f + dp(12);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(ink);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        fitted(canvas, merchantName(), words, top + pad + dp(20), dp(19), left + wide - pad - words);
+        text.setTypeface(Typeface.DEFAULT);
+        text.setColor(0xFFB0213A);
+        fitted(canvas, RunLilith.TIER_NAMES[tier] + (grudge > 0 ? "  ·  she remembers being struck" : ""), words, top + pad + dp(42), dp(13), left + wide - pad - words);
+        merchantHearts(canvas, words + dp(46), top + pad + dp(64), dp(8.5f));
+        text.setColor(soft);
+        fitted(canvas, run.purse() + " pluses to spend", words, top + pad + dp(92), dp(12.5f), left + wide - pad - words);
+        float y = top + pad + dp(120), each = (wide - pad * 2 - dp(12)) / 3, bottom = top + tall - pad;
+        String[] names = {"Wares", "Gifts", "Talk"};
+        for (int tab = 0; tab < 3; tab++) {
+            merchantTabs[tab].set(left + pad + tab * (each + dp(6)), y, left + pad + tab * (each + dp(6)) + each, y + dp(32));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(tab == merchantTab ? 0xFFB0213A : dark ? 0xFF2C3033 : 0xFFF0F1F2);
+            canvas.drawRoundRect(merchantTabs[tab], dp(16), dp(16), paint);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(tab == merchantTab ? Color.WHITE : ink);
+            fitted(canvas, names[tab], merchantTabs[tab].centerX(), merchantTabs[tab].centerY() + dp(4.5f), dp(13), each - dp(10));
+        }
+        y += dp(42);
+        merchantAct.setEmpty();
+        for (int row = 0; row < merchantRows.length; row++) if (merchantRows[row] == null) merchantRows[row] = new RectF(); else merchantRows[row].setEmpty();
+        text.setTextAlign(Paint.Align.LEFT);
+        if (merchantTab == 0) {
+            for (int one = 0; one < DRAUGHTS.length; one++) {
+                int price = RunLilith.price(DRAUGHT_PRICE[one], affinity, grudge);
+                text.setTextAlign(Paint.Align.LEFT);
+                box.set(left + dp(8), y, left + wide - dp(8), y + dp(56));
+                paint.setColor(dark ? 0xFF2C3033 : 0xFFF5F6F7);
+                canvas.drawRoundRect(box, dp(12), dp(12), paint);
+                merchantRows[one].set(left + wide - dp(18) - dp(96), y + dp(12), left + wide - dp(18), y + dp(44));
+                text.setColor(ink);
+                fitted(canvas, DRAUGHTS[one], left + dp(20), y + dp(24), dp(13.5f), merchantRows[one].left - left - dp(28));
+                text.setColor(soft);
+                fitted(canvas, "Mends " + (DRAUGHT_MENDS[one] == 100 ? "all of her" : DRAUGHT_MENDS[one] + " in a hundred of her") + (price < DRAUGHT_PRICE[one] ? "  ·  less, for you" : ""),
+                        left + dp(20), y + dp(42), dp(11.5f), merchantRows[one].left - left - dp(28));
+                smithButton(canvas, merchantRows[one], price + " +", run.purse() >= price, 0xFFB0213A);
+                y += dp(62);
+            }
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(soft);
+            fitted(canvas, "More of her wares as she comes to trust you.", left + pad, y + dp(14), dp(12), wide - pad * 2);
+        } else if (merchantTab == 1) {
+            boolean any = false;
+            for (int gift = 0; gift < RunLilith.GIFT_KINDS; gift++) {
+                int have = session.tally(RunLilith.HAVE + gift), given = session.tally(RunLilith.GIVEN + gift);
+                if (have <= 0 && given <= 0) continue;
+                any = true;
+                text.setTextAlign(Paint.Align.LEFT);
+                box.set(left + dp(8), y, left + wide - dp(8), y + dp(40));
+                paint.setColor(dark ? 0xFF2C3033 : 0xFFF5F6F7);
+                canvas.drawRoundRect(box, dp(10), dp(10), paint);
+                merchantRows[gift].set(left + wide - dp(18) - dp(84), y + dp(6), left + wide - dp(18), y + dp(34));
+                text.setColor(ink);
+                fitted(canvas, RunLilith.GIFTS[gift] + "  ×" + have, left + dp(20), y + dp(17), dp(13), merchantRows[gift].left - left - dp(28));
+                text.setColor(given > 0 ? (RunLilith.likes(gift) ? 0xFF2E9E6E : 0xFFB0213A) : soft);
+                fitted(canvas, given > 0 ? (RunLilith.likes(gift) ? "She likes it" : "She does not like it") : "What will she think of it?", left + dp(20), y + dp(33), dp(11), merchantRows[gift].left - left - dp(28));
+                smithButton(canvas, merchantRows[gift], "Give", have > 0, 0xFFB0213A);
+                y += dp(44);
+            }
+            if (!any) {
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(soft);
+                fitted(canvas, "Nothing for her yet. Gifts lie on the dungeons' floors.", left + pad, y + dp(16), dp(12.5f), wide - pad * 2);
+            }
+        } else {
+            text.setColor(ink);
+            text.setTextSize(dp(14));
+            String line = RunStory.MERCHANT[session.tally(RunLilith.MET) == 0 ? 0 : 1 + tier][1];
+            List<String> lines = wrap("\u201C" + line + "\u201D", wide - pad * 2);
+            for (int index = 0; index < Math.min(4, lines.size()); index++) canvas.drawText(lines.get(index), left + pad, y + dp(18) + index * dp(20), text);
+            merchantAct.set(left + pad, y + dp(100), left + wide - pad, y + dp(140));
+            smithButton(canvas, merchantAct, "Talk with her", true, 0xFFB0213A);
+        }
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(merchantSaid.isEmpty() ? soft : 0xFFB0213A);
+        fitted(canvas, merchantSaid.isEmpty() ? "Tap outside to close. Mind your blade: she does not like to be struck." : merchantSaid, left + pad, bottom - dp(6), dp(12), wide - pad * 2);
+    }
+
+    private void merchantTouch(float x, float y) {
+        for (int tab = 0; tab < merchantTabs.length; tab++) {
+            if (!merchantTabs[tab].contains(x, y)) continue;
+            merchantTab = tab;
+            merchantSaid = "";
+            audio.play("tap", .5f);
+            return;
+        }
+        int affinity = RunLilith.affinity(merchantStore), grudge = session.tally(RunLilith.GRUDGE);
+        if (merchantTab == 0) {
+            for (int one = 0; one < DRAUGHTS.length; one++) {
+                if (!merchantRows[one].contains(x, y)) continue;
+                int price = RunLilith.price(DRAUGHT_PRICE[one], affinity, grudge);
+                if (!run.buyFromMerchant(price)) {
+                    audio.play("no", .5f);
+                    merchantSaid = "Not enough pluses";
+                    speak(RunStory.MERCHANT_SHOP[2], true);
+                    return;
+                }
+                run.drinkHeal(DRAUGHT_MENDS[one]);
+                audio.play("buy", .6f);
+                buzz(true);
+                merchantSaid = "Drunk: " + DRAUGHTS[one].toLowerCase(java.util.Locale.ROOT);
+                merchantPleased = 0;
+                speak(RunStory.MERCHANT_SHOP[price < DRAUGHT_PRICE[one] && RunLilith.tier(affinity) >= RunLilith.FOND ? 1 : 0], true);
+                return;
+            }
+        } else if (merchantTab == 1) {
+            for (int gift = 0; gift < RunLilith.GIFT_KINDS; gift++) {
+                if (merchantRows[gift] == null || !merchantRows[gift].contains(x, y)) continue;
+                int have = session.tally(RunLilith.HAVE + gift);
+                if (have <= 0) {
+                    audio.play("no", .5f);
+                    return;
+                }
+                session.keep(RunLilith.HAVE + gift, have - 1);
+                int by = RunLilith.give(merchantStore, gift);
+                merchantSaid = RunLilith.GIFTS[gift] + (by >= 0 ? ": she likes you a little more" : ": she likes you a little less");
+                if (by > 0) merchantPleased = 0;
+                audio.play(by > 0 ? "heart" : "no", .6f);
+                speak(RunStory.MERCHANT_GIFT[gift == 5 ? 2 : gift == 7 ? 3 : gift == 6 ? 4 : RunLilith.GIFT_WORTH[gift] >= 6 ? 0 : 1], true);
+                return;
+            }
+        } else if (!merchantAct.isEmpty() && merchantAct.contains(x, y)) {
+            speak(RunStory.MERCHANT[session.tally(RunLilith.MET) == 0 ? 0 : 1 + RunLilith.tier(affinity)], true);
+            audio.play("tap", .5f);
+            return;
+        }
+        if (!merchantCard.contains(x, y)) {
+            merchantOpen = false;
+            audio.play("tap", .3f);
+        }
+    }
+
+    /** She waits at the last of her health: the killing blow is asked about first, for it cannot be undone. */
+    private void drawMerchantAsk(Canvas canvas) {
+        canvas.drawColor(0xAA000000);
+        float wide = Math.min(safe.width() - dp(32), dp(380)), tall = dp(220), left = safe.centerX() - wide / 2, top = safe.centerY() - tall / 2, pad = dp(18);
+        merchantCard.set(left, top, left + wide, top + tall);
+        plate(canvas, merchantCard, dp(22), 255);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(0xFFB0213A);
+        text.setTypeface(Typeface.DEFAULT_BOLD);
+        fitted(canvas, "This cannot be undone", safe.centerX(), top + pad + dp(20), dp(19), wide - pad * 2);
+        text.setTypeface(Typeface.DEFAULT);
+        text.setColor(ink);
+        text.setTextSize(dp(13.5f));
+        List<String> lines = wrap(merchantName() + " is at your mercy. Finish her, and she is gone for ever, and so is everything she might have been to you.", wide - pad * 2);
+        for (int index = 0; index < Math.min(3, lines.size()); index++) canvas.drawText(lines.get(index), safe.centerX(), top + pad + dp(50) + index * dp(19), text);
+        float half = (wide - pad * 2 - dp(10)) / 2;
+        merchantNo.set(left + pad, top + tall - pad - dp(44), left + pad + half, top + tall - pad);
+        merchantYes.set(left + pad + half + dp(10), top + tall - pad - dp(44), left + wide - pad, top + tall - pad);
+        smithButton(canvas, merchantNo, "Spare her", true, 0xFF2E9E6E);
+        smithButton(canvas, merchantYes, "Finish her", true, 0xFFB0213A);
+        text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    private void merchantAskTouch(float x, float y) {
+        if (merchantYes.contains(x, y)) {
+            run.lilithEnds(true);
+            session.keep(RunLilith.ROUTE, RunLilith.VAMPIRE);
+            audio.play("lose", .7f);
+            speak(RunStory.MERCHANT_WARN[6], true);
+            toast(merchantName() + " is gone", "It cannot be undone", 0);
+        } else if (merchantNo.contains(x, y)) {
+            run.lilithEnds(false);
+            session.keep("run_lil_spared", session.tally("run_lil_spared") + 1);
+            RunLilith.befriend(merchantStore, RunLilith.SPARED);
+            audio.play("heart", .6f);
+            speak(RunStory.MERCHANT_WARN[5], true);
+            talk.add(RunStory.MERCHANT_ANSWERS[3]);
+            toast("You spared her", "She will remember it", 0);
+        }
+    }
     private Bitmap laterSheet, statusSheet, hidden2Sheet;
     private boolean laterTried, statusTried, hidden2Tried;
 
@@ -11553,12 +12005,17 @@ final class RunGame {
                 drawHomeSecret(canvas, item);
                 continue;
             }
+            if (item[0] == PlusRun.GIFT) {
+                drawGift(canvas, item);
+                continue;
+            }
             if (item[0] == PlusRun.SPOT && item[4] >= 100) {
                 if (item[4] == PlusRun.MACHINE) drawMachine(canvas, item);
                 else if (item[4] == PlusRun.BOUTIQUE) drawKeeper(canvas, item);
                 else if (item[4] == PlusRun.DEALER) drawDealer(canvas, item);
                 else if (item[4] == PlusRun.STAIRS) drawStairs(canvas, item);
                 else if (keepsake(item[4])) drawKeepsake(canvas, item);
+                else if (item[4] == PlusRun.LILITH) drawMerchant(canvas, item);
                 else if (item[4] >= PlusRun.SMITH) drawSmith(canvas, item);
                 else drawBoard(canvas, item);
                 continue;
@@ -13430,7 +13887,12 @@ final class RunGame {
         canvas.drawCircle(x, y, radius, paint);
         paint.setColor(Color.BLACK);
         Bitmap picture;
-        if (who == MOTHER_FACE) {
+        if (who == MERCHANT_FACE && merchantPortrait() != null) {
+            // (The Vampire Merchant: her face from her portrait, fanged or not as she shows herself.)
+            picture = merchantPortrait();
+            int sideOf = Math.round(picture.getHeight() * .2f);
+            source.set(picture.getWidth() / 2 - sideOf / 2, Math.round(picture.getHeight() * .045f), picture.getWidth() / 2 + sideOf / 2, Math.round(picture.getHeight() * .045f) + sideOf);
+        } else if (who == MOTHER_FACE) {
             // (The Mother Tongue: her head and her crown, from the first picture of her sheet.)
             if (motherArt == null) motherArt = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_mother);
             picture = motherArt;

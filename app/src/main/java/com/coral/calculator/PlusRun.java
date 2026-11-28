@@ -142,6 +142,279 @@ final class PlusRun {
 
     /** What she has looked at a keepsake for: a chest put down by it, so much in it, the first time. */
     void keepsakeChest(int column, int row, int much) { items.add(new int[]{CHEST, column, row, 0, much}); }
+
+    /** And on some floors of the dungeons, the Vampire Merchant's stall (see {@link RunLilith}); and a gift for her, lying on a floor (its fifth number which). */
+    static final int LILITH = 900, GIFT = 50;
+    private int merchantBlows, gifts, lastGift = -1;
+    private float merchantCool, lilithMend;
+    private boolean lilithAsks, lilithFinishing, lilithMocks;
+
+    /** How many blows she has struck at the merchant's stall; how many gifts for her she has picked up, and the last. */
+    int merchantBlows() { return merchantBlows; }
+
+    int gifts() { return gifts; }
+
+    int lastGift() { return lastGift; }
+
+    /** Whether the merchant, fought down to the last of her health, waits to be finished or spared; and whether, too strong yet to be beaten, she laughs. */
+    boolean lilithAsks() { return lilithAsks; }
+
+    boolean lilithMocks() { return lilithMocks; }
+
+    /** A blow over a box: if the merchant's stall is in it, she is struck (a blow at most every third of a second). */
+    void merchant(float from, float to, float top, float bottom) {
+        if (merchantCool > 0 || !merchantHere()) return;
+        for (int[] item : items) {
+            if (item[0] != SPOT || item[4] != LILITH || item[1] + 1.2f <= from || item[1] - .2f >= to || item[2] + 1 <= top || item[2] - 1.2f >= bottom) continue;
+            merchantBlows++;
+            merchantCool = .33f;
+            return;
+        }
+    }
+
+    /** Whether her stall stands on this floor (looked for once, and again only while it does). */
+    private int merchantKnown = -1;
+
+    private boolean merchantHere() {
+        if (merchantKnown == 0) return false;
+        boolean here = false;
+        for (int[] item : items) here |= item[0] == SPOT && item[4] == LILITH;
+        merchantKnown = here ? 1 : 0;
+        return here;
+    }
+
+    /** The merchant, past her last warning, fights where her stall stood: whether there was a stall for her to come out of. */
+    boolean lilithFights() {
+        for (int index = 0; index < items.size(); index++) {
+            int[] item = items.get(index);
+            if (item[0] != SPOT || item[4] != LILITH) continue;
+            items.remove(index);
+            Foe foe = new Foe(RunUniques.LILITH);
+            foe.left = foe.most = RunUniques.health(RunUniques.LILITH, level.number);
+            foe.x = item[1] + .5f - foe.wide() / 2;
+            foe.ground = item[2] + 1 - foe.tall();
+            foe.y = foe.ground;
+            foe.home = foe.x;
+            foe.dazed = .8f;
+            foes.add(foe);
+            return true;
+        }
+        return false;
+    }
+
+    // Potions (see RunPotions): the one being drunk and how much of it is left; cooldowns (heals share one); buffs on; heals in a fight with a boss.
+    private int drinking = -1, potionsDrunk, drinksStopped, bossHeals, lastPotion = -1, potionsSaved;
+    private float drinkLeft, drinkTotal, healCool, regenLeft, regenCarry;
+    private final float[] potionCool = new float[RunPotions.COUNT], potionOn = new float[RunPotions.COUNT];
+
+    /** The potion being drunk (-1 for none), how far through it she is (0 to 1); how many drunk, stopped; the last drunk. */
+    int drinking() { return drinking; }
+
+    float drinkThrough() { return drinking < 0 || drinkTotal <= 0 ? 0 : 1 - drinkLeft / drinkTotal; }
+
+    int potionsDrunk() { return potionsDrunk; }
+
+    int drinksStopped() { return drinksStopped; }
+
+    int lastPotion() { return lastPotion; }
+
+    /** How many potions the tree's second draught has kept from being used up. */
+    int potionsSaved() { return potionsSaved; }
+
+    /** How long a buff of hers has left. */
+    float potionOn(int potion) { return potionOn[potion]; }
+
+    /** How long before a potion can be drunk again (a heal, the heals' shared wait; a buff, its own, and while it lasts). */
+    float potionWait(int potion) {
+        if (RunPotions.permanent(potion)) return 0;
+        return RunPotions.heals(potion) ? healCool : Math.max(potionCool[potion], potionOn[potion]);
+    }
+
+    /** And how long that wait was, all of it, to draw what is left of it against. */
+    float potionWaitFull(int potion) { return RunPotions.cooldownFor(potion, herbalism(), 0, bossFight()); }
+
+    /** Whether she is in a fight with one who waits or a keeper. */
+    boolean bossFight() {
+        for (Foe foe : foes) if (!foe.flat && (RunLevels.boss(foe.kind) || RunUniques.keeper(foe.kind) || foe.kind == RunUniques.LILITH) && Math.abs(foe.x - x) < 14) return true;
+        return false;
+    }
+
+    /** Why a potion cannot be drunk now, or null if it can: already drinking, permanent, climbing or in water, not ready, too many heals in a boss fight. */
+    String cannotDrink(int potion) {
+        if (state != PLAYING) return "Not now";
+        if (drinking >= 0) return "Still drinking";
+        if (RunPotions.permanent(potion)) return "Drunk from the bag";
+        if (climbing() || inWater()) return "Not while climbing or swimming";
+        if (potionWait(potion) > 0) return "Not ready yet";
+        if (RunPotions.heals(potion) && bossFight() && bossHeals >= RunPotions.BOSS_HEALS) return "No more heals in this fight";
+        return null;
+    }
+
+    /** She begins to drink a potion: whether she could. It does nothing until it has been drunk to the end. */
+    boolean drink(int potion) {
+        if (cannotDrink(potion) != null) return false;
+        drinking = potion;
+        drinkTotal = drinkLeft = RunPotions.drinkFor(potion, quickSip());
+        return true;
+    }
+
+    /** A drink stopped part way, by a hard blow, a jump or a swap: nothing comes of it, the potion is kept, and it is ready again after a moment. */
+    void stopDrink() {
+        if (drinking < 0) return;
+        if (RunPotions.heals(drinking)) healCool = Math.max(healCool, RunPotions.INTERRUPTED_COOL);
+        else potionCool[drinking] = Math.max(potionCool[drinking], RunPotions.INTERRUPTED_COOL);
+        drinking = -1;
+        drinksStopped++;
+    }
+
+    /** Whether the potion just drunk was kept by the tree's second draught (so the game does not take it from her bag). */
+    private boolean keptLast;
+
+    boolean keptLast() { return keptLast; }
+
+    /** Each moment: a drink goes on (and is done), cooldowns and buffs run down, the heartsease mends, and the wards keep off what they keep off. */
+    private void potionTick(float seconds, boolean jump) {
+        if (drinking >= 0 && jump) stopDrink();
+        if (drinking >= 0 && (climbing() || inWater())) stopDrink();
+        if (drinking >= 0 && (drinkLeft -= seconds) <= 0) {
+            int potion = drinking;
+            drinking = -1;
+            potionsDrunk++;
+            lastPotion = potion;
+            keptLast = secondDraught() > 0 && (potionsDrunk * 37 + potion * 11) % 100 < secondDraught();
+            if (keptLast) potionsSaved++;
+            potionDrunk(potion);
+        }
+        if (healCool > 0) healCool -= seconds;
+        for (int potion = 0; potion < RunPotions.COUNT; potion++) {
+            if (potionCool[potion] > 0) potionCool[potion] -= seconds;
+            if (potionOn[potion] > 0) potionOn[potion] -= seconds;
+        }
+        if (regenLeft > 0 && hp > 0) {
+            regenLeft -= seconds;
+            regenCarry += maxHp() * RunPotions.HEAL_PERCENT[RunPotions.REGEN] / 100f * seconds / RunPotions.REGEN_SECONDS;
+            int mended = (int) regenCarry;
+            regenCarry -= mended;
+            hp = Math.min(maxHp(), hp + mended);
+        }
+        if (potionOn[RunPotions.EMBER] > 0) herBurn = 0;
+        if (potionOn[RunPotions.FROST] > 0) herChill = 0;
+        if (potionOn[RunPotions.VENOM] > 0) herPoison = 0;
+    }
+
+    /** A potion drunk to the end: what it does, and its cooldown begins. */
+    private void potionDrunk(int potion) {
+        int herbal = herbalism();
+        boolean boss = bossFight();
+        if (RunPotions.heals(potion)) {
+            if (potion == RunPotions.REGEN) {
+                regenLeft = RunPotions.REGEN_SECONDS;
+            } else {
+                drinkHeal(RunPotions.HEAL_PERCENT[potion]);
+            }
+            healCool = RunPotions.cooldownFor(potion, herbal, 0, boss);
+            if (boss) bossHeals++;
+            return;
+        }
+        if (potion == RunPotions.CLEANSE) {
+            herBurn = herChill = herPoison = herStun = 0;
+        } else {
+            potionOn[potion] = RunPotions.lasts(potion);
+        }
+        potionCool[potion] = RunPotions.cooldownFor(potion, herbal, 0, boss);
+    }
+
+    /** The tree's alchemy: how much quicker she drinks and how much shorter her cooldowns are (in a hundred), whether her hands are steady, and the chance in a hundred that a potion is not used up. (Its nodes come with the tree's alchemy.) */
+    int quickSip() { return 0; }
+
+    int herbalism() { return 0; }
+
+    int steadyHands() { return 0; }
+
+    int secondDraught() { return 0; }
+
+    /** From how quick a sip she walks as she drinks, rather than creeping. */
+    static final int QUICK_SIP_WALKS = 45;
+
+    /** Whether a hurt stops a drink: a hard one always; a light one unless the tree steadies her hands. */
+    private void drinkHurt(boolean hard) {
+        if (drinking >= 0 && (hard || steadyHands() <= 0)) stopDrink();
+    }
+
+    /** Something bought at the merchant's stall, paid for from what she has collected: whether there was enough. */
+    boolean buyFromMerchant(int cost) {
+        if (purse() < cost) return false;
+        spent += cost;
+        return true;
+    }
+
+    /** One of the merchant's draughts drunk: so many in a hundred of her most mended, half a heart at least. */
+    void drinkHeal(int percent) { hp = Math.min(maxHp(), hp + Math.max(HALF, maxHp() * percent / 100)); }
+
+    /** The merchant who waits at the last of her health: finished (it cannot be undone), or spared, when she goes. */
+    void lilithEnds(boolean finish) {
+        lilithAsks = false;
+        lilithMocks = false;
+        for (int index = foes.size() - 1; index >= 0; index--) {
+            Foe foe = foes.get(index);
+            if (foe.kind != RunUniques.LILITH || foe.flat) continue;
+            if (!finish) {
+                // (Spared, or tired of the game: she is simply gone, as bats are.)
+                foes.remove(index);
+                continue;
+            }
+            lilithFinishing = true;
+            foe.left = 0;
+            foe.flat = true;
+            foe.dropped = true;
+            foe.defeat = DEFEAT_FADE;
+            foe.y = foe.ground;
+            foe.act = 0;
+        }
+    }
+
+    /** Whether the merchant is fighting her on this floor. */
+    boolean lilithFighting() {
+        for (Foe foe : foes) if (foe.kind == RunUniques.LILITH && !foe.flat) return true;
+        return false;
+    }
+
+    /** Each moment of a fight with her: she mends, and cannot be brought below the last of her health unless she is being finished. */
+    private void lilithTick(float seconds) {
+        if (merchantCool > 0) merchantCool -= seconds;
+        // (What she throws strikes the merchant's stall as a blow does, and is spent on it.)
+        for (int index = 0; index < shots.size() && merchantKnown != 0 && merchantCool <= 0; index++) {
+            Shot shot = shots.get(index);
+            if (!shot.hers || shot.pets || shot.left <= 0) continue;
+            int before = merchantBlows;
+            merchant(shot.x - .2f, shot.x + .2f, shot.y - .2f, shot.y + .2f);
+            if (merchantBlows > before) shot.left = 0;
+        }
+        for (Foe foe : foes) {
+            if (foe.kind != RunUniques.LILITH || foe.flat && lilithFinishing) continue;
+            int least = Math.round(foe.most * RunLilith.LAST_BLOW);
+            if (foe.flat) {
+                // (Brought down some other way than a blow: she stands again.)
+                foe.flat = false;
+                foe.dropped = false;
+                foe.left = least;
+            }
+            if (lilithAsks) continue;
+            lilithMend += foe.most * RunLilith.mends(perks.level) * seconds;
+            int mended = (int) lilithMend;
+            lilithMend -= mended;
+            foe.left = Math.min(foe.most, Math.max(least, foe.left + mended));
+        }
+    }
+
+    /** A blow that would bring her below the last of her health: it stops there; she asks, if Halgakos is strong enough, or laughs. Whether it was stopped. */
+    boolean lilithHolds(Foe foe, float dealt) {
+        if (foe.kind != RunUniques.LILITH || lilithFinishing || foe.left - dealt > foe.most * RunLilith.LAST_BLOW) return false;
+        foe.left = Math.round(foe.most * RunLilith.LAST_BLOW);
+        if (perks.level >= RunLilith.MORTAL_LEVEL) lilithAsks = true;
+        else lilithMocks = true;
+        return true;
+    }
     /**
      * A pot of black ink, which stands in the later lands and throws the black curse: how
      * often, for how long it swells before it does, from how far off it throws, and how
@@ -669,6 +942,8 @@ final class PlusRun {
                 if (Math.hypot(plus[0] + .5f - it.x, plus[1] + .5f - it.y + .4f) > 1.8f) continue;
                 pluses.remove(index);
                 collected++;
+                // (Under the gilded elixir every plus is worth two.)
+                if (potionOn[RunPotions.RICHES] > 0) bonus++;
                 plusX = plus[0] + .5f;
                 plusY = plus[1] + .5f;
             }
@@ -855,6 +1130,8 @@ final class PlusRun {
         int poundLevel, glideLevel, aerial;
         /** In a dungeon, how much harder her blows land, in percent, from the blessings chosen on the way down. */
         int mightPct;
+        /** What the Vampire Merchant's permanent potions have given her: health (ten each), and attack, defence and intelligence in a hundred. */
+        int potionLife, potionAtk, potionDef, potionInt;
     }
 
     // How much creatures take
@@ -2566,6 +2843,8 @@ final class PlusRun {
     /** She has beaten a creature: HP and energy back, and a frenzy. */
     private void killed() {
         treeKills++;
+        // (Under the clover cordial a creature leaves a plus more.)
+        if (potionOn[RunPotions.LUCK] > 0) bonus++;
         int heal = skillOf(RunSkills.E_KILL_HEAL), more = skillOf(RunSkills.E_KILL_ENERGY);
         if (heal > 0 && hp > 0 && hp < maxHp()) {
             hp = Math.min(maxHp(), hp + heal);
@@ -2686,7 +2965,8 @@ final class PlusRun {
         // (Attack and the tree's attack make every blow harder; intelligence, those of tomes, staffs and wands.)
         int thing = thingOf(with);
         boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
-        float more = 1 + (perks.skills.stats[RunSkills.ATK] + skillOf(RunSkills.E_ATK_PCT) + (minded ? intelligence() : 0) + perks.mightPct + metered()
+        float more = 1 + (perks.skills.stats[RunSkills.ATK] + skillOf(RunSkills.E_ATK_PCT) + (minded ? intelligence() + perks.potionInt : 0) + perks.mightPct + metered()
+                + (potionOn[RunPotions.MIGHT] > 0 ? 33 : 0) + perks.potionAtk
                 + (hp * 3 <= maxHp() ? skillOf(RunSkills.E_LAST_STAND) : 0) - (inked() ? curseWeak() : 0) + (white() ? Math.max(0, skillOf(RunSkills.E_WHITE)) : 0)) / 100f;
         return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
     }
@@ -2695,7 +2975,7 @@ final class PlusRun {
     int intelligence() { return RunSkills.intelligence(perks.skills, skillOf(RunSkills.E_INT_PCT) - perks.skills.effects[RunSkills.E_INT_PCT]); }
 
     /** How much less a hurt costs, in percent: the tree's (a strong passive may make it more), and an active's. */
-    int defencePercent() { return RunSkills.defencePercent(skillOf(RunSkills.E_DEF_PCT) + (skillOf(RunSkills.E_IRON) > 0 ? dodgeRaw() : 0) + (has(BROWN) ? Math.max(0, skillOf(RunSkills.E_BROWN)) : 0)); }
+    int defencePercent() { return RunSkills.defencePercent(skillOf(RunSkills.E_DEF_PCT) + perks.potionDef + (skillOf(RunSkills.E_IRON) > 0 ? dodgeRaw() : 0) + (has(BROWN) ? Math.max(0, skillOf(RunSkills.E_BROWN)) : 0)); }
 
     /** How much of energy spent becomes divine power, in percent, now. */
     int dpMaking() { return Math.max(0, skillOf(RunSkills.E_DP)); }
@@ -3968,7 +4248,7 @@ final class PlusRun {
 
     /** The most HP she can have: her hearts, and what her skill tree gives. */
     int maxHp() {
-        int base = perks.hearts * RunSkills.HEART + perks.skills.stats[RunSkills.HP];
+        int base = perks.hearts * RunSkills.HEART + perks.skills.stats[RunSkills.HP] + perks.potionLife * RunPotions.LIFE_HEALTH;
         return Math.max(RunSkills.HEART / 2, base + base * perks.skills.effects[RunSkills.E_HP_PCT] / 100);
     }
     /** The last firm ground she stood on, where a fall puts her back; how much longer she flinches from a hurt, and which way it sent her. */
@@ -5769,6 +6049,13 @@ final class PlusRun {
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         // Stunned, she can do nothing for a moment.
         if (herStun > 0) left = right = jump = strike = false;
+        lilithTick(seconds);
+        potionTick(seconds, jump);
+        // (Drinking, she cannot strike; nor jump, which would have stopped it.)
+        if (drinking >= 0) {
+            strike = false;
+            jump = false;
+        }
         for (Foe foe : foes) {
             if (foe.flat && !foe.dropped) {
                 foe.dropped = true;
@@ -5851,7 +6138,8 @@ final class PlusRun {
         }
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
-        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy() * (inked() ? curseSlow() : 1) * (herChill > 0 ? CHILLED : 1);
+        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * (potionOn[RunPotions.SWIFT] > 0 ? 1.25f : 1)
+                * (drinking >= 0 && quickSip() < QUICK_SIP_WALKS ? .3f : 1) * slowedBy() * (inked() ? curseSlow() : 1) * (herChill > 0 ? CHILLED : 1);
         float fast = rush > 0 ? run * 1.3f : run, leap = (rush > 0 ? LEAP * 1.1f : LEAP) * (inked() ? CURSE_JUMP : 1);
         if (has(YELLOW)) fast = run * (mastered ? 2.1f : 1.7f);
         float wanted = left == right ? 0 : left ? -fast : fast;
@@ -6039,6 +6327,8 @@ final class PlusRun {
             if (drawn || x < plus[0] + .8f && x + WIDE > plus[0] + .2f && y < plus[1] + .8f && y + TALL > plus[1] + .2f) {
                 pluses.remove(index);
                 collected++;
+                // (Under the gilded elixir every plus is worth two.)
+                if (potionOn[RunPotions.RICHES] > 0) bonus++;
                 plusX = plus[0] + .5f;
                 plusY = plus[1] + .5f;
             }
@@ -6138,6 +6428,14 @@ final class PlusRun {
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
                 if (cursed > 0 && item[0] > FORM && item[0] < CHEST && item[0] != FORM + WHITE) continue;
+                if (item[0] == GIFT) {
+                    items.remove(index);
+                    gifts++;
+                    lastGift = item.length > 4 ? item[4] : 0;
+                    tookX = item[1] + .5f;
+                    tookY = item[2] + .5f;
+                    continue;
+                }
                 if (item[0] == DIARY) {
                     items.remove(index);
                     diaries++;
@@ -7015,6 +7313,7 @@ final class PlusRun {
                 if (walks(foe.kind) && heldAt(foe, from) && !held(foe)) foe.x = from;
             }
         }
+        if (lilithHolds(foe, dealt)) return;
         if ((foe.left -= dealt) <= 0) {
             hit[8] = 1;
             // How it is seen going: frozen, burning, or as it is made.
@@ -7502,6 +7801,7 @@ final class PlusRun {
         if (sweeping) swept.add(new float[]{by, from, to, top, bottom});
         breakSecrets(from, to, top, bottom);
         crack(from, to, top, bottom);
+        merchant(from, to, top, bottom);
         int met = 0;
         for (int index = 0; index < foes.size(); index++) {
             Foe foe = foes.get(index);
@@ -7832,6 +8132,7 @@ final class PlusRun {
             beat(foe, swungWith == SWORD ? SWORDED : PLAIN);
         }
         crack(from, to, top, bottom);
+        merchant(from, to, top, bottom);
         breakSecrets(from, to, top, bottom);
         for (int index = shots.size() - 1; index >= 0; index--) {
             Shot shot = shots.get(index);
@@ -8099,6 +8400,9 @@ final class PlusRun {
      */
     private boolean hurt(boolean fell, int costs) {
         if (!fell && (notes > 0 || worn[BLACK] > 0)) return false;
+        // (Under the starveil nothing hurts her; a hurt stops a drink, a light one only without steady hands.)
+        if (!fell && potionOn[RunPotions.STAR] > 0) return false;
+        drinkHurt(fell || costs >= 2);
         if (!fell && gearTakes()) {
             safe = SAFE * perks.mercy;
             return true;
@@ -8120,6 +8424,7 @@ final class PlusRun {
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();
             int lost = costs * HALF;
             if (!fell) lost = Math.max(Math.max(1, lost / 10), lost - perks.skills.stats[RunSkills.DEF] - lost * defencePercent() / 100);
+            if (!fell && potionOn[RunPotions.GUARD] > 0) lost = Math.max(1, lost * 2 / 3);
             hp -= lost;
             lastLost = lost;
         }
