@@ -89,7 +89,7 @@ public class RunConnectedTest {
     @Test public void thereIsNoCardBetweenLands() throws Exception {
         String game = new String(Files.readAllBytes(new File("src/main/java/com/coral/calculator/RunGame.java").toPath()), StandardCharsets.UTF_8);
         assertTrue(game.contains("if (onward()) clearLand();"));
-        assertTrue(game.contains("private boolean onward() { return blackRung == 0 && number < RunLevels.OPEN_TO && finale == NO_FINALE; }"));
+        assertTrue(game.contains("private boolean onward() { return blackRung == 0 && delve < 0 && number < RunLevels.OPEN_TO && finale == NO_FINALE; }"));
         // (What was kept before is read as it was: the stars of a land, the land open furthest.)
         assertTrue(game.contains("session.keep(\"run_stars_\" + number, stars)"));
         assertTrue(game.contains("session.keep(\"run_open\", number + 1)"));

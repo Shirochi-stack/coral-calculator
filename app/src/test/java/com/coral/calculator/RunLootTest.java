@@ -146,7 +146,7 @@ public class RunLootTest {
         for (int number = 1; number <= 40; number++) {
             PlusRun one = new PlusRun(RunLevels.level(number));
             for (PlusRun.Foe foe : one.foes()) {
-                if (RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET) continue;
+                if (RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || RunUniques.hidden(foe.kind)) continue;
                 foe.flat = true;
                 // (One of a swarm counts for its share.)
                 falls += foe.swarm ? 1.0 / PlusRun.SWARM_SHARE : 1;

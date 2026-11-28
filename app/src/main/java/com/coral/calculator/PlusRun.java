@@ -135,6 +135,8 @@ final class PlusRun {
     static final int MACHINE = 500;
     /** And Tulle, who keeps the vanity boutique that stands in Rosemarrow: a counter she is at. */
     static final int BOUTIQUE = 600;
+    /** And the stairway down into a land's dungeon. */
+    static final int STAIRS = 700;
     /**
      * A pot of black ink, which stands in the later lands and throws the black curse: how
      * often, for how long it swells before it does, from how far off it throws, and how
@@ -824,6 +826,8 @@ final class PlusRun {
          */
         boolean triple, airDash, dashStrikes, pound, roll, wallJump, glide, secondWind;
         int thorns;
+        /** In a dungeon, how much harder her blows land, in percent, from the blessings chosen on the way down. */
+        int mightPct;
     }
 
     // How much creatures take
@@ -884,6 +888,41 @@ final class PlusRun {
     /** How many of a swarm give what one of a land's own gives (experience, pluses, a chance of a drop); and what is gathered toward the next of it. */
     static final int SWARM_SHARE = 25;
     private float swarmXp;
+
+    // Water
+
+    /** How fast she swims; how long she can hold her breath; and how fast an ink bolt she shoots underwater goes. */
+    static final float SWIM = 3.6f, HOLD_BREATH = 8, INK_BOLT = 9;
+    private boolean inWater, swimming;
+    private float breath = HOLD_BREATH, breathTick, swum;
+    private int inkBolts;
+
+    boolean inWater() { return inWater; }
+    boolean swimming() { return swimming; }
+    float breath() { return breath; }
+    float swum() { return swum; }
+    int inkBolts() { return inkBolts; }
+
+    /** Underwater, a use of what she holds also sends a bolt of ink the way she faces. */
+    private void inkBolt() {
+        Shot shot = shoot(BLOT_SHOT, true, x + WIDE / 2 + (facingLeft ? -.4f : .4f), y + TALL * .5f, (facingLeft ? -1 : 1) * INK_BOLT, 0, .8f);
+        shot.by = PLAIN;
+        inkBolts++;
+    }
+
+    // Hideouts
+
+    /** Hidden bosses beaten in this land, and the last of them; strong cracks struck too weakly. */
+    private int hiddenBeaten, hiddenKind = -1;
+
+    int hiddenBeaten() { return hiddenBeaten; }
+    int hiddenKind() { return hiddenKind; }
+
+    /** What a blow must count for to break the crack in front of a hideout: as a land's shields ask, less a part. */
+    static int crackNeeds(int number) { return Math.round(shieldNeeds(Math.max(SHIELDS_FROM, number)) * .7f); }
+
+    /** Whether a hidden door is a hideout's strong crack. */
+    private boolean strongCrack(int[] one) { return one[0] == RunLevels.HIDEOUT && one[7] == 1; }
 
     // Paper trees
 
@@ -1058,7 +1097,8 @@ final class PlusRun {
     /** How many times what a sign gives one of them gives: experience, and the chance of a drop. */
     static final int UNIQUE_XP = 3;
     /** How long each way of fighting winds up before it strikes; and how long its strike lasts. */
-    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f}, STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f};
+    private static final float[] WIND_UP = {.6f, .5f, .35f, .5f, .9f, .7f, .7f, 1, .8f, .7f, .5f, .5f, .8f, .7f, .55f, .45f, .5f, .7f, .4f, .9f, .5f, .7f},
+            STRIKE = {.9f, .3f, .45f, .35f, .15f, .1f, .55f, .2f, .3f, .4f, .7f, .35f, .45f, .45f, .35f, .6f, .7f, .1f, .8f, .2f, .35f, .5f};
     /** Wind-ups begun, things they made (minions, shots, heals), and how many came apart. */
     private int windUps, uniqueShots, calledUp, heals, halves;
 
@@ -1082,7 +1122,7 @@ final class PlusRun {
         float speed = SPEED[foe.kind] * seconds, feet = y + TALL, down = feet - foe.y - foe.tall(), level_ = Math.abs(down);
         boolean near = away < 9 && level_ < 3;
         foe.wait -= seconds;
-        if (way == RunUniques.FORMATION || way == RunUniques.GHOST) foe.ground = foe.y;
+        if (way == RunUniques.FORMATION || way == RunUniques.GHOST || RunUniques.floats(foe.kind)) foe.ground = foe.y;
         if (foe.mode == 1) {
             foe.act -= seconds;
             if (foe.act <= 0) {
@@ -1097,8 +1137,10 @@ final class PlusRun {
             foe.act -= seconds;
             if (foe.act <= 0) {
                 foe.mode = 3;
-                foe.act = way == RunUniques.BURROWER ? 1.6f : way == RunUniques.MINIBOSS ? .6f - .15f * phase3(foe) : .8f;
-                foe.wait = way == RunUniques.SUMMONER ? 6 : way == RunUniques.HEALER ? 4 : way == RunUniques.SNIPER ? 2.2f : way == RunUniques.MINIBOSS ? 1.4f - .4f * phase3(foe) : 1.6f;
+                boolean big = way == RunUniques.MINIBOSS || way == RunUniques.HIDDEN || way == RunUniques.KEEPER;
+                foe.act = way == RunUniques.BURROWER ? 1.6f : big ? .6f - .15f * phase3(foe) : .8f;
+                foe.wait = way == RunUniques.SUMMONER ? 6 : way == RunUniques.HEALER ? 4 : way == RunUniques.SNIPER ? 2.2f : big ? 1.4f - .4f * phase3(foe)
+                        : way == RunUniques.ORBITER ? 3.5f : way == RunUniques.BLINKER ? 2.6f : way == RunUniques.STAMPER ? 2.2f : way == RunUniques.BOUNCER ? 1.2f : 1.6f;
             }
             return;
         }
@@ -1229,6 +1271,7 @@ final class PlusRun {
                 }
                 break;
             }
+            case RunUniques.HIDDEN:
             case RunUniques.MINIBOSS: {
                 int phase = phase3(foe);
                 if (near && level_ < 2) {
@@ -1238,6 +1281,23 @@ final class PlusRun {
                 } else {
                     walk(foe, speed * .5f, true);
                 }
+                break;
+            }
+            case RunUniques.SWIMMER: {
+                // In the water only: toward her, and then each its own way. The eel winds up and darts; the squid keeps off and squirts ink;
+                // the puffer swells and bursts; the jelly drifts up and down after her, crackling.
+                int which = RunUniques.index(foe.kind) - (RunUniques.WATER_FIRST - RunUniques.FIRST);
+                float dx = x + WIDE / 2 - middle, dy = y + TALL / 2 - (foe.y + foe.tall() / 2), far = (float) Math.hypot(dx, dy);
+                if (far > 12) break;
+                foe.leftward = dx < 0;
+                float keep = which == 0 ? 5 : 0, pace = speed * (which == 3 ? .7f : 1);
+                float toward = far > keep ? 1 : -1;
+                if (which == 3) dy += (float) Math.sin(foe.clock * 2) * 1.2f;
+                swimBy(foe, toward * dx / Math.max(.3f, far) * pace, toward * dy / Math.max(.3f, far) * pace);
+                boolean ready = foe.wait <= 0;
+                if (which == 0 && far < 8 && ready) windUp(foe, way);
+                else if (which == 1 && far < 1.8f) windUp(foe, way);
+                else if (which == 2 && far < 6 && ready) windUp(foe, way);
                 break;
             }
             case RunUniques.FORMATION:
@@ -1251,9 +1311,206 @@ final class PlusRun {
                     if (!diving) windUp(foe, way);
                 }
                 break;
+            case RunUniques.BLINKER: {
+                // The moth flutters about her, bobbing; then, lit, it blinks to behind her and lunges.
+                float wantY = y + TALL * .25f + (float) Math.sin(foe.clock * 3) * .3f, dx = middle - (x + WIDE / 2);
+                foe.leftward = toLeft;
+                if (Math.abs(dx) > 2.5f && away < 12) driftBy(foe, (toLeft ? -1 : 1) * speed, 0);
+                driftBy(foe, 0, Math.max(-speed, Math.min(speed, wantY - foe.y)));
+                if (away < 7 && level_ < 3 && foe.wait <= 0) windUp(foe, way);
+                break;
+            }
+            case RunUniques.DROPPER:
+                // Hanging on its thread over the way until she is under it; then down it comes, and after that it runs at her.
+                if (foe.turn == 0) {
+                    foe.y = foe.ground - DROP_HANG + (float) Math.sin(foe.clock * 2) * .12f;
+                    if (away < 1.3f && down > 0) windUp(foe, way);
+                } else if (near && level_ < 1.3f) {
+                    foe.leftward = toLeft;
+                    if (away < 4 && foe.wait <= 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.LEAPER:
+            case RunUniques.BOUNCER: {
+                // The frog hops toward her and then leaps; the stamp bounces as it goes, and then springs at her.
+                if (way == RunUniques.BOUNCER) foe.y = foe.ground - Math.abs((float) Math.sin(foe.clock * Math.PI / .55f)) * .7f;
+                if (near && level_ < 2.5f) {
+                    foe.leftward = toLeft;
+                    if (away < 6 && foe.wait <= 0 && leapTo(foe, x + WIDE / 2) != 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            }
+            case RunUniques.ORBITER: {
+                // The wisp floats a little way off, at the height of her head, its three quills about it; it flings them, and grows them again.
+                float wantX = x + WIDE / 2 + (toLeft ? 3.2f : -3.2f), wantY = y - .2f + (float) Math.sin(foe.clock * 2) * .25f;
+                foe.leftward = toLeft;
+                if (away < 12) driftBy(foe, Math.max(-speed, Math.min(speed, wantX - middle)), Math.max(-speed, Math.min(speed, wantY - foe.y)));
+                if (foe.did == 1 && foe.wait <= 0) foe.did = 0;
+                if (foe.did == 0) {
+                    // (Its quills cut whatever they meet as they go round.)
+                    for (int one = 0; one < 3; one++) {
+                        float[] at = quill(foe, one);
+                        if (at[0] > x && at[0] < x + WIDE && at[1] > y && at[1] < y + TALL && safe <= 0 && offIt <= 0) {
+                            cause = STRUCK;
+                            knock = x + WIDE / 2 < at[0] ? -1 : 1;
+                            if (hurt(false, 2 + RunUniques.bite(foe.kind, level.number))) return;
+                        }
+                    }
+                    if (away < 7 && level_ < 3 && foe.wait <= 0) windUp(foe, way);
+                }
+                break;
+            }
+            case RunUniques.STAMPER:
+                // Slow, and heavy: near her it rears up and slams the ground, and the blow runs along it both ways.
+                if (near && level_ < 1.6f) {
+                    foe.leftward = toLeft;
+                    if (away < 5 && foe.wait <= 0) windUp(foe, way);
+                    else walk(foe, speed, false);
+                } else {
+                    walk(foe, speed * .5f, true);
+                }
+                break;
+            case RunUniques.MIRROR: {
+                // Her own shadow in ink: it goes where she would be in a mirror set at where it began, jumps as she jumps, and near her it lunges.
+                float want = Math.max(foe.home - 7, Math.min(foe.home + 7, 2 * foe.home + foe.wide() / 2 - x - WIDE / 2));
+                foe.leftward = want < foe.x;
+                if (Math.abs(want - foe.x) > .1f) walk(foe, Math.min(speed, Math.abs(want - foe.x)), false);
+                boolean up = !onGround && speedDown < -4;
+                if (up && foe.turn == 0 && foe.y >= foe.ground - .01f) foe.toX = -9;
+                foe.turn = up ? 1 : 0;
+                if (foe.y < foe.ground - .001f || foe.toX < 0) {
+                    foe.toX += 24 * seconds;
+                    foe.y = Math.min(foe.ground, foe.y + foe.toX * seconds);
+                    if (foe.y >= foe.ground) foe.toX = 0;
+                }
+                foe.leftward = toLeft;
+                if (away < 1.8f && level_ < 1.6f && foe.wait <= 0) windUp(foe, way);
+                break;
+            }
+            case RunUniques.KEEPER: {
+                // A keeper fights in three phases, faster at each: it charges, it slams the ground, it sends a volley of what is its own;
+                // and in its last third it calls up those of its dungeon.
+                int phase = phase3(foe);
+                if (away < 15 && level_ < 4) {
+                    foe.leftward = toLeft;
+                    if (away < 9 && foe.wait <= 0) windUp(foe, way);
+                    else if (away > 2.2f) walk(foe, speed * (1 + .35f * phase), false);
+                } else {
+                    walk(foe, speed * .4f, true);
+                }
+                break;
+            }
             default:
                 walk(foe, speed, true);
         }
+    }
+
+    // The dungeons' creatures
+
+    /** How far over its place a spider hangs; how fast what leaps falls; and how far a leap goes at most. */
+    static final float DROP_HANG = 4, LEAP_FALL = 22, LEAP_MOST = 5;
+    /** Blinks made, spiders dropped, leaps taken, stamps of the ground made, and keepers beaten, in this land. */
+    private int blinks, drops_, leaps, stamps, keepersBeaten;
+
+    int blinks() { return blinks; }
+    int spidersDropped() { return drops_; }
+    int leaps() { return leaps; }
+    int stamps() { return stamps; }
+    int keepersBeaten() { return keepersBeaten; }
+
+    /** Where one of a wisp's three quills is now: the middle of it. */
+    static float[] quill(Foe foe, int which) {
+        double angle = foe.clock * 2.4f + which * Math.PI * 2 / 3;
+        float reach = 1.15f * foe.size;
+        return new float[]{foe.x + foe.wide() / 2 + (float) Math.cos(angle) * reach, foe.y + foe.tall() / 2 + (float) Math.sin(angle) * reach * .8f};
+    }
+
+    /** One that floats moves so far, unless that would put it inside something solid. */
+    private void driftBy(Foe foe, float across, float down) {
+        if (roomFor(foe, foe.x + across, foe.y)) foe.x += across;
+        if (roomFor(foe, foe.x, foe.y + down)) foe.y += down;
+        foe.ground = foe.y;
+    }
+
+    /** Whether one would fit at a place: nothing solid where it would be, and inside the land. */
+    private boolean roomFor(Foe foe, float fx, float fy) {
+        if (fx < 0 || fx + foe.wide() > columns || fy < 0) return false;
+        for (int column = (int) Math.floor(fx + .05f); column <= (int) Math.floor(fx + foe.wide() - .05f); column++) {
+            for (int row = (int) Math.floor(fy + .05f); row <= (int) Math.floor(fy + foe.tall() - .05f); row++) if (solid(at(column, row))) return false;
+        }
+        return true;
+    }
+
+    /**
+     * How far across a leap at her would take one (toward her, no further than a leap goes): as far as there is ground at its own height
+     * to come down on, and nothing in the way between; 0 if there is none.
+     */
+    private float leapTo(Foe foe, float target) {
+        float middle = foe.x + foe.wide() / 2, want = Math.max(-LEAP_MOST, Math.min(LEAP_MOST, target - middle));
+        int row = (int) Math.floor(foe.ground + foe.tall() + .05f);
+        for (float across = want; Math.abs(across) >= 1; across -= Math.signum(want) * .5f) {
+            float lands = foe.x + across;
+            boolean ground = solid(at((int) Math.floor(lands + .1f), row)) && solid(at((int) Math.floor(lands + foe.wide() - .1f), row));
+            if (ground && roomFor(foe, lands, foe.ground)) return across;
+        }
+        return 0;
+    }
+
+    /** A slam: the ground jumps, and the blow runs along it both ways from under one. */
+    private void stomp(Foe foe, float middle, float fast) {
+        float feet = foe.ground + foe.tall();
+        shoot(SHOCK, false, middle - .5f, feet - .3f, -fast, 0, 1.6f);
+        shoot(SHOCK, false, middle + .5f, feet - .3f, fast, 0, 1.6f);
+        stamps++;
+        uniqueShots += 2;
+    }
+
+    /** What a keeper sends at her: index cards, needles, ink, chips of stone, paper streamers, the archivist's motes. */
+    static int keeperShot(int kind) {
+        switch (kind - RunUniques.KEEPER_FIRST) {
+            case 0: return SCROLL;
+            case 1: return KNIFE;
+            case 2: return BLOT_SHOT;
+            case 3: return STOP;
+            case 4: return FEATHER;
+            default: return DOT;
+        }
+    }
+
+    /** Whether a keeper still stands in the land: while one does, the way out stays shut. */
+    boolean keeperStands() {
+        for (Foe foe : foes) if (RunUniques.keeper(foe.kind) && !foe.flat) return true;
+        return false;
+    }
+
+    /** She comes down onto a floor of a dungeon with the hearts and lives she had on the floor above. */
+    void carry(int hpLeft, int livesLeft) {
+        hp = Math.max(1, Math.min(maxHp(), hpLeft));
+        lives = Math.max(1, livesLeft);
+    }
+
+    /** Her hearts are mended, all of them: a blessing. */
+    void mend() { hp = maxHp(); }
+
+    /** One that swims goes so far, across and down, as far as the water lets it. */
+    private void swimBy(Foe foe, float across, float down) {
+        float nx = foe.x + across, ny = foe.y + down;
+        if (wet(nx, foe.y, foe)) foe.x = nx;
+        if (wet(foe.x, ny, foe)) foe.y = ny;
+        foe.ground = foe.y;
+    }
+
+    /** Whether every corner of one, at a place, is in water. */
+    private boolean wet(float fx, float fy, Foe foe) {
+        return at((int) Math.floor(fx + .05f), (int) Math.floor(fy + .05f)) == RunLevels.WATER && at((int) Math.floor(fx + foe.wide() - .05f), (int) Math.floor(fy + .05f)) == RunLevels.WATER
+                && at((int) Math.floor(fx + .05f), (int) Math.floor(fy + foe.tall() - .05f)) == RunLevels.WATER
+                && at((int) Math.floor(fx + foe.wide() - .05f), (int) Math.floor(fy + foe.tall() - .05f)) == RunLevels.WATER;
     }
 
     /** Which third of what it can take a creature has lost: 0, 1 or 2. */
@@ -1261,7 +1518,7 @@ final class PlusRun {
 
     private void windUp(Foe foe, int way) {
         foe.mode = 1;
-        foe.act = way == RunUniques.MINIBOSS ? WIND_UP[way] - .15f * phase3(foe) : WIND_UP[way];
+        foe.act = way == RunUniques.MINIBOSS || way == RunUniques.HIDDEN || way == RunUniques.KEEPER ? WIND_UP[way] - .15f * phase3(foe) : WIND_UP[way];
         windUps++;
     }
 
@@ -1312,6 +1569,114 @@ final class PlusRun {
                     heals++;
                 }
                 break;
+            case RunUniques.SWIMMER: {
+                int which = RunUniques.index(foe.kind) - (RunUniques.WATER_FIRST - RunUniques.FIRST);
+                if (which == 0) {
+                    // The squid's ink: three blots at her, fanned.
+                    float toX = x + WIDE / 2 - middle, toY = y + TALL / 2 - cy, far = Math.max(.5f, (float) Math.hypot(toX, toY));
+                    for (int one = -1; one <= 1; one++) shoot(BLOT_SHOT, false, middle, cy, toX / far * 6 + one * toY / far * 1.5f, toY / far * 6 - one * toX / far * 1.5f, 1.6f);
+                    uniqueShots += 3;
+                } else if (which == 1) {
+                    // The puffer bursts, quills all round, and is gone.
+                    for (int drop = 0; drop < 8; drop++) {
+                        double angle = drop * Math.PI / 4;
+                        shoot(KNIFE, false, middle, cy, (float) Math.cos(angle) * 5, (float) Math.sin(angle) * 5, .4f);
+                    }
+                    uniqueShots += 8;
+                    foe.left = 0;
+                    foe.flat = true;
+                    foe.act = 0;
+                    flattened++;
+                }
+                break;
+            }
+            case RunUniques.HIDDEN: {
+                // A hidden boss throws what is its own, more of it at each phase.
+                int many = 3 + phase3(foe) * 2;
+                for (int one = 0; one < many; one++) {
+                    float spread = (one - (many - 1) / 2f) * 1.1f;
+                    shoot(RunUniques.hiddenShot(foe.kind), false, middle, cy, (toLeft ? -1 : 1) * 6.5f, spread, 1.8f);
+                }
+                uniqueShots += many;
+                break;
+            }
+            case RunUniques.BLINKER: {
+                // To behind her, at her height, if there is room there.
+                float to = x + WIDE / 2 + (facingLeft ? 1.7f : -1.7f) - foe.wide() / 2, high = y + TALL * .2f;
+                if (roomFor(foe, to, high)) {
+                    foe.x = to;
+                    foe.y = high;
+                    blinks++;
+                }
+                foe.leftward = x + WIDE / 2 < foe.x + foe.wide() / 2;
+                break;
+            }
+            case RunUniques.DROPPER:
+                if (foe.turn == 0) drops_++;
+                break;
+            case RunUniques.LEAPER:
+            case RunUniques.BOUNCER: {
+                float across = leapTo(foe, x + WIDE / 2), time = STRIKE[way];
+                foe.fromX = across / time;
+                foe.toX = -.5f * LEAP_FALL * time * (way == RunUniques.BOUNCER ? 1.25f : 1);
+                foe.y = foe.ground;
+                leaps++;
+                break;
+            }
+            case RunUniques.ORBITER:
+                // Its three quills, at her.
+                for (int one = 0; one < 3; one++) {
+                    float[] at = quill(foe, one);
+                    float toX = x + WIDE / 2 - at[0], toY = y + TALL * .45f - at[1], far = Math.max(.5f, (float) Math.hypot(toX, toY));
+                    shoot(FEATHER, false, at[0], at[1], toX / far * 6.5f, toY / far * 6.5f, 1.8f);
+                }
+                uniqueShots += 3;
+                foe.did = 1;
+                break;
+            case RunUniques.STAMPER:
+                stomp(foe, middle, 7);
+                break;
+            case RunUniques.KEEPER: {
+                int phase = phase3(foe), move = foe.turn++ % 3;
+                if (move == 0) {
+                    // A charge, the length of the hall.
+                    foe.act = 1.1f;
+                } else if (move == 1) {
+                    stomp(foe, middle, 8 + phase);
+                    if (phase >= 1) for (int one = -1; one <= 1; one++) shoot(keeperShot(foe.kind), false, middle, foe.y + .3f, one * 2.5f, -7, 1.6f);
+                } else {
+                    int many = 3 + phase * 2;
+                    for (int one = 0; one < many; one++) {
+                        float spread = (one - (many - 1) / 2f) * 1.1f;
+                        shoot(keeperShot(foe.kind), false, middle, cy, (toLeft ? -1 : 1) * 6.5f, spread, 1.8f);
+                    }
+                    uniqueShots += many;
+                    // In its last third, two of its dungeon's own, one each side.
+                    if (phase >= 2 && foe.did < 6) {
+                        int dungeon = (RunUniques.index(foe.kind) - RunUniques.index(RunUniques.KEEPER_FIRST)) * 4 + foe.did / 2 % 4;
+                        int[] kinds = RunDungeons.delvers(dungeon);
+                        for (int side = -1; side <= 1; side += 2) {
+                            int kind = kinds[(foe.did + side + 1) % kinds.length];
+                            if (RunUniques.way(kind) == RunUniques.DROPPER) kind = kinds[(foe.did + side + 2) % kinds.length];
+                            if (RunUniques.way(kind) == RunUniques.DROPPER) kind = RunUniques.DELVER_FIRST + 4;
+                            Foe minion = new Foe(kind);
+                            minion.left = minion.most = Math.max(BLOW, RunUniques.health(kind, level.number) / 2);
+                            float at = middle + side * (foe.wide() / 2 + 1);
+                            minion.x = at - minion.wide() / 2;
+                            minion.ground = foe.ground + foe.tall() - minion.tall();
+                            minion.y = RunUniques.floats(kind) ? minion.ground - 2 : minion.ground;
+                            minion.home = RunUniques.floats(kind) ? minion.y : minion.x;
+                            minion.leftward = toLeft;
+                            minion.dazed = .6f;
+                            minion.spawned = true;
+                            born.add(minion);
+                            foe.did++;
+                            calledUp++;
+                        }
+                    }
+                }
+                break;
+            }
             case RunUniques.MINIBOSS:
                 // From its second phase on, three knives as well, fanned.
                 if (phase3(foe) >= 1) {
@@ -1331,8 +1696,9 @@ final class PlusRun {
                 if (!walk(foe, speed * 3.4f, false)) foe.act = 0;
                 break;
             case RunUniques.SHIELDER:
+            case RunUniques.HIDDEN:
             case RunUniques.MINIBOSS:
-                walk(foe, speed * (way == RunUniques.MINIBOSS ? 4.5f + phase3(foe) : 5), false);
+                walk(foe, speed * (way == RunUniques.SHIELDER ? 5 : 4.5f + phase3(foe)), false);
                 break;
             case RunUniques.MIMIC: {
                 walk(foe, speed * 4, false);
@@ -1348,6 +1714,45 @@ final class PlusRun {
                 foe.y = foe.ground - (float) Math.sin(through * Math.PI) * .7f;
                 break;
             }
+            case RunUniques.SWIMMER: {
+                // The eel's dart.
+                int which = RunUniques.index(foe.kind) - (RunUniques.WATER_FIRST - RunUniques.FIRST);
+                if (which == 2) {
+                    float dx = x + WIDE / 2 - middle, dy = y + TALL / 2 - (foe.y + foe.tall() / 2), far = Math.max(.3f, (float) Math.hypot(dx, dy));
+                    swimBy(foe, dx / far * speed * 3.2f, dy / far * speed * 3.2f);
+                }
+                break;
+            }
+            case RunUniques.BLINKER:
+                driftBy(foe, (foe.leftward ? -1 : 1) * speed * 4, 0);
+                break;
+            case RunUniques.DROPPER:
+                if (foe.turn == 0) {
+                    foe.y = Math.min(foe.ground, foe.y + speed / SPEED[foe.kind] * 14);
+                    if (foe.y >= foe.ground) {
+                        foe.turn = 1;
+                        foe.act = 0;
+                    }
+                } else {
+                    if (!walk(foe, speed * 3.2f, false)) foe.act = 0;
+                }
+                break;
+            case RunUniques.LEAPER:
+            case RunUniques.BOUNCER: {
+                float step = speed / SPEED[foe.kind];
+                float to = foe.x + foe.fromX * step;
+                if (roomFor(foe, to, foe.y)) foe.x = to;
+                foe.toX += LEAP_FALL * step;
+                foe.y = Math.min(foe.ground, foe.y + foe.toX * step);
+                if (foe.act - seconds <= 0) foe.y = foe.ground;
+                break;
+            }
+            case RunUniques.MIRROR:
+                if (!walk(foe, speed * 3, false)) foe.act = 0;
+                break;
+            case RunUniques.KEEPER:
+                if ((foe.turn - 1) % 3 == 0 && !walk(foe, speed * (4 + phase3(foe)), false)) foe.act = 0;
+                break;
             case RunUniques.FORMATION:
                 foe.y += speed * 5;
                 if (foe.y + foe.tall() > y + TALL) foe.y = y + TALL - foe.tall();
@@ -1428,7 +1833,8 @@ final class PlusRun {
         // (Attack and the tree's attack make every blow harder; intelligence, those of tomes, staffs and wands.)
         int thing = thingOf(with);
         boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
-        float more = 1 + (perks.skills.stats[RunSkills.ATK] + perks.skills.effects[RunSkills.E_ATK_PCT] + activeEffect(RunSkills.E_ATK_PCT) + (minded ? intelligence() : 0)) / 100f;
+        float more = 1 + (perks.skills.stats[RunSkills.ATK] + perks.skills.effects[RunSkills.E_ATK_PCT] + activeEffect(RunSkills.E_ATK_PCT) + (minded ? intelligence() : 0)
+                + perks.mightPct) / 100f;
         return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
     }
 
@@ -2194,6 +2600,22 @@ final class PlusRun {
             float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
             loose(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
         }
+        if (RunUniques.great(foe.kind)) {
+            if (RunUniques.hidden(foe.kind)) {
+                hiddenBeaten++;
+                hiddenKind = foe.kind;
+            } else {
+                keepersBeaten++;
+            }
+            int theme = Math.min(RunLoot.THEMES.length - 1, RunUniques.chapter(foe.kind) + 1);
+            for (int type = 0; type < 3; type++) {
+                int roll = lootRoll(100), rarity = roll < 10 ? RunLoot.ROSE : roll < 40 ? RunLoot.RED : RunLoot.GOLD;
+                int typeRoll = type == 0 ? 0 : type == 1 ? 6000 : 9999;
+                int code = RunLoot.dropped(RunLoot.WAITS, theme, rarity, typeRoll, lootRoll(10000));
+                loose(new Drop(middle, top, (type - 1) * 2.2f, -9, code));
+            }
+            return;
+        }
         // (Gold and black ink drop as the hardest do.)
         hard |= foe.tier >= GOLD_TIER;
         if (lootRoll(10000) < RunLoot.gearChance(boss, hard, landLevel) * TIER_DROPS[foe.tier] * (RunUniques.is(foe.kind) ? UNIQUE_XP : 1)) {
@@ -2414,7 +2836,7 @@ final class PlusRun {
             foe.y = foe.ground;
             foe.home = foe.x;
             // (One of a swarm is never of a colour of toughness: a swarm is many, not tough.)
-            foe.tier = waits || !level.tiered || RunLevels.swarmed(spec) ? NORMAL : tierOf(level.number, spec[0], spec[1], spec[2]);
+            foe.tier = waits || !level.tiered || RunLevels.swarmed(spec) || RunUniques.keeper(spec[0]) ? NORMAL : tierOf(level.number, spec[0], spec[1], spec[2]);
             foe.left = waits ? health(spec[0]) + (RunLevels.rover(spec[0]) ? 0 : RunMarket.takes(perks.black))
                     : RunUniques.is(spec[0]) ? RunUniques.health(spec[0], level.number) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW
                     : healthOf(spec[0]) * (spec.length > 3 ? spec[3] : 1) * TIER_HEALTH[foe.tier] + tougher(spec[0]) * BLOW;
@@ -2426,14 +2848,15 @@ final class PlusRun {
                 foe.guard = foe.guardMost = shieldHolds(level.number) + 2;
                 foe.guardNeeds = level.number < SHIELDS_FROM ? BLOW : Math.round(shieldNeeds(level.number) * .8f);
                 foe.guardKind = -1;
-            } else if (RunUniques.flies(spec[0])) {
+            } else if (RunUniques.flies(spec[0]) || RunUniques.floats(spec[0])) {
                 foe.home = foe.y;
-            } else if (!waits && level.tiered && shielded(level.number, spec[0], spec[1], spec[2])) {
+            } else if (!waits && level.tiered && !RunUniques.keeper(spec[0]) && shielded(level.number, spec[0], spec[1], spec[2])) {
                 foe.guard = foe.guardMost = shieldHolds(level.number);
                 foe.guardNeeds = shieldNeeds(level.number);
                 foe.guardKind = shieldKind(level.number);
             }
             if (spec[0] == RunLevels.WORD) foe.y = foe.ground - WORD_HANGS;
+            if (RunUniques.is(spec[0]) && RunUniques.way(spec[0]) == RunUniques.DROPPER) foe.y = foe.ground - DROP_HANG;
             // Each divide starts its hop at a different moment.
             foe.clock = spec[1] * .37f % HOP_EVERY;
             if (waits) {
@@ -2633,6 +3056,10 @@ final class PlusRun {
         for (int[] tree : other.trees) trees.add(tree.clone());
         System.arraycopy(other.paperCut, 0, paperCut, 0, paperCut.length);
         treesCut = other.treesCut;
+        inWater = other.inWater;
+        swimming = other.swimming;
+        breath = other.breath;
+        breathTick = other.breathTick;
         // (Her moves, as they are.)
         airDashLeft = other.airDashLeft;
         rollLeft = other.rollLeft;
@@ -2762,7 +3189,13 @@ final class PlusRun {
      * it and jumps up through it, and it holds her only when she comes down onto it.
      */
     private boolean firm(char square) {
-        return square != RunLevels.LEDGE && solid(square) || square == RunLevels.LAVA && has(RED) || square == RunLevels.WATER && has(BLUE);
+        // (Water holds her up, in blue, only at its top and only while she does not mean to go down into it.)
+        return square != RunLevels.LEDGE && solid(square) || square == RunLevels.LAVA && has(RED) || square == RunLevels.WATER && has(BLUE) && !down && !inWater;
+    }
+
+    /** What stops her from the side or from below: what is firm, but never water, which she swims into. */
+    private boolean wall(char square) {
+        return square != RunLevels.WATER && firm(square);
     }
 
     /** The pluses not yet collected: the column and row of each. */
@@ -2876,6 +3309,12 @@ final class PlusRun {
         if (room < 0) {
             far = one[5] != one[1] && Math.abs(middle - one[5] - .5f) < .8f;
             if (!far && one[7] == 1 && (revealed & 1 << at) == 0) {
+                if (strongCrack(one) && dealt() < crackNeeds(level.number)) {
+                    clangX = one[1] + .5f;
+                    clangY = one[2] - 1;
+                    clangs++;
+                    return true;
+                }
                 revealed |= 1 << at;
                 reveals++;
                 return true;
@@ -3858,7 +4297,7 @@ final class PlusRun {
     float foeY() { return foeY; }
 
     /** Whether the gate will let her through: always, but for the land where Zero stands in front of it. */
-    boolean gateOpen() { return !level.guarded || !standing() && opening <= 0; }
+    boolean gateOpen() { return (!level.guarded || !standing() && opening <= 0) && !keeperStands(); }
 
     /** The things one of those who wait does in a third of the fight, in order: for checking that each is done. */
     static int[] does(int kind, int phase) { return PATTERNS[kind][phase]; }
@@ -4121,6 +4560,36 @@ final class PlusRun {
         } else if (climbing) {
             climbing = false;
             if (jump) speedDown = Math.min(speedDown, -CLIMB * 2);
+        }
+        // In water, in blue, she swims: up while the jump is held, down with the down button, along with the arrows; at the top, a jump
+        // takes her out. Without it she holds her breath, and when that is gone it costs her.
+        inWater = about == RunLevels.WATER;
+        swimming = inWater && has(BLUE);
+        if (swimming) {
+            float wantDown = jump ? -SWIM : down ? SWIM : .4f, wantAcross = left == right ? 0 : left ? -SWIM : SWIM;
+            speedDown += (wantDown - speedDown) * Math.min(1, seconds * 7);
+            speedAcross += (wantAcross - speedAcross) * Math.min(1, seconds * 7);
+            airJumps = 0;
+            sinceGround = 0;
+            int head = (int) Math.floor(y + TALL * .25f);
+            if (pressed && at((int) Math.floor(x + WIDE / 2), head) != RunLevels.WATER) {
+                speedDown = -LEAP * .9f;
+                swimming = false;
+            }
+            swum += seconds;
+        }
+        if (inWater && !has(BLUE)) {
+            breath -= seconds;
+            if (breath <= 0 && (breathTick -= seconds) <= 0) {
+                breathTick = 1;
+                if (safe <= 0) {
+                    cause = SANK;
+                    if (hurt(false)) return;
+                }
+            }
+        } else {
+            breath = Math.min(HOLD_BREATH, breath + seconds * 3);
+            breathTick = 0;
         }
         // Water she cannot swim in lets her down slowly, and out through the bottom.
         if (about == RunLevels.WATER && !has(BLUE)) {
@@ -5344,6 +5813,7 @@ final class PlusRun {
         sinceStrike = 0;
         strikes++;
         chop();
+        if (inWater) inkBolt();
         copied();
         float way = facingLeft ? -1 : 1, fromX = x + WIDE / 2 + way * .5f, fromY = y + TALL * .45f;
         // How fast it flies and how far it reaches are the table's; a find of something she has already makes it reach a third as far again.
@@ -5453,7 +5923,7 @@ final class PlusRun {
     private boolean clear(float across) {
         if (across < 0 || across + WIDE > columns) return false;
         for (int row = (int) Math.floor(y + .05f); row <= (int) Math.floor(y + TALL - .05f); row++) {
-            for (int column = (int) Math.floor(across + .02f); column <= (int) Math.floor(across + WIDE - .02f); column++) if (firm(at(column, row))) return false;
+            for (int column = (int) Math.floor(across + .02f); column <= (int) Math.floor(across + WIDE - .02f); column++) if (wall(at(column, row))) return false;
         }
         return true;
     }
@@ -5731,6 +6201,12 @@ final class PlusRun {
         for (int index = 0; index < level.rooms.size() && room < 0; index++) {
             int[] one = level.rooms.get(index);
             if (one[7] == 1 && (revealed & 1 << index) == 0 && one[1] + 1 > from && one[1] < to && one[2] > top && one[2] - 1 < bottom) {
+                if (strongCrack(one) && dealt() < crackNeeds(level.number)) {
+                    clangX = one[1] + .5f;
+                    clangY = one[2] - 1;
+                    clangs++;
+                    continue;
+                }
                 revealed |= 1 << index;
                 reveals++;
             }
@@ -6085,7 +6561,7 @@ final class PlusRun {
         if (by > 0) {
             int column = (int) Math.floor(x + WIDE);
             for (int row = top; row <= bottom; row++) {
-                if (firm(at(column, row))) {
+                if (wall(at(column, row))) {
                     x = column - WIDE - .001f;
                     speedAcross = 0;
                     break;
@@ -6094,7 +6570,7 @@ final class PlusRun {
         } else if (by < 0) {
             int column = (int) Math.floor(x);
             for (int row = top; row <= bottom; row++) {
-                if (firm(at(column, row))) {
+                if (wall(at(column, row))) {
                     x = column + 1 + .001f;
                     speedAcross = 0;
                     break;
@@ -6162,8 +6638,8 @@ final class PlusRun {
                     if (column == left && y + TALL - by <= row + .0001f) drops++;
                     continue;
                 }
-                // A ledge, of either kind, holds her only when she comes down onto it from above.
-                if (firm(here) || thin && y + TALL - by <= row + .02f) {
+                // A ledge, of either kind, holds her only when she comes down onto it from above; and so does water, in blue.
+                if (wall(here) || (thin || here == RunLevels.WATER && firm(here)) && y + TALL - by <= row + .02f) {
                     y = row - TALL;
                     speedDown = 0;
                     onGround = true;
@@ -6190,7 +6666,7 @@ final class PlusRun {
         } else if (by < 0) {
             int row = (int) Math.floor(y);
             for (int column = left; column <= right; column++) {
-                if (firm(at(column, row))) {
+                if (wall(at(column, row))) {
                     y = row + 1 + .001f;
                     speedDown = 0;
                     break;
@@ -6224,7 +6700,8 @@ final class PlusRun {
         }
         if (foe.away && !RunLevels.rover(foe.kind) || foe.kind == RunLevels.TARGET) return;
         if (foe.crowd && (room >= 0 || Math.abs(foe.x - x) > WAKES)) return;
-        if (RunUniques.is(foe.kind) && (room >= 0 && !foe.spawned || Math.abs(foe.x - x) > WAKES)) return;
+        // (One of them in the land keeps still while she is in a place off it; a hidden boss in its hideout, while she is not.)
+        if (RunUniques.is(foe.kind) && ((room >= 0) != (foe.x >= level.main) || Math.abs(foe.x - x) > WAKES)) return;
         if (!puddles.isEmpty() && mired(foe)) seconds *= PUDDLE_SLOWS;
         foe.clock += seconds;
         foe.guardMet += seconds;

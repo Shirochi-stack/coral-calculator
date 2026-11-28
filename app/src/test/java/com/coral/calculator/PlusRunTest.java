@@ -4170,6 +4170,8 @@ public class PlusRunTest {
             assertTrue("land " + number + " has " + level.rooms.size(), level.rooms.size() >= (level.chapter >= 1 && number % 3 != 1 || level.chapter >= 2 ? 2 : 1));
             assertTrue(level.main > level.gate && level.main < level.columns);
             for (int[] one : level.rooms) {
+                // (A hideout and a lagoon have tests of their own: RunSecretsTest, RunWaterTest.)
+                if (one[0] == RunLevels.HIDEOUT || one[0] == RunLevels.LAGOON) continue;
                 kinds[one[0]] = true;
                 if (one[7] != 0) hidden++;
                 // Its door is in the land proper, on the ground; the place itself is beyond the end of it.
@@ -4226,12 +4228,13 @@ public class PlusRunTest {
                 }
                 // (A home may have one behind a false wall of its own.)
                 if (one[0] == RunLevels.HOUSE && one[14] == RunLevels.HOME) assertTrue("land " + number, chests <= 1);
-                else assertEquals("land " + number, one[0] == RunLevels.STASH || one[0] == RunLevels.PASSAGE || one[0] == RunLevels.ARENA ? 1 : 0, chests);
+                else assertEquals("land " + number, one[0] == RunLevels.STASH || one[0] == RunLevels.PASSAGE || one[0] == RunLevels.ARENA || one[0] == RunLevels.LAGOON ? 1 : 0, chests);
             }
             // No sign of the land is in them but those that walk in its passages, and nothing of the land's to fight with.
             for (int[] foe : level.foes) {
                 boolean passing = false;
-                for (int[] one : level.rooms) passing |= one[0] <= RunLevels.PASSAGE && foe[1] >= one[3] && foe[1] <= one[4];
+                // (And a hideout's hidden boss.)
+                for (int[] one : level.rooms) passing |= (one[0] <= RunLevels.PASSAGE || one[0] == RunLevels.HIDEOUT || one[0] == RunLevels.LAGOON) && foe[1] >= one[3] && foe[1] <= one[4];
                 assertTrue(foe[1] < level.main || passing);
             }
             for (int[] weapon : level.weapons) assertTrue(weapon[1] < level.main);
@@ -6404,7 +6407,7 @@ public class PlusRunTest {
         // Galpi's hidden room: gone into, it is found.
         run = asked(RunLevels.SHAPED_FROM, RunLevels.ROOM);
         int hidden = -1;
-        for (int index = 0; index < run.level().rooms.size(); index++) if (run.level().rooms.get(index)[7] != 0) hidden = index;
+        for (int index = 0; index < run.level().rooms.size(); index++) if (run.level().rooms.get(index)[7] != 0 && run.level().rooms.get(index)[0] != RunLevels.HIDEOUT) hidden = index;
         one = run.level().rooms.get(hidden);
         run.place(one[1] + (1 - PlusRun.WIDE) / 2, one[2] - PlusRun.TALL);
         run.step(STEP, false, false, false);
@@ -7612,7 +7615,7 @@ public class PlusRunTest {
         }
         assertEquals(95 + 86 + 37 + 7 + 11 + 4 + 40 + 19 + 3 + 3 + 3 + 3 + 5 + 7 + 1 + 1 + 2 + 1 + 10 + 5 + 6 + 4 + 2 + 9 + 19 + 12 + 14 + 4 + RunStory.GALLERY.length + RunStory.NEW_PET.length + RunStory.WARP.length + 80 + RunStory.LEVEL.length
                 // (The two lines about sloppy copies in the lands, her line with the game's name in it, and the keys.)
-                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length, lines);
+                + 2 + RunStory.TITLE_LINE.length + RunStory.KEYS.length + RunStory.SKILLS.length + RunStory.MOVES.length + RunStory.SECRETS.length + RunStory.WATER.length + RunStory.DUNGEONS.length + RunStory.SMITH_QUESTS.length, lines);
         assertEquals(5, RunStory.GALLERY.length);
         assertEquals(14, RunStory.REVEAL.length);
         // The clip stands where Halgakos names the great evil, and says it shorter, in her own way; there is something told before it and after.
@@ -7678,8 +7681,9 @@ public class PlusRunTest {
         else run.step(STEP, false, true, step < HOLDS[plan - 3], strike);
     }
 
-    /** Whether the bot fights as it goes: a tap of what it holds, five times a second, while a creature is near. */
+    /** Whether the bot fights as it goes: a tap of what it holds, five times a second, while a creature is near. And how much harder it has it (deep in a dungeon). */
     private static boolean fighting;
+    private static int crossHarder;
 
     private static boolean strikeNow(PlusRun run) {
         if ((int) (run.time() * 10) % 2 != 0) return false;
@@ -7721,6 +7725,53 @@ public class PlusRunTest {
         assertTrue("crossed " + crossed + ":" + lost, crossed >= 8);
     }
 
+    /**
+     * A fair player in the dungeons: the same bot, fighting, crosses a middle floor of dungeons from first to last with their own creatures
+     * in, and keeps a life. (Their keepers are fought in RunDungeonsTest.)
+     */
+    @Test public void aFairPlayerWhoFightsCrossesDungeonFloorsWithTheirOwnCreatures() {
+        StringBuilder lost = new StringBuilder();
+        int beaten = 0, crossed = 0;
+        fighting = true;
+        try {
+            for (int dungeon : new int[]{0, 4, 9, 14, 19, 23}) {
+                // (On the hardest of its floors that a dive lays: a teeming one, as deep as can be before the keeper's.)
+                int floor = RunDungeons.floors(dungeon) - 2;
+                long dive = 77;
+                while (RunDungeons.kindOf(dungeon, floor, dive) != RunDungeons.TEEMING) dive++;
+                RunLevels.Level level = RunLevels.dungeon(dungeon, floor, dive);
+                crossHarder = RunDungeons.deeper(floor);
+                for (int index = level.items.size() - 1; index >= 0; index--) if (level.items.get(index)[0] >= PlusRun.PET) level.items.remove(index);
+                int own = 0;
+                for (int[] foe : level.foes) if (RunUniques.is(foe[0])) own++;
+                PlusRun run = cross(level, 500);
+                lost.append(" ").append(dungeon).append(" (").append(level.columns).append(" wide, ").append(own).append(" of its own, ").append(run.flattened()).append(" beaten):").append(run.livesLost()).append(run.state() == PlusRun.WON ? "" : run.state() == PlusRun.PLAYING ? " (stuck at " + (int) run.x() + " of " + run.columns() + ")" : " LOST");
+                if (run.state() == PlusRun.LOST) beaten++;
+                if (run.state() == PlusRun.WON) crossed++;
+            }
+        } finally {
+            fighting = false;
+            crossHarder = 0;
+        }
+        System.out.println("DIVE lives lost" + lost);
+        assertEquals("beaten:" + lost, 0, beaten);
+        assertTrue("crossed " + crossed + ":" + lost, crossed >= 4);
+    }
+
+    /** Every dungeon's first floor and keeper's floor can be crossed, and every floor of three of them (without their creatures, as for a land). */
+    @Test public void everyDungeonFloorCanBeCrossed() {
+        StringBuilder stuck = new StringBuilder();
+        for (int dungeon = 0; dungeon < RunDungeons.COUNT; dungeon++) {
+            int floors = RunDungeons.floors(dungeon);
+            for (int floor = 0; floor < floors; floor++) {
+                if (floor != 0 && floor != floors - 1 && dungeon % 8 != 3) continue;
+                PlusRun run = cross(unguarded(RunLevels.dungeon(dungeon, floor, 31 + dungeon)), 400);
+                if (run.state() != PlusRun.WON) stuck.append("\n").append(dungeon).append("/").append(floor).append(" at ").append((int) run.x()).append(" of ").append(run.columns()).append(around(run));
+            }
+        }
+        assertEquals("", stuck.toString());
+    }
+
     private static int length(int plan) { return plan == WALK ? 4 : plan == WAIT ? 12 : plan == BACK ? 14 : 6; }
 
     /**
@@ -7755,6 +7806,7 @@ public class PlusRunTest {
         perks.level = RunLoot.recommended(level.number);
         perks.hearts += RunLoot.hearts(perks.level);
         perks.defence = RunLoot.guard(perks.level);
+        perks.harder = crossHarder;
         PlusRun run = new PlusRun(level, perks);
         float furthest = run.x(), since = 0;
         while (run.state() == PlusRun.PLAYING && run.time() < seconds) {

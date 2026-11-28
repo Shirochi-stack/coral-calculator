@@ -579,6 +579,59 @@ final class RunStory {
             {"wind1", "Not yet! Second wind Sloppy~♡", "H", PLAYER + "She was about to be knocked out but her second wind kicks in and leaves her standing on half a heart. Gritty, defiant, catching her breath, then a cheeky grin."},
     };
 
+    /** Hideouts: near one for the first time, she feels it; a hidden boss beaten, she crows. */
+    static final String[][] SECRETS = {
+            {"hid1", "Something's hidden near here. I can feel it Sloppy~♡", "H", PLAYER + "She senses a secret place nearby, a hideout no one was meant to find. Hushed, intrigued, a little thrilled, leaning in."},
+            {"hid2", "A boss nobody was meant to find. Mine now Sloppy~♡", "H", PLAYER + "She has just beaten a hidden boss in a secret hideout and claims its treasure. Breathless, triumphant, smug."},
+    };
+
+    /** Water: the first time she is in deep water, in blue and without it. */
+    /**
+     * The smith sisters' quests: for each of Moru's, Pulmu's, Sutdol's and all three's, the asking, Halgakos's answer, two steps handed
+     * in, and the end.
+     */
+    static final String[][] SMITH_QUESTS = {
+            {"sq0a", "My good hammer's gone. Fell down a dungeon stair. Help me get it back.", "W", "A blunt, short-spoken dwarf smith girl, asks the hero for help: her favourite hammer fell down a dungeon. Flat, gruff, embarrassed underneath."},
+            {"sq0b", "A hammer at the bottom of a dungeon? On it Sloppy~♡", "H", PLAYER + "She agrees to fetch the blacksmith's lost hammer from a dungeon. Eager, game."},
+            {"sq0c", "Sixty flat. Good. Now metal. Six of it.", "W", "A blunt, short-spoken dwarf smith girl, approves the hero's progress and asks for six pieces of metal. Short, approving."},
+            {"sq0d", "Good metal. Last thing. The hammer's at the bottom of a dungeon. Go.", "W", "A blunt, short-spoken dwarf smith girl, sends the hero down a dungeon for the hammer. Blunt, trusting."},
+            {"sq0e", "That's it. My hammer. ...Made you one like it. Take it. Don't thank me.", "W", "A blunt, short-spoken dwarf smith girl, has her hammer back and gives the hero a hammer she forged. Gruff, touched, hiding it."},
+            {"sq1a", "I'm making you a coat of scales! Real scales! I just need, um, everything. Help me?", "c", "A loud, sunny dwarf armourer girl, excitedly asks the hero to help gather what she needs for a coat of scales. Big, warm, laughing."},
+            {"sq1b", "A coat of scales? Yes please Sloppy~♡", "H", PLAYER + "She happily agrees to help the cheerful armourer make her a coat of scales. Delighted."},
+            {"sq1c", "Four hunts! The guild loves you! Now ink crystals, four, for the shine!", "c", "A loud, sunny dwarf armourer girl, cheers the hero's progress and asks for four ink crystals. Loud, happy."},
+            {"sq1d", "Ooh, sparkly! Last one: a hidden boss's scale. They keep the best ones in hideouts!", "c", "A loud, sunny dwarf armourer girl, delighted with the crystals, sends the hero to beat a hidden boss for its scale. Excited, conspiratorial."},
+            {"sq1e", "Done! Try it on, try it on! Fits like a book cover! I knew it would!", "c", "A loud, sunny dwarf armourer girl, has finished the coat of scales and makes the hero try it on. Overjoyed, laughing."},
+            {"sq2a", "A charm of paper and gold. Weighed twice, cut once. Bring me what I ask, in order.", "d", "A calm, exact dwarf jeweller-smith girl, asks the hero to gather paper and gold for a charm, precisely and in order. Quiet, level, dry."},
+            {"sq2b", "In order. Weighed twice. Got it Sloppy~♡", "H", PLAYER + "She promises the exacting smith to bring things in order. Mock-serious, amused."},
+            {"sq2c", "Five trees. The paper is good. Three gold leaf next.", "d", "A calm, exact dwarf jeweller-smith girl, checks the paper the hero brought and asks for three gold leaf. Dry, satisfied."},
+            {"sq2d", "Gold, weighed twice. Now go four floors down a dungeon. The charm wants the depth.", "d", "A calm, exact dwarf jeweller-smith girl, weighs the gold and sends the hero four floors down a dungeon. Calm, exact, a touch mysterious."},
+            {"sq2e", "Finished. It is exact. So are you, today.", "d", "A calm, exact dwarf jeweller-smith girl, hands over the finished charm with a rare compliment. Quiet, dry, warm underneath."},
+            {"sq3a", "We three want to make one thing together. Clear dungeons. Bring metal. Lots of it.", "W", "A blunt, short-spoken dwarf smith girl, speaks for all three sisters: they want to forge one thing together, and need the hero's help. Gruff, serious, proud."},
+            {"sq3b", "All three sisters at once? I'd better not haggle Sloppy~♡", "H", PLAYER + "She accepts a quest from all three smith sisters at once. Teasing, a little nervous."},
+            {"sq3c", "Three dungeons! Now metal, five of each kind, for all three anvils!", "c", "A loud, sunny dwarf armourer girl, cheers the hero for clearing three dungeons and asks for five of each metal. Loud, thrilled."},
+            {"sq3d", "Weighed. All fifteen. Last: the Inkwell Depths. Its keeper's ink sets the seal.", "d", "A calm, exact dwarf jeweller-smith girl, has weighed all the metal and sends the hero to clear the Inkwell Depths. Calm, exact, solemn."},
+            {"sq3e", "Three anvils. One seal. Yours. ...Proud of you. Don't make it weird.", "W", "A blunt, short-spoken dwarf smith girl, gives the hero the seal the three sisters forged together. Gruff, proud, embarrassed."},
+    };
+
+    /** The dungeons: the stairway found, going down, between floors, the keeper, cleared, lost, three kinds of floor, and her own double in ink. */
+    static final String[][] DUNGEONS = {
+            {"dng1", "Stairs going down... a whole dungeon under here! Want to see how deep it goes Sloppy~♡", "H", PLAYER + "She has found a stone stairway leading down into a dungeon. Curious, excited, a little daring."},
+            {"dng2", "Down we go. Stay close, it gets dark down here Sloppy~♡", "H", PLAYER + "She is heading down the stairs into a dungeon. Brave but whispering a little."},
+            {"dng3", "Another floor down! Pick a blessing, quick Sloppy~♡", "H", PLAYER + "She has cleared a dungeon floor and is offered a choice of blessings. Pleased, eager."},
+            {"dng4", "That's the keeper of this place. Big, and grumpy Sloppy~♡", "H", PLAYER + "A huge dungeon boss has appeared ahead. Nervous, but determined and a little teasing."},
+            {"dng5", "The whole dungeon, cleared! The keeper's treasure is ours Sloppy~♡", "H", PLAYER + "She has beaten the dungeon's keeper and cleared every floor. Triumphant, delighted."},
+            {"dng6", "The dungeon wins this time. Next dive, we go deeper Sloppy~♡", "H", PLAYER + "She has run out of lives in a dungeon. Disappointed but stubborn and hopeful."},
+            {"dng7", "It's so dark... I'll keep my lantern close Sloppy~♡", "H", PLAYER + "She has come down onto a pitch-dark dungeon floor. Hushed, a little spooked."},
+            {"dng8", "Look at all the pluses! A gilded floor Sloppy~♡", "H", PLAYER + "She has come down onto a dungeon floor glittering with treasure. Gleeful, greedy."},
+            {"dng9", "So many of them on this floor... careful Sloppy~♡", "H", PLAYER + "She has come down onto a dungeon floor crawling with monsters. Wary, bracing herself."},
+            {"dng10", "Is that... me? Made of ink? How rude Sloppy~♡", "H", PLAYER + "She meets a living ink shadow copying her. Startled, then offended and indignant."},
+    };
+
+    static final String[][] WATER = {
+            {"wat1", "Blue ribbon, deep water. I can swim in this Sloppy~♡", "H", PLAYER + "She dives into deep water wearing the blue ribbon and finds she can swim and breathe. Delighted, surprised, bubbly."},
+            {"wat2", "Can't breathe down here! The blue ribbon, quick Sloppy~♡", "H", PLAYER + "She has fallen into deep water without the blue ribbon and is holding her breath. Urgent, flustered, a little panicked."},
+    };
+
     /** A new level: she says so, glowing. */
     static final String[][] LEVEL = {
             {"lvl1", "Level up! Feel that? That's me getting stronger Sloppy~♡", "H", PLAYER + "She has just gone up a level in a game and glows with new power. Thrilled, smug, flexing."},
@@ -1214,6 +1267,10 @@ final class RunStory {
         groups.add(KEYS);
         groups.add(SKILLS);
         groups.add(MOVES);
+        groups.add(SECRETS);
+        groups.add(WATER);
+        groups.add(DUNGEONS);
+        groups.add(SMITH_QUESTS);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
