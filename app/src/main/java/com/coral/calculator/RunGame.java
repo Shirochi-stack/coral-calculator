@@ -225,7 +225,7 @@ final class RunGame {
      */
     private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings: a second jump", "Glossary magnet", "Longer treats", "Bigger ink tank",
             "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons", "A place by her side", "Room for a stray", "Kennel: brisker pets",
-            "Kennel: stronger pets", "Triple jump", "Air dash", "Thorns", "Ground pound", "Dodge roll", "Wall jump", "Glide", "Second wind"};
+            "Kennel: stronger pets", "Triple jump", "Air dash", "Thorns", "Ground pound", "Dodge roll", "Wall jump", "Glide", "Second wind", "Aerial strike"};
     private static final String[][] UP_GIVES = {
             {"A fourth heart in every land", "A fifth heart in every land"},
             {"A second jump in the air: press jump again"},
@@ -244,22 +244,26 @@ final class RunGame {
             {"A third jump in the air, a flip: press jump again"},
             {"In the air, double-tap a way (or Shift): a dash that way", "And the dash strikes whatever it goes through"},
             {"Whatever hurts her takes a blow of thorns", "Two blows of thorns", "Three blows of thorns"},
-            {"Hold down in the air: landing, she strikes all round her"},
+            {"Hold down in the air: she slams the ground with what she holds, even out of an air dash", "A wider slam that hits harder, and cracks two pieces off a shield",
+                    "The widest slam: shields broken outright, and a shockwave along the ground"},
             {"On the ground, double-tap a way (or Shift): a roll nothing hurts"},
             {"Against a wall in the air she clings: jump to kick off it"},
-            {"Hold jump as she falls: she glides down slowly"},
-            {"Once a land, what would end her leaves half a heart"}};
+            {"Hold jump as she falls: she glides down slowly", "She glides slower, and so further", "Slower still, and every second and a half a gust lifts her"},
+            {"Once a land, what would end her leaves half a heart"},
+            {"Hold strike in the air: she hangs there, wings out, and strikes all round her", "It holds her up longer, reaches wider and hits harder",
+                    "Longest and hardest, with quicker strikes, and twice before she lands"}};
     private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}, {200, 350, 500, 900},
-            {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}, {350}, {300, 650}, {250, 500, 900}, {280}, {260}, {320}, {300}, {600}};
+            {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}, {350}, {300, 650}, {250, 500, 900}, {280, 520, 900}, {260}, {320}, {300, 560, 950}, {600},
+            {350, 650, 1000}};
     /** The moves bought at the counter, by their places in those lists. */
-    private static final int TRIPLE = 14, AIR_DASH = 15, THORNS = 16, POUND = 17, ROLL = 18, WALL_JUMP = 19, GLIDE = 20, SECOND_WIND = 21;
+    private static final int TRIPLE = 14, AIR_DASH = 15, THORNS = 16, POUND = 17, ROLL = 18, WALL_JUMP = 19, GLIDE = 20, SECOND_WIND = 21, AERIAL = 22;
     /** For her pets: more of her own beside her, more strays, brisker, stronger. */
     private static final int PET_PLACES = 10, STRAY_ROOM = 11, PET_BRISK = 12, PET_STRONG = 13;
     /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
     private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800, 950, 900, 1200, 1500};
     /** The counter's tabs, and what stands under each. */
     private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms", "Vanity"};
-    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1, 14, 15, 18, 19, 17, 20, 16, 21}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
+    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1, 14, 15, 18, 19, 17, 20, 22, 16, 21}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
     private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2, VANITY_TAB = 6;
     private final RectF[] counterTabs = new RectF[TAB_NAMES.length], petCells = new RectF[PlusRun.PETS];
     private final RectF petAct = new RectF(), armsAct = new RectF();
@@ -274,14 +278,14 @@ final class RunGame {
             "she comes down slowly, and water goes both ways", "what is sent back goes on through a row", "she rises much faster",
             "what she knocks over flies off burning", "whatever lands on her lands by half", "every colour's power for a while: a glow, not yet a light"};
     /** The order they stand in at the counter: lives under hearts. And the picture that stands for her own face. */
-    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 14, 15, 18, 19, 17, 20, 16, 21, 2, 3, 4, 5, 6, 10, 11, 12, 13};
+    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 14, 15, 18, 19, 17, 20, 22, 16, 21, 2, 3, 4, 5, 6, 10, 11, 12, 13};
     private static final int HER_FACE = -2;
     /** A ware whose picture is her in one of her moves: below nothing, so that it is never taken for one of the other pictures. */
     private static final int MOVE_ART = -100;
     private static final int[] UP_ART = {BUFF_ART + PlusRun.BREAD, -1, BUFF_ART + PlusRun.MAGNET, BUFF_ART + PlusRun.ICE, WEAPON_ART + PlusRun.GUN,
             FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART,
             MOVE_ART + PlusRun.MOVE_FLIP + 1, MOVE_ART + PlusRun.MOVE_DASH, STAR_ART, MOVE_ART + PlusRun.MOVE_POUND, MOVE_ART + PlusRun.MOVE_ROLL, MOVE_ART + PlusRun.MOVE_WALL,
-            MOVE_ART + PlusRun.MOVE_GLIDE, HER_FACE};
+            MOVE_ART + PlusRun.MOVE_GLIDE, HER_FACE, MOVE_ART + PlusRun.MOVE_GLIDE};
     /** How long the ice cream, the magnet and the notes last before anything is bought, as {@link PlusRun} has them. */
     private static final float[] BUFF_LASTS = {0, 8, 0, 10, 6};
 
@@ -827,6 +831,9 @@ final class RunGame {
         kept.roll = bought(ROLL) > 0;
         kept.wallJump = bought(WALL_JUMP) > 0;
         kept.glide = bought(GLIDE) > 0;
+        kept.poundLevel = bought(POUND);
+        kept.glideLevel = bought(GLIDE);
+        kept.aerial = bought(AERIAL);
         kept.secondWind = bought(SECOND_WIND) > 0;
         kept.reach = bought(2) == 0 ? 0 : bought(2) == 1 ? 1.6f : 2.6f;
         kept.lasting = 1 + .5f * bought(3);
@@ -3112,6 +3119,239 @@ final class RunGame {
         return tierFilters[tier];
     }
 
+    // The ground pound and the aerial strike, seen
+
+    /** The things she may hold, by the names their pictures go by; and the pictures of the ground pound's four (wind-up, drop, impact, rising) and the aerial strike's four, from the runart pack. */
+    static final String[] MOVE_KINDS = {"pen", "knife", "book", "brush", "sword", "gun", "tablet", "keys", "katana", "lance", "cannon", "whip", "greatsword", "staff",
+            "mace", "hammer", "wand", "scythe", "knuckles"};
+    static final int MOVE_FRAMES = 4;
+    private final java.util.Map<String, Bitmap> moveSheets = new java.util.HashMap<>();
+    private final java.util.Map<String, android.util.SparseArray<Bitmap>> moveForms = new java.util.HashMap<>();
+
+    /** A sheet of the ground pound's (or the aerial strike's) for what she holds: its name in the pack and the vanity's. */
+    static String moveSheet(boolean smash, int weapon) {
+        return (smash ? "smash_" : "aerial_") + (weapon < 0 || weapon >= MOVE_KINDS.length ? "unarmed" : MOVE_KINDS[weapon]);
+    }
+
+    private Bitmap moveArt(String name) {
+        if (!moveSheets.containsKey(name)) {
+            Bitmap art = null;
+            try (java.io.InputStream in = context.getAssets().open("runart/halgakos_" + name + ".webp")) {
+                art = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException missing) {
+                art = null;
+            }
+            moveSheets.put(name, art);
+        }
+        return moveSheets.get(name);
+    }
+
+    /**
+     * She is drawn in a ground pound's own pictures (gathering in the air, the drop, the impact as she lands, rising after it) or an aerial
+     * strike's (wings spread, the thing in her hands about her): in her form's colour, and dressed as she is where what she wears has them.
+     * Whether she was; where what she wears has not got them yet, she is not, and her own moves stand for them.
+     */
+    private boolean drawSmashOrAerial(Canvas canvas, int weapon, float feetX, float feetY, float tall, boolean leftward) {
+        int frame;
+        boolean smash;
+        int phase = run.poundPhase();
+        float landed = run.poundAge();
+        if (phase == 1) {
+            smash = true;
+            frame = 0;
+        } else if (phase == 2) {
+            smash = true;
+            frame = 1;
+        } else if (landed < SMASH_AFTER && run.onGround()) {
+            smash = true;
+            frame = landed < SMASH_IMPACT ? 2 : 3;
+        } else if (run.aerialOn()) {
+            smash = false;
+            float age = run.aerialAge();
+            frame = age < AERIAL_WIND ? 0 : 1 + (int) ((age - AERIAL_WIND) / AERIAL_BEAT) % 3;
+        } else {
+            return false;
+        }
+        String name = moveSheet(smash, weapon);
+        if (!vanityCovers(name)) return false;
+        Bitmap art = moveArt(name);
+        if (art == null) return false;
+        android.util.SparseArray<Bitmap> forms = moveForms.get(name);
+        if (forms == null) moveForms.put(name, forms = new android.util.SparseArray<>());
+        frame(canvas, dressed(name, formed(art, forms)), frame, MOVE_FRAMES, feetX, feetY, tall, leftward);
+        return true;
+    }
+
+    /** How long after landing a pound she is seen in its impact, and then rising; how long the aerial strike's wind-up shows, and each of its strikes. */
+    static final float SMASH_IMPACT = .14f, SMASH_AFTER = .34f, AERIAL_WIND = .1f, AERIAL_BEAT = .1f;
+
+    /**
+     * What the moves throw about: for the ground pound, a ring along the ground as wide as it reaches, dust, cracks, and bits flying in the
+     * way of what she holds (ink for brushes, pens and guns, sparks for blades, rubble for blunt things, shards for magic), and at the third
+     * step its shockwave running out; for a glide and the aerial strike, wind behind her and feathers off her wings. (Never more than
+     * FX_MOST bits at once.)
+     */
+    private final List<float[]> moveBits = new ArrayList<>();
+    static final int FX_MOST = 48;
+    private int seenPounds, seenAerials, seenAerialHits;
+    private float poundFxAge = 9, poundFxX, poundFxY, poundFxReach, featherClock;
+    private int poundFxFlavour, poundFxLevel;
+
+    private void movesAfter(float seconds) {
+        poundFxAge += seconds;
+        if (run.pounds() != seenPounds) {
+            seenPounds = run.pounds();
+            poundFxAge = 0;
+            poundFxX = run.x() + PlusRun.WIDE / 2;
+            poundFxY = run.y() + PlusRun.TALL;
+            poundFxReach = run.poundReach();
+            poundFxLevel = Math.max(1, perks.poundLevel);
+            poundFxFlavour = PlusRun.flavourOf(PlusRun.blowOf(run.weapon()));
+            shake = Math.max(shake, .1f + .04f * poundFxLevel);
+            audio.play("quake", .5f + .15f * poundFxLevel);
+            int bits = 8 + 5 * poundFxLevel;
+            for (int bit = 0; bit < bits && moveBits.size() < FX_MOST; bit++) {
+                float side = bit % 2 == 0 ? -1 : 1, speed = 2.5f + random.nextFloat() * 3 * poundFxLevel;
+                moveBits.add(new float[]{poundFxX + side * random.nextFloat() * .6f, poundFxY - .1f, side * speed * (.4f + random.nextFloat()), -3 - random.nextFloat() * 5, 0, poundFxFlavour, .5f + random.nextFloat() * .5f});
+            }
+        }
+        if (run.aerials() != seenAerials) {
+            seenAerials = run.aerials();
+            audio.play("flap", .6f);
+        }
+        if (run.aerialHits() != seenAerialHits) {
+            if (run.aerialHits() / 3 != seenAerialHits / 3) audio.play("slash", .35f);
+            seenAerialHits = run.aerialHits();
+        }
+        // Feathers off her wings, and the wind behind her, while she glides or hangs in an aerial strike.
+        boolean aloft = run.gliding() || run.aerialOn();
+        if (aloft && (featherClock -= seconds) <= 0 && moveBits.size() < FX_MOST) {
+            featherClock = run.aerialOn() ? .07f : .16f;
+            float cx = run.x() + PlusRun.WIDE / 2 + (run.facingLeft() ? .35f : -.35f), cy = run.y() + PlusRun.TALL * .35f;
+            moveBits.add(new float[]{cx + (random.nextFloat() - .5f) * .6f, cy + (random.nextFloat() - .5f) * .4f, (run.facingLeft() ? 1 : -1) * (.6f + random.nextFloat()),
+                    -.4f + random.nextFloat() * .5f, 0, FEATHER_BIT + (random.nextInt(2)), 1.1f + random.nextFloat() * .5f});
+        }
+        for (int index = moveBits.size() - 1; index >= 0; index--) {
+            float[] bit = moveBits.get(index);
+            bit[4] += seconds;
+            if (bit[4] > bit[6]) {
+                moveBits.remove(index);
+                continue;
+            }
+            boolean feather = bit[5] >= FEATHER_BIT;
+            bit[0] += bit[2] * seconds;
+            bit[1] += bit[3] * seconds;
+            if (feather) {
+                bit[3] = Math.min(.9f, bit[3] + 1.2f * seconds);
+                bit[2] *= 1 - seconds * .8f;
+            } else {
+                bit[3] += 18 * seconds;
+            }
+        }
+    }
+
+    /** Bits that are feathers (white, then dark): above the four ways a blow is seen. */
+    static final int FEATHER_BIT = 10;
+
+    private void drawMoveFx(Canvas canvas) {
+        if (run == null) return;
+        // The pound's ring, along the ground and as wide as it reaches; its cracks; and its dust.
+        if (poundFxAge < .6f) {
+            float x = (poundFxX - cameraX) * tile, y = (poundFxY - cameraY) * tile, through = Math.min(1, poundFxAge / .35f), reach = poundFxReach * tile;
+            int colour = poundFxFlavour == PlusRun.SPLASHES ? 0xFF2A3266 : poundFxFlavour == PlusRun.CUTS ? 0xFFFFE08A : poundFxFlavour == PlusRun.SPARKLES ? 0xFFB9F3FF : 0xFFF2E6CF;
+            if (poundFxAge < .35f) {
+                stroke.setColor(colour);
+                stroke.setAlpha(Math.round(230 * (1 - through)));
+                stroke.setStrokeWidth(tile * (.16f - .1f * through));
+                box.set(x - reach * through, y - tile * .28f * through, x + reach * through, y + tile * .16f * through);
+                canvas.drawOval(box, stroke);
+                stroke.setColor(Color.WHITE);
+                stroke.setAlpha(Math.round(200 * (1 - through)));
+                stroke.setStrokeWidth(tile * .04f);
+                box.set(x - reach * through * .7f, y - tile * .2f * through, x + reach * through * .7f, y + tile * .1f * through);
+                canvas.drawOval(box, stroke);
+            }
+            // Cracks running out along the ground, longer the further it reaches.
+            stroke.setColor(0xFF2B2420);
+            stroke.setAlpha(Math.round(200 * Math.max(0, 1 - poundFxAge / .6f)));
+            stroke.setStrokeWidth(Math.max(1.5f, tile * .04f));
+            int cracks = 2 + poundFxLevel;
+            for (int crack = 0; crack < cracks; crack++) {
+                float side = crack % 2 == 0 ? -1 : 1, long_ = reach * (.45f + .5f * ((crack * 37) % 10) / 10f) * Math.min(1, poundFxAge / .12f);
+                float px = x, py = y + tile * .02f;
+                for (int step = 1; step <= 4; step++) {
+                    float nx = x + side * long_ * step / 4, ny = y + tile * .02f + (step % 2 == 0 ? -1 : 1) * tile * .05f * ((crack + step) % 3);
+                    canvas.drawLine(px, py, nx, ny, stroke);
+                    px = nx;
+                    py = ny;
+                }
+            }
+            // Dust, rolling out low on both sides.
+            paint.setStyle(Paint.Style.FILL);
+            for (int puff = 0; puff < 6 + 2 * poundFxLevel; puff++) {
+                float side = puff % 2 == 0 ? -1 : 1, out = reach * (.2f + .8f * through) * (.5f + .5f * (puff % 4) / 3f);
+                paint.setColor(0xFFE9E0D0);
+                paint.setAlpha(Math.round(170 * Math.max(0, 1 - poundFxAge / .6f)));
+                canvas.drawCircle(x + side * out, y - tile * (.08f + .06f * (puff % 3)), tile * (.14f + .1f * through) * (1 + poundFxLevel * .15f), paint);
+            }
+            stroke.setAlpha(255);
+            paint.setAlpha(255);
+        }
+        // The third step's shockwave: a crest of dust running out both ways along the ground.
+        if (run.waveFront() >= 0) {
+            float y = (poundFxY - cameraY) * tile;
+            for (int side = -1; side <= 1; side += 2) {
+                float x = (run.waveX() + side * run.waveFront() - cameraX) * tile;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFF2E6CF);
+                paint.setAlpha(190);
+                box.set(x - tile * .35f, y - tile * .7f, x + tile * .35f, y + tile * .05f);
+                canvas.drawOval(box, paint);
+                stroke.setColor(Color.WHITE);
+                stroke.setAlpha(220);
+                stroke.setStrokeWidth(tile * .06f);
+                canvas.drawArc(box, side < 0 ? 180 : 270, 90, false, stroke);
+            }
+            paint.setAlpha(255);
+            stroke.setAlpha(255);
+        }
+        // The wind behind her, while she glides or strikes from the air.
+        if (run.gliding() || run.aerialOn()) {
+            float hx = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, hy = (run.y() + PlusRun.TALL * .45f - cameraY) * tile, back = run.facingLeft() ? 1 : -1;
+            stroke.setColor(Color.WHITE);
+            stroke.setStrokeWidth(Math.max(1.5f, tile * .03f));
+            for (int line = 0; line < 3; line++) {
+                float drift = (clock * 3 + line * .33f) % 1;
+                stroke.setAlpha(Math.round(160 * (1 - drift)));
+                float sy = hy + (line - 1) * tile * .32f, sx = hx + back * tile * (.6f + drift * 1.4f);
+                canvas.drawLine(sx, sy, sx + back * tile * .55f, sy, stroke);
+            }
+            stroke.setAlpha(255);
+        }
+        // The bits: what flew off a pound, and feathers.
+        paint.setStyle(Paint.Style.FILL);
+        for (float[] bit : moveBits) {
+            float x = (bit[0] - cameraX) * tile, y = (bit[1] - cameraY) * tile, left = 1 - bit[4] / bit[6];
+            int kind = (int) bit[5];
+            if (kind >= FEATHER_BIT) {
+                paint.setColor(kind == FEATHER_BIT ? 0xFFFFFFFF : 0xFF3A2E44);
+                paint.setAlpha(Math.round(230 * Math.min(1, left * 2)));
+                canvas.save();
+                canvas.rotate((float) Math.sin(bit[4] * 6 + bit[0]) * 50, x, y);
+                box.set(x - tile * .1f, y - tile * .035f, x + tile * .1f, y + tile * .035f);
+                canvas.drawOval(box, paint);
+                canvas.restore();
+                continue;
+            }
+            paint.setColor(kind == PlusRun.SPLASHES ? 0xFF1B2152 : kind == PlusRun.CUTS ? 0xFFFFD45A : kind == PlusRun.SPARKLES ? (((int) (bit[0] * 10)) % 2 == 0 ? 0xFFB9F3FF : 0xFFF5C8FF) : 0xFF8A7A66);
+            paint.setAlpha(Math.round(255 * Math.min(1, left * 2)));
+            float r = tile * (kind == PlusRun.CUTS ? .05f : .08f);
+            if (kind == PlusRun.THUDS) canvas.drawRect(x - r, y - r, x + r, y + r, paint);
+            else canvas.drawCircle(x, y, r, paint);
+        }
+        paint.setAlpha(255);
+        stroke.setAlpha(255);
+    }
     /** How long a creature just hit is lifted near to white, and how long it is squashed by the blow. */
     static final float STRUCK_WHITE = .12f, STRUCK_SQUASH = .16f;
 
@@ -3921,9 +4161,13 @@ final class RunGame {
                 right = tabs[volume].left - dp(6);
             }
         }
-        // The button that changes what she holds: over the one that uses it, a little smaller.
-        float swaps = Math.max(dp(44), size * .66f);
-        swapButton.set(strikeButton.centerX() - swaps / 2, strikeButton.top - dp(12) - swaps, strikeButton.centerX() + swaps / 2, strikeButton.top - dp(12));
+        // The button that lets her down through a thin ledge, and that slams the ground from the air: with the strike and the jump, over the
+        // gap between them, so that the thumb that strikes rolls onto it. (The arrows' thumb has only the arrows.)
+        float downs = Math.max(dp(46), size * .66f), gap = (strikeButton.right + jumpButton.left) / 2;
+        downButton.set(gap - downs / 2, y - dp(10) - downs, gap + downs / 2, y - dp(10));
+        // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the down button.
+        float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, downButton.left - dp(8));
+        swapButton.set(swapRight - swaps, strikeButton.top - dp(12) - swaps, swapRight, strikeButton.top - dp(12));
         // Her active slots, in a row to the left of it, the first leftmost.
         float slotSide = Math.max(dp(40), size * .6f), slotGap = dp(6), slotsFrom = swapButton.left - between - 3 * slotSide - 2 * slotGap;
         for (int slot = 0; slot < 3; slot++) {
@@ -3931,12 +4175,9 @@ final class RunGame {
             slotPlaces[slot].set(slotLeft, swapButton.centerY() - slotSide / 2, slotLeft + slotSide, swapButton.centerY() + slotSide / 2);
         }
         turnTo(page);
-        // The button that lets her down through a thin ledge: over the arrows and between them, where the thumb that holds them reaches it,
-        // and clear of where she walks. It keeps its place whether it can do anything or not.
-        float downs = Math.max(dp(48), size * .78f), middle = (leftButton.left + rightButton.right) / 2;
-        downButton.set(middle - downs / 2, y - dp(12) - downs, middle + downs / 2, y - dp(12));
-        // The stall in a land, or a door: its button over the jump, where her thumb already is.
-        stallButton.set(jumpButton.left, jumpButton.top - dp(14) - size, jumpButton.right, jumpButton.top - dp(14));
+        // The stall in a land, or a door: its button over the jump, where her thumb already is, and over the down button too.
+        float stallBottom = Math.min(jumpButton.top - dp(14), downButton.top - dp(8));
+        stallButton.set(jumpButton.left, stallBottom - size, jumpButton.right, stallBottom);
         // The fifth button, on the right in the row with the rest, so that it never lies over her or over what she is about to walk into:
         // the ribbon that calls on a colour of hers, with a small one on its corner that chooses which.
         float ribbon = size * .9f;
@@ -7028,6 +7269,7 @@ final class RunGame {
         float wasX = run.x() + PlusRun.WIDE / 2, wasY = run.y() + PlusRun.TALL;
         boolean wasLeft = run.facingLeft();
         run.step(seconds, goLeft, goRight, goJump || jumpPressed, goStrike || strikePressed);
+        movesAfter(seconds);
         jumpPressed = false;
         strikePressed = false;
         sinceUse += seconds;
@@ -10870,6 +11112,7 @@ final class RunGame {
         drawRoomOver(canvas);
         drawForeground(canvas);
         drawHits(canvas, first, last);
+        drawMoveFx(canvas);
         // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
         for (PlusRun.Foe foe : run.foes()) {
             if (foe.flat || foe.most <= PlusRun.BLOW || foe.left >= foe.most || RunLevels.boss(foe.kind) || foe.kind == RunLevels.TARGET || foe.x + foe.wide() < first - 1 || foe.x > last + 1) continue;
@@ -12811,6 +13054,11 @@ final class RunGame {
             } else {
                 frame(canvas, herJump(), step % 2 == 0 ? RISE : TOP, JUMP_FRAMES, feetX, feetY, tall, leftward);
             }
+            paint.setAlpha(255);
+            return;
+        }
+        // The ground pound and the aerial strike have pictures of their own for each thing she may hold.
+        if (drawSmashOrAerial(canvas, weapon, feetX, feetY, tall, leftward)) {
             paint.setAlpha(255);
             return;
         }

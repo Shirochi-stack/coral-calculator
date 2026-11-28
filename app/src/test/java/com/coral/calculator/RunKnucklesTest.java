@@ -140,7 +140,8 @@ public class RunKnucklesTest {
         int start = -1, notables = 0;
         for (RunSkills.Node node : RunSkills.tree()) {
             if (node.type == RunSkills.START && node.path == 12) start = node.id;
-            if (node.type == RunSkills.NOTABLE && node.path == 12) notables++;
+            // (And Meteor Fist, of the moves of the air, added after.)
+            if (node.type == RunSkills.NOTABLE && node.path == 12 && node.notable < RunSkills.HYBRIDS) notables++;
         }
         assertTrue(start > 0);
         assertEquals(RunSkills.PER_CLASS, notables);
