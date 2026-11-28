@@ -10,7 +10,7 @@ final class RunUniques {
     private RunUniques() {}
 
     /** The first of their kinds, after Lucy; how many there are. */
-    static final int FIRST = RunLevels.LUCY + 1, COUNT = 75;
+    static final int FIRST = RunLevels.LUCY + 1, COUNT = 87;
     /** And the four of the lagoons, who swim: after the hidden bosses. */
     static final int WATER_FIRST = FIRST + 30, WATER_COUNT = 4;
     /** Of them, the six hidden bosses: after the twenty-four, one for each two chapters, each in the hideouts of its lands. */
@@ -38,6 +38,22 @@ final class RunUniques {
      */
     static final int SHADOW_FIRST = FIRST + 71, SHADOW_COUNT = 3, COPY = FIRST + 74;
     static final String COPY_SHEET = "mirror/imperfect_copy.webp";
+    /**
+     * Seven of her from timelines that ended badly, the Echoes, met at the bottom of the mirror's first two bands (one on its fifth floor,
+     * one on its tenth): each in an outfit of her vanity (by its place in {@link RunVanity#STYLES}) and with a weapon of hers, shaded as
+     * her timeline left her, and tougher than a mini-boss.
+     */
+    static final int ECHO_FIRST = FIRST + 75, ECHO_COUNT = 7;
+    static final int[] ECHO_OUTFIT = {6, 1, 2, 5, 17, 4, 19};
+    static final int[] ECHO_WEAPON = {RunArms.WAND, RunArms.SCYTHE, RunArms.GREATSWORD, RunArms.PEN, RunArms.STAFF, RunArms.KNIFE, RunArms.KATANA};
+    static final float ECHO_TOUGHER = 1.5f;
+    /**
+     * And the mirror's shadows of those she knows, met as it goes down (one on each of its third, sixth, ninth and twelfth floors, by turns):
+     * Chikuwa, who leaps; Rune, who throws her ink; Illya, who floats with her hearts about her; Tsubakieh, who charges with her bat; and the
+     * Mawang, who darts. Drawn from their own pictures in shadow; their touch blinds her as her own shadows' does.
+     */
+    static final int CAST_FIRST = FIRST + 82, CAST_COUNT = 5;
+    static final float CAST_TOUGHER = 5;
     /** What each of them is made of (see {@link PlusRun#resists}), or nought for those that stun. */
     static final int[] STATUS_MADE = {PlusRun.RESISTS_FIRE, PlusRun.RESISTS_COLD, PlusRun.RESISTS_INK, PlusRun.RESISTS_INK, 0, PlusRun.RESISTS_COLD,
             PlusRun.RESISTS_FIRE, PlusRun.RESISTS_INK, PlusRun.RESISTS_COLD, PlusRun.RESISTS_FIRE, PlusRun.RESISTS_INK, 0};
@@ -62,14 +78,18 @@ final class RunUniques {
             "Sand-Glass Sprite", "Hermit Scroll Crab", "Hoard Wyrmling", "Lantern Sentinel",
             "Cinder Sprite", "Frost Folio", "Venom Quill", "Ink Bomb Beetle", "Static Bookend", "Glacier Tome", "Flame Fan", "Plague Page",
             "Snowglobe Golem", "Ashen Scribe", "Smog Moth", "Thunder Clapper",
-            "Shadow Self", "Hidden Reflection", "Shadow Archer", "The Imperfect Copy"};
+            "Shadow Self", "Hidden Reflection", "Shadow Archer", "The Imperfect Copy",
+            "The Drowned Halgakos", "The Ashen Halgakos", "The Knight Who Stayed", "The Last Idol", "The Frozen Scholar", "The Hollow Maid", "The Blank Page",
+            "Shadow Chikuwa", "Shadow Rune", "Shadow Illya", "Shadow Tsubakieh", "Shadow Mawang"};
     /** Each one's chapter (two to a chapter, in order) and way of fighting. */
     static final int[] WAY = {CHARGER, SHIELDER, MIMIC, GHOST, EXPLODER, SNIPER, CHARGER, BURROWER, SUMMONER, HEALER, MINIBOSS, SHIELDER, FORMATION, CHARGER,
             GHOST, MIMIC, SPLITTER, EXPLODER, SNIPER, MINIBOSS, SHIELDER, SUMMONER, HEALER, CHARGER, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN,
             SWIMMER, SWIMMER, SWIMMER, SWIMMER, BLINKER, DROPPER, LEAPER, ORBITER, BOUNCER, STAMPER, MIRROR, KEEPER, KEEPER, KEEPER, KEEPER, KEEPER, KEEPER,
             ROLLER, HERALD, LASHER, LINER, PULLER, SMEARER, REFLECTOR, ECHOER, HOURGLASS, HERMIT, BREATHER, SWEEPER,
             SNIPER, STAMPER, SNIPER, EXPLODER, CHARGER, SHIELDER, LEAPER, SPLITTER, STAMPER, SNIPER, BLINKER, BOUNCER,
-            MIRROR, GHOST, SNIPER, KEEPER};
+            MIRROR, GHOST, SNIPER, KEEPER,
+            MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS, MINIBOSS,
+            LEAPER, SNIPER, ORBITER, CHARGER, BLINKER};
     /** How many blows of health each has at the start of the game (it grows with the land), by way of fighting. */
     private static final float[] HEALTH = {4, 6, 4, 3, 2, 3, 4, 5, 4, 24, 1.5f, 6, 70, 4, 3, 3.5f, 4, 3, 3, 7, 4, 90, 7, 6, 7, 6, 8, 9, 8, 6, 7, 9, 8, 9};
     /** How wide and tall each is, in squares. */
@@ -77,18 +97,24 @@ final class RunUniques {
             2, 2, 2.4f, 2.2f, 1.8f, 1.6f, .9f, .9f, 1.5f, .8f, .9f, .9f, 1, .8f, .85f, 1.3f, .7f, 2.4f, 2.4f, 2.6f, 2, 2.8f, 1.8f,
             1.1f, .9f, 1.4f, .9f, 1.15f, 1.2f, 1.2f, .85f, .85f, 1.05f, 1.1f, 1.1f,
             .8f, 1.1f, .9f, .95f, 1.1f, 1.25f, 1, .9f, 1.3f, .9f, 1, 1,
-            .7f, .7f, .7f, 1.3f};
+            .7f, .7f, .7f, 1.3f,
+            .8f, .8f, .8f, .8f, .8f, .8f, .8f,
+            .8f, .8f, .8f, .9f, 1.1f};
     static final float[] TALL = {.8f, .85f, .7f, 1.15f, .75f, .85f, .95f, .95f, 1.25f, .75f, 1.5f, 1.35f, .7f, .8f, 1.2f, .85f, .75f, .9f, .75f, 1.45f, .8f, .85f, 1.05f, 1.05f,
             1.8f, 1.7f, 1.6f, 2.4f, 1.9f, 2.4f, .9f, .85f, .6f, 1.1f, .8f, .8f, .85f, .9f, .85f, 1.2f, 1.4f, 2.2f, 1.8f, 2.2f, 2.4f, 2, 2.6f,
             .8f, 1.05f, .7f, 1.2f, .9f, .8f, .85f, .95f, 1.1f, 1, 1.05f, 1.45f,
             .85f, .95f, .8f, .8f, .85f, 1.1f, .95f, .95f, 1.4f, 1.15f, .85f, .9f,
-            1.4f, 1.4f, 1.4f, 2.4f};
+            1.4f, 1.4f, 1.4f, 2.4f,
+            1.6f, 1.6f, 1.6f, 1.6f, 1.6f, 1.6f, 1.6f,
+            1.3f, 1.4f, 1.4f, 1.5f, 1.6f};
     /** How fast each walks, squares a second. */
     static final float[] SPEED = {1.5f, .55f, 1.2f, .9f, 1.3f, .8f, 1.4f, 1.6f, .6f, .9f, 1.1f, .5f, 2.2f, 1.6f, 1, 1.4f, .8f, 1.2f, .9f, .9f, .7f, .7f, .9f, 1.7f,
             1.3f, 1.2f, 1.4f, .8f, 1.5f, 1.3f, 1.4f, 1.2f, 2.4f, .7f, 1.4f, 1.6f, 1.2f, 1, 2.2f, .6f, 3, 1.2f, 1.4f, 1.1f, 1.2f, 1.3f, 1.2f,
             1.3f, .9f, 1.2f, 1, .7f, .8f, .9f, 1.4f, .8f, .9f, 1.1f, .5f,
             .9f, .6f, .8f, 1.3f, 1.6f, .5f, 1.2f, .8f, .55f, .8f, 1.4f, 1.2f,
-            1.4f, 1.1f, .9f, 1.3f};
+            1.4f, 1.1f, .9f, 1.3f,
+            1.2f, 1.1f, 1, 1.3f, .9f, 1.4f, 1.3f,
+            1.3f, .9f, 1.1f, 1.5f, 1.4f};
 
     static boolean is(int kind) { return kind >= FIRST && kind < FIRST + COUNT; }
 
@@ -122,6 +148,12 @@ final class RunUniques {
 
     static boolean copy(int kind) { return kind == COPY; }
 
+    /** Whether it is one of the Echoes, her from a doomed timeline. */
+    static boolean echo(int kind) { return kind >= ECHO_FIRST && kind < ECHO_FIRST + ECHO_COUNT; }
+
+    /** Whether it is the shadow of one she knows. */
+    static boolean castShadow(int kind) { return kind >= CAST_FIRST && kind < CAST_FIRST + CAST_COUNT; }
+
     static int keeperOf(int dungeon) { return KEEPER_FIRST + Math.max(0, Math.min(KEEPER_COUNT - 1, dungeon / 4)); }
 
     /** Whether it is one of the great ones, who drop three things of gold or better: a hidden boss or a keeper. */
@@ -135,7 +167,7 @@ final class RunUniques {
 
     /** What one shrugs off (see {@link PlusRun#resists}), by what it is made of, as its name tells it: ink, fire, frost. */
     static int resists(int kind) {
-        if (!is(kind) || shadow(kind) || kind == COPY) return 0;
+        if (!is(kind) || shadow(kind) || kind == COPY || echo(kind) || castShadow(kind)) return 0;
         if (status(kind)) return STATUS_MADE[kind - STATUS_FIRST];
         String name = name(kind).toLowerCase(java.util.Locale.ROOT);
         int resists = 0;
@@ -157,8 +189,8 @@ final class RunUniques {
     static int defeat(int kind) {
         if (!is(kind)) return PlusRun.DEFEAT_FADE;
         // (The Copy cracks apart like the mirror she is; her shadows go as smoke does.)
-        if (kind == COPY) return PlusRun.DEFEAT_SHATTER;
-        if (shadow(kind)) return PlusRun.DEFEAT_FADE;
+        if (kind == COPY || echo(kind)) return PlusRun.DEFEAT_SHATTER;
+        if (shadow(kind) || castShadow(kind)) return PlusRun.DEFEAT_FADE;
         if (status(kind)) {
             int made = STATUS_MADE[kind - STATUS_FIRST];
             return made == PlusRun.RESISTS_FIRE ? PlusRun.DEFEAT_ASH : made == PlusRun.RESISTS_COLD ? PlusRun.DEFEAT_SHATTER : made == PlusRun.RESISTS_INK ? PlusRun.DEFEAT_MELT
@@ -206,7 +238,7 @@ final class RunUniques {
     /** How much health one has in a land (in tenths of a blow): its way's, made more as her blows grow with the level the land is for. */
     static int health(int kind, int number) {
         // (The twelve made of fire, frost and ink are tougher than others of their way.)
-        return Math.round(PlusRun.BLOW * HEALTH[way(kind)] * (status(kind) ? STATUS_TOUGHER : 1) * RunLoot.power(RunLoot.recommended(number)) * (1 + number / 100f));
+        return Math.round(PlusRun.BLOW * HEALTH[way(kind)] * (status(kind) ? STATUS_TOUGHER : echo(kind) ? ECHO_TOUGHER : castShadow(kind) ? CAST_TOUGHER : 1) * RunLoot.power(RunLoot.recommended(number)) * (1 + number / 100f));
     }
 
     /** The halves of a heart more than a sign's its touch costs: none in the first two chapters, then one (two for a mini-boss), and one more every fifty lands. */

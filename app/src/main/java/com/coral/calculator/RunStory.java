@@ -592,6 +592,36 @@ final class RunStory {
             {"mir4", "You were never imperfect. You were me before the ink dried. Rest now Sloppy~♡", "H", PLAYER + "She has beaten the Imperfect Copy, who shatters into mirror shards. Gentle, sad, a little proud, kind."},
             {"mir5", "Hey, who turned out the lights? My own shadow just touched me Sloppy~♡", "H", PLAYER + "A shadow of herself touched her and everything went dark around her for a moment. Startled, creeped out, joking to stay brave."},
     };
+    /**
+     * The Echoes: seven of her from timelines that ended badly, each met in the mirror with a word of how hers ended (in her voice, worn by
+     * it), and her answer.
+     */
+    static final String[][] ECHOES = {
+            {"ech1", "The library flooded and nobody came. I kept reading until the ink ran off every page Sloppy~♡", "H", "An Echo of Halgakos from a timeline where the great library drowned: soaked, pale blue, hair dripping, voice quiet and waterlogged, lonely and tired."},
+            {"ech2", "I burned the last book to stay warm. Then there was nothing left to be Sloppy~♡", "H", "An Echo of Halgakos from a timeline that burned: grey with ash, eyes dull embers, voice hoarse and empty, guilty and numb."},
+            {"ech3", "I promised to guard the gate until she came back. She never did. I'm still standing here Sloppy~♡", "H", "An Echo of Halgakos who stayed a knight forever at a gate: steel-grey, stiff, voice proud but cracked, loyal and heartbroken."},
+            {"ech4", "They wanted one more song, then one more. I sang until there was no me left, only the encore Sloppy~♡", "H", "An Echo of Halgakos from a timeline where fame consumed her: faded idol in magenta, smile stuck on, voice sweet but hollow and exhausted."},
+            {"ech5", "Winter came to the archive and never left. I learned every word for cold Sloppy~♡", "H", "An Echo of Halgakos from a timeline of endless winter: frosted, scholarly, voice slow and brittle, shivering and resigned."},
+            {"ech6", "I served the Copy, polished her mirror, smiled when told. Serving was easier than being Sloppy~♡", "H", "An Echo of Halgakos who became the Imperfect Copy's maid: violet-shaded, eyes lowered, voice soft, obedient and sad."},
+            {"ech7", "Someone erased my story one line at a time. I don't remember my name, only yours Sloppy~♡", "H", "An Echo of Halgakos whose story was erased: pale and blank like an empty page, voice faint and whispering, confused and gentle."},
+    };
+    static final String[][] ECHO_ANSWERS = {
+            {"eca1", "Then let me finish the book for you. Rest, you've read enough Sloppy~♡", "H", PLAYER + "She answers the drowned Echo of herself, gently, kindly, determined."},
+            {"eca2", "There's still you. I'll carry the warmth from here Sloppy~♡", "H", PLAYER + "She answers the burned, ash-grey Echo of herself, warm and firm, near tears."},
+            {"eca3", "You can stand down, knight. I'm the one who came back Sloppy~♡", "H", PLAYER + "She answers the Echo who guarded a gate forever, softly, honouring her."},
+            {"eca4", "Encore's over. Take a bow and go home Sloppy~♡", "H", PLAYER + "She answers the faded idol Echo of herself, playful but tender."},
+            {"eca5", "Then I'll be the spring. Come on, thaw out Sloppy~♡", "H", PLAYER + "She answers the frozen scholar Echo of herself, bright and encouraging."},
+            {"eca6", "Nobody gets to order you around anymore. Not even a mirror Sloppy~♡", "H", PLAYER + "She answers the Echo who served the Copy, protective and fierce."},
+            {"eca7", "Your name is Halgakos. I'll write it back in, every letter Sloppy~♡", "H", PLAYER + "She answers the erased, blank Echo of herself, gentle and resolute."},
+    };
+    /** The mirror's shadows of those she knows, each in their own voice, as their shadows: a word when she meets them. */
+    static final String[][] CAST_SHADOWS = {
+            {"csh1", "You left me behind with the bread. The shadow of me is hungry for more than chikuwa now.", "C", "A shadow copy of Chikuwa in the mirror dungeon: the same cheerful baker's voice, but flat, hollow and a little menacing, as if echoing from glass."},
+            {"csh2", "Every ink ball I ever threw at you, I kept. Shall I give them all back at once?", "R", "A shadow copy of Rune in the mirror dungeon: Rune's voice but cold, smug and echoing, a mocking rival made of ink."},
+            {"csh3", "Hearts, hearts, hearts! Mine are black now. Do you still want one?", "I", "A shadow copy of Illya in the mirror dungeon: Illya's sweet sing-song voice turned eerie and giggling, echoing."},
+            {"csh4", "Batter up. This time I'm swinging for you, and I don't miss in the dark.", "T", "A shadow copy of Tsubakieh in the mirror dungeon: Tsubakieh's cool, sporty voice made low and threatening, echoing."},
+            {"csh5", "My feathers fell in the dark and grew back as shadows. Fly with me, little one, down and down.", "M", "A shadow copy of the Mawang in the mirror dungeon: her regal, airy voice turned hollow and hungry, echoing from glass."},
+    };
     /** The first time she meets each of the twelve made of fire, frost and ink, or that stun: what it does to her, and what to do. */
     static final String[][] STATUS_UNIQUES = {
             {"u3a", "A matchstick with an attitude! Its embers burn, keep moving Sloppy~♡", "H", PLAYER + "A tiny sooty match-head sprite flicks burning embers at her. Wary, teasing, quick warning that fire burns her."},
@@ -1332,6 +1362,9 @@ final class RunStory {
         groups.add(LATER_UNIQUES);
         groups.add(STATUS_UNIQUES);
         groups.add(MIRROR);
+        groups.add(ECHOES);
+        groups.add(ECHO_ANSWERS);
+        groups.add(CAST_SHADOWS);
         groups.add(BLACKENED);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);

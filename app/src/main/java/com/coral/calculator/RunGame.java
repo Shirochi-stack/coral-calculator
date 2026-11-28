@@ -1946,7 +1946,10 @@ final class RunGame {
         if (delve >= 0 && run.room() < 0) {
             if (depthSquares == null) depthSquares = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ground_depths);
             int band = RunDungeons.band(delveFloor);
+            // (In the mirror, the stone is glass: silvered and pale violet.)
+            if (delve == RunDungeons.MIRROR) paint.setColorFilter(MIRROR_GLASS);
             groundSquare(canvas, depthSquares, capped ? band : RunDungeons.BANDS + band, left, y, column, row, capped);
+            if (delve == RunDungeons.MIRROR) paint.setColorFilter(null);
             return true;
         }
         return false;
@@ -5220,7 +5223,8 @@ final class RunGame {
             fitted(canvas, "Laid anew every time; her hearts go down with her.", box.left + dp(20), top + dp(18), dp(13), wide);
             fitted(canvas, "A blessing to choose after every floor.", box.left + dp(20), top + dp(38), dp(13), wide);
             text.setColor(0xFF7A3A9A);
-            fitted(canvas, "At the bottom: " + RunUniques.name(RunDungeons.keeper(dungeon)) + (cleared ? "" : "  ·  a relic the first time"), box.left + dp(20), top + dp(58), dp(13), wide);
+            fitted(canvas, "At the bottom: " + RunUniques.name(RunDungeons.keeper(dungeon)) + (cleared ? "" : "  ·  a relic the first time")
+                    + (dungeon == RunDungeons.MIRROR ? "  ·  Echoes laid to rest " + Integer.bitCount(session.tally("run_echoes")) + " of " + RunUniques.ECHO_COUNT : ""), box.left + dp(20), top + dp(58), dp(13), wide);
             return;
         }
         int floors = RunDungeons.floors(delve), next = RunDungeons.kindOf(delve, delveFloor + 1, delveDive);
@@ -7414,6 +7418,25 @@ final class RunGame {
                 if (!blindSaid && run.herBlind() > 0) {
                     blindSaid = true;
                     speak(RunStory.MIRROR[4], true);
+                }
+                // An Echo or a shadow of one she knows, the first time she meets it: its word (and to an Echo, her answer after); an Echo beaten
+                // for the first time is laid to rest, and leaves her a keepsake of Rose.
+                for (PlusRun.Foe foe : run.foes()) {
+                    boolean echo = RunUniques.echo(foe.kind), cast = RunUniques.castShadow(foe.kind);
+                    if (!echo && !cast) continue;
+                    int which = foe.kind - (echo ? RunUniques.ECHO_FIRST : RunUniques.CAST_FIRST);
+                    String seen = (echo ? "run_echo_seen_" : "run_cast_seen_") + which;
+                    if (!foe.flat && Math.abs(foe.x - run.x()) < 9 && session.tally(seen) == 0 && captionLeft <= 0) {
+                        session.keep(seen, 1);
+                        speak(echo ? RunStory.ECHOES[which] : RunStory.CAST_SHADOWS[which], true);
+                        if (echo) talk.add(RunStory.ECHO_ANSWERS[which]);
+                    }
+                    if (echo && foe.flat && (session.tally("run_echoes") >> which & 1) == 0) {
+                        session.keep("run_echoes", session.tally("run_echoes") | 1 << which);
+                        int keepsake = RunLoot.code(RunLoot.ACCESSORY, 11, which, RunLoot.ROSE);
+                        intoBag(keepsake);
+                        toast(RunUniques.name(foe.kind) + " is laid to rest", Integer.bitCount(session.tally("run_echoes")) + " of " + RunUniques.ECHO_COUNT + " Echoes  ·  " + RunLoot.name(keepsake), LOOT_PICTURE + keepsake);
+                    }
                 }
                 for (PlusRun.Foe foe : run.foes()) {
                     if (foe.flat || !RunUniques.is(foe.kind) || Math.abs(foe.x - run.x()) > 10) continue;
@@ -10025,7 +10048,7 @@ final class RunGame {
         if (uniqueSheet == null) return;
         int way = RunUniques.way(foe.kind);
         if (foe.flat && foe.act > 1.1f) return;
-        if (RunUniques.shadow(foe.kind) || RunUniques.copy(foe.kind)) {
+        if (RunUniques.shadow(foe.kind) || RunUniques.copy(foe.kind) || RunUniques.echo(foe.kind) || RunUniques.castShadow(foe.kind)) {
             drawMirrored(canvas, foe, middle, feet, turned);
             return;
         }
@@ -10148,6 +10171,37 @@ final class RunGame {
             paint.setAlpha(255);
             return;
         }
+        if (RunUniques.echo(foe.kind)) {
+            // An Echo: her, in an outfit of hers and with a weapon of hers, shaded as her timeline left her, and a little taller.
+            int which = foe.kind - RunUniques.ECHO_FIRST, held = RunUniques.ECHO_WEAPON[which];
+            Bitmap sheet = armed(held);
+            if (vanityArt == null) vanityArt = new VanityArt(context);
+            Bitmap dressedAs = vanityArt.sheet("arm" + held, sheet, RunVanity.STYLES[RunUniques.ECHO_OUTFIT[which]]);
+            if (dressedAs != null) sheet = dressedAs;
+            int frames = sheet.getWidth() / sheet.getHeight() >= 20 ? MAIN_FRAMES : ARMED_FRAMES;
+            int pose = foe.mode == 1 ? (frames == MAIN_FRAMES ? MAIN_GATHER : ARMED_RISE) : foe.mode == 2 ? (frames == MAIN_FRAMES ? MAIN_GO : ARMED_USE) : ARMED_RUN + (int) (clock * 8) % 4;
+            glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * .9f, ECHO_GLOWS[which], Math.round(alpha * .45f));
+            paint.setColorFilter(ECHO_TINTS[which]);
+            paint.setAlpha(alpha);
+            frame(canvas, sheet, pose, frames, middle, feet, tile * 1.62f * 1.2f, !turned);
+            paint.setColorFilter(null);
+            paint.setAlpha(255);
+            return;
+        }
+        if (RunUniques.castShadow(foe.kind)) {
+            // The shadow of one she knows: drawn from their own pictures in ink-black, with a violet glow.
+            int which = foe.kind - RunUniques.CAST_FIRST;
+            Bitmap sheet = which == 4 ? laterCastArt(5) : cast(which == 0 ? CHIKUWA : which == 1 ? RUNE : which == 2 ? ILLYA : TSUBAKIEH);
+            int frames = which == 4 ? LATER_FRAMES[5] : CAST_FRAMES[which == 0 ? CHIKUWA : which == 1 ? RUNE : which == 2 ? ILLYA : TSUBAKIEH];
+            int frame = foe.mode == 2 ? frames - 1 : (int) (clock * 5) % Math.max(1, frames - 1);
+            glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * .9f, 0xFF7A4BD8, Math.round(alpha * .4f));
+            paint.setColorFilter(SHADOW_INK);
+            paint.setAlpha(alpha);
+            cell(canvas, sheet, frame, frames, middle, feet, foe.tall() * tile * 1.25f, !turned);
+            paint.setColorFilter(null);
+            paint.setAlpha(255);
+            return;
+        }
         // Her shadows: the one that mirrors her, and the hidden one, with her sword; the one that shoots with her ink gun.
         int weapon = foe.kind == RunUniques.SHADOW_FIRST + 2 ? PlusRun.GUN : PlusRun.SWORD;
         int pose = foe.mode == 1 || foe.mode == 2 ? ARMED_USE : ARMED_RUN + (int) (clock * 8) % 4;
@@ -10158,6 +10212,22 @@ final class RunGame {
         frame(canvas, armed(weapon), pose, ARMED_FRAMES, middle, feet, tile * 1.62f * 1.05f, !turned);
         paint.setColorFilter(null);
         paint.setAlpha(255);
+    }
+
+    private static final android.graphics.ColorFilter MIRROR_GLASS = new android.graphics.ColorMatrixColorFilter(new float[]{
+            .5f, .3f, .2f, 0, 70, .3f, .45f, .25f, 0, 70, .3f, .3f, .55f, 0, 95, 0, 0, 0, 1, 0});
+    /** The Echoes' shading and glow: drowned teal, ash grey, steel, faded magenta, frost, violet, blank white. */
+    private static final android.graphics.ColorFilter[] ECHO_TINTS = {
+            new android.graphics.LightingColorFilter(0xFF90C8D0, 0x00102830), new android.graphics.ColorMatrixColorFilter(new float[]{.3f, .4f, .2f, 0, 20, .3f, .4f, .2f, 0, 20, .3f, .4f, .2f, 0, 22, 0, 0, 0, 1, 0}),
+            new android.graphics.LightingColorFilter(0xFFB0B8C8, 0x00101418), new android.graphics.LightingColorFilter(0xFFE0A0D0, 0x00200818),
+            new android.graphics.LightingColorFilter(0xFFC0E0FF, 0x00203040), new android.graphics.LightingColorFilter(0xFFA890D0, 0x00100820),
+            new android.graphics.ColorMatrixColorFilter(new float[]{.25f, .3f, .15f, 0, 110, .25f, .3f, .15f, 0, 110, .25f, .3f, .15f, 0, 115, 0, 0, 0, 1, 0})};
+    private static final int[] ECHO_GLOWS = {0xFF3FA8C0, 0xFF6A6A6A, 0xFF8A9AB8, 0xFFD050A8, 0xFF8FD0FF, 0xFF7A4BD8, 0xFFE8E8F0};
+    private final Bitmap[] laterCastArts = new Bitmap[LATER_CAST.length];
+
+    private Bitmap laterCastArt(int which) {
+        if (laterCastArts[which] == null) laterCastArts[which] = BitmapFactory.decodeResource(context.getResources(), LATER_CAST[which]);
+        return laterCastArts[which];
     }
 
     private Bitmap copySheet;
