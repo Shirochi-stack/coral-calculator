@@ -1697,6 +1697,17 @@ final class PlusRun {
         return standable(at((int) Math.floor(fx + .15f), row)) || standable(at((int) Math.floor(fx + foe.wide() - .15f), row));
     }
 
+    /** Whether, falling straight down from where it stands, one would come down on something, before water, lava or the bottom of the land. */
+    private boolean groundBelow(Foe foe, float feet) {
+        int middle = (int) Math.floor(foe.x + foe.wide() / 2);
+        for (int row = (int) Math.floor(feet + .05f) + 1; row < level.land.length; row++) {
+            char square = at(middle, row);
+            if (square == RunLevels.WATER || square == RunLevels.LAVA) return false;
+            if (standsAt(foe, foe.x, row)) return true;
+        }
+        return false;
+    }
+
     private boolean standable(char square) {
         return solid(square) || square == RunLevels.LEDGE || square == RunLevels.THIN;
     }
@@ -1741,7 +1752,7 @@ final class PlusRun {
                 // Coming down: falling until there is something to stand on, and never through the floor it began on.
                 foe.fall += BOSS_FALL * seconds;
                 float next = foe.y + foe.fall * seconds;
-                if (next >= foe.base || standsAt(foe, foe.x, next + foe.tall()) && Math.floor(next + foe.tall()) > Math.floor(foe.y + foe.tall())) {
+                if (next >= foe.base && standsAt(foe, foe.x, foe.base + foe.tall()) || standsAt(foe, foe.x, next + foe.tall()) && Math.floor(next + foe.tall()) > Math.floor(foe.y + foe.tall())) {
                     float landed = next >= foe.base ? foe.base : (float) Math.floor(next + foe.tall()) - foe.tall();
                     foe.ground = foe.y = landed;
                     foe.leaping = 0;
@@ -1761,6 +1772,26 @@ final class PlusRun {
             foe.leaping = 3;
             foe.fall = 0;
             bossDrops++;
+            // (With nothing to come down onto straight below, over water or a gap, it leaps back down to its own floor instead.)
+            if (!groundBelow(foe, feet)) {
+                float back = Float.NaN;
+                for (float shift = 0; shift <= 16 && Float.isNaN(back); shift += .5f) {
+                    for (float side : new float[]{-1, 1}) {
+                        float at = Math.max(lo, Math.min(hi, foe.x + side * shift));
+                        if (standsAt(foe, at, foe.base + foe.tall()) && roomFor(foe, at, foe.base - .02f)) {
+                            back = at;
+                            break;
+                        }
+                    }
+                }
+                if (Float.isNaN(back)) back = Math.max(lo, Math.min(hi, foe.home));
+                foe.leaping = 2;
+                foe.leap = 0;
+                foe.leapFX = foe.x;
+                foe.leapFY = foe.y;
+                foe.leapTX = back;
+                foe.leapTY = foe.base;
+            }
             return true;
         }
         // Stood above it, on a ledge, within its reach: it comes for her.
@@ -2420,7 +2451,7 @@ final class PlusRun {
         int thing = thingOf(with);
         boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
         float more = 1 + (perks.skills.stats[RunSkills.ATK] + skillOf(RunSkills.E_ATK_PCT) + (minded ? intelligence() : 0) + perks.mightPct + metered()
-                + (hp * 3 <= maxHp() ? skillOf(RunSkills.E_LAST_STAND) : 0)) / 100f;
+                + (hp * 3 <= maxHp() ? skillOf(RunSkills.E_LAST_STAND) : 0) - (inked() ? curseWeak() : 0)) / 100f;
         return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
     }
 
@@ -2639,6 +2670,7 @@ final class PlusRun {
         dodgeAge += seconds;
         shrugAge += seconds;
         regenAge += seconds;
+        drip(seconds);
         sinceMeter += seconds;
         if (chargedLeft > 0) chargedLeft -= seconds;
         if (frenzyLeft > 0) frenzyLeft -= seconds;
@@ -3095,6 +3127,8 @@ final class PlusRun {
         /** Its colour of toughness (0 as it is drawn, then red, purple, gold, black ink); and how long since a blow last landed on it. */
         int tier;
         float struck = 9;
+        /** How fast one that walks is falling, having nothing under it; and which way the last blow knocked it. */
+        float dropping, knocked;
         /**
          * A shield it carries, if any: how many more strong blows it takes, how many it took whole, what a blow must count for to tell
          * on it, which of the four it is (book cover, steel, gold, black ink), and how long since a blow last met it.
@@ -3253,6 +3287,8 @@ final class PlusRun {
         float middle = foe.x + foe.wide() / 2, top = foe.y + foe.tall() * .4f;
         int coins = RunLoot.plusesFor(boss, tough), more = gear(RunLoot.PLUSES);
         if (more > 0) coins += (coins * more + lootRoll(100)) / 100;
+        // (Under black, half of them, rounded up.)
+        if (inked()) coins = (coins + 1) / 2;
         for (int coin = 0; coin < coins; coin++) {
             float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
             loose(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
@@ -3709,6 +3745,8 @@ final class PlusRun {
             foe.guardKind = from.guardKind;
             foe.guardMet = from.guardMet;
             foe.struck = from.struck;
+            foe.dropping = from.dropping;
+            foe.knocked = from.knocked;
             foe.perch = from.perch;
             foe.base = from.base;
             foe.leap = from.leap;
@@ -5287,8 +5325,8 @@ final class PlusRun {
         }
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
-        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy();
-        float fast = rush > 0 ? run * 1.3f : run, leap = rush > 0 ? LEAP * 1.1f : LEAP;
+        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy() * (inked() ? curseSlow() : 1);
+        float fast = rush > 0 ? run * 1.3f : run, leap = (rush > 0 ? LEAP * 1.1f : LEAP) * (inked() ? CURSE_JUMP : 1);
         if (has(YELLOW)) fast = run * (mastered ? 2.1f : 1.7f);
         float wanted = left == right ? 0 : left ? -fast : fast;
         // On slime there is little to push against, and little to stop her.
@@ -5337,7 +5375,7 @@ final class PlusRun {
             }
             // With her wings, one more jump in the air; and in steam, which lifts her, another.
             // With her wings, one more jump in the air.
-            speedDown = -LEAP * .88f;
+            speedDown = -LEAP * .88f * (inked() ? CURSE_JUMP : 1);
             sinceJump = 1;
             sprung = false;
             airJumps++;
@@ -5539,7 +5577,7 @@ final class PlusRun {
                 continue;
             }
             if (x < item[1] + .85f && x + WIDE > item[1] + .15f && y < item[2] + .9f && y + TALL > item[2] + .1f) {
-                if (cursed > 0 && item[0] > FORM && item[0] < CHEST) continue;
+                if (cursed > 0 && item[0] > FORM && item[0] < CHEST && item[0] != FORM + WHITE) continue;
                 if (item[0] == DIARY) {
                     items.remove(index);
                     diaries++;
@@ -5965,6 +6003,11 @@ final class PlusRun {
      * then it is her own shadow.
      */
     private void wear(int colour, float lasts) {
+        // White washes black off her.
+        if (colour == WHITE && cursed > 0) {
+            cursed = 0;
+            cleansed++;
+        }
         if (colour == WHITE) {
             for (int each = RED; each <= PURPLE; each++) put(each, lasts, true);
             pale = lasts;
@@ -5980,8 +6023,11 @@ final class PlusRun {
 
     /**
      * Black is put on her, by a black ribbon or by a curse that is thrown: every colour she
-     * wore is gone, and for as long as it lies on her she can call on none and pick up none.
-     * It does not slow her, and what she carries still strikes.
+     * wore is gone, and for as long as it lies on her she can call on none and pick up none
+     * (but a white ribbon, which washes it off). And it weighs on her, a little more the
+     * further on the land: heavy ink, slower and with lower jumps; ink in her eyes, the edges
+     * of what she sees dark; weak, her blows lighter and the pluses she wins halved; and it
+     * drips off her, a little of her HP at a time, never her last heart.
      */
     private void curse(float lasts) {
         // On the white that is truly hers black does not lie: it is one of her colours.
@@ -5995,6 +6041,45 @@ final class PlusRun {
 
     /** How long the black that is on her was to lie on her in all; and how many times black has been put on her, a count that only goes up. */
     float cursedFor() { return cursedFor; }
+
+    // What black does to her while it lies on her
+
+    /** Whether black lies on her now, and weighs on her (on the white that is truly hers it is one of her colours, and does not). */
+    boolean inked() { return cursed > 0 && !mastered; }
+
+    /** Black's weights: how much slower she runs, how much lower she jumps, how much lighter her blows, in percent; how often it drips. */
+    static final float CURSE_JUMP = .88f, DRIP_EVERY = 5;
+    static final String[] CURSE_NAMES = {"Heavy ink: slower, lower jumps", "Ink in her eyes: the edges dark", "Weak: lighter blows, half the pluses",
+            "Dripping: a little HP at a time, never the last heart"};
+
+    /** How fast she runs under black: a little slower, more so the further on. */
+    float curseSlow() { return 1 - Math.min(.26f, .18f + level.number / 1000f); }
+
+    /** How much lighter her blows are under black, in percent. */
+    int curseWeak() { return Math.min(30, 20 + level.number / 20); }
+
+    /** How much HP a drip of black takes. */
+    int curseDrip() { return Math.min(10, 3 + level.number / 30); }
+
+    private float dripClock;
+    private int drips, cleansed;
+
+    /** Counts that only go up: drips of black, and black washed off by a white ribbon. */
+    int drips() { return drips; }
+    int cleansed() { return cleansed; }
+
+    /** As time goes, black drips off her: a little HP, never so much that she has less than a heart. */
+    private void drip(float seconds) {
+        if (!inked() || state != PLAYING) {
+            dripClock = 0;
+            return;
+        }
+        if ((dripClock += seconds) < DRIP_EVERY) return;
+        dripClock = 0;
+        if (hp <= RunSkills.HEART) return;
+        hp = Math.max(RunSkills.HEART, hp - curseDrip());
+        drips++;
+    }
     int curses() { return curses; }
     private float cursedFor;
     private int curses;
@@ -6246,6 +6331,19 @@ final class PlusRun {
                 : by == REAPED ? SCYTHE : by == PUNCHED || by == UPPERCUT || by == HAYMAKER ? KNUCKLES : UNARMED;
     }
 
+    /** How a blow is seen landing, by what dealt it: a cut (0), a splash of ink (1), a thud (2), or a sparkle of magic (3). */
+    static final int CUTS = 0, SPLASHES = 1, THUDS = 2, SPARKLES = 3;
+
+    static int flavourOf(int by) {
+        if (by == BEAMED || by == SURE || by == STEAM || by == FIRE || by == WATER) return SPARKLES;
+        switch (thingOf(by)) {
+            case SWORD: case KATANA: case GREATSWORD: case SCYTHE: case LANCE: case KNIFE: case WHIP: return CUTS;
+            case BRUSH: case PEN: case GUN: return SPLASHES;
+            case WAND: case STAFF: return SPARKLES;
+            default: return THUDS;
+        }
+    }
+
     private boolean dashCut;
 
     private void fell(Foe foe, int by) {
@@ -6301,20 +6399,30 @@ final class PlusRun {
             } else if ((foe.guard -= breaking >= 100 ? 2 : 1) <= 0) {
                 foe.guard = 0;
                 shieldsBroken++;
+                // (A shield breaking is seen as a great blow is, without a number.)
+                if (hits.size() < 24) hits.add(new float[]{clangX, clangY - foe.tall() * .2f, 0, 1, 0, 1, 0, flavourOf(with), 0, 1});
             }
             return;
         }
         foe.struck = 0;
         if (hers) landed(foe, waits);
         boolean stun = hers && !waits && chance(skillOf(RunSkills.E_STUN));
-        if (hits.size() < 24) hits.add(new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0});
+        // (What it was dealt with, for how the blow is seen: a cut, a splash of ink, a thud, a sparkle; and, below, whether it was the last.)
+        float[] hit = new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0, flavourOf(with), 0, 0};
+        if (hits.size() < 24) hits.add(hit);
         // A creature is knocked back a little, away from her, where there is room.
+        foe.knocked = foe.x + foe.wide() / 2 < x + WIDE / 2 ? -1 : 1;
         if (!waits && foe.left > dealt && !RunLevels.flier(foe.kind)) {
-            float push = (foe.x + foe.wide() / 2 < x + WIDE / 2 ? -1 : 1) * .22f, to = foe.x + push;
+            // (And not off the edge of what it stands on: one that walks is knocked back only as far as there is ground.)
+            float push = foe.knocked * .22f, to = foe.x + push, from = foe.x;
             int row = (int) Math.floor(foe.y + foe.tall() - .05f);
-            if (!solid(at((int) Math.floor(push < 0 ? to : to + foe.wide()), row))) foe.x = to;
+            if (!solid(at((int) Math.floor(push < 0 ? to : to + foe.wide()), row))) {
+                foe.x = to;
+                if (walks(foe.kind) && heldAt(foe, from) && !held(foe)) foe.x = from;
+            }
         }
         if ((foe.left -= dealt) <= 0) {
+            hit[8] = 1;
             foe.left = 0;
             foe.flat = true;
             foe.y = foe.ground;
@@ -7631,12 +7739,88 @@ final class PlusRun {
     /** How far from where it was put one of a swarm goes after her: it keeps to its place, and does not follow her along the land. */
     static final float LEASH = 6;
 
+    /**
+     * Whether a creature of a kind goes on the ground, and so must have something under it: not one that flies, floats, hangs, swims or
+     * haunts, and not one who waits (who keeps to the place made for them), nor a paper target.
+     */
+    static boolean walks(int kind) {
+        if (RunLevels.flier(kind) || RunLevels.boss(kind) || RunLevels.rover(kind) || kind == RunLevels.DRAGON || kind == RunLevels.TARGET) return false;
+        if (!RunUniques.is(kind)) return true;
+        int way = RunUniques.way(kind);
+        return !RunUniques.flies(kind) && !RunUniques.floats(kind) && way != RunUniques.GHOST && way != RunUniques.SWIMMER && !RunUniques.great(kind);
+    }
+
     private void move(Foe foe, float seconds) {
         moveFoe(foe, seconds);
         if (foe.swarm && !foe.flat && Math.abs(foe.x - foe.home) > LEASH) {
+            float was = foe.x;
             foe.x = foe.home + Math.signum(foe.x - foe.home) * LEASH;
+            // (Kept to its place only where there is ground to keep to.)
+            if (walks(foe.kind) && !held(foe)) foe.x = was;
             foe.leftward = foe.x > foe.home;
         }
+        if (!foe.flat && foe.leaping == 0 && walks(foe.kind)) settle(foe, seconds);
+    }
+
+    /** How fast one that walks falls, and the fastest it falls; and counts that only go up: those that fell, and those that fell into water, lava or out of the land. */
+    static final float FOE_FALLS = 34, FOE_FALLS_MOST = 20;
+    private int foesFell, foesSank;
+
+    int foesFell() { return foesFell; }
+
+    int foesSank() { return foesSank; }
+
+    /** Whether there is something under one that walks, where it is. */
+    boolean held(Foe foe) { return heldAt(foe, foe.x); }
+
+    private boolean heldAt(Foe foe, float at) { return heldOn(foe, at, (int) Math.floor(foe.ground + foe.tall() + .05f)); }
+
+    private boolean heldOn(Foe foe, float at, int row) {
+        for (int column = (int) Math.floor(at + .12f); column <= (int) Math.floor(at + foe.wide() - .12f); column++) if (standable(at(column, row))) return true;
+        return false;
+    }
+
+    /**
+     * One that walks with nothing under it (knocked off an edge, its ledge crumbled, or laid where there is none) falls, as she does,
+     * until it lands on something; into water or lava, or out of the bottom of the land, it is gone, and gives nothing.
+     */
+    private void settle(Foe foe, float seconds) {
+        if (held(foe)) {
+            foe.dropping = 0;
+            return;
+        }
+        if (foe.dropping == 0) foesFell++;
+        float feet = foe.ground + foe.tall();
+        foe.dropping = Math.min(FOE_FALLS_MOST, foe.dropping + FOE_FALLS * seconds);
+        float to = feet + Math.max(.02f, foe.dropping * seconds);
+        int middle = (int) Math.floor(foe.x + foe.wide() / 2);
+        for (int row = (int) Math.floor(feet + .05f); row <= (int) Math.floor(to); row++) {
+            // (Coming down onto the top of a square it can stand on; or going into water or lava.)
+            if (row > feet + .01f && heldOn(foe, foe.x, row)) {
+                to = row;
+                foe.dropping = 0;
+                break;
+            }
+            char square = at(middle, row);
+            if (to > row && (square == RunLevels.WATER || square == RunLevels.LAVA)) {
+                sink(foe);
+                return;
+            }
+        }
+        foe.y += to - feet;
+        foe.ground = to - foe.tall();
+        if (to > level.land.length + 1) sink(foe);
+    }
+
+    /** One that walks has fallen where it cannot stand: it is gone, giving nothing. */
+    private void sink(Foe foe) {
+        foe.flat = true;
+        foe.left = 0;
+        foe.act = 0;
+        foe.dropping = 0;
+        // (Nothing flies out of it.)
+        foe.dropped = true;
+        foesSank++;
     }
 
     private void moveFoe(Foe foe, float seconds) {

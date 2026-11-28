@@ -523,11 +523,17 @@ final class RunGame {
     private boolean saidCombo, saidLast, saidFlag, saidCharm;
     private float squash, sinceUse = 9, sinceLook, sinceAim = 9;
     /** Knuckles: uppercuts and haymakers seen, and how long since the last of each, for her pose. */
+    /** Whether her title line was said on this visit to the map (her line with the game's new name waits for another). */
+    private boolean titleThisVisit;
+    private float lastBlackLine = -99;
     private int seenUppercuts, seenHaymakers;
     private float uppercutAge = 9, haymakerAge = 9;
     private int seenFormed, seenDoors, seenQuakes, seenParried, seenCensors, seenEntrances, seenSpecials, seenPhases, seenUnlocks, seenWiped;
     private final boolean[] saidForm = new boolean[PlusRun.WHITE + 1];
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
+    /** How long everything is held still after a heavy blow (a frame or two), and how long that is. */
+    private float hitStop;
+    static final float HIT_STOP = .04f;
     private float formLasts = 1, shake, sinceBump = 9, sinceShut = 9, sinceOpened = 9, sinceParry = 9, flash;
     private int seenGreetings, seenEntered, seenReveals, seenWins, seenCurses, seenDrops, seenBeams, seenBlasts, jumpsAtFall;
     /** In a build made for testing: frames drawn since a moment, to find how many are drawn a second. */
@@ -3091,6 +3097,9 @@ final class RunGame {
         return tierFilters[tier];
     }
 
+    /** How long a creature just hit is lifted near to white, and how long it is squashed by the blow. */
+    static final float STRUCK_WHITE = .12f, STRUCK_SQUASH = .16f;
+
     /** The white of a blow landing: everything of the picture lifted near to white for a moment. */
     private android.graphics.ColorFilter struckFilter() {
         if (struck == null) struck = new android.graphics.LightingColorFilter(0xFF606060, 0x00B8B8B8);
@@ -3098,30 +3107,100 @@ final class RunGame {
     }
 
     /**
-     * Blows landing: a spark where each landed, ink splashing out from it (ink, never anything else), and the number it took off rising and
-     * fading, gold and bigger for a great blow. A heavy blow shakes the screen a little.
+     * Blows landing: a burst where each landed in the way of what dealt it (a slash of light for a blade, a splat of ink for ink and pens,
+     * a star of rays for a blunt blow, a scatter of shards for magic), ink splashing out from it (ink, never anything else), and the number
+     * it took off rising and fading, gold and bigger for a great blow. A great blow, a shield breaking and a creature beaten burst bigger,
+     * with a ring; a heavy one shakes the screen a little and holds everything still for a frame or two. (There are never more than 24 at
+     * once, so a swarm stays readable.)
      */
     private void drawHits(Canvas canvas, int first, int last) {
         text.setTextAlign(Paint.Align.CENTER);
         text.setTypeface(Typeface.DEFAULT_BOLD);
         for (float[] hit : run.hits()) {
             if (hit[0] < first - 2 || hit[0] > last + 2) continue;
+            boolean great = hit[3] > 0, beaten = hit[8] > 0, broke = hit[9] > 0;
             if (hit[6] == 0) {
                 hit[6] = 1;
                 if (perks.item != 0 && RunLoot.rarity(perks.item) >= RunLoot.RED && RunArms.kindOf(perks.item) == run.weapon()) shake = Math.max(shake, .12f);
-                if (hit[3] > 0 || hit[2] >= 3 * PlusRun.BLOW) shake = Math.max(shake, hit[3] > 0 ? .14f : .08f);
+                if (great || hit[2] >= 3 * PlusRun.BLOW || broke) shake = Math.max(shake, great || broke ? .14f : .08f);
+                // The hit-stop: a heavy blow, a shield broken, or a big one beaten.
+                if (great || broke || hit[2] >= 3 * PlusRun.BLOW || beaten && hit[5] > 0) hitStop = Math.max(hitStop, HIT_STOP);
             }
             float age = hit[4], x = (hit[0] - cameraX) * tile, y = (hit[1] - cameraY) * tile + tile * .25f;
-            // The spark.
-            if (age < .14f) {
-                float through = age / .14f, reach = tile * (.25f + .35f * through);
-                stroke.setColor(0xFFFFF4C2);
-                stroke.setAlpha(Math.round(255 * (1 - through)));
-                stroke.setStrokeWidth(tile * .05f);
-                for (int ray = 0; ray < 6; ray++) {
-                    double turn = ray * Math.PI / 3 + hit[0];
-                    canvas.drawLine(x + (float) Math.cos(turn) * reach * .35f, y + (float) Math.sin(turn) * reach * .35f, x + (float) Math.cos(turn) * reach, y + (float) Math.sin(turn) * reach, stroke);
+            float big = great || broke ? 1.6f : beaten ? 1.35f : 1;
+            int flavour = (int) hit[7];
+            // The burst.
+            if (age < .18f) {
+                float through = age / .18f, reach = tile * (.3f + .45f * through) * big;
+                int alpha = Math.round(255 * (1 - through));
+                if (flavour == PlusRun.CUTS) {
+                    // A slash of light across where it landed, a thin crescent sweeping and thinning.
+                    stroke.setColor(0xFFFFFFFF);
+                    stroke.setAlpha(alpha);
+                    stroke.setStrokeCap(Paint.Cap.ROUND);
+                    float turn = (float) (Math.sin(hit[0] * 13) * 25) - 35;
+                    android.graphics.RectF arc = new android.graphics.RectF(x - reach, y - reach * .7f, x + reach, y + reach * .7f);
+                    stroke.setStrokeWidth(tile * .12f * (1 - through) * big);
+                    canvas.drawArc(arc, turn, 110 + 40 * through, false, stroke);
+                    stroke.setColor(0xFFFFE9A8);
+                    stroke.setAlpha(alpha);
+                    stroke.setStrokeWidth(tile * .04f * big);
+                    canvas.drawArc(arc, turn + 10, 90 + 40 * through, false, stroke);
+                    stroke.setStrokeCap(Paint.Cap.BUTT);
+                } else if (flavour == PlusRun.SPLASHES) {
+                    // A splat of ink, thrown wide.
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(0xFF1B2152);
+                    paint.setAlpha(alpha);
+                    canvas.drawCircle(x, y, tile * .2f * big * (1 - through * .5f), paint);
+                    for (int blob = 0; blob < 8; blob++) {
+                        double turn = blob * Math.PI / 4 + hit[1];
+                        canvas.drawCircle(x + (float) Math.cos(turn) * reach, y + (float) Math.sin(turn) * reach * .8f, tile * .08f * big * (1 - through * .6f), paint);
+                    }
+                } else if (flavour == PlusRun.SPARKLES) {
+                    // Shards of light, turning as they fly.
+                    paint.setStyle(Paint.Style.FILL);
+                    for (int shard = 0; shard < 7; shard++) {
+                        double turn = shard * Math.PI * 2 / 7 + hit[0] * 3;
+                        float sx = x + (float) Math.cos(turn) * reach, sy = y + (float) Math.sin(turn) * reach, r = tile * .09f * big * (1 - through * .5f);
+                        paint.setColor(shard % 2 == 0 ? 0xFFB9F3FF : 0xFFF5C8FF);
+                        paint.setAlpha(alpha);
+                        android.graphics.Path diamond = new android.graphics.Path();
+                        diamond.moveTo(sx, sy - r * 1.6f);
+                        diamond.lineTo(sx + r, sy);
+                        diamond.lineTo(sx, sy + r * 1.6f);
+                        diamond.lineTo(sx - r, sy);
+                        diamond.close();
+                        canvas.drawPath(diamond, paint);
+                    }
+                } else {
+                    // A star of rays, thick, for a blow that thuds.
+                    stroke.setColor(0xFFFFF4C2);
+                    stroke.setAlpha(alpha);
+                    stroke.setStrokeWidth(tile * .08f * big);
+                    for (int ray = 0; ray < 8; ray++) {
+                        double turn = ray * Math.PI / 4 + hit[0];
+                        float long_ = ray % 2 == 0 ? 1 : .65f;
+                        canvas.drawLine(x + (float) Math.cos(turn) * reach * .3f, y + (float) Math.sin(turn) * reach * .3f, x + (float) Math.cos(turn) * reach * long_, y + (float) Math.sin(turn) * reach * long_, stroke);
+                    }
                 }
+                // The white of it, at its heart, for a moment.
+                if (age < .07f) {
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.WHITE);
+                    paint.setAlpha(Math.round(230 * (1 - age / .07f)));
+                    canvas.drawCircle(x, y, tile * .22f * big, paint);
+                }
+                stroke.setAlpha(255);
+                paint.setAlpha(255);
+            }
+            // A great blow, a shield breaking and a creature beaten: a ring going out.
+            if ((great || broke || beaten) && age < .3f) {
+                float through = age / .3f;
+                stroke.setColor(broke ? 0xFFBFE6FF : great ? 0xFFFFC433 : 0xFFFFFFFF);
+                stroke.setAlpha(Math.round(220 * (1 - through)));
+                stroke.setStrokeWidth(tile * .07f * (1 - through));
+                canvas.drawCircle(x, y, tile * (.3f + 1.1f * through) * big, stroke);
                 stroke.setAlpha(255);
             }
             // The ink.
@@ -3130,15 +3209,15 @@ final class RunGame {
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0xFF1B2152);
                 paint.setAlpha(Math.round(220 * (1 - through)));
-                for (int drop = 0; drop < 7; drop++) {
+                for (int drop = 0; drop < (beaten || great ? 10 : 7); drop++) {
                     double turn = drop * 0.9 + hit[1] * 3;
-                    float far = tile * (.15f + .5f * through) * (.6f + .4f * (drop % 3) / 2f);
+                    float far = tile * (.15f + .5f * through) * (.6f + .4f * (drop % 3) / 2f) * big;
                     canvas.drawCircle(x + (float) Math.cos(turn) * far, y + (float) Math.sin(turn) * far + through * through * tile * .3f, tile * (.07f - .03f * through) * (drop % 2 == 0 ? 1 : .7f), paint);
                 }
                 paint.setAlpha(255);
             }
+            if (hit[2] <= 0) continue;
             // The number.
-            boolean great = hit[3] > 0;
             float rise = age / .9f, size = dp(great ? 19 : 14) * (age < .1f ? 1 + (1 - age / .1f) * .4f : 1);
             text.setTextSize(size);
             String said = String.valueOf((int) hit[2]) + (great ? "!" : "");
@@ -4466,6 +4545,42 @@ final class RunGame {
         }
         int tint = BAND_TINT[RunDungeons.band(delveFloor)];
         canvas.drawColor(Color.argb(Math.min(160, 30 + delveFloor % RunDungeons.BAND_FLOORS * 18 + RunDungeons.band(delveFloor) * 20), Color.red(tint), Color.green(tint), Color.blue(tint)));
+    }
+
+    /** Under black: the edges of what she sees dark (lighter than a lightless floor), and ink dripping off her. */
+    private void drawInked(Canvas canvas) {
+        if (run == null || !run.inked()) return;
+        float hx = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, hy = (run.y() + PlusRun.TALL / 2 - cameraY) * tile;
+        float fade = Math.min(1, Math.min(run.cursed(), run.cursedFor() - run.cursed() + .3f) / .6f);
+        paint.setShader(new android.graphics.RadialGradient(hx, hy, Math.max(width, height) * .62f, new int[]{0x00000000, 0x00000000, 0xB0080412},
+                new float[]{0, .38f, 1}, android.graphics.Shader.TileMode.CLAMP));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAlpha(Math.round(255 * Math.max(0, fade)));
+        canvas.drawRect(0, 0, width, height, paint);
+        paint.setShader(null);
+        paint.setAlpha(255);
+        // Drops of ink running off her and falling.
+        paint.setColor(0xFF120A1C);
+        for (int drop = 0; drop < 4; drop++) {
+            float through = (clock * .9f + drop * .27f) % 1, across = (drop - 1.5f) * tile * .16f;
+            float y = hy - tile * .35f + through * tile * 1.1f, size = tile * (.05f + .03f * (1 - through));
+            paint.setAlpha(Math.round(230 * (1 - through * .7f)));
+            canvas.drawOval(hx + across - size * .7f, y - size, hx + across + size * .7f, y + size * 1.3f, paint);
+        }
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+    }
+
+    /** The black ribbon on the HUD while black lies on her: the ribbon, and how long it has left. */
+    private void drawBlackChip(Canvas canvas, float left, float top) {
+        if (!run.inked()) return;
+        float wide = dp(70), high = dp(22);
+        box.set(left, top, left + wide, top + high);
+        plate(canvas, box, high / 2, 235);
+        pieceIn(canvas, two, RIBBON_ART + PlusRun.BLACK - 1, left + dp(13), top + high / 2, dp(20), 0);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setColor(0xFF2A1C3A);
+        fitted(canvas, (int) Math.ceil(run.cursed()) + " s", left + dp(27), top + high / 2 + dp(4.5f), dp(12), wide - dp(32));
     }
 
     /** Over a dungeon's floor: on a lightless one, the dark, but for a ring of light about her; and the keeper's name and what it has left, while it is near. */
@@ -6610,6 +6725,13 @@ final class RunGame {
         if (screen == MAP && video == null && captionLeft <= 0 && personLeft <= 0 && session.tally("run_title_said") == 0 && clock > 1.5f) {
             session.keep("run_title_said", 1);
             speak(RunStory.TITLE_LINE[0], false);
+            titleThisVisit = true;
+        }
+        // And, on a later visit, the game's own name: the Queen of Sloppies, once.
+        if (screen == MAP && video == null && !treeOpen && captionLeft <= 0 && personLeft <= 0 && !titleThisVisit && session.tally("run_title_said") != 0
+                && session.tally("run_title2_said") == 0 && clock > 2.5f && !audio.speaking()) {
+            session.keep("run_title2_said", 1);
+            speak(RunStory.TITLE_LINE[1], false);
         }
         // The tree redrawn and every point back: she says so, once, the next time the map is open.
         if (screen == MAP && video == null && !treeOpen && captionLeft <= 0 && personLeft <= 0 && session.tally("run_tree_notice") == 1 && session.tally("run_tree_said") == 0
@@ -6868,6 +6990,11 @@ final class RunGame {
     }
 
     private void step(float seconds) {
+        // (Held still a moment by a heavy blow: what she pressed waits for it.)
+        if (hitStop > 0) {
+            hitStop -= seconds;
+            return;
+        }
         if (slow > 0) {
             slow -= seconds;
             seconds *= .3f;
@@ -6992,6 +7119,11 @@ final class RunGame {
             shake = Math.max(shake, .25f);
             darkened = .6f;
             pop(herX, herY - 1.9f, "Black: no ribbons for " + Math.round(run.cursedFor()) + " s");
+            // And she says how it weighs on her (not every time: once in a while).
+            if (run.inked() && clock - lastBlackLine > 40) {
+                lastBlackLine = clock;
+                speak(RunStory.BLACKENED[0], true);
+            }
         }
         if (darkened > 0) darkened -= seconds;
         if (hintMix && run.time() > 1.2f && captionLeft <= 0 && personLeft <= 0) {
@@ -8962,6 +9094,7 @@ final class RunGame {
         } else {
             drawLand(canvas);
             drawDepthsOver(canvas);
+            drawInked(canvas);
             drawWayOn(canvas);
             drawDiary(canvas);
             // A moment in which something is won or handed over lies over the land, and under what is said and shown of how she stands.
@@ -9078,7 +9211,17 @@ final class RunGame {
                     // (With her backpack to look into.)
                     float inside = card(canvas, "Paused", (delve >= 0 ? RunDungeons.NAMES[delve] + ", floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve)
                             : blackRung > 0 ? "The black arena, rung " + blackRung : RunStory.CHAPTERS[RunLevels.chapterOf(number)] + ", land " + number + "  ·  level " + RunLevels.levelOf(number))
-                            + (hard() > 0 ? "  ·  harder by " + hard() : ""), dp(52));
+                            + (hard() > 0 ? "  ·  harder by " + hard() : "") + (run != null && run.inked() ? "  ·  under black " + (int) Math.ceil(run.cursed()) + " s" : ""), dp(run != null && run.inked() ? 112 : 52));
+                    // Black, and what it does to her, named.
+                    if (run != null && run.inked()) {
+                        text.setTextAlign(Paint.Align.LEFT);
+                        text.setColor(0xFF6A4A8A);
+                        float line = inside + dp(60);
+                        for (String name : PlusRun.CURSE_NAMES) {
+                            fitted(canvas, "\u2022 " + name, box.left + dp(20), line, dp(11), box.width() - dp(40));
+                            line += dp(13);
+                        }
+                    }
                     packButton.set(box.left + dp(20), inside, box.right - dp(20) - dp(104), inside + dp(42));
                     skillPause.set(packButton.right + dp(8), inside, box.right - dp(20), inside + dp(42));
                     paint.setStyle(Paint.Style.FILL);
@@ -11073,10 +11216,22 @@ final class RunGame {
         }
         drawTrees(canvas, first, last);
         drawHideouts(canvas, first, last);
+        int squashed = -1;
         for (PlusRun.Foe foe : run.foes()) {
             paint.setColorFilter(null);
+            if (squashed >= 0) {
+                canvas.restoreToCount(squashed);
+                squashed = -1;
+            }
             if (foe.x + foe.wide() < first - 9 || foe.x > last + 9) continue;
             float middle = (foe.x + foe.wide() / 2 - cameraX) * tile, feet = (foe.y + foe.tall() - cameraY) * tile;
+            // Just hit: squashed down and wide, and pushed a little the way the blow went, springing back.
+            if (foe.struck < STRUCK_SQUASH && !foe.flat) {
+                float give = 1 - foe.struck / STRUCK_SQUASH, wobble = (float) Math.sin(foe.struck / STRUCK_SQUASH * Math.PI) * give;
+                squashed = canvas.save();
+                canvas.translate(foe.knocked * tile * .12f * give, 0);
+                canvas.scale(1 + .16f * wobble, 1 - .14f * wobble, middle, feet);
+            }
             // Crouched to leap up to her ledge: lit red-gold and pulsing, so that it is seen coming.
             if (foe.leaping == 1 && !foe.flat) {
                 float pulse = .5f + .5f * (float) Math.sin(clock * 24);
@@ -11088,13 +11243,16 @@ final class RunGame {
                 if (!foe.flat && foe.tier == PlusRun.GOLD_TIER) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * 1.1f, 0xFFFFD45A, 120 + (int) (40 * Math.sin(clock * 3 + foe.x)));
                 if (!foe.flat && foe.tier == PlusRun.INK_TIER) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * 1.2f, 0xFF1A1030, 170 + (int) (50 * Math.sin(clock * 2 + foe.x)));
                 paint.setAlpha(255);
-                paint.setColorFilter(foe.struck < .1f && !foe.flat ? struckFilter() : tierFilter(foe.tier));
+                paint.setColorFilter(foe.struck < STRUCK_WHITE && !foe.flat ? struckFilter() : tierFilter(foe.tier));
             }
             boolean second = (int) (clock * 6 + foe.x) % 2 != 0;
             // The pictures face left, and are turned about to go right.
             boolean turned = !foe.leftward && !foe.flat;
             if (RunLevels.boss(foe.kind)) {
+                // (Those who wait are lifted to white by a blow too.)
+                if (foe.struck < STRUCK_WHITE && !foe.flat) paint.setColorFilter(struckFilter());
                 drawWaiting(canvas, foe, middle, feet, second);
+                paint.setColorFilter(null);
             } else if (foe.kind == RunLevels.TARGET) {
                 // A paper target on its string: rings of red and white, and a hole through it when it is hit.
                 if (foe.flat && foe.act > .5f) continue;
@@ -11168,6 +11326,7 @@ final class RunGame {
                 }
             }
         }
+        if (squashed >= 0) canvas.restoreToCount(squashed);
         paint.setColorFilter(null);
         drawShields(canvas, first, last);
         drawRoomOver(canvas);
@@ -14271,7 +14430,9 @@ final class RunGame {
         drawLevel(canvas, x, under);
         boolean anySlot = run.active(0) != null || run.active(1) != null || run.active(2) != null;
         if (RunArms.heavy(run.weapon()) || anySlot || run.energy() < PlusRun.ENERGY_MOST - .5f) drawEnergy(canvas, x + dp(128), under);
-        if (run.dpMaking() > 0 || run.dp() > 0 || run.divineLeft() > 0) drawDivine(canvas, x + dp(232), under);
+        boolean divine = run.dpMaking() > 0 || run.dp() > 0 || run.divineLeft() > 0;
+        if (divine) drawDivine(canvas, x + dp(232), under);
+        drawBlackChip(canvas, x + dp(divine ? 336 : 232), under);
         if (anySlot) drawSlots(canvas);
         drawBreath(canvas, x, under + dp(26));
         drawDelveLabel(canvas, safe.centerX(), leftButton.top - dp(30));
