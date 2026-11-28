@@ -179,7 +179,7 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
         if (over) return;
         try {
             player = new MediaPlayer();
-            try (AssetFileDescriptor file = getResources().openRawResourceFd(resource)) {
+            try (AssetFileDescriptor file = FilmFiles.open(getContext(), resource)) {
                 player.setDataSource(file.getFileDescriptor(), file.getStartOffset(), file.getLength());
             }
             surface = new Surface(texture);
@@ -220,7 +220,7 @@ final class RunVideo extends FrameLayout implements TextureView.SurfaceTextureLi
             voice = new MediaPlayer();
             voice.setAudioAttributes(new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_GAME)
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build());
-            try (AssetFileDescriptor file = getResources().openRawResourceFd(voiceResource)) {
+            try (AssetFileDescriptor file = FilmFiles.open(getContext(), voiceResource)) {
                 voice.setDataSource(file.getFileDescriptor(), file.getStartOffset(), file.getLength());
             }
             voice.setOnPreparedListener(which -> {

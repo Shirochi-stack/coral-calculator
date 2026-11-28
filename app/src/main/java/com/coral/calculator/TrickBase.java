@@ -173,7 +173,8 @@ abstract class TrickBase {
                 }
                 break;
             default:
-                if (reach(homeX, homeY, dp(620)) || clock > 4) return true;
+                // Home at a run that is seen to be a run, not a blink; given time to get there from anywhere on the screen.
+                if (reach(homeX, homeY, dp(HOME_RUN)) || clock > 7) return true;
                 break;
         }
         return false;
@@ -185,8 +186,17 @@ abstract class TrickBase {
             ownUp();
             return false;
         }
-        return true;
+        // While she owns up, a touch sends her home now; and once she is on her way, it lets her get there. (It used to end the trick at
+        // once, and she was simply back where she started, without the run back.)
+        if (phase == OWN) {
+            phase = HOME;
+            clock = 0;
+        }
+        return false;
     }
+
+    /** How fast she runs home after a prank, in dp a second. */
+    private static final float HOME_RUN = 340;
 
     private void ownUp() {
         phase = OWN;

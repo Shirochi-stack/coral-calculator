@@ -73,7 +73,7 @@ public class RunHidden2Test {
             assertEquals("H", line[2]);
             assertTrue(line[1], line[1].endsWith(" Sloppy~♡"));
             assertFalse(line[1], line[1].contains(", Sloppy"));
-            assertTrue(new java.io.File("src/main/res/raw/run_v_" + line[0] + ".ogg").isFile());
+            assertTrue(line[0], RunVoicesTest.recorded(line[0]));
         }
     }
 }

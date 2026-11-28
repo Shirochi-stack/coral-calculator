@@ -20,15 +20,37 @@ from PIL import Image
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "runart/src/main/assets/runart/vfx"
 ORIG = ROOT / "assets/vfx"
+# The plus coins (and their pop) are Plus run's own art: a folder of their own in the pack, and in the originals.
+OUT_COINS = ROOT / "runart/src/main/assets/runart/coins"
+ORIG_COINS = ROOT / "assets/plus-run/coins"
+SOLID = {"plus_coin", "plus_silver", "plus_gold", "plus_prism", "gem_glossary"}
+COINS = {"plus_coin", "plus_silver", "plus_gold", "plus_prism", "gem_glossary", "coin_pop"}
 SCRATCH = pathlib.Path(r"C:\Users\ADMIN\AppData\Local\Temp\claude\b5219ac421f6d431\f0915c1e-5858-4761-9ef4-023c764bbc22\scratchpad\vfx")
 RAW = SCRATCH / "raw"
 CANVAS = (1536, 1024)
 COLS, ROWS = 4, 3
 FRAMES = COLS * ROWS
-CENTRED = {"flames", "poison", "stun", "poof", "dust"}
+CENTRED = {"flames", "poison", "stun", "poof", "dust", "plus_coin", "plus_gold", "plus_silver", "plus_prism", "gem_glossary"}
 
 # name: (what it is, fps, loops, additive, px (the longest side of a frame))
 EFFECTS = {
+    "plus_coin": ("a glossy collectible coin shaped like a thick plus sign (a cross with equal arms and rounded ends): a deep red ruby-gem plus with bright glossy highlights and "
+                  "facets, set in a bevelled gold rim, with a crisp clean edge and no glow, halo, cloud or mist round it at all. It turns slowly and steadily around its vertical axis through one full turn, so that over the twelve "
+                  "frames it is seen from the front, then narrowing as it turns edge-on, then from the back, then edge-on, then front again, with a white light glint sweeping across "
+                  "its face as it turns; it stays recognisably a plus at every angle except edge-on, and the last frame leads smoothly into the first", 14, True, False, 128),
+    "plus_gold": ("a glossy collectible coin shaped like a thick plus sign (a cross with equal arms and rounded ends): a bright polished gold plus with rose-gold facets and white "
+                  "highlights, set in a thin warm-orange rim, with a soft golden glow and two tiny sparkles. It turns slowly and steadily around its vertical axis through one full "
+                  "turn, so that over the twelve frames it is seen from the front, then narrowing as it turns edge-on, then from the back, then edge-on, then front again, with a white "
+                  "light glint sweeping across its face as it turns; the last frame leads smoothly into the first", 14, True, False, 128),
+    "plus_silver": ("a glossy collectible coin shaped like a thick plus sign (a cross with equal arms and rounded ends): a polished silver-white plus with pale-blue steel facets and "
+                    "bright white highlights, set in a bevelled silver rim with small studs, with a crisp clean edge and no glow, halo, cloud or mist round it at all. It turns slowly and steadily around its vertical axis through one full turn, so that over the twelve frames it is seen from the front, then narrowing as it turns edge-on, then from the back, then edge-on, then front again, with a white light glint sweeping across its face as it turns; the last frame leads smoothly into the first", 14, True, False, 128),
+    "plus_prism": ("a rare glossy collectible coin shaped like a thick plus sign (a cross with equal arms and rounded ends): a prismatic crystal plus whose facets shine in rainbow "
+                   "colours (pink, gold, green, cyan, violet), set in a bevelled white-gold rim with tiny gems, with a crisp clean edge and no halo, cloud or mist round it, and just a few tiny sparkles. It turns slowly and steadily around its vertical axis through one full turn, so that over the twelve frames it is seen from the front, then narrowing as it turns edge-on, then from the back, then edge-on, then front again, with a white light glint sweeping across its face as it turns; the last frame leads smoothly into the first", 14, True, False, 144),
+    "gem_glossary": ("a rare collectible multiplier gem: a large faceted diamond-cut gemstone in glowing aqua and violet with a bright white core, a small glowing multiplication "
+                     "cross mark (like an x) shining inside it, and a gold collar and tiny floating sparkles. It turns slowly and steadily around its vertical axis through one full "
+                     "turn over the twelve frames, with a white light glint sweeping across its facets as it turns and a gentle pulse of glow; the last frame leads smoothly into the first", 14, True, True, 144),
+    "coin_pop": ("a small pop when a coin is picked up: a bright gold and white flash from a point, a thin ring of light expanding, five little gold plus signs and round sparkles "
+                 "flying outward and fading, with a tiny soft glow", 26, False, True, 160),
     "slash_light": ("a quick sword slash: a thin white-cyan crescent arc drawn left to right across the cell like a smile (curving up at both ends); it begins as a hair-thin bright line, "
                     "widens into a glowing crescent with a hot white edge and a few sparks, then thins out and fades", 30, False, True, 192),
     "slash_heavy": ("a heavy sword slash: a thick orange and white crescent arc drawn left to right across the cell like a smile, with a hot white core, a red-orange edge, smear lines and a "
@@ -128,7 +150,7 @@ def key(rgb):
     return out
 
 
-def clean(rgba, glow=False):
+def clean(rgba, glow=False, solid=False):
     """A frame that came with its own alpha: faint haze under a cut is dropped, and the colour at the edges is the colour of the effect (not of what was behind it)."""
     import cv2
     a = rgba[..., 3].astype(np.float32) / 255
@@ -146,6 +168,13 @@ def clean(rgba, glow=False):
         keep = np.clip((bright - 95) / 90.0, 0, 1)
         a = np.where(a >= 0.8, a, a * keep)
         a = np.where(a < 0.04, 0, a)
+    if solid:
+        # (a coin is a thing with an edge: the model's pale cloud round it is not part of it. Whatever is not plainly there and is not beside what is, goes.)
+        import cv2
+        body = (a >= 0.7).astype(np.uint8)
+        near = cv2.dilate(body, np.ones((5, 5), np.uint8)) > 0
+        a = np.where(near | (a >= 0.7), a, 0)
+        a = np.where(a < 0.12, 0, a)
     out = rgba.copy()
     out[..., 3] = (a * 255 + .5).astype(np.uint8)
     return out
@@ -172,6 +201,8 @@ def best_draw(name):
 def pack(names):
     OUT.mkdir(parents=True, exist_ok=True)
     ORIG.mkdir(parents=True, exist_ok=True)
+    OUT_COINS.mkdir(parents=True, exist_ok=True)
+    ORIG_COINS.mkdir(parents=True, exist_ok=True)
     total = 0
     for name in names:
         draw = best_draw(name)
@@ -187,7 +218,7 @@ def pack(names):
         frames = []
         for k in range(FRAMES):
             cell = im.crop(((k % COLS) * cw, (k // COLS) * ch, (k % COLS) * cw + cw, (k // COLS) * ch + ch))
-            frames.append(key(np.array(cell)) if opaque else clean(np.array(cell), EFFECTS[name][3]))
+            frames.append(key(np.array(cell)) if opaque else clean(np.array(cell), EFFECTS[name][3], name in SOLID))
         # (a cell's own edge is black, and any line the model drew along it is not part of the effect)
         for f in frames:
             f[:3, :, 3] = 0
@@ -220,9 +251,10 @@ def pack(names):
         for k, f in enumerate(frames):
             piece = Image.fromarray(shrink(f[box[1]:box[3], box[0]:box[2]], (fw, fh)), "RGBA")
             sheet.paste(piece, (k * fw, 0))
-        sheet.save(OUT / (name + ".webp"), quality=82, alpha_quality=88, method=6)
-        full.save(ORIG / (name + ".png"), optimize=True)
-        size = (OUT / (name + ".webp")).stat().st_size
+        out_dir, orig_dir = (OUT_COINS, ORIG_COINS) if name in COINS else (OUT, ORIG)
+        sheet.save(out_dir / (name + ".webp"), quality=84, alpha_quality=90, method=6)
+        full.save(orig_dir / (name + ".png"), optimize=True)
+        size = (out_dir / (name + ".webp")).stat().st_size
         total += size
         print("%-15s frame %dx%d  %7d bytes" % (name, fw, fh, size))
     print("total", total)
@@ -284,7 +316,7 @@ if __name__ == "__main__":
     ap.add_argument("names", nargs="*")
     ap.add_argument("--redo", action="store_true")
     a = ap.parse_args()
-    names = a.names or list(EFFECTS)
+    names = a.names or [n for n in EFFECTS if n not in COINS]
     for n in names:
         if n not in EFFECTS:
             sys.exit("no such effect: " + n)

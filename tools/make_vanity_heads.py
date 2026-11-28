@@ -60,11 +60,11 @@ GRIPS = ["grip%d" % k for k in outfit.layers.GRIP]
 
 def frames_list():
     """Every frame: those of the sheets she had first, then those of the sheets that came later (as grids of their own, so that the grids drawn before stay the same)."""
-    out, later, grips, moves, swims, extra = [], [], [], [], [], []
+    out, later, grips, moves, swims, extra, latest = [], [], [], [], [], [], []
     for name in SHEETS:
         for idx, c in cells(name):
-            (extra if name in outfit.layers.EXTRA else swims if name == "swim" else moves if name == "moves" else grips if name in GRIPS else later if name in LATER else out).append((name, idx, c))
-    return out, later, grips, moves, swims, extra
+            (latest if name in outfit.layers.LATEST else extra if name in outfit.layers.EXTRA else swims if name == "swim" else moves if name == "moves" else grips if name in GRIPS else later if name in LATER else out).append((name, idx, c))
+    return out, later, grips, moves, swims, extra, latest
 
 
 def build_grid(variant, work, name, group, cols, rows, big_note=False):
@@ -94,7 +94,7 @@ def build_grid(variant, work, name, group, cols, rows, big_note=False):
     return place, prompt
 
 
-def make_jobs(variant, redo=False, fix=False, new=False):
+def make_jobs(variant, redo=False, fix=False, new=None):
     work = WORK.parent / "heads" / variant
     (work / "grids").mkdir(parents=True, exist_ok=True)
     (work / "raw").mkdir(exist_ok=True)
@@ -106,15 +106,18 @@ def make_jobs(variant, redo=False, fix=False, new=False):
         while any((work / "raw" / ("%s_r%d.png" % (j, n))).exists() for j in weak):
             n += 1
         suffix = "_r%d" % n
-    first, later, grips, moves, swims, extra = frames_list()
-    allf = first + later + grips + moves + swims + extra
-    groups = [x[i:i + COLS * ROWS] for x in (first, later, grips, moves, swims, extra) for i in range(0, len(x), COLS * ROWS)]
-    first_new = len(groups) - (len(extra) + COLS * ROWS - 1) // (COLS * ROWS) if new else 0
+    first, later, grips, moves, swims, extra, latest = frames_list()
+    allf = first + later + grips + moves + swims + extra + latest
+    groups = [x[i:i + COLS * ROWS] for x in (first, later, grips, moves, swims, extra, latest) for i in range(0, len(x), COLS * ROWS)]
+    pool = outfit.layers.LATEST if new == "latest" else outfit.layers.EXTRA
+
+    def wanted(group):
+        return not new or any(fr[0] in pool for fr in group)
     for gnum, group in enumerate(groups):
         name = "%s_%02d" % (variant, gnum)
         place, prompt = build_grid(variant, work, name, group, COLS, ROWS)
         manifest[name] = place
-        if (redo and name not in weak) or fix or gnum < first_new:
+        if (redo and name not in weak) or fix or not wanted(group):
             continue
         jobs.append({"name": name + suffix, "background": "transparent", "size": "%dx%d" % CANVAS, "prompt": prompt, "refs": [str(work / "grids" / (name + ".png"))]})
     # The grids of the frames the draws failed on, drawn again four to a picture, bigger; earlier ones are kept, for pack to choose among.
@@ -124,7 +127,9 @@ def make_jobs(variant, redo=False, fix=False, new=False):
             if "_fix" in key:
                 manifest[key] = value
     if fix:
-        report = json.loads((work / "report.json").read_text())
+        # (the latest pack, whole or of some sheets only, is the one to go by)
+        newest = max((work / n for n in ("report.json", "report_only.json") if (work / n).exists()), key=lambda q: q.stat().st_mtime)
+        report = json.loads(newest.read_text())
         keys = sorted({(f[1], f[2]) for f in report["failed"] if len(f) > 2})
         attempt = 1
         while list((work / "raw").glob("%s_fix%d_*.png" % (variant, attempt))):
@@ -138,7 +143,7 @@ def make_jobs(variant, redo=False, fix=False, new=False):
         suffix = "_fix%d" % attempt
     (work / "manifest.json").write_text(json.dumps(manifest))
     for s in range(3):
-        (work / ("jobs%s_%d.json" % ("_new" if new else suffix, s))).write_text(json.dumps(jobs[s::3]))
+        (work / ("jobs%s_%d.json" % ("_" + new if new else suffix, s))).write_text(json.dumps(jobs[s::3]))
     print(variant, "grids", len(manifest), "frames", len(allf), "jobs", len(jobs))
 
 
@@ -401,6 +406,6 @@ if __name__ == "__main__":
     ap.add_argument("--redo", action="store_true")
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--fix", action="store_true")
-    ap.add_argument("--new", action="store_true")
+    ap.add_argument("--new", nargs="?", const="new", choices=["new", "latest"])
     a = ap.parse_args()
     {"jobs": lambda: make_jobs(a.variant, a.redo, a.fix, a.new), "pack": lambda: pack(a.variant, only=set(a.only) if a.only else None), "offsets": lambda: offsets(a.variant)}[a.what]()

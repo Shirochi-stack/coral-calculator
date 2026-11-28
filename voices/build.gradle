@@ -1,0 +1,12 @@
+plugins {
+    id 'com.android.asset-pack'
+}
+
+// Voice lines recorded since the base module grew near its limit (tools/make_run_voice.py --pack), kept out of the base module and played
+// from assets by RunAudio. Delivered with the install; the debug build (the GitHub APK) carries the same files, see app/build.gradle.
+assetPack {
+    packName = 'voices'
+    dynamicDelivery {
+        deliveryType = 'install-time'
+    }
+}

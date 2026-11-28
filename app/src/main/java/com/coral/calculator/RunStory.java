@@ -646,6 +646,31 @@ final class RunStory {
             {"hb2e", "The Footnote King. So many tiny marks, and every one is aimed at me Sloppy~♡", "H", PLAYER + "A round regal king made of a swarm of tiny footnote marks with a crown of asterisks flings streams of marks with a pointer staff. Overwhelmed, wry."},
             {"hb2f", "The last librarian. She looks so tired. I'll be gentle, but I won't lose Sloppy~♡", "H", PLAYER + "A tall gaunt ghostly old librarian with a lantern and a huge chained tome casts beams of pale words. Softer, respectful, then determined."},
     };
+    /**
+     * In each home, what is dear to whoever lives there, looked at: what Halgakos says of it, and what its owner says back. In the order
+     * {@link RunLevels#SOMI} on: Somi's ballot box, Inju's golden stamp, Boksun-halmeoni's rice cakes, Ttosun's trophy, Galpi's wind chime,
+     * Yeseo's card catalogue, Nabi's sleeping kitten, Moru's sword with a flower tied on.
+     */
+    static final String[][] KEEPSAKES = {
+            {"hks0", "A ballot box with one vote in it. I bet it says Somi Sloppy~♡", "H", PLAYER + "She peeks into a little wooden ballot box with a heart on it in a cheerful girl's clubhouse bedroom. Amused, fond, teasing."},
+            {"hks1", "A golden stamp. One press and I'm officially approved Sloppy~♡", "H", PLAYER + "She eyes a big shiny golden rubber stamp on a tidy desk in a neat little flat. Mischievous, tempted."},
+            {"hks2", "Rice cakes, still steaming. Halmeoni won't mind one. Or two Sloppy~♡", "H", PLAYER + "She leans over a steaming pot of rice cakes in a granny's warm bakery kitchen. Hungry, sneaky, delighted."},
+            {"hks3", "First place, every race. I'd beat her, you know. Probably Sloppy~♡", "H", PLAYER + "She looks up at a shining gold racing trophy in a sporty girl's room. Competitive, cocky, then a little unsure."},
+            {"hks4", "Ribbons that ring in the wind. I think it's playing my name Sloppy~♡", "H", PLAYER + "She listens to a wind chime of ribbons and bells in a witch's breezy loft. Hushed, dreamy, charmed."},
+            {"hks5", "One drawer glows. The card inside is about me. Footnote: flattering Sloppy~♡", "H", PLAYER + "She pulls a glowing card from a card catalogue drawer in a bookish girl's study. Curious, pleased, playfully smug."},
+            {"hks6", "A sleeping kitten. Shh. Even I can be quiet sometimes Sloppy~♡", "H", PLAYER + "She tiptoes up to a kitten curled asleep in a cat bed in a cat girl's home. Whispering, soft, sweet."},
+            {"hks7", "A sword with a flower tied on. Moru has a soft side after all Sloppy~♡", "H", PLAYER + "She finds a polished sword on a stand with a little flower tied to its hilt in a gruff smith's forge home. Surprised, teasing, warm."},
+    };
+    static final String[][] KEEPSAKE_REPLIES = {
+            {"hkr0", "Halgakos-nim found the ballot box! You can vote too. Just vote for me!", "S", "The genki little girl of the Footnote Party catches her hero at her ballot box and begs for her vote. Bouncy, giggly, high."},
+            {"hkr1", "Please do not stamp yourself. That stamp is for approved forms only. Fine. Approved.", "U", "The prim guild clerk, at home, catches someone with her golden stamp; she protests, then stamps her anyway. Dry, deadpan, a small smile at the end."},
+            {"hkr2", "Aigoo, take the whole pot, dear. I made them thinking someone would come.", "B", "The kind old baker granny pushes her whole pot of rice cakes on a visitor, a little lonely. Warm, fussing, tender."},
+            {"hkr3", "Hands off my trophy! Okay, hold it once. Then race me for it!", "O", "The sporty ice-cream girl guards her racing trophy, then gives in and issues a challenge. Loud, grinning, competitive."},
+            {"hkr4", "The wind tied those ribbons, not me. It likes you. Listen when it rings.", "P", "The quiet bookmark witch explains softly that the wind tied the ribbons on her chime. Hushed, mysterious, kind."},
+            {"hkr5", "Footnote one: that card is yours now. Footnote two: please put the drawer back.", "E", "The careful footnote girl lets a visitor keep a card from her catalogue, then asks her to tidy up. Precise, earnest, a touch flustered."},
+            {"hkr6", "Nya, shh! She only just fell asleep. Here, a treat for being quiet, nya.", "A", "The playful cat girl whispers so as not to wake a kitten, and rewards her guest. Whispering, purring, mischievous."},
+            {"hkr7", "That flower's nothing. Don't tell anyone. Here. For keeping quiet.", "W", "The gruff young smith, embarrassed, waves off the flower on her sword and bribes her guest to keep the secret. Flat, gruff, flustered."},
+    };
     /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
     static final String[][] LATER_UNIQUES = {
             {"u2a", "A newspaper bug! Don't let it roll you flat Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
@@ -707,6 +732,11 @@ final class RunStory {
             {"knk2", "Jab, jab, and up you go Sloppy~♡", "H", PLAYER + "She lands a quick combo ending in an uppercut. Snappy, rhythmic, pleased."},
             {"knk3", "Shields? Not against this fist Sloppy~♡", "H", PLAYER + "Her charged haymaker has just smashed through a shield. Smug, powerful."},
             {"knk4", "Coming through, fists first Sloppy~♡", "H", PLAYER + "She dashes forward into a punch at full speed. Breathless, gleeful."},
+    };
+
+    /** A glossary gem, the first time she takes one: pluses count double for a while. */
+    static final String[][] GEM = {
+            {"gem1", "A glossary gem! Every plus counts double while it glows Sloppy~♡", "H", PLAYER + "She picks up a glowing aqua gem and learns every plus is worth double for a while. Delighted, a little greedy."},
     };
 
     /** The dungeons: the stairway found, going down, between floors, the keeper, cleared, lost, three kinds of floor, and her own double in ink. */
@@ -1371,6 +1401,8 @@ final class RunStory {
         groups.add(LATER_UNIQUES);
         groups.add(STATUS_UNIQUES);
         groups.add(HIDDEN2);
+        groups.add(KEEPSAKES);
+        groups.add(KEEPSAKE_REPLIES);
         groups.add(MIRROR);
         groups.add(ECHOES);
         groups.add(ECHO_ANSWERS);

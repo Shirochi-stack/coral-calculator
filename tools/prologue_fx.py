@@ -25,7 +25,7 @@ import clips_fit as cf  # noqa: E402
 
 D = pathlib.Path(r"C:\Users\ADMIN\Documents\ChatGPT\Calculator APP\dist\cutscenes\opening")
 RATE = 48000
-RAW = ROOT / "app" / "src" / "main" / "res" / "raw"
+RAW = ROOT / "films" / "src" / "main" / "assets" / "films"
 LANGS = ("en", "ja", "ko", "zh")
 GAIN_DB = 17.0  # the hits are about -40 dB in the stem; this brings their loudest to about -22 dB under the mix
 
