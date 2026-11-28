@@ -2051,6 +2051,117 @@ final class RunGame {
         return false;
     }
 
+    /**
+     * The stone and boards of the little rooms behind doors (a wine cellar, a map room, a vault, a clock tower, the homes and shops of a
+     * village): a sheet of eight squares in the runart pack, each material a lit top and what lies under it. Brick, planks, cut slabs, cracked rock.
+     */
+    private Bitmap lookTiles;
+    private boolean lookTilesTried;
+    private static final int BRICK_TILES = 0, PLANK_TILES = 1, SLAB_TILES = 2, CRACKED_TILES = 3;
+    /** Which material each look is built of; a room with no look of its own (a range, a trample) is plain cracked rock. */
+    private static final int[] LOOK_STUFF = {BRICK_TILES, PLANK_TILES, SLAB_TILES, PLANK_TILES, SLAB_TILES, PLANK_TILES, CRACKED_TILES, BRICK_TILES,
+            PLANK_TILES, BRICK_TILES, PLANK_TILES, SLAB_TILES, CRACKED_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES, PLANK_TILES};
+    /** How each look dyes its stone: lit where it is stood on or stands inside the room, dim in the walls round it (made once). */
+    private android.graphics.ColorFilter[] lookLit, lookDim;
+    private android.graphics.LinearGradient sideShade;
+    private final android.graphics.Matrix sideMatrix = new android.graphics.Matrix();
+
+    private boolean lookTilesReady() {
+        if (lookTiles == null) {
+            if (lookTilesTried) return false;
+            lookTilesTried = true;
+            try (java.io.InputStream in = context.getAssets().open("runart/run_look_tiles.webp")) {
+                lookTiles = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                return false;
+            }
+        }
+        return lookTiles != null;
+    }
+
+    private android.graphics.LinearGradient floorShade, lipShade;
+
+    /**
+     * The floor of a building of a village: boards (flagstones in the smithy and the black market) with a lit skirting lip along the walking
+     * line, going right across the screen and down under the buttons, a shadow tucked under the lip and the floor darkening as it comes
+     * toward her, so it reads as ground she stands on and not a ledge. Returns whether it drew it.
+     */
+    private boolean houseFloor(Canvas canvas, int[] in, int first, int last) {
+        int look = look();
+        if (in[0] != RunLevels.HOUSE || look < 0 || look >= LOOK_STUFF.length || !lookTilesReady()) return false;
+        int stuff = look == 11 || look == 12 ? SLAB_TILES : PLANK_TILES;
+        float top = (in[11] - cameraY) * tile;
+        if (top >= height) return true;
+        android.graphics.ColorFilter lit = new android.graphics.PorterDuffColorFilter(mixed(Color.WHITE, LOOK_CAP[look], .3f), android.graphics.PorterDuff.Mode.MULTIPLY);
+        paint.setAlpha(255);
+        paint.setColorFilter(lit);
+        int rows = (int) Math.ceil((height - top) / tile) + 1;
+        for (int column = first; column <= last; column++) {
+            float left = (column - cameraX) * tile;
+            for (int row = 0; row < rows; row++) groundSquare(canvas, lookTiles, stuff * 2 + (row == 0 ? 0 : 1), left, top + row * tile, column, row, row == 0);
+        }
+        paint.setColorFilter(null);
+        // The shade: a shadow tucked under the lip, and the floor deepening toward the bottom of the screen.
+        paint.setStyle(Paint.Style.FILL);
+        if (floorShade == null) floorShade = new android.graphics.LinearGradient(0, 0, 0, 1, 0x00000000, 0x80000000, android.graphics.Shader.TileMode.CLAMP);
+        if (lipShade == null) lipShade = new android.graphics.LinearGradient(0, 0, 0, 1, 0x77000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP);
+        waterMatrix.setScale(1, height - top);
+        waterMatrix.postTranslate(0, top);
+        floorShade.setLocalMatrix(waterMatrix);
+        paint.setShader(floorShade);
+        canvas.drawRect(0, top, width, height + 1, paint);
+        waterMatrix.setScale(1, tile * .4f);
+        waterMatrix.postTranslate(0, top + tile * .2f);
+        lipShade.setLocalMatrix(waterMatrix);
+        paint.setShader(lipShade);
+        canvas.drawRect(0, top + tile * .2f, width, top + tile * .6f, paint);
+        paint.setShader(null);
+        paint.setColor(Color.BLACK);
+        return true;
+    }
+
+    /**
+     * One square of a room behind a door, drawn from its look's stone, boards or brick, with a lit lip on the top of whatever is stood on,
+     * and the sides of a block that stand free darkened a little, so a step reads as a step. Returns whether it drew it.
+     */
+    private boolean lookSquare(Canvas canvas, int column, int row, float left, float y, boolean capped) {
+        if (!lookTilesReady()) return false;
+        int look = look(), kinds = LOOK_STUFF.length;
+        int[] in = run.level().rooms.get(run.room());
+        if (lookLit == null) {
+            lookLit = new android.graphics.ColorFilter[kinds + 1];
+            lookDim = new android.graphics.ColorFilter[kinds + 1];
+            for (int each = 0; each <= kinds; each++) {
+                int cap = each == kinds ? 0xFF8A5F3E : LOOK_CAP[each], wall = each == kinds ? 0xFF2A1D1A : LOOK_WALL[each];
+                lookLit[each] = new android.graphics.PorterDuffColorFilter(mixed(Color.WHITE, cap, .38f), android.graphics.PorterDuff.Mode.MULTIPLY);
+                lookDim[each] = new android.graphics.PorterDuffColorFilter(mixed(Color.WHITE, wall, .62f), android.graphics.PorterDuff.Mode.MULTIPLY);
+            }
+        }
+        int slot = look < 0 || look >= kinds ? kinds : look;
+        int stuff = slot == kinds ? CRACKED_TILES : LOOK_STUFF[slot];
+        boolean within = look >= 0 && row >= in[12] && row < in[11] && column >= in[3] && column <= in[4];
+        // In a building of a village, its floor is laid in one piece from the walking line to the bottom of the screen (houseFloor).
+        if (in[0] == RunLevels.HOUSE && look >= 0 && row >= in[11]) return true;
+        paint.setColorFilter(capped || within ? lookLit[slot] : lookDim[slot]);
+        groundSquare(canvas, lookTiles, stuff * 2 + (capped ? 0 : 1), left, y, column, row, capped);
+        paint.setColorFilter(null);
+        // The side of a block that stands with air beside it: a soft shade going in from its edge.
+        for (int side = 0; side < 2; side++) {
+            if (run.shown(column + (side == 0 ? -1 : 1), row) == RunLevels.BLOCK) continue;
+            if (sideShade == null) sideShade = new android.graphics.LinearGradient(0, 0, 1, 0, 0x66000000, 0x00000000, android.graphics.Shader.TileMode.CLAMP);
+            sideMatrix.setScale(side == 0 ? tile * .3f : -tile * .3f, 1);
+            sideMatrix.postTranslate(side == 0 ? left : left + tile, 0);
+            sideShade.setLocalMatrix(sideMatrix);
+            int was = paint.getAlpha();
+            paint.setShader(sideShade);
+            paint.setAlpha(was);
+            canvas.drawRect(side == 0 ? left : left + tile * .7f, y, side == 0 ? left + tile * .3f : left + tile + 1, y + tile + 1, paint);
+            paint.setShader(null);
+            paint.setAlpha(was);
+        }
+        return true;
+    }
+
     /** A place's own picture behind it, where it has one: under the sea for a lagoon, a basement for a hideout. Returns whether it drew one. */
     private boolean drawRoomBack(Canvas canvas) {
         int kind = roomKind();
@@ -11600,7 +11711,10 @@ final class RunGame {
         // In a place off the land nothing is drawn beyond its walls: whatever else lies beyond the end of the land is not there to be seen.
         if (run.room() >= 0) {
             int[] in = level.rooms.get(run.room());
-            canvas.clipRect((in[3] - 2 - cameraX) * tile, (in[12] - 2 - cameraY) * tile, (in[4] + 3 - cameraX) * tile, (in[11] + 3 - cameraY) * tile);
+            // (A building's floor goes on down to the bottom of the screen, under the buttons.)
+            boolean building = in[0] == RunLevels.HOUSE && look() >= 0;
+            canvas.clipRect(building ? 0 : (in[3] - 2 - cameraX) * tile, (in[12] - 2 - cameraY) * tile, building ? width : (in[4] + 3 - cameraX) * tile,
+                    building ? height : (in[11] + 3 - cameraY) * tile);
         }
         // The ground jumps when something heavy comes down on it.
         if (shake > 0) canvas.translate((random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4), (random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4));
@@ -11676,6 +11790,10 @@ final class RunGame {
                 }
                 if (here == RunLevels.AIR) continue;
                 if (here == RunLevels.BLOCK && underSquare(canvas, column, row, left, y)) continue;
+                if (here == RunLevels.BLOCK && run.room() >= 0 && lookSquare(canvas, column, row, left, y, run.shown(column, row - 1) != RunLevels.BLOCK)) {
+                    paint.setColor(Color.BLACK);
+                    continue;
+                }
                 if (here == RunLevels.BLOCK && run.room() >= 0) {
                     // In a place off the land, its walls are dark, of the colour of the place, with a lighter board where they are stood on.
                     boolean capped = run.shown(column, row - 1) != RunLevels.BLOCK;
@@ -11818,6 +11936,7 @@ final class RunGame {
                 }
             }
         }
+        if (run.room() >= 0) houseFloor(canvas, level.rooms.get(run.room()), first, last);
         // Under the land it is darker: the caves and the rock round them.
         if (run.room() < 0 && level.under != null && (RunLevels.ROWS - cameraY) * tile < height) {
             paint.setStyle(Paint.Style.FILL);
@@ -11833,8 +11952,11 @@ final class RunGame {
             if (look >= 0) canvas.drawColor(LOOK_LIGHT[look]);
             paint.setColor(look < 0 ? 0xFF2A1D1A : LOOK_WALL[look]);
             float from = (run.roomFrom() - 1 - cameraX) * tile, to = (run.roomTo() + 2 - cameraX) * tile;
-            if (from > 0) canvas.drawRect(0, 0, from + 1, height, paint);
-            if (to < width) canvas.drawRect(to - 1, 0, width, height, paint);
+            // (A building's floor runs on past its walls: only above the floor is the dark beside it.)
+            int[] in = level.rooms.get(run.room());
+            float stop = in[0] == RunLevels.HOUSE && look >= 0 ? Math.min(height, (in[11] - cameraY) * tile) : height;
+            if (from > 0) canvas.drawRect(0, 0, from + 1, stop, paint);
+            if (to < width) canvas.drawRect(to - 1, 0, width, stop, paint);
             paint.setColor(Color.BLACK);
         }
         // The ledges that move: books lying open on the air.
