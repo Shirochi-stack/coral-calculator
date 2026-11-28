@@ -43,7 +43,10 @@ final class RunTree {
 
     private final Resources resources;
     private final float density;
-    private Bitmap icons;
+    private Bitmap icons, notables;
+    private boolean notablesTried;
+    /** Where the notables' pictures are, in the run's asset pack. */
+    static final String NOTABLE_SHEET = "runart/tree_notables.webp";
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -177,13 +180,30 @@ final class RunTree {
 
     /** One of the sheet's pictures, at a middle and a size. */
     void icon(Canvas canvas, int index, float x, float y, float size, int alpha) {
-        if (icons == null) icons = BitmapFactory.decodeResource(resources, R.drawable.run_skill_icons);
-        if (icons == null) return;
+        // (The notables' own pictures are in the run's asset pack, kept out of the base module; the emblems and node pictures in the app.)
+        boolean notable = index >= RunSkills.NOTABLE_ICONS;
+        Bitmap sheet;
+        if (notable) {
+            if (notables == null && !notablesTried) {
+                notablesTried = true;
+                try (java.io.InputStream in = resources.getAssets().open(NOTABLE_SHEET)) {
+                    notables = BitmapFactory.decodeStream(in);
+                } catch (java.io.IOException ignored) {
+                    notables = null;
+                }
+            }
+            sheet = notables;
+            index -= RunSkills.NOTABLE_ICONS;
+        } else {
+            if (icons == null) icons = BitmapFactory.decodeResource(resources, R.drawable.run_skill_icons);
+            sheet = icons;
+        }
+        if (sheet == null) return;
         int column = index % COLUMNS, row = index / COLUMNS;
         source.set(column * ICON, row * ICON, (column + 1) * ICON, (row + 1) * ICON);
         target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
         paint.setAlpha(alpha);
-        canvas.drawBitmap(icons, source, target, paint);
+        canvas.drawBitmap(sheet, source, target, paint);
         paint.setAlpha(255);
     }
 

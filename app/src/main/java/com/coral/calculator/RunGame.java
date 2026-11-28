@@ -522,6 +522,9 @@ final class RunGame {
     private final boolean[] remarked = new boolean[PlusRun.GUN + 1];
     private boolean saidCombo, saidLast, saidFlag, saidCharm;
     private float squash, sinceUse = 9, sinceLook, sinceAim = 9;
+    /** Knuckles: uppercuts and haymakers seen, and how long since the last of each, for her pose. */
+    private int seenUppercuts, seenHaymakers;
+    private float uppercutAge = 9, haymakerAge = 9;
     private int seenFormed, seenDoors, seenQuakes, seenParried, seenCensors, seenEntrances, seenSpecials, seenPhases, seenUnlocks, seenWiped;
     private final boolean[] saidForm = new boolean[PlusRun.WHITE + 1];
     /** How long her form lasts in all; how much longer the screen shakes; how long since she walked into a shut way, since one shut, and since they opened. */
@@ -4696,6 +4699,8 @@ final class RunGame {
         seenJumps = seenLandings = seenCollected = seenFlattened = seenHurts = seenSprings = seenFlags = seenBlows = 0;
         seenStrikes = seenPicked = seenThrown = seenTurned = seenTaken = seenSpared = seenCharms = seenFlaps = seenSwings = seenBonus = 0;
         seenFormed = seenDoors = seenQuakes = seenParried = seenCensors = seenEntrances = seenSpecials = seenPhases = seenUnlocks = seenWiped = 0;
+        seenUppercuts = seenHaymakers = 0;
+        uppercutAge = haymakerAge = 9;
         java.util.Arrays.fill(remarked, false);
         java.util.Arrays.fill(saidForm, false);
         saidCombo = saidLast = saidFlag = saidCharm = false;
@@ -6866,6 +6871,8 @@ final class RunGame {
         jumpPressed = false;
         strikePressed = false;
         sinceUse += seconds;
+        uppercutAge += seconds;
+        haymakerAge += seconds;
         sinceAim += seconds;
         float across = width / tile, down = height / tile;
         float goal = Math.max(0, Math.min(Math.max(0, run.columns() - across), run.x() + PlusRun.WIDE / 2 - across * (run.facingLeft() ? .58f : .4f)));
@@ -7110,6 +7117,15 @@ final class RunGame {
                 bits.add(new float[]{run.braceX(), run.braceY(), (float) Math.cos(way) * 6, (float) Math.sin(way) * 6 - 2, .35f, spark % 2 == 0 ? 2 + PlusRun.BROWN : 0});
             }
             pop(run.braceX(), run.braceY() - 1, "Turned aside");
+        }
+        if (run.uppercuts() != seenUppercuts) {
+            seenUppercuts = run.uppercuts();
+            uppercutAge = 0;
+        }
+        if (run.haymakers() != seenHaymakers) {
+            seenHaymakers = run.haymakers();
+            haymakerAge = 0;
+            shake = Math.max(shake, .1f);
         }
         if (run.strikes() != seenStrikes) {
             seenStrikes = run.strikes();
@@ -12995,6 +13011,14 @@ final class RunGame {
                     : airAge < .3f ? KATANA_DOWN : cutAge < .05f ? KATANA_DRAW : cutAge < .2f ? KATANA_CUT : cutAge < .33f ? KATANA_SHEATHE : moving;
             boolean fast = pose == KATANA_CUT || pose == KATANA_DASH || pose == KATANA_DOWN || pose == KATANA_DRAW;
             if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, fast)) frame(canvas, herArmed(weapon), pose, KATANA_FRAMES, feetX, feetY, tall, leftward);
+        } else if (weapon == PlusRun.KNUCKLES) {
+            // Knuckles, a combo that reads as one: a jab is wound (low) and thrown (out); the third of three, the uppercut, is low and then the fist
+            // up; the haymaker is gathered while it is held, and thrown long.
+            int moving = !run.onGround() ? (run.speedDown() < 3 ? ARMED_RISE : ARMED_FALL) : run.running() ? ARMED_RUN + (int) (clock * 11) % 4 : 0;
+            int pose = haymakerAge < .34f ? MAIN_GO : run.heldFor() > .12f ? MAIN_GATHER : uppercutAge < .06f ? MAIN_BACK : uppercutAge < .3f ? MAIN_HEAVY
+                    : sinceUse < .07f ? MAIN_BACK : sinceUse < .22f ? MAIN_GO : moving;
+            weaponAura(canvas, weapon, feetX + (leftward ? -1 : 1) * tall * .32f, feetY - tall * .5f, tall);
+            if (!gripped(canvas, weapon, pose, feetX, feetY, tall, leftward, pose == MAIN_GO || pose == MAIN_HEAVY)) frame(canvas, herArmed(weapon), pose, MAIN_FRAMES, feetX, feetY, tall, leftward);
         } else if (weapon >= PlusRun.TABLET) {
             int pose = beaming ? (run.beam() > 0 ? MAIN_HEAVY : MAIN_GATHER) : sinceHeavy < .3f ? MAIN_HEAVY : sinceHeavy < .5f ? MAIN_SETTLE
                     : run.heldFor() > .12f ? MAIN_GATHER : sinceUse < .09f ? MAIN_BACK : sinceUse < .26f ? MAIN_GO
