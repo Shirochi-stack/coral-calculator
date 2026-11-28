@@ -30,6 +30,7 @@ SHEETS = layers.SHEETS
 SMALL = ["jump", "lose", "party", "white", "back"]
 ARMS = ["arm%d" % i for i in range(12)]
 LATER_ARMS = ["arm%d" % i for i in range(12, 18)]
+GRIPS = ["grip%d" % k for k in layers.GRIP]
 
 DESIGNS = {
     "bunny": ("the bunny girl suit", "a strapless glossy black satin bodysuit shaped like a ballet leotard, sheer black tights, a white detached collar with a red bow tie, white wrist cuffs and black high heels"),
@@ -50,7 +51,7 @@ CLEAR = (" The background must be fully transparent (a PNG with an alpha channel
 
 
 def sheet_image(name):
-    return Image.open(RES / ("halgakos_%s.webp" % name)).convert("RGBA")
+    return Image.open(layers.sheet_file(name)).convert("RGBA")
 
 
 def cells(name):
@@ -77,6 +78,15 @@ def groups():
     # The sheets that came later are their own grids, so that the grids drawn before are the same grids still.
     later = [(s, i) for s in LATER_ARMS for i, _ in cells(s)]
     out += [("g2x3", later[i:i + 6]) for i in range(0, len(later), 6)]
+    # And the weapon-free grips, last of all, for the same reason.
+    grips = [(s, i) for s in GRIPS for i, _ in cells(s)]
+    out += [("g2x3", grips[i:i + 6]) for i in range(0, len(grips), 6)]
+    # And the moves, after them.
+    moves = [(s, i) for s in ("moves",) if s in SHEETS for i, _ in cells(s)]
+    out += [("g3x2", moves[i:i + 6]) for i in range(0, len(moves), 6)]
+    # And her swimming, after those.
+    swims = [(s, i) for s in ("swim",) if s in SHEETS for i, _ in cells(s)]
+    out += [("g3x2", swims[i:i + 6]) for i in range(0, len(swims), 6)]
     return out
 
 
@@ -199,7 +209,7 @@ def register(out_cell, ref_mask):
     return Image.fromarray(fitted, "RGBa").convert("RGBA"), v
 
 
-def pack(outfit, threshold=0.80):
+def pack(outfit, threshold=0.80, only=None):
     work = WORK / outfit
     manifest = json.loads((work / "manifest.json").read_text())
     out_dir = ASSETS / outfit
@@ -208,6 +218,8 @@ def pack(outfit, threshold=0.80):
     metrics = {}
     bad, missing = [], []
     for name, info in manifest.items():
+        if only and not any(fr["sheet"] in only for fr in info["frames"]):
+            continue
         draws = sorted((work / "raw").glob(name + "*.png"))
         draws = [d for d in draws if d.stem == name or d.stem.startswith(name + "_r")]
         if not draws:
@@ -216,6 +228,8 @@ def pack(outfit, threshold=0.80):
         opened = [cleaned(Image.open(d)) for d in draws]
         for fr in info["frames"]:
             sheet, idx = fr["sheet"], fr["index"]
+            if only and sheet not in only:
+                continue
             cols, rows, cw, ch = SHEETS[sheet]
             orig = [c for i, c in cells(sheet) if i == idx][0]
             x, y, w, h = fr["cell"]
@@ -271,9 +285,10 @@ def pack(outfit, threshold=0.80):
         im.save(out_dir / (sheet + ".webp"), quality=88, alpha_quality=95, method=6)
     size = sum((out_dir / (s + ".webp")).stat().st_size for s in sheets)
     report = {"outfit": outfit, "missing_jobs": missing, "frames": len(metrics), "bad": bad, "mean_iou": round(float(np.mean(list(metrics.values()))), 3) if metrics else 0, "bytes": size}
-    (work / "report.json").write_text(json.dumps(report, indent=1))
+    (work / ("report_only.json" if only else "report.json")).write_text(json.dumps(report, indent=1))
     print(json.dumps({k: v for k, v in report.items() if k != "bad"}), "bad", len(bad))
-    contact(outfit)
+    if not only:
+        contact(outfit)
 
 
 def contact(outfit):
@@ -304,5 +319,6 @@ if __name__ == "__main__":
     ap.add_argument("what", choices=["jobs", "pack", "contact"])
     ap.add_argument("outfit")
     ap.add_argument("--redo", action="store_true")
+    ap.add_argument("--only", nargs="*", default=None, help="pack only these sheets (the others' files are left as they are)")
     a = ap.parse_args()
-    {"jobs": lambda: make_jobs(a.outfit, a.redo), "pack": lambda: pack(a.outfit), "contact": lambda: contact(a.outfit)}[a.what]()
+    {"jobs": lambda: make_jobs(a.outfit, a.redo), "pack": lambda: pack(a.outfit, only=set(a.only) if a.only else None), "contact": lambda: contact(a.outfit)}[a.what]()

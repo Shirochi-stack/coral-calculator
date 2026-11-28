@@ -42,7 +42,8 @@ public class RunVanityTest {
         RunVanity.setMode(save, RunVanity.GEAR);
         RunVanity.Style gear = RunVanity.styleFor(RunVanity.mode(save), RunVanity.outfit(save), rose());
         assertNotNull(gear);
-        assertTrue(gear.shimmer);
+        // (The Rosebound Armour is drawn whole once its pictures are in; until then it is its colours with a moving light.)
+        assertTrue(RunVanity.ROSE_READY ? "rose".equals(gear.art) : gear.shimmer);
         assertNotEquals(RunVanity.STYLES[1].key(), gear.key());
         // With nothing worn, gear shows nothing.
         assertNull(RunVanity.styleFor(RunVanity.GEAR, 1, RunLoot.NOTHING));
@@ -102,7 +103,9 @@ public class RunVanityTest {
             total += frames;
             covered += anchors.count(name);
             // The pet atlas has empty cells; every other sheet is full of frames, and at most a frame or two where the cut found no skirt.
-            if (!name.equals("pet")) assertTrue(name + " has " + anchors.count(name) + " of " + frames, anchors.count(name) >= frames - 2);
+            // (Her moves, rolling and spinning, show her skirt in only a few frames: those are the ones that can be cut; the drawn outfits cover all eight.)
+            if (name.equals("moves")) assertTrue(name, anchors.count(name) >= 3);
+            else if (!name.equals("pet")) assertTrue(name + " has " + anchors.count(name) + " of " + frames, anchors.count(name) >= frames - 2);
         }
         assertEquals(62, anchors.count("pet"));
         assertTrue("covered " + covered + " of " + total, covered >= 215);
