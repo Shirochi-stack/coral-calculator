@@ -86,5 +86,5 @@ The screenshots and feature graphic still show the calculator first and should b
 | Financial features | None. The currency converter only multiplies by a rate the user types. |
 | Health features | None. |
 | News app | No. |
-| Content rating | Answered as a utility app in 2026-11; needs redoing for the games: cartoon fantasy violence, and the vanity outfits. |
+| Content rating | Answered as a utility app in 2026-11; needs redoing for the games before the next submission: cartoon fantasy violence; the vanity outfits; romance with a tasteful kiss scene between adult characters (Lilith's wedding); and **strong language**: Halgakos sings "fuck" in the True Grimoire transformation song (decided 2026-11-28), alongside milder words ("damn", "hell", "crap"). Answer the language questions as strong language, not mild; expect about PEGI 16 / ESRB Teen. |
 | Target audience | 13 and over. The app is not designed for children. |
