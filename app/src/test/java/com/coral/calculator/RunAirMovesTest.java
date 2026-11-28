@@ -258,10 +258,31 @@ public class RunAirMovesTest {
         assertTrue(run.aerialOn());
         hold(run, 1.6f, false, true, false);
         assertEquals(0, run.specialsUsed());
+        // (Nor is it gathered for, the hold still held after the aerial strike has run out.)
+        assertFalse(run.aerialOn());
+        assertEquals(0, run.heldFor(), .001f);
         // On the ground the same hold is the special, as ever.
         hold(run, 1, false, false, false);
         assertTrue(run.onGround());
         hold(run, 1, false, true, false);
         assertEquals(1, run.specialsUsed());
+    }
+
+    /** Every thing she may hold has its ground pound's four pictures and its aerial strike's four, in one row of equal cells, in the runart pack; and her empty hands their pound. */
+    @Test public void everyThingSheHoldsHasItsSmashAndAerialPictures() throws Exception {
+        for (int weapon = -1; weapon < RunArms.NAMES.length; weapon++) {
+            for (boolean smash : new boolean[]{true, false}) {
+                if (weapon < 0 && !smash) continue;
+                String name = (smash ? "smash_" : "aerial_") + (weapon < 0 ? "unarmed" : RunArms.MOVE_KINDS[weapon]);
+                java.io.File file = new java.io.File("../runart/src/main/assets/runart/halgakos_" + name + ".webp");
+                assertTrue(name, file.isFile());
+                assertTrue(name, new java.io.File("../assets/plus-run/moves/" + name + ".png").isFile());
+                // (A WebP's size, from its header: VP8X keeps width and height less one in three bytes each.)
+                byte[] head = java.nio.file.Files.readAllBytes(file.toPath());
+                int width = 1 + ((head[24] & 255) | (head[25] & 255) << 8 | (head[26] & 255) << 16), height = 1 + ((head[27] & 255) | (head[28] & 255) << 8 | (head[29] & 255) << 16);
+                assertEquals(name, 0, width % 4);
+                assertTrue(name + " " + height, height >= 248 && width / 4 >= 500);
+            }
+        }
     }
 }

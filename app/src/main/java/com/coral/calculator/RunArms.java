@@ -30,6 +30,9 @@ final class RunArms {
     static final int KNUCKLES = 18, COUNT = 19;
     static final String[] NAMES = {"Pen", "Knife", "Book", "Brush", "Sword", "Ink gun", "Tablet-book", "API keys", "Katana", "Fountain-pen lance", "Ink-well cannon",
             "Ribbon whip", "Greatsword", "Summoning staff", "Mace", "War hammer", "Wand", "Scythe", "Knuckles"};
+    /** Each, by the name its pictures go by (the ground pound's and the aerial strike's sheets, and the vanity's for them). */
+    static final String[] MOVE_KINDS = {"pen", "knife", "book", "brush", "sword", "gun", "tablet", "keys", "katana", "lance", "cannon", "whip", "greatsword", "staff",
+            "mace", "hammer", "wand", "scythe", "knuckles"};
     /** Those she may begin a land with, in the order they are kept: the two that were always hers to have, and the four won in the black arena. */
     static final int[] MAINS = {TABLET, KEYS, KATANA, LANCE, CANNON, WHIP};
     /** How a thing is used: thrown straight, lobbed, or swung. */
