@@ -844,6 +844,8 @@ final class PlusRun {
          */
         boolean triple, airDash, dashStrikes, pound, roll, wallJump, glide, secondWind;
         int thorns;
+        /** How far each of three is worked on at the counter (nought for not bought): the ground pound, the glide, and the aerial strike. */
+        int poundLevel, glideLevel, aerial;
         /** In a dungeon, how much harder her blows land, in percent, from the blessings chosen on the way down. */
         int mightPct;
     }
@@ -1007,6 +1009,117 @@ final class PlusRun {
     private int wallSide, flips, airDashes, rolls, pounds, wallJumps, secondWinds, dashStruck;
     private final java.util.Set<Foe> dashHit = new java.util.HashSet<>();
 
+    /**
+     * The ground pound, worked on: how far it reaches at each step (times POUND_REACH), how much harder its blow is, how long she gathers
+     * herself in the air before the drop, how fast the drop is, and how far and fast the third step's shockwave runs along the ground.
+     */
+    static final float[] POUND_WIDER = {1, 1, 1.35f, 1.75f}, POUND_HARDER = {1, 1, 1.25f, 1.5f};
+    static final float POUND_WIND = .12f, POUND_DROP = 30, WAVE_SPEED = 11, WAVE_REACH = 3.2f;
+    /** The third step of the glide: how often a gust lifts her, and how hard; how long this glide has gone on; and gusts that have lifted her. */
+    static final float GUST_EVERY = 1.5f, GUST = 3.2f;
+    private float glideFor;
+    private int gusts;
+
+    int gusts() { return gusts; }
+    /** Where the pound is: nothing (0), gathering in the air (1), dropping (2); and how long it has gathered. */
+    private int poundPhase;
+    private float poundWind;
+    /** The shockwave of the third step: where it began, at what height of ground, how far out its front is, and who it has met. */
+    private float waveX, waveFeet, waveFront = -1;
+    private final java.util.Set<Foe> waveHit = new java.util.HashSet<>();
+    private int poundHits, waveHits, poundShields, popped;
+
+    int poundPhase() { return poundPhase; }
+    float waveFront() { return waveFront; }
+    float waveX() { return waveX; }
+    int poundHits() { return poundHits; }
+    int waveHits() { return waveHits; }
+    int poundShields() { return poundShields; }
+    int popped() { return popped; }
+
+    /** How far the ground pound reaches, now: by its step, and the tree's. */
+    float poundReach() {
+        int level = Math.max(1, perks.poundLevel);
+        return POUND_REACH * POUND_WIDER[Math.min(3, level)] * (1 + Math.max(0, skillOf(RunSkills.E_POUND_AREA)) / 100f);
+    }
+
+    /** How much of a blow the ground pound's is: by its step, and the tree's. */
+    float poundHarder() {
+        int level = Math.max(1, perks.poundLevel);
+        return POUND_HARDER[Math.min(3, level)] * (1 + Math.max(0, skillOf(RunSkills.E_POUND_HIT)) / 100f);
+    }
+
+    /** How slowly she glides: by its step, and the tree's (the slower, the further). */
+    float glideFall() {
+        int level = Math.max(1, perks.glideLevel);
+        float fall = level >= 3 ? .65f : level == 2 ? 1 : GLIDE_FALL;
+        return fall / (1 + Math.max(0, skillOf(RunSkills.E_GLIDE)) / 100f);
+    }
+
+    /**
+     * The aerial strike: held in the air, she hangs there with her wings out and strikes all round her, again and again, until it runs out
+     * or she lets go. How long it holds her up at each step, how often it strikes, how far round her, how much of a blow each is, how
+     * slowly she sinks while it lasts, how long the button is held before it begins, and how many she may do before she lands.
+     */
+    static final float[] AERIAL_LASTS = {0, .9f, 1.3f, 1.8f}, AERIAL_EVERY = {0, .16f, .15f, .12f}, AERIAL_ROUND = {0, 1.7f, 2f, 2.4f}, AERIAL_SHARE = {0, .55f, .6f, .7f};
+    static final float AERIAL_SINK = .45f, AERIAL_HOLD = .16f;
+    static final int[] AERIAL_TIMES = {0, 1, 1, 2};
+    private float aerialLeft, aerialHeld, aerialTick, aerialAge = 9;
+    private int aerialsUsed, aerials, aerialHits;
+
+    boolean aerialOn() { return aerialLeft > 0; }
+    float aerialAge() { return aerialAge; }
+    int aerials() { return aerials; }
+    int aerialHits() { return aerialHits; }
+
+    /** How long the aerial strike holds her up, now. */
+    float aerialLasts() {
+        int level = Math.min(3, Math.max(1, perks.aerial));
+        return AERIAL_LASTS[level] * (1 + Math.max(0, skillOf(RunSkills.E_AERIAL_TIME)) / 100f);
+    }
+
+    /** How much of a blow each of its strikes is, now (twice as much with Skyborne, which is in what the tree gives). */
+    float aerialShare() {
+        int level = Math.min(3, Math.max(1, perks.aerial));
+        return AERIAL_SHARE[level] * (1 + Math.max(0, skillOf(RunSkills.E_AERIAL_HIT)) / 100f);
+    }
+
+    /** How far round her it strikes. */
+    float aerialRound() {
+        int level = Math.min(3, Math.max(1, perks.aerial));
+        return AERIAL_ROUND[level] * (1 + Math.max(0, skillOf(RunSkills.E_AREA)) / 200f);
+    }
+
+    /** With Skyborne in her tree she cannot attack on the ground. */
+    boolean skyborne() { return skillOf(RunSkills.E_SKYBORNE) < 0; }
+
+    /** A share of a blow: what the next blows count for (the ground pound's, the aerial strike's). */
+    private float blowScale = 1;
+
+    /** What the thing in her hands deals its own blows with, as the blows are told apart. */
+    static int blowOf(int weapon) {
+        switch (weapon) {
+            case BRUSH: return PLAIN;
+            case SWORD: return SWORDED;
+            case BOOK: return BLASTED;
+            case PEN: case KNIFE: case GUN: return weapon;
+            case TABLET: return PAGE;
+            case KEYS: return THROWN_KEY;
+            case KATANA: return CUT;
+            case LANCE: return LANCED;
+            case CANNON: return SHELLED;
+            case WHIP: return WHIPPED;
+            case GREATSWORD: return GREAT;
+            case STAFF: return SUMMONED;
+            case MACE: return MACED;
+            case HAMMER: return HAMMERED;
+            case WAND: return BOLTED;
+            case SCYTHE: return REAPED;
+            case KNUCKLES: return PUNCHED;
+            default: return LANDED;
+        }
+    }
+
     int flips() { return flips; }
     int airDashes() { return airDashes; }
     int rolls() { return rolls; }
@@ -1073,6 +1186,7 @@ final class PlusRun {
             rollLeft -= seconds;
             speedAcross = (facingLeft ? -1 : 1) * ROLL_SPEED;
         }
+        waves(seconds);
         if (airDashLeft > 0) {
             airDashLeft -= seconds;
             speedAcross = (facingLeft ? -1 : 1) * DASH_SPEED;
@@ -1089,16 +1203,111 @@ final class PlusRun {
         }
     }
 
-    /** A ground pound landed: what stands on the ground near her is struck, as if landed on. */
+    /**
+     * A ground pound landed: the thing in her hands is slammed into the ground, and what stands on it near her is struck with it, knocked up
+     * off its feet and its shield cracked (two pieces from the second step; broken outright, and a shockwave sent along the ground both
+     * ways, at the third). Without anything in her hands it is the landing's blow.
+     */
     private void poundWave() {
         poundNow = false;
         pounds++;
         poundAge = 0;
-        float middle = x + WIDE / 2, feet = y + TALL;
+        poundPhase = 0;
+        int level = Math.max(1, perks.poundLevel);
+        float middle = x + WIDE / 2, feet = y + TALL, reach = poundReach();
         for (Foe foe : foes) {
             if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET || RunLevels.flier(foe.kind)) continue;
-            if (Math.abs(foe.x + foe.wide() / 2 - middle) > POUND_REACH || Math.abs(foe.y + foe.tall() - feet) > 1.1f) continue;
-            beat(foe, LANDED);
+            if (Math.abs(foe.x + foe.wide() / 2 - middle) > reach + foe.wide() / 2 || Math.abs(foe.y + foe.tall() - feet) > 1.4f) continue;
+            poundHits++;
+            pounded(foe, level >= 3 ? 99 : level >= 2 ? 2 : 1, poundHarder());
+        }
+        if (level >= 3) {
+            waveX = middle;
+            waveFeet = feet;
+            waveFront = reach * .6f;
+            waveHit.clear();
+        }
+    }
+
+    /** A blow of the ground pound's on one: its shield cracked by so many pieces first, and then the blow, if nothing is in the way. */
+    private void pounded(Foe foe, int pieces, float share) {
+        if (foe.guard > 0) {
+            foe.guard = Math.max(0, foe.guard - pieces);
+            foe.guardMet = 0;
+            poundShields++;
+            if (foe.guard == 0) {
+                shieldsBroken++;
+                if (hits.size() < 24) hits.add(new float[]{foe.x + foe.wide() / 2, foe.y + foe.tall() * .3f, 0, 1, 0, 1, 0, THUDS, 0, 1});
+            }
+            if (foe.guard > 0) return;
+        }
+        boolean waits = RunLevels.boss(foe.kind);
+        blowScale = share;
+        beat(foe, blowOf(weapon));
+        blowScale = 1;
+        // Knocked up off its feet for a moment (not those who wait).
+        if (!foe.flat && !waits) {
+            foe.popped = 0;
+            foe.dazed = Math.max(foe.dazed, .45f);
+            popped++;
+        }
+    }
+
+    /** The third step's shockwave, as time goes: its front runs out both ways along the ground, and strikes what it meets there. */
+    private void waves(float seconds) {
+        if (waveFront < 0) return;
+        float was = waveFront;
+        waveFront += WAVE_SPEED * seconds;
+        float most = poundReach() * WAVE_REACH;
+        for (Foe foe : foes) {
+            if (foe.flat || absent(foe) || waveHit.contains(foe) || foe.kind == RunLevels.TARGET || RunLevels.flier(foe.kind)) continue;
+            float away = Math.abs(foe.x + foe.wide() / 2 - waveX) - foe.wide() / 2;
+            if (away > waveFront || away < was - .8f || Math.abs(foe.y + foe.tall() - waveFeet) > 1.4f) continue;
+            waveHit.add(foe);
+            waveHits++;
+            pounded(foe, 99, poundHarder() * .6f);
+        }
+        if (waveFront > most) waveFront = -1;
+    }
+
+    /** The aerial strike, as time goes: begun by holding the strike in the air, ended by letting go, landing, or its time running out. */
+    private void aerialStrike(float seconds, boolean strike) {
+        aerialAge += seconds;
+        boolean free = !onGround && !climbing && !inWater && !clinging && poundPhase == 0;
+        if (onGround || climbing || clinging || inWater) aerialsUsed = 0;
+        if (aerialLeft > 0) {
+            if (!strike || !free || weapon == UNARMED) {
+                aerialLeft = 0;
+                return;
+            }
+            aerialLeft -= seconds;
+            int level = Math.min(3, perks.aerial);
+            if ((aerialTick -= seconds) <= 0) {
+                aerialTick += AERIAL_EVERY[level];
+                float round = aerialRound(), middle = x + WIDE / 2, chest = y + TALL * .5f;
+                for (Foe foe : foes) {
+                    if (foe.flat || absent(foe) || foe.kind == RunLevels.TARGET) continue;
+                    float dx = Math.max(0, Math.abs(foe.x + foe.wide() / 2 - middle) - foe.wide() / 2), dy = Math.max(0, Math.abs(foe.y + foe.tall() / 2 - chest) - foe.tall() / 2);
+                    if (dx * dx + dy * dy > round * round) continue;
+                    aerialHits++;
+                    blowScale = aerialShare();
+                    beat(foe, blowOf(weapon));
+                    blowScale = 1;
+                }
+            }
+            return;
+        }
+        if (perks.aerial > 0 && free && strike && weapon != UNARMED && !mastered && aerialsUsed < AERIAL_TIMES[Math.min(3, perks.aerial)]) {
+            if ((aerialHeld += seconds) >= AERIAL_HOLD) {
+                aerialHeld = 0;
+                aerialLeft = aerialLasts();
+                aerialTick = 0;
+                aerialAge = 0;
+                aerialsUsed++;
+                aerials++;
+            }
+        } else if (!strike) {
+            aerialHeld = 0;
         }
     }
 
@@ -2695,6 +2904,7 @@ final class PlusRun {
         for (int index = hits.size() - 1; index >= 0; index--) if ((hits.get(index)[4] += seconds) > .9f) hits.remove(index);
         for (Foe foe : foes) {
             foe.struck += seconds;
+            foe.popped += seconds;
             if (foe.flat || foe.away) {
                 foe.poisoned = foe.burning = foe.frozen = 0;
                 continue;
@@ -3132,8 +3342,8 @@ final class PlusRun {
         /** Its colour of toughness (0 as it is drawn, then red, purple, gold, black ink); and how long since a blow last landed on it. */
         int tier;
         float struck = 9;
-        /** How fast one that walks is falling, having nothing under it; and which way the last blow knocked it. */
-        float dropping, knocked;
+        /** How fast one that walks is falling, having nothing under it; which way the last blow knocked it; and how long since a ground pound knocked it up. */
+        float dropping, knocked, popped = 9;
         /**
          * A shield it carries, if any: how many more strong blows it takes, how many it took whole, what a blow must count for to tell
          * on it, which of the four it is (book cover, steel, gold, black ink), and how long since a blow last met it.
@@ -3752,6 +3962,7 @@ final class PlusRun {
             foe.struck = from.struck;
             foe.dropping = from.dropping;
             foe.knocked = from.knocked;
+            foe.popped = from.popped;
             foe.perch = from.perch;
             foe.base = from.base;
             foe.leap = from.leap;
@@ -3776,6 +3987,17 @@ final class PlusRun {
         rollLeft = other.rollLeft;
         flipAge = other.flipAge;
         poundAge = other.poundAge;
+        poundPhase = other.poundPhase;
+        poundWind = other.poundWind;
+        waveX = other.waveX;
+        waveFeet = other.waveFeet;
+        waveFront = other.waveFront;
+        glideFor = other.glideFor;
+        aerialLeft = other.aerialLeft;
+        aerialHeld = other.aerialHeld;
+        aerialTick = other.aerialTick;
+        aerialAge = other.aerialAge;
+        aerialsUsed = other.aerialsUsed;
         dashUsed = other.dashUsed;
         windUsed = other.windUsed;
         clinging = other.clinging;
@@ -4645,6 +4867,9 @@ final class PlusRun {
         perks.roll = now.roll;
         perks.wallJump = now.wallJump;
         perks.glide = now.glide;
+        perks.poundLevel = now.poundLevel;
+        perks.glideLevel = now.glideLevel;
+        perks.aerial = now.aerial;
         perks.secondWind = now.secondWind;
         perks.thorns = now.thorns;
         perks.reach = now.reach;
@@ -5402,6 +5627,24 @@ final class PlusRun {
         if (plunging && speedDown > FALL) plunged = true;
         // (In an air dash she does not fall.)
         if (airDashLeft > 0) speedDown = 0;
+        // The ground pound: held down in the air, with the move, she gathers herself for a moment, still in the air, and slams down with what
+        // she holds; out of an air dash too, which it cuts short. (Without it, holding down only brings her down faster.)
+        if (perks.pound && down && !onGround && !climbing && !inWater && poundPhase == 0) {
+            poundPhase = 1;
+            poundWind = POUND_WIND;
+            airDashLeft = 0;
+            aerialLeft = 0;
+        }
+        if (poundPhase != 0 && (onGround || climbing || inWater)) poundPhase = 0;
+        if (poundPhase == 1) {
+            speedDown = 0;
+            speedAcross *= Math.max(0, 1 - seconds * 10);
+            if ((poundWind -= seconds) <= 0) poundPhase = 2;
+        } else if (poundPhase == 2) {
+            speedDown = POUND_DROP;
+            plunged = true;
+            speedAcross *= Math.max(0, 1 - seconds * 8);
+        }
         char about = at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL * .6f));
         // A draught lifts her; and with the wind in her hair she flies for as long as the jump is held.
         if (about == RunLevels.DRAUGHT) speedDown = Math.max(-5, speedDown - (GRAVITY + 24) * seconds);
@@ -5421,8 +5664,24 @@ final class PlusRun {
                 airJumps = 0;
             }
         }
-        gliding = perks.glide && !onGround && !clinging && jump && !down && speedDown > GLIDE_FALL && airDashLeft <= 0 && sinceJump > .25f;
-        if (gliding) speedDown = GLIDE_FALL;
+        float glideFall = glideFall();
+        boolean wasGliding = gliding;
+        gliding = perks.glide && !onGround && !clinging && jump && !down && speedDown > glideFall && airDashLeft <= 0 && sinceJump > .25f && poundPhase == 0;
+        if (gliding) {
+            speedDown = glideFall;
+            // (At its third step, a rising gust every second and a half of a glide.)
+            glideFor = wasGliding ? glideFor + seconds : 0;
+            if (perks.glideLevel >= 3 && glideFor >= GUST_EVERY) {
+                glideFor -= GUST_EVERY;
+                speedDown = -GUST;
+                gusts++;
+            }
+        }
+        // In the aerial strike she hangs there, sinking only a little, and drifts.
+        if (aerialLeft > 0) {
+            speedDown = Math.min(speedDown, AERIAL_SINK);
+            speedAcross *= Math.max(0, 1 - seconds * 3);
+        }
         boolean onVine = about == RunLevels.VINE || at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL - .05f)) == RunLevels.VINE;
         if (onVine && (jump || down || climbing)) {
             climbing = !(onGround && !jump && !down);
@@ -5663,9 +5922,12 @@ final class PlusRun {
         sinceCast += seconds;
         sinceBrace += seconds;
         if (mastered) shine(seconds, strike);
+        // Held in the air, with the move, the strike is the aerial strike: it takes the hold over from anything else a hold would do there.
+        aerialStrike(seconds, strike);
         {
             int haste = Math.min(80, gear(RunLoot.HASTE) + (frenzyLeft > 0 ? Math.max(0, skillOf(RunSkills.E_FRENZY)) : 0));
-            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= restOf(weapon) * (1 - haste / 100f);
+            boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= restOf(weapon) * (1 - haste / 100f)
+                    && aerialLeft <= 0 && !(onGround && skyborne());
             if (used) {
                 // (What the tree does to every use: a charge for a rest before it, more of what is thrown, a swing that strikes again.)
                 boolean rested = sinceStrike >= CHARGE_REST;
@@ -5681,7 +5943,11 @@ final class PlusRun {
             // hers the hold is her beam's.)
             // (The Mother Tongue's Quill is held for its wave, whatever kind it is.)
             boolean quill = RunLoot.ultimate(perks.item) && weapon == RunArms.kindOf(perks.item);
-            if (weapon != UNARMED && (RunArms.heavy(weapon) || quill) && strike && !mastered) {
+            if (aerialLeft > 0) {
+                // (The aerial strike has the hold: and what it held for is not let go into a special after it.)
+                heldFor = 0;
+                heavied = true;
+            } else if (weapon != UNARMED && (RunArms.heavy(weapon) || quill) && strike && !mastered && !(onGround && skyborne())) {
                 heldFor += seconds;
                 if (heldFor >= RunArms.CHARGE && !heavied && canSpend(specialCost())) {
                     heavied = true;
@@ -6396,6 +6662,8 @@ final class PlusRun {
         // Against a creature a blow counts for as many as the smith has made what dealt it count for; against those who wait, for one.
         // (And her level makes a part of a blow more, gathered up into whole ones.)
         int dealt = geared(foe, waits ? 1 : dealt(), waits);
+        // (A share of a blow: the ground pound's, the aerial strike's.)
+        if (blowScale != 1) dealt = Math.max(1, Math.round(dealt * blowScale));
         // (Her tree makes some blows harder: on one nearly beaten, on one not yet hurt, after a rest.)
         boolean hers = thingOf(with) != UNARMED;
         if (!waits && hers) dealt = Math.max(1, Math.round(dealt * (1 + bonus(foe) / 100f)));
@@ -7712,6 +7980,7 @@ final class PlusRun {
                     onGround = true;
                     if (plunged && perks.pound) poundNow = true;
                     plunged = false;
+                    poundPhase = 0;
                     sprung = false;
                     wet = false;
                     // Coming down from a height counts as a landing; standing on the ground does not.
