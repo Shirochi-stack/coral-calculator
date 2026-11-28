@@ -34,6 +34,26 @@ SHEETS = {
 }
 
 
+GRIP = {2: ("book", 8, 304), 12: ("greatsword", 12, 500), 5: ("gun", 8, 304), 15: ("hammer", 12, 500), 8: ("katana", 14, 400), 1: ("knife", 8, 304),
+        14: ("mace", 12, 500), 0: ("pen", 8, 304), 17: ("scythe", 12, 500), 13: ("staff", 12, 500), 4: ("sword", 8, 304), 16: ("wand", 12, 500)}
+for kind, (gname, frames, wide) in GRIP.items():
+    SHEETS["grip%d" % kind] = (frames, 1, wide, 248)
+
+# The moves (flips, air dash, ground pound, roll, cling, glide): one sheet of eight, once it is in the game.
+if (RES / "halgakos_moves.webp").exists():
+    SHEETS["moves"] = (8, 1, 256, 208)
+# Her swimming (two strokes, a dive, an ink shot).
+if (RES / "halgakos_swim.webp").exists():
+    SHEETS["swim"] = (4, 1, 256, 208)
+
+
+def sheet_file(name):
+    """Where a sheet of her is: her own sheets by their name, the weapon-free grips under their weapon's."""
+    if name.startswith("grip"):
+        return RES / ("run_grip_%s.webp" % GRIP[int(name[4:])][0])
+    return RES / ("halgakos_%s.webp" % name)
+
+
 def cut(cell):
     """Outfit mask (0..1, same size as the cell) and the anchor points, or (None, None) for an empty cell or one with no skirt."""
     a = np.array(cell).astype(np.float32)
@@ -106,7 +126,7 @@ def main():
     args = ap.parse_args()
     lines, total, hit = [], 0, 0
     for name, (cols, rows, cw, ch) in SHEETS.items():
-        im = Image.open(RES / ("halgakos_%s.webp" % name)).convert("RGBA")
+        im = Image.open(sheet_file(name)).convert("RGBA")
         atlas = np.zeros((rows * ch, cols * cw), np.float32)
         tiles = []
         for idx, col, row, cell in frames(name, im):
