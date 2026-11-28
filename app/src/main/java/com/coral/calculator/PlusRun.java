@@ -3308,6 +3308,13 @@ final class PlusRun {
     int xp() { return xp; }
 
     /** A roll of the land's own chance, from 0 to below a number. */
+    private int gemRoll(int bound) {
+        gemDice = gemDice * 6364136223846793005L + 1442695040888963407L;
+        return (int) ((gemDice >>> 33) % bound);
+    }
+
+    private long gemDice = 0x5DEECE66DL;
+
     private int lootRoll(int bound) {
         lootDice = lootDice * 6364136223846793005L + 1442695040888963407L;
         return (int) ((lootDice >>> 33) % bound);
@@ -3335,18 +3342,24 @@ final class PlusRun {
         if (more > 0) coins += (coins * more + lootRoll(100)) / 100;
         // (Under black, half of them, rounded up.)
         if (inked()) coins = (coins + 1) / 2;
-        // (A tenth more, rounded down, for pluses all round; and in coins as big as will go.)
-        coins += coins * MORE_TENTHS / 10;
-        for (int left = coins; left > 0; ) {
+        // (The throws are those of each coin she has always had, rolled in the same order, so that what falls is where it fell before; a tenth more, rounded down,
+        // for pluses all round, and in coins as big as will go, take their throws from those.)
+        float[] ways = new float[coins], ups = new float[coins];
+        for (int coin = 0; coin < coins; coin++) {
+            ways[coin] = (lootRoll(1000) / 1000f - .5f) * 1.4f;
+            ups[coin] = -6 - lootRoll(1000) / 250f;
+        }
+        int piece = 0;
+        for (int left = coins + coins * MORE_TENTHS / 10; left > 0; piece++) {
             int worth = coinWorth(left);
             left -= worth;
-            float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
-            Drop drop = new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0);
+            int throwOf = Math.min(piece, coins - 1);
+            Drop drop = new Drop(middle, top, ways[throwOf] * (boss ? 7 : 4) * (piece >= coins ? .6f : 1), ups[throwOf] * (piece >= coins ? .9f : 1), 0);
             drop.worth = worth;
             loose(drop);
         }
-        // A glossary gem: from every boss, and now and then from one of the rest (not from a swarm).
-        if (!foe.swarm && (boss || lootRoll(1000) < gemChance(landLevel) * (hard ? 2 : 1))) {
+        // A glossary gem: from every boss, and now and then from one of the rest (not from a swarm). (Its own dice: what the land's chance made before is made still.)
+        if (!foe.swarm && (boss || gemRoll(1000) < gemChance(landLevel) * (hard ? 2 : 1))) {
             Drop glossary = new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, 0);
             glossary.gem = true;
             loose(glossary);
@@ -3645,6 +3658,7 @@ final class PlusRun {
         firmX = x;
         firmY = y;
         lootDice = level.number * 977L + 12345;
+        gemDice = level.number * 7919L + 31337;
         findSecrets();
         for (int[] tree : level.trees) trees.add(new int[]{tree[0], tree[1], tree[2], RunCraft.treeHolds(tree[2])});
     }
