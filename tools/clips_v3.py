@@ -30,6 +30,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import clips_data as data  # noqa: E402
 import clips_fit as cf  # noqa: E402
 import clips_v3_lines as nl  # noqa: E402
+import clips_v4 as v4m  # noqa: E402
 import make_clips as mk  # noqa: E402
 
 RATE = 48000
@@ -343,7 +344,13 @@ def _build(clip, lang, table, segs, encode_it):
     else:
         wins, how = windows(clip, vocals, en_lines)
     mine = lines_of(clip, lang)
-    for i, piece in enumerate(mine):
+    v4 = v4m.PHRASES.get(number)
+    if v4:
+        import json as _json
+        tw = _json.load(open(CLIPS / 'transcripts' / f"{clip['id']}.json", encoding='utf-8'))['words']
+        laid = v4m.place(clip, lang, voice, RATE, cf, tw)
+        lane = [(s0, e0) for s0, e0, _, _ in laid]
+    for i, piece in enumerate([] if v4 else mine):
         got = None if (number == '13' and i == 1) or number in ('26', '33') else aligned.get(i)
         if got is not None and lang == "en":
             shown, start, knots = got
@@ -382,6 +389,10 @@ def _build(clip, lang, table, segs, encode_it):
         voice[s:s + len(shown)] += shown[: total - s]
         lane.append((start, start + n))
         laid.append((start, start + n, i, mode))
+    if v4:
+        import soundfile as _sf
+        (CLIPS / "review" / "v4-voice").mkdir(exist_ok=True)
+        _sf.write(str(CLIPS / "review" / "v4-voice" / f"{clip['id']}-{lang}.wav"), voice, RATE)
     # the voice at one level: -16 dBFS RMS where it speaks, as in the clips that were approved
     on = numpy.abs(voice) > .01
     if on.any():
@@ -437,8 +448,8 @@ def _build(clip, lang, table, segs, encode_it):
     up = scipy.signal.resample_poly(mix, 4, 1)
     peak = 20 * numpy.log10(numpy.abs(up).max() + 1e-9)
     # captions in the language, then the picture, once
-    rows = [(s, e, (nl.NEW.get((number, i), {}).get(lang) or clip["lines"][i][2 + LANGS.index(lang)]).replace("\u2661", "")) for s, e, i, _ in laid]
-    target = CLIPS / "review" / f"{clip['id']}-{lang}-v3.mp4"
+    rows = [(s, e, v4[i]["text"][lang].replace("\u2661", "").replace("~", "")) for s, e, i, _ in laid] if v4 else [(s, e, (nl.NEW.get((number, i), {}).get(lang) or clip["lines"][i][2 + LANGS.index(lang)]).replace("\u2661", "")) for s, e, i, _ in laid]
+    target = CLIPS / "review" / f"{clip['id']}-{lang}-{'v4' if v4 else 'v3'}.mp4"
     if encode_it and not os.environ.get("DRY"):
         encode(master, a, b, mix, rows, lang, target, mk.HOLDS.get(number, ()), segs)
     if need or not encode_it:

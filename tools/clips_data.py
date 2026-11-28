@@ -162,7 +162,7 @@ CLIPS = [
       [("M", 1.0, "I know that kind of quiet.", "あの静けさなら知ってる。", "그런 고요함은 나도 알아.", "那种安静我很熟悉。")], gen="G5", cut=(10, 20)),
     C("31-ice-cream-revenge", "magi", 10, "H", "Land 90: a comic beat, the sea of ink melts her ice cream.", ["A wave splashes her cone.", "She glares and sends a revenge beam at the sea."],
       "At the edge of a shore of ink. An ink wave splashes onto Halgakos's mint ice cream cone; she freezes, glares, and blasts a revenge beam from her book at the sea with a pout.", "a splash, a beam, a pout",
-      [("H", 4.0, "That was my mint ice cream. You'll pay Sloppy~♡", "それは私のミントアイスよ。覚悟しなさい、スロッピー♡", "그건 내 민트 아이스크림이었어. 각오해, 슬로피♡", "那是我的薄荷冰淇淋。你要付出代价，Sloppy♡")], gen="G5", cut=(20, 30)),
+      [("H", 4.0, "That was my mint ice cream. You'll pay Sloppy~♡", "それは私のミントアイスよ。覚悟しなさい、スロッピー♡", "그건 내 민트 아이스크림이었어. 각오해, 슬로피♡", "那是我的薄荷冰淇淋。你要付出代价，Sloppy♡")]),
     # G6: the last stand
     C("32-last-stand-gather", "magi", 10, "HCRIT", "Land 100: the last land, everyone gathers.", ["Everyone appears one by one.", "They line up behind Halgakos."],
       "A vast dark library of ink. Chikuwa, Rune, Illya and Tsubakieh appear one by one and line up behind Halgakos, who raises her book.", "footsteps, a rising hum",

@@ -35,6 +35,7 @@ G_SHOTS = [(8.0, 16.0), (20.0, 24.0), (30.0, 38.0), (60.0, 68.0), (72.0, 84.0)]
 G_FILL = [((8.0, 16.0), 6), ((20.0, 24.0), 9), ((30.0, 38.0), 16), ((60.0, 68.0), 35), ((72.0, 84.0), 39)]  # the line said again in a mouth of a group shot that has none
 UNISON = (("C", .5, .012), ("R", .4, .02), ("I", .5, .006), ("T", .45, .016))
 H_CAP = 1.3
+DROPPED = {1, 3, 11, 13, 21, 44}  # a lone "Sloppy~" (the old second halves of intro, call, member and ending): folded into the line before it in the spec
 INTRO = 7.9  # before this second nobody sings: what is said there stays where it was said
 LANG_SUFFIX = {"en": "", "ja": "-ja", "ko": "-ko", "zh": "-zh"}
 
@@ -261,7 +262,7 @@ def main():
         lengths_en = [max(eng[i][1] for i in u) - min(eng[i][0] for i in u) + .12 for u in units]
     else:
         lengths_en = lengths
-    movable = [k for k, u in enumerate(units) if times[u[0]][0] >= INTRO - .3]
+    movable = [k for k, u in enumerate(units) if times[u[0]][0] >= INTRO - .3 and (film != 'idol' or u[0] not in DROPPED)]
     starts_of = {k: times[units[k][0]][0] for k in movable}
     # Her call section (A7, 24-30 s: Squish! Sloppy~ Squish! Sloppy~ Louder, zaako!) is put on the mouths of that shot one to one, in order, before anything else.
     call_units, call_spans = [], []
@@ -363,17 +364,15 @@ def main():
     # Her call section (A7): every mouth of hers in the shot has a call on it, laid first and pinned: "Squish!" on each, and "Louder, zaako." on the last. The crowd's answers
     # (her shout with her whisper) are not laid in this shot: the mouths run on without a gap for them.
     if film == "idol" and call_units:
-        squish = next(k for k in call_units if spec["lines"][units[k][0]][2].startswith("Squish"))
+        calls = [k for k in call_units if units[k][0] in (10, 12)]
         louder = next(k for k in call_units if spec["lines"][units[k][0]][2].startswith("Louder"))
-        answer_text = next(W[lang][units[k][0]] for k in call_units if spec["lines"][units[k][0]][3] == "crowd")
-        answer_path = ig.path_of("H", lang, answer_text, "-n")
-        answer = edged(load(answer_path)) if answer_path.exists() else None
+        answer_text, answer = "", None  # no lone answers any more: every call is a whole line
         for n, (a, b) in enumerate(call_spans):
             last = n == len(call_spans) - 1
-            k = louder if last else squish
+            k = louder if last else calls[n % 2]
             i2 = units[k][0]
             piece0 = cut[k][2]
-            if not last and answer is not None and b - a >= 1.1:
+            if False:
                 # a mouth long enough for the call and its answer has both, in her own voice: "Squish!" and "Sloppy~!", one after the other, to fill it
                 total = (len(piece0) + len(answer)) / RATE + .03
                 factor = max(total / max(b - a, total / 2.0), .8)
@@ -384,7 +383,7 @@ def main():
                 notes.append(f"{start:5.1f}-{start + total / factor:5.1f} s her call and its answer, pinned on her mouth {a:.1f}-{b:.1f}: x{factor:.2f}  {W[lang][i2]} {answer_text}")
                 continue
             word = W[lang][i2]
-            if not last and answer is not None:
+            if False:
                 # a short mouth gets the word with the most voice in it (Sloppy~), which is heard where "Squish!" is mostly breath
                 piece0, i2, word = answer, units[call_units[1]][0], answer_text
             share = min(max(b - a, len(piece0) / RATE / 2.0), len(piece0) / RATE / .6)
@@ -395,7 +394,7 @@ def main():
         notes.append(f"the crowd's whispered double of the answers ({', '.join(dropped)}) is left out of this shot: her mouths leave no gap for it")
     # the intro stays where it was said
     for k, (a, b, piece) in enumerate(cut):
-        if k not in movable and k not in call_units:
+        if k not in movable and k not in call_units and units[k][0] not in DROPPED:
             put(piece, a, k)
             notes.append(f"{a:5.1f} s intro, left where it was said: nobody's mouth moves ({words(lang, k)})")
     forms = {k: [(units[k][0], cut[k][2])] + [(i2, piece_of(i2)) for i2 in forms_of.get(units[k][0], [])] for k in range(len(units))}
@@ -461,7 +460,7 @@ def main():
             at = start + share + .08
     # A mouth that is left with no line is given a line she already has, said again: in a shot where the five sing, the line of that shot, in unison; in her close-up,
     # a call of hers; elsewhere "Squish!" for a short one and "Louder" for a longer.
-    short_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Squish!") and spec["lines"][u[0]][3] == "call" and times[u[0]][0] >= INTRO)
+    short_unit = next(k for k, u in enumerate(units) if u[0] == 10)
     long_unit = next(k for k, u in enumerate(units) if spec["lines"][u[0]][2].startswith("Louder"))
     filled = []
 
