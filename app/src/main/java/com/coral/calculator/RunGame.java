@@ -575,14 +575,9 @@ final class RunGame {
     /** The dash's own button, over the arrows between the two, once she has the roll or the dash in the air; and when it was last tapped. */
     private final RectF dashButton = new RectF();
     private float dashTapped = -9;
-    /** Where the down button goes alone, and beside the dash; and the ground pound's own button, shown only in the air, with when it was tapped. */
-    private final RectF downAlone = new RectF(), downBeside = new RectF(), poundButton = new RectF();
+    /** The ground pound's own button, shown only in the air, and when it was tapped. */
+    private final RectF poundButton = new RectF();
     private float poundTapped = -9;
-
-    /** The down button in the middle over the arrows, or beside the dash once she has one. */
-    private void dashButtonsPlaced() {
-        downButton.set(run != null && run.hasDash() && finale == NO_FINALE ? downBeside : downAlone);
-    }
 
     /** Whether the ground pound's button is up: in the air, with the move, where a pound could begin. */
     private boolean poundShown() {
@@ -4415,18 +4410,20 @@ final class RunGame {
                 right = tabs[volume].left - dp(6);
             }
         }
-        // The button that lets her down through a thin ledge: back over the arrows, where the thumb that holds them reaches it. Beside it, the
-        // dash, the same size: the two of them side by side over the middle of the arrows (the down button alone in the middle when she has
-        // no dash yet; see dashButtonsPlaced).
-        float downs = Math.max(dp(46), size * .66f), mid = (leftButton.right + rightButton.left) / 2, pair = dp(10);
+        // The button that lets her down through a thin ledge: over the arrows and between them, where the thumb that holds them reaches it.
+        float downs = Math.max(dp(46), size * .66f), mid = (leftButton.right + rightButton.left) / 2;
         downButton.set(mid - downs / 2, y - dp(10) - downs, mid + downs / 2, y - dp(10));
-        dashButton.set(mid + pair / 2, y - dp(10) - downs, mid + pair / 2 + downs, y - dp(10));
-        downAlone.set(downButton);
-        downBeside.set(mid - pair / 2 - downs, y - dp(10) - downs, mid - pair / 2, y - dp(10));
         // The ground pound's own button, there only while she is in the air with the move: with the strike and the jump, over the gap
         // between them, where the thumb that strikes rolls onto it.
         float gap = (strikeButton.right + jumpButton.left) / 2;
         poundButton.set(gap - downs / 2, y - dp(10) - downs, gap + downs / 2, y - dp(10));
+        // The dash, with the moves of the right thumb too. Upright, a third row: over the pound. On a wide screen, where the land is short and
+        // a third row would lie over too much of it, beside the pound instead, over the jump.
+        if (safe.width() > safe.height()) {
+            dashButton.set(poundButton.right + dp(10), poundButton.top, poundButton.right + dp(10) + downs, poundButton.bottom);
+        } else {
+            dashButton.set(poundButton.left, poundButton.top - dp(10) - downs, poundButton.right, poundButton.top - dp(10));
+        }
         // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the pound's place.
         float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, poundButton.left - dp(8));
         swapButton.set(swapRight - swaps, strikeButton.top - dp(12) - swaps, swapRight, strikeButton.top - dp(12));
@@ -4437,8 +4434,8 @@ final class RunGame {
             slotPlaces[slot].set(slotLeft, swapButton.centerY() - slotSide / 2, slotLeft + slotSide, swapButton.centerY() + slotSide / 2);
         }
         turnTo(page);
-        // The stall in a land, or a door: its button over the jump, where her thumb already is, and over the pound's place too.
-        float stallBottom = Math.min(jumpButton.top - dp(14), poundButton.top - dp(8));
+        // The stall in a land, or a door: its button over the jump, where her thumb already is, and over the pound's and the dash's places too.
+        float stallBottom = Math.min(jumpButton.top - dp(14), Math.min(poundButton.top, dashButton.top) - dp(8));
         stallButton.set(jumpButton.left, stallBottom - size, jumpButton.right, stallBottom);
         // The fifth button, on the right in the row with the rest, so that it never lies over her or over what she is about to walk into:
         // the ribbon that calls on a colour of hers, with a small one on its corner that chooses which.
@@ -7753,7 +7750,7 @@ final class RunGame {
             // Inside a building, the floor and what stands on it, with its prices, are kept above the buttons over the arrows and the jump,
             // as far as the screen is tall enough to show the whole of the room as well (in a wide screen the buttons are at its sides instead).
             if (in[0] == RunLevels.HOUSE) {
-                float buttons = Math.min(Math.min(stallButton.top, downButton.top), swapButton.top) - dp(8);
+                float buttons = Math.min(Math.min(stallButton.top, downButton.top), Math.min(swapButton.top, run.hasDash() ? dashButton.top : swapButton.top)) - dp(8);
                 ground = Math.max(ground, Math.min(in[11] + .5f + (height - buttons) / tile, in[12] - .5f + down));
             }
             level = ground - ceiling <= down ? ground - down : Math.max(ceiling, Math.min(ground - down, run.y() + PlusRun.TALL - down * .6f));
@@ -9204,7 +9201,6 @@ final class RunGame {
                 pills("Back to the land", RESUME, "Guild counter", COUNTER);
                 return;
             }
-            dashButtonsPlaced();
             if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && poundShown()
                     && near(poundButton, event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
                 poundTapped = clock;
@@ -9865,7 +9861,6 @@ final class RunGame {
             if (screen == PLAY) {
                 // (While keys are used, the buttons are all but gone; a touch brings them back.)
                 if (keyed) canvas.saveLayerAlpha(0, 0, width, height, 60);
-                dashButtonsPlaced();
                 // Charmed, the arrows are the wrong way round, and show it.
                 boolean charmed = run.charmed() > 0;
                 control(canvas, leftButton, goLeft, 180, charmed);
