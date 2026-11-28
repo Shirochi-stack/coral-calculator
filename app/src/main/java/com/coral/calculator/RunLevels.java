@@ -1475,7 +1475,7 @@ final class RunLevels {
         int[] kinds = {V_VAULT, V_SHORTCUT, V_BASEMENT};
         for (int tries = 0; tries < 4000 && want > 0; tries++) {
             // (The kind that is its turn; and, if there is no room for that one, a vault, which is the smallest.)
-            int kind = tries < 2000 ? kinds[(level.vaults.size() + level.number) % kinds.length] : V_VAULT;
+            int kind = tries < (level.main < 130 ? 500 : 2000) ? kinds[(level.vaults.size() + level.number) % kinds.length] : V_VAULT;
             if (vault(level, dice, kind, needIn(level.chapter, dice), layersTo(level), false)) want--;
         }
     }

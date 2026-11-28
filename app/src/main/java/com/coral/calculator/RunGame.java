@@ -3540,13 +3540,13 @@ final class RunGame {
     private void drawCracks(Canvas canvas) {
         if (crackSpots.isEmpty()) return;
         int[] colours = CRACK_LOOKS[crackLook()];
-        float line = Math.max(1.5f, tile * .05f);
+        float line = Math.max(2f, tile * .06f);
         for (int[] spot : crackSpots) {
             int column = spot[0], row = spot[1], need = spot[2];
             float left = (column - cameraX) * tile, top = (row - cameraY) * tile;
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(colours[0]);
-            paint.setAlpha(34 + 16 * need);
+            paint.setAlpha(60 + 18 * need);
             canvas.drawRect(left, top, left + tile + 1, top + tile + 1, paint);
             // The fissures: one right across from the top, bending as it goes; a branch off it for each step the pound has to be; and a hairline.
             stroke.setStyle(Paint.Style.STROKE);
@@ -5823,6 +5823,8 @@ final class RunGame {
             if (session.tally("run_from_row") > 0) stand = session.tally("run_from_row");
             run.place(column + (1 - PlusRun.WIDE) / 2, stand - PlusRun.TALL - .05f);
         }
+        // (And with no one else in the land, to look at the land.)
+        if (BuildConfig.DEBUG && session.tally("run_calm") > 0) run.foes().clear();
         // And, for the same, she may start in a colour, as from a ribbon, and with something in her hands.
         if (BuildConfig.DEBUG && session.tally("run_wear") > 0) run.lend(session.tally("run_wear"));
         // (And straight into a place off the land of a kind, kind and one, for looking at it.)
@@ -11367,7 +11369,7 @@ final class RunGame {
             if (way[2] > 1 && way[2] < RunLevels.WAY_SHAFT) continue;
             float x = (way[0] - cameraX) * tile;
             if (x < -tile || x > width) continue;
-            canvas.drawRect(x - 1, (way[1] + .3f - cameraY) * tile, x + tile + 1, (RunLevels.ROWS - cameraY) * tile + 1, paint);
+            canvas.drawRect(x - 1, (way[1] + (way[2] == RunLevels.WAY_SHAFT ? 0 : .3f) - cameraY) * tile, x + tile + 1, (RunLevels.ROWS - cameraY) * tile + 1, paint);
         }
         paint.setColor(Color.BLACK);
         if (top >= height) return;
