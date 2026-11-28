@@ -20,4 +20,7 @@ DESIGNS = {
     "magical": ("the magical girl dress", "a magical girl outfit: a short pink and white frilly dress with puffed sleeves, a big pink ribbon at the chest with a gold star brooch, a layered ruffled skirt, white thigh-high socks with pink frills and pink boots"),
     "blazer": ("the school blazer", "a school blazer outfit: a navy blazer with gold buttons over a white shirt with a red striped tie, a short grey plaid pleated skirt, black knee socks and brown loafers"),
     "rose": ("the Rosebound Armour", "Rosebound Armour exactly as in reference image 2 (its icon): pale rose-pink and cream armour with gold trim, a rose-pink breastplate bodice with a pink rose at the chest, small rose pauldrons with roses, a short layered rose-pink armoured skirt with a gold edge, rose-pink stockings with gold garters, and gold-banded boots"),
+    "pajama": ("the pajama set", "a cute pajama set: a loose soft purple button-up pajama top with white stars and short pajama shorts, bare arms below the sleeves and bare lower legs, and fluffy slippers"),
+    "gothic": ("the gothic dress", "a gothic lolita dress: a black and violet lace corset bodice, a layered ruffled skirt, a small red gem at the throat, black stockings and black platform boots"),
+    "tabard": ("the knight's tabard", "a knight's outfit: a royal blue tabard with a gold edge and a white crest over a light steel breastplate with one pauldron, a short skirt and armoured boots"),
 }
