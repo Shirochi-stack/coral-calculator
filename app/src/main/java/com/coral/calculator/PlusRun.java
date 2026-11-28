@@ -2098,7 +2098,7 @@ final class PlusRun {
         int before = shots.size();
         strikesBy(foe, way, middle, toLeft);
         // (What one made of fire, frost or ink throws is fire, frost or ink: it burns, chills or poisons her.)
-        int made = RunUniques.status(foe.kind) ? resists(foe.kind) : RunUniques.shadow(foe.kind) ? BLINDS : 0;
+        int made = RunUniques.status(foe.kind) ? resists(foe.kind) : RunUniques.shadow(foe.kind) || RunUniques.castShadow(foe.kind) ? BLINDS : 0;
         if (made != 0) for (int index = before; index < shots.size(); index++) if (!shots.get(index).hers) shots.get(index).afflicts = made;
         // The ink bomb beetle's burst is an ink explosion: a pool, and ink-poison on what is near (her too).
         if (made == RESISTS_INK && way == RunUniques.EXPLODER) {
@@ -3140,7 +3140,7 @@ final class PlusRun {
     private void afflictedBy(Foe foe) {
         // (Only those made to: the twelve made of fire, frost and ink, the candle wisp and the rime flake. The rest bite as they always have.)
         // Her own shadows' touch blinds her for a moment.
-        if (RunUniques.shadow(foe.kind) || RunUniques.copy(foe.kind)) blindHer();
+        if (RunUniques.shadow(foe.kind) || RunUniques.castShadow(foe.kind) || RunUniques.copy(foe.kind)) blindHer();
         if (!RunUniques.status(foe.kind) && foe.kind != RunLevels.WISP && foe.kind != RunLevels.RIME) return;
         int made = resists(foe.kind);
         if ((made & RESISTS_FIRE) != 0) burnHer();
