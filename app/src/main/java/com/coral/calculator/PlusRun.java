@@ -2925,7 +2925,7 @@ final class PlusRun {
     int ultimateEnds() { return ultEnds; }
     int lastUltimate() { return lastUltimate; }
     int lastEnded() { return lastEnded; }
-    float exhausted() { return exhaust; }
+    float exhausted() { return Math.max(0, exhaust); }
     int cleaves() { return cleaves; }
     int leeched() { return leeched; }
     int heldBlows() { return heldBlows; }
