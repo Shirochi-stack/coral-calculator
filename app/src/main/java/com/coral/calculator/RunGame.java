@@ -5227,16 +5227,46 @@ final class RunGame {
     private void drawDelveLabel(Canvas canvas, float right, float top, float clearOf, float lower) {
         if (delve < 0) return;
         int kind = delveKind();
-        String words = "Floor " + (delveFloor + 1) + (kind == RunDungeons.PLAIN ? "" : "  ·  " + RunDungeons.KIND_NAMES[kind]);
-        text.setTextSize(dp(12));
-        float wide = text.measureText(words) + dp(24), left = right - wide;
-        if (left < clearOf) top = lower;
-        box.set(left, top, left + wide, top + dp(22));
-        plate(canvas, box, dp(11), 235);
+        // The floor's number and nothing else: large, in gold on a dark edge, slanted like a chapter's number; under it, small, what the
+        // floor is like, if it is anything.
+        String number = String.valueOf(delveFloor + 1), sort = kind == RunDungeons.PLAIN ? "" : RunDungeons.KIND_NAMES[kind];
+        Typeface was = text.getTypeface();
+        text.setTypeface(FLOOR_FACE);
+        text.setTextSize(dp(44));
+        text.setTextAlign(Paint.Align.RIGHT);
+        float wide = text.measureText(number), x = right - dp(6);
+        if (x - wide < clearOf) top = lower;
+        float base = top + dp(40);
+        text.setStyle(Paint.Style.STROKE);
+        text.setStrokeJoin(Paint.Join.ROUND);
+        text.setStrokeWidth(dp(5));
+        text.setColor(0xFF2A1440);
+        text.setShadowLayer(dp(4), 0, dp(2), 0x99000000);
+        canvas.drawText(number, x, base, text);
+        text.clearShadowLayer();
+        text.setStyle(Paint.Style.FILL);
+        if (floorGold == null || floorGoldAt != base) {
+            floorGoldAt = base;
+            floorGold = new android.graphics.LinearGradient(0, base - dp(34), 0, base, 0xFFFFF3C2, 0xFFE0A21A, android.graphics.Shader.TileMode.CLAMP);
+        }
+        text.setShader(floorGold);
+        canvas.drawText(number, x, base, text);
+        text.setShader(null);
+        text.setTypeface(was);
+        if (!sort.isEmpty()) {
+            text.setTextSize(dp(11));
+            text.setColor(0xFFF1E4FF);
+            text.setShadowLayer(dp(2.5f), 0, dp(1), 0xE0200A33);
+            canvas.drawText(sort, x, base + dp(15), text);
+            text.clearShadowLayer();
+        }
         text.setTextAlign(Paint.Align.LEFT);
-        text.setColor(0xFF6A3FA0);
-        canvas.drawText(words, left + dp(12), top + dp(15.5f), text);
     }
+
+    /** The face the floor's number is set in, and its gold, made again only when it moves. */
+    private static final Typeface FLOOR_FACE = Typeface.create(Typeface.SERIF, Typeface.BOLD_ITALIC);
+    private android.graphics.Shader floorGold;
+    private float floorGoldAt = -1;
 
     /** The cards of a dive: at the stairway, what the dungeon is and how she has done in it; between floors, the three blessings to choose from. */
     private void drawDelveCard(Canvas canvas) {
