@@ -2093,6 +2093,20 @@ final class PlusRun {
 
     /** The moment a strike begins: a shot, a burst, minions, a heal. */
     private void strikes(Foe foe, int way, float middle, boolean toLeft) {
+        int before = shots.size();
+        strikesBy(foe, way, middle, toLeft);
+        // (What one made of fire, frost or ink throws is fire, frost or ink: it burns, chills or poisons her.)
+        int made = RunUniques.status(foe.kind) ? resists(foe.kind) : 0;
+        if (made != 0) for (int index = before; index < shots.size(); index++) if (!shots.get(index).hers) shots.get(index).afflicts = made;
+        // The ink bomb beetle's burst is an ink explosion: a pool, and ink-poison on what is near (her too).
+        if (made == RESISTS_INK && way == RunUniques.EXPLODER) {
+            if (puddles.size() < 12) puddles.add(new float[]{middle, foe.y + foe.tall(), POOL_LASTS});
+            if (inkSplashes.size() < 12) inkSplashes.add(new float[]{middle, foe.y + foe.tall() * .5f, INK_BURST, 0});
+            if (Math.abs(x + WIDE / 2 - middle) < INK_BURST + .5f && Math.abs(y + TALL - foe.y - foe.tall()) < 1.5f) poisonHer();
+        }
+    }
+
+    private void strikesBy(Foe foe, int way, float middle, boolean toLeft) {
         float cy = foe.y + foe.tall() * .5f;
         switch (way) {
             case RunUniques.EXPLODER:
@@ -2694,6 +2708,8 @@ final class PlusRun {
     static final float POISON_LASTS = 4, BURN_LASTS = 2, FREEZE_LASTS = 1.4f, POISON_EVERY = 1, BURN_EVERY = .5f;
     /** What a blow of ink-poison, of burning, and of thorns is made with. */
     static final int POISONED = -20, BURNT = -21, THORNY = -22;
+    /** A blow of a burst of ink out of a creature beaten while ink-poisoned. */
+    static final int INKED = -25;
     /** HP the last hurt took. */
     private int lastLost;
 
@@ -2886,6 +2902,7 @@ final class PlusRun {
         shrugAge += seconds;
         regenAge += seconds;
         drip(seconds);
+        afflictions(seconds);
         sinceMeter += seconds;
         if (chargedLeft > 0) chargedLeft -= seconds;
         if (frenzyLeft > 0) frenzyLeft -= seconds;
@@ -2906,6 +2923,7 @@ final class PlusRun {
             regenClock = 0;
         }
         for (int index = hits.size() - 1; index >= 0; index--) if ((hits.get(index)[4] += seconds) > .9f) hits.remove(index);
+        for (int index = inkSplashes.size() - 1; index >= 0; index--) if ((inkSplashes.get(index)[3] += seconds) > .5f) inkSplashes.remove(index);
         for (Foe foe : foes) {
             foe.struck += seconds;
             foe.popped += seconds;
@@ -2914,9 +2932,21 @@ final class PlusRun {
                 continue;
             }
             boolean waits = RunLevels.boss(foe.kind);
+            // (Frozen, it goes slowly, and frozen solid not at all: see moveFoe. Either can still be hit.)
             if (foe.frozen > 0) {
                 foe.frozen -= seconds;
-                foe.dazed = Math.max(foe.dazed, Math.min(.12f, Math.max(0, foe.frozen)));
+                if (foe.frozen <= 0) foe.chill = 0;
+            }
+            if (foe.iced > 0) foe.iced -= seconds;
+            // Its fire leaps to whatever is close beside it, now and then.
+            if (foe.burning > 0 && (foe.spreadTick += seconds) >= SPREAD_EVERY) {
+                foe.spreadTick = 0;
+                for (Foe other : foes) {
+                    if (other == foe || other.flat || other.away || other.burning > 0 || absent(other)) continue;
+                    if (Math.abs(other.x + other.wide() / 2 - foe.x - foe.wide() / 2) > SPREAD_REACH + (other.wide() + foe.wide()) / 2 || Math.abs(other.y + other.tall() - foe.y - foe.tall()) > 1.2f) continue;
+                    if (ignite(other, BURN_LASTS * .6f)) spreads++;
+                    break;
+                }
             }
             // (Those who wait take a blow of it half as often.)
             if (foe.poisoned > 0) {
@@ -2938,6 +2968,213 @@ final class PlusRun {
 
     /** A chance, in a hundred, comes off (a roll only when there is a chance, so that what drops is as it would be without it). */
     private boolean chance(int inHundred) { return inHundred > 0 && lootRoll(100) < inHundred; }
+
+    // What burns, freezes, poisons and stuns
+
+    /**
+     * How often a creature's fire leaps to another beside it, and how far; how many chills freeze one solid, and for how long (half for
+     * one who waits), and how much harder the blow that shatters it is; how far an ink-poisoned creature's ink bursts when it is beaten.
+     */
+    static final float SPREAD_EVERY = .8f, SPREAD_REACH = 1.3f, ICED_LASTS = 1.6f, SHATTERS = 1.5f, INK_BURST = 1.8f;
+    static final int CHILLS = 3;
+    /** What a creature shrugs off, by its kind: fire, cold, ink-poison. */
+    static final int RESISTS_FIRE = 1, RESISTS_COLD = 2, RESISTS_INK = 4;
+    private int spreads, frozenSolid, iceShatters, inkBursts, resisted, burstDepth;
+    private final List<float[]> inkSplashes = new ArrayList<>();
+
+    int spreads() { return spreads; }
+    int frozenSolid() { return frozenSolid; }
+    int iceShatters() { return iceShatters; }
+    int inkBursts() { return inkBursts; }
+    int resisted() { return resisted; }
+    /** Ink bursts, for showing: where, how far, and how long ago. */
+    List<float[]> inkSplashes() { return inkSplashes; }
+
+    /** What a kind of creature shrugs off: the candle wisp and the dragon fire, the rime flake cold, Blot and the ink-made ink-poison; and a unique by its theme. */
+    static int resists(int kind) {
+        if (RunUniques.is(kind)) return RunUniques.resists(kind);
+        if (kind == RunLevels.WISP || kind == RunLevels.DRAGON) return RESISTS_FIRE;
+        if (kind == RunLevels.RIME) return RESISTS_COLD;
+        if (kind == RunLevels.BLOT || kind == RunLevels.SLIME || kind == RunLevels.KING) return RESISTS_INK;
+        return 0;
+    }
+
+    /**
+     * How a creature is seen going when it is beaten: as everything does (fades), a slime splattering into little blobs, a book slamming shut
+     * and coming apart in pages, an ink beast melting into a pool, paper crumpling and blowing away, type crumbling into blocks; and, whatever
+     * it is, one frozen shatters and one burning goes to ash.
+     */
+    static final int DEFEAT_FADE = 0, DEFEAT_SPLAT = 1, DEFEAT_PAGES = 2, DEFEAT_MELT = 3, DEFEAT_CRUMPLE = 4, DEFEAT_CRUMBLE = 5, DEFEAT_SHATTER = 6, DEFEAT_ASH = 7;
+
+    static int defeatOf(int kind) {
+        if (RunUniques.is(kind)) return RunUniques.defeat(kind);
+        switch (kind) {
+            case RunLevels.SLIME: case RunLevels.KING: case RunLevels.POGO: return DEFEAT_SPLAT;
+            case RunLevels.BLOT: return DEFEAT_MELT;
+            case RunLevels.WORD: case RunLevels.TARGET: return DEFEAT_CRUMPLE;
+            case RunLevels.OLD_BOOK: return DEFEAT_PAGES;
+            default: return DEFEAT_FADE;
+        }
+    }
+
+    /** Sets one burning, unless fire is nothing to it. Whether it took. */
+    boolean ignite(Foe foe, float lasts) {
+        if ((resists(foe.kind) & RESISTS_FIRE) != 0) {
+            resisted++;
+            return false;
+        }
+        if (foe.burning <= 0) burns++;
+        foe.burning = Math.max(foe.burning, lasts);
+        // (Fire thaws.)
+        foe.iced = 0;
+        foe.chill = 0;
+        return true;
+    }
+
+    /** Chills one: slowed, and at the third chill frozen solid. Whether it took. */
+    boolean chillFoe(Foe foe) {
+        if ((resists(foe.kind) & RESISTS_COLD) != 0) {
+            resisted++;
+            return false;
+        }
+        if (foe.frozen <= 0) freezes++;
+        foe.frozen = FREEZE_LASTS;
+        foe.burning = 0;
+        if (foe.iced <= 0 && ++foe.chill >= CHILLS) {
+            foe.chill = 0;
+            foe.iced = ICED_LASTS * (RunLevels.boss(foe.kind) || RunUniques.great(foe.kind) ? .5f : 1);
+            frozenSolid++;
+        }
+        return true;
+    }
+
+    /** Ink-poisons one, unless it is made of ink. Whether it took. */
+    boolean poison(Foe foe) {
+        if ((resists(foe.kind) & RESISTS_INK) != 0) {
+            resisted++;
+            return false;
+        }
+        if (foe.poisoned <= 0) poisons++;
+        foe.poisoned = POISON_LASTS;
+        return true;
+    }
+
+    /**
+     * An ink-poisoned creature beaten bursts: the ink in it splashes out round it, a share of a blow on what is near, ink-poisoning it, and a
+     * pool that slows. (What that beats bursts too, but no more than three deep.)
+     */
+    private void inkBurst(Foe from) {
+        if (burstDepth >= 3) return;
+        burstDepth++;
+        inkBursts++;
+        float middle = from.x + from.wide() / 2, feet = from.y + from.tall();
+        if (inkSplashes.size() < 12) inkSplashes.add(new float[]{middle, feet - from.tall() * .5f, INK_BURST, 0});
+        if (puddles.size() < 12) puddles.add(new float[]{middle, feet, POOL_LASTS});
+        for (Foe foe : new ArrayList<>(foes)) {
+            if (foe == from || foe.flat || absent(foe) || foe.kind == RunLevels.TARGET) continue;
+            float dx = Math.max(0, Math.abs(foe.x + foe.wide() / 2 - middle) - foe.wide() / 2), dy = Math.max(0, Math.abs(foe.y + foe.tall() / 2 - (feet - from.tall() / 2)) - foe.tall() / 2);
+            if (dx * dx + dy * dy > INK_BURST * INK_BURST) continue;
+            poison(foe);
+            blowScale = .5f;
+            beat(foe, INKED);
+            blowScale = 1;
+        }
+        burstDepth--;
+    }
+
+    // What burns, freezes, poisons and stuns her
+
+    /**
+     * Some creatures' blows burn her, chill her, ink-poison her or stun her. Burning and ink-poison take a little now and then and never take
+     * her below half a heart; chilled, she is slower; stunned, she can do nothing for a moment, and cannot be again for a while after. Red
+     * keeps fire off her and blue cold; white, or a white ribbon, clears all of it.
+     */
+    static final float HER_BURN = 2.5f, HER_CHILL = 3, HER_POISON = 5, HER_STUN = .5f, STUN_GUARD = 2.5f, HER_BURN_EVERY = .5f, HER_POISON_EVERY = 1, CHILLED = .72f;
+    private float herBurn, herChill, herPoison, herStun, stunGuard, herBurnTick, herPoisonTick;
+    private int herBurns, herChills, herPoisons, herStuns, statusHurt;
+
+    float herBurn() { return herBurn; }
+    float herChill() { return herChill; }
+    float herPoison() { return herPoison; }
+    float herStun() { return herStun; }
+    int herStuns() { return herStuns; }
+    int statusHurt() { return statusHurt; }
+
+    /** Burns her (not in red). */
+    void burnHer() {
+        if (has(RED) || white()) return;
+        if (herBurn <= 0) herBurns++;
+        herBurn = HER_BURN;
+        herChill = 0;
+    }
+
+    /** Chills her (not in blue). */
+    void chillHer() {
+        if (has(BLUE) || white()) return;
+        if (herChill <= 0) herChills++;
+        herChill = HER_CHILL;
+        herBurn = 0;
+    }
+
+    /** Ink-poisons her. */
+    void poisonHer() {
+        if (white()) return;
+        if (herPoison <= 0) herPoisons++;
+        herPoison = HER_POISON;
+    }
+
+    /** Stuns her, unless she was just stunned. */
+    void stunHer() {
+        if (white() || stunGuard > 0) return;
+        herStuns++;
+        herStun = HER_STUN;
+        stunGuard = STUN_GUARD;
+    }
+
+    /** A touch of one: fire burns her, frost chills her, ink poisons her (whatever shrugs one off is made of it); and a few stun. */
+    private void afflictedBy(Foe foe) {
+        // (Only those made to: the twelve made of fire, frost and ink, the candle wisp and the rime flake. The rest bite as they always have.)
+        if (!RunUniques.status(foe.kind) && foe.kind != RunLevels.WISP && foe.kind != RunLevels.RIME) return;
+        int made = resists(foe.kind);
+        if ((made & RESISTS_FIRE) != 0) burnHer();
+        if ((made & RESISTS_COLD) != 0) chillHer();
+        if ((made & RESISTS_INK) != 0 && foe.kind != RunLevels.SLIME) poisonHer();
+        if (RunUniques.is(foe.kind) && RunUniques.stuns(foe.kind)) stunHer();
+    }
+
+    /** Clears all of it: a white ribbon. */
+    void cleanseHer() { herBurn = herChill = herPoison = herStun = 0; }
+
+    /** What burns, chills, poisons and stuns her, as time goes. */
+    private void afflictions(float seconds) {
+        if (white()) cleanseHer();
+        if (stunGuard > 0) stunGuard -= seconds;
+        if (herStun > 0) herStun -= seconds;
+        if (herChill > 0) herChill -= seconds;
+        if (herBurn > 0) {
+            herBurn -= seconds;
+            if ((herBurnTick += seconds) >= HER_BURN_EVERY) {
+                herBurnTick = 0;
+                statusTakes(Math.max(1, HALF / 10));
+            }
+        }
+        if (herPoison > 0) {
+            herPoison -= seconds;
+            if ((herPoisonTick += seconds) >= HER_POISON_EVERY) {
+                herPoisonTick = 0;
+                statusTakes(Math.max(1, HALF / 8));
+            }
+        }
+    }
+
+    /** A little taken by what burns or poisons her: never below half a heart. */
+    private void statusTakes(int amount) {
+        int to = Math.max(Math.min(hp, HALF), hp - amount);
+        if (to < hp) {
+            statusHurt += hp - to;
+            hp = to;
+        }
+    }
 
     /** What she wears does as a blow of hers lands on a creature: how many blows it counts for, harder for her gear and now and then a great blow. */
     private int geared(Foe foe, int dealt, boolean waits) {
@@ -2966,18 +3203,9 @@ final class PlusRun {
             leeches++;
             regenAge = 0;
         }
-        if (chance(gear(RunLoot.POISON))) {
-            if (foe.poisoned <= 0) poisons++;
-            foe.poisoned = POISON_LASTS;
-        }
-        if (chance(gear(RunLoot.BURN))) {
-            if (foe.burning <= 0) burns++;
-            foe.burning = BURN_LASTS;
-        }
-        if (!waits && chance(gear(RunLoot.FREEZE))) {
-            if (foe.frozen <= 0) freezes++;
-            foe.frozen = FREEZE_LASTS;
-        }
+        if (chance(gear(RunLoot.POISON))) poison(foe);
+        if (chance(gear(RunLoot.BURN))) ignite(foe, BURN_LASTS);
+        if (!waits && chance(gear(RunLoot.FREEZE))) chillFoe(foe);
         return dealt;
     }
 
@@ -3264,6 +3492,8 @@ final class PlusRun {
         boolean wipes, spent;
         /** A wand's bolt: its element. */
         int element = -1;
+        /** One of a creature's: what it does to her besides the hurt (fire burns, frost chills, ink poisons; see RESISTS_), or nought. */
+        int afflicts;
         /**
          * What her skill tree has made of one of hers: how many more creatures it jumps on to, how many more walls it bounces off, and how
          * much harder its blow lands, in percent, for being let fly after a rest.
@@ -3348,6 +3578,11 @@ final class PlusRun {
         float struck = 9;
         /** How fast one that walks is falling, having nothing under it; which way the last blow knocked it; and how long since a ground pound knocked it up. */
         float dropping, knocked, popped = 9;
+        /** How chilled it is (three chills and it is frozen solid), how much longer it is frozen solid, and how long since its fire last leapt to another. */
+        int chill;
+        float iced, spreadTick;
+        /** How it is seen going when it is beaten: see {@link #defeatOf}. */
+        int defeat;
         /**
          * A shield it carries, if any: how many more strong blows it takes, how many it took whole, what a blow must count for to tell
          * on it, which of the four it is (book cover, steel, gold, black ink), and how long since a blow last met it.
@@ -3967,6 +4202,10 @@ final class PlusRun {
             foe.dropping = from.dropping;
             foe.knocked = from.knocked;
             foe.popped = from.popped;
+            foe.chill = from.chill;
+            foe.iced = from.iced;
+            foe.spreadTick = from.spreadTick;
+            foe.defeat = from.defeat;
             foe.perch = from.perch;
             foe.base = from.base;
             foe.leap = from.leap;
@@ -4003,6 +4242,14 @@ final class PlusRun {
         aerialAge = other.aerialAge;
         aerialsUsed = other.aerialsUsed;
         aerialHolding = other.aerialHolding;
+        herBurn = other.herBurn;
+        herChill = other.herChill;
+        herPoison = other.herPoison;
+        herStun = other.herStun;
+        stunGuard = other.stunGuard;
+        herBurnTick = other.herBurnTick;
+        herPoisonTick = other.herPoisonTick;
+        for (float[] splash : other.inkSplashes) inkSplashes.add(splash.clone());
         dashUsed = other.dashUsed;
         windUsed = other.windUsed;
         clinging = other.clinging;
@@ -4029,6 +4276,7 @@ final class PlusRun {
             shot.wipes = from.wipes;
             shot.spent = from.spent;
             shot.element = from.element;
+            shot.afflicts = from.afflicts;
             shot.hops = from.hops;
             shot.bounces = from.bounces;
             shot.boost = from.boost;
@@ -5485,6 +5733,8 @@ final class PlusRun {
     }
 
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
+        // Stunned, she can do nothing for a moment.
+        if (herStun > 0) left = right = jump = strike = false;
         for (Foe foe : foes) {
             if (foe.flat && !foe.dropped) {
                 foe.dropped = true;
@@ -5567,7 +5817,7 @@ final class PlusRun {
         }
 
         // Across: she speeds up toward the arrow that is held, and slows when neither is.
-        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy() * (inked() ? curseSlow() : 1);
+        float run = RUN * Math.max(.5f, 1 + skillOf(RunSkills.E_SPEED) / 100f) * slowedBy() * (inked() ? curseSlow() : 1) * (herChill > 0 ? CHILLED : 1);
         float fast = rush > 0 ? run * 1.3f : run, leap = (rush > 0 ? LEAP * 1.1f : LEAP) * (inked() ? CURSE_JUMP : 1);
         if (has(YELLOW)) fast = run * (mastered ? 2.1f : 1.7f);
         float wanted = left == right ? 0 : left ? -fast : fast;
@@ -6054,7 +6304,11 @@ final class PlusRun {
                 cause = foe.kind == RunLevels.YEOBAEK ? SLASHED : TOUCHED;
                 knock = x + WIDE / 2 < foe.x + foe.wide() / 2 ? -1 : 1;
                 // (One of a swarm, small as it is, bites for half a heart; one of the unique creatures harder.)
-                if (hurt(false, (foe.swarm ? 1 : 2) + TIER_BITE[foe.tier] + (RunUniques.is(foe.kind) ? RunUniques.bite(foe.kind, level.number) : 0))) return;
+                int lives = livesLost;
+                boolean took = hurt(false, (foe.swarm ? 1 : 2) + TIER_BITE[foe.tier] + (RunUniques.is(foe.kind) ? RunUniques.bite(foe.kind, level.number) : 0));
+                // What it is made of goes onto her: fire burns her, frost chills her, ink poisons her.
+                if (took && livesLost == lives) afflictedBy(foe);
+                if (took) return;
             }
         }
         if (y > bottomAt((int) Math.floor(x + WIDE / 2)) + 1) {
@@ -6619,6 +6873,7 @@ final class PlusRun {
 
     static int flavourOf(int by) {
         if (by == BEAMED || by == SURE || by == STEAM || by == FIRE || by == WATER) return SPARKLES;
+        if (by == INKED || by == POISONED) return SPLASHES;
         switch (thingOf(by)) {
             case SWORD: case KATANA: case GREATSWORD: case SCYTHE: case LANCE: case KNIFE: case WHIP: return CUTS;
             case BRUSH: case PEN: case GUN: return SPLASHES;
@@ -6669,6 +6924,13 @@ final class PlusRun {
         int dealt = geared(foe, waits ? 1 : dealt(), waits);
         // (A share of a blow: the ground pound's, the aerial strike's.)
         if (blowScale != 1) dealt = Math.max(1, Math.round(dealt * blowScale));
+        // One frozen solid shatters at a blow, which lands half as hard again.
+        if (foe.iced > 0 && with != POISONED && with != BURNT && with != INKED) {
+            dealt = Math.round(dealt * SHATTERS);
+            foe.iced = 0;
+            foe.chill = 0;
+            iceShatters++;
+        }
         // (Her tree makes some blows harder: on one nearly beaten, on one not yet hurt, after a rest.)
         boolean hers = thingOf(with) != UNARMED;
         if (!waits && hers) dealt = Math.max(1, Math.round(dealt * (1 + bonus(foe) / 100f)));
@@ -6708,6 +6970,9 @@ final class PlusRun {
         }
         if ((foe.left -= dealt) <= 0) {
             hit[8] = 1;
+            // How it is seen going: frozen, burning, or as it is made.
+            foe.defeat = foe.iced > 0 || foe.frozen > 0 ? DEFEAT_SHATTER : foe.burning > 0 ? DEFEAT_ASH : defeatOf(foe.kind);
+            if (foe.poisoned > 0) inkBurst(foe);
             foe.left = 0;
             foe.flat = true;
             foe.y = foe.ground;
@@ -6734,6 +6999,9 @@ final class PlusRun {
             else if (waits && !foe.spawned && phase(foe) > phase) changed();
             return;
         }
+        // Red's fire burns what it lands on, and blue's water chills it.
+        if (with == FIRE) ignite(foe, BURN_LASTS);
+        else if (with == WATER && !waits) chillFoe(foe);
         if (!waits) {
             // A big one flinches, and can be hit again at once; knocked off its feet, it goes at a crawl for a moment.
             foe.dazed = .15f;
@@ -7718,7 +7986,15 @@ final class PlusRun {
                     // In brown what is thrown at her still lands, but it costs her half a heart.
                     cause = STRUCK;
                     knock = Math.signum(shot.across);
-                    if (hurt(false, has(BROWN) ? 1 : 2)) return true;
+                    int lives = livesLost;
+                    boolean took = hurt(false, has(BROWN) ? 1 : 2);
+                    // A creature's fire burns her, its frost chills her, its ink poisons her (unless that hurt sent her back to a flag).
+                    if (took && livesLost == lives) {
+                        if ((shot.afflicts & RESISTS_FIRE) != 0) burnHer();
+                        if ((shot.afflicts & RESISTS_COLD) != 0) chillHer();
+                        if ((shot.afflicts & RESISTS_INK) != 0) poisonHer();
+                    }
+                    if (took) return true;
                 }
             }
         }
@@ -8120,6 +8396,8 @@ final class PlusRun {
         // (One of them in the land keeps still while she is in a place off it; a hidden boss in its hideout, while she is not.)
         if (RunUniques.is(foe.kind) && ((room >= 0) != (foe.x >= level.main) || Math.abs(foe.x - x) > WAKES)) return;
         if (!puddles.isEmpty() && mired(foe)) seconds *= PUDDLE_SLOWS;
+        // Frozen, it is held where it is (and frozen solid, for longer) until it thaws or is shattered; it can still be hit.
+        if (foe.iced > 0 || foe.frozen > 0) return;
         if (foe.stunned > 0) {
             // (Its flinch from a blow passes as fast as ever: knocked down, it can still be hit.)
             foe.stunned -= seconds;

@@ -293,7 +293,7 @@ final class RunLevels {
     /** Where in an arena something may come in: on its floor, on a platform, on a high perch, or in the open air. */
     static final int ON_FLOOR = 0, ON_PLATFORM = 1, ON_PERCH = 2, IN_AIR = 3;
     /** One of the last wave that is outsized is its kind and this much more. */
-    static final int GIANT = 100;
+    static final int GIANT = 1000;
     /** How many times over the troop of a wave comes; and how many outsized ones the last wave ends on. */
     static final int SWELL = 20, GIANTS = 4;
 
@@ -554,8 +554,10 @@ final class RunLevels {
             for (int column : taken) clear &= Math.abs(column - spot[0]) >= 9;
             for (int[] foe : level.foes) if (uniqueSpec(foe)) clear &= Math.abs(foe[1] - spot[0]) >= 9;
             if (!clear) continue;
-            // (From the sixth chapter on, the chapter's two later ones as well: four to choose from.)
-            int later = RunUniques.laterOf(chapter), pick = random.nextInt(later < 0 ? 2 : 4);
+            // (From the sixth chapter on, the chapter's two later ones as well: four to choose from; before it, its two made of fire, frost and ink.)
+            int later = RunUniques.laterOf(chapter);
+            if (later < 0) later = RunUniques.statusOf(chapter);
+            int pick = random.nextInt(later < 0 ? 2 : 4);
             int kind = pick < 2 ? first + pick : later + pick - 2;
             if (RunUniques.way(kind) == RunUniques.MINIBOSS) kind = kind == first ? first + 1 : first;
             taken.add(spot[0]);
@@ -1835,7 +1837,9 @@ final class RunLevels {
             int kind = kinds[random.nextInt(kinds.length)];
             // (One in five is one of its chapter's own; never its mini-boss, nor its hornets.)
             if (random.nextInt(5) == 0) {
-                int own = chapterFirst + random.nextInt(2);
+                int own = chapterFirst + random.nextInt(2), status = RunUniques.statusOf(Math.min(11, level.chapter));
+                // (And in the first six chapters' dungeons, every other time, one of its two made of fire, frost and ink.)
+                if (status >= 0 && spot[0] % 2 == 0) own = status + own - chapterFirst;
                 if (RunUniques.way(own) != RunUniques.MINIBOSS && !RunUniques.flies(own)) kind = own;
             }
             int way = RunUniques.way(kind);

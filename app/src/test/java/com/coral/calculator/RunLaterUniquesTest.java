@@ -37,7 +37,7 @@ public class RunLaterUniquesTest {
     }
 
     @Test public void twelveMoreTwoForEachLaterChapterAndTougher() {
-        assertEquals(59, RunUniques.COUNT);
+        assertEquals(71, RunUniques.COUNT);
         assertEquals(12, RunUniques.LATER_COUNT);
         Set<String> names = new HashSet<>();
         Set<Integer> ways = new HashSet<>();

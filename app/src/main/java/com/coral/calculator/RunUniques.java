@@ -10,7 +10,7 @@ final class RunUniques {
     private RunUniques() {}
 
     /** The first of their kinds, after Lucy; how many there are. */
-    static final int FIRST = RunLevels.LUCY + 1, COUNT = 59;
+    static final int FIRST = RunLevels.LUCY + 1, COUNT = 71;
     /** And the four of the lagoons, who swim: after the hidden bosses. */
     static final int WATER_FIRST = FIRST + 30, WATER_COUNT = 4;
     /** Of them, the six hidden bosses: after the twenty-four, one for each two chapters, each in the hideouts of its lands. */
@@ -25,6 +25,16 @@ final class RunUniques {
      */
     static final int LATER_FIRST = FIRST + 47, LATER_COUNT = 12, LATER_CHAPTER = 6;
     static final String LATER_SHEET = "runart/uniques_later.webp";
+    /**
+     * And twelve made of fire, frost and ink, or that stun, two more for each of the first six chapters (which had fewest): each burns,
+     * chills, poisons or stuns her, shrugs off what it is made of, goes in its own way when beaten, and is tougher than those of its chapter.
+     */
+    static final int STATUS_FIRST = FIRST + 59, STATUS_COUNT = 12;
+    static final String STATUS_SHEET = "runart/uniques_status.webp";
+    static final float STATUS_TOUGHER = 1.6f;
+    /** What each of them is made of (see {@link PlusRun#resists}), or nought for those that stun. */
+    static final int[] STATUS_MADE = {PlusRun.RESISTS_FIRE, PlusRun.RESISTS_COLD, PlusRun.RESISTS_INK, PlusRun.RESISTS_INK, 0, PlusRun.RESISTS_COLD,
+            PlusRun.RESISTS_FIRE, PlusRun.RESISTS_INK, PlusRun.RESISTS_COLD, PlusRun.RESISTS_FIRE, PlusRun.RESISTS_INK, 0};
 
     /** The ways of fighting. */
     static final int CHARGER = 0, SHIELDER = 1, MIMIC = 2, GHOST = 3, EXPLODER = 4, SNIPER = 5, BURROWER = 6, SUMMONER = 7, HEALER = 8, MINIBOSS = 9,
@@ -43,25 +53,31 @@ final class RunUniques {
             "Inkblink Moth", "Shelf Spider", "Folio Frog", "Quill Wisp", "Bouncing Stamp", "Anvil Tome", "Ink Double",
             "The Card Catalogue", "The Bookbinder Beetle", "The Inkwell Kraken", "The Gargoyle Lectern", "The Kite Dragon", "The Hollow Archivist",
             "Newsreel Pillbug", "Headline Herald", "Ruled-Line Serpent", "Strikethrough", "Gluepot Toad", "Smudge Slime", "Cross-Reference Crab", "Ibid Echo",
-            "Sand-Glass Sprite", "Hermit Scroll Crab", "Hoard Wyrmling", "Lantern Sentinel"};
+            "Sand-Glass Sprite", "Hermit Scroll Crab", "Hoard Wyrmling", "Lantern Sentinel",
+            "Cinder Sprite", "Frost Folio", "Venom Quill", "Ink Bomb Beetle", "Static Bookend", "Glacier Tome", "Flame Fan", "Plague Page",
+            "Snowglobe Golem", "Ashen Scribe", "Smog Moth", "Thunder Clapper"};
     /** Each one's chapter (two to a chapter, in order) and way of fighting. */
     static final int[] WAY = {CHARGER, SHIELDER, MIMIC, GHOST, EXPLODER, SNIPER, CHARGER, BURROWER, SUMMONER, HEALER, MINIBOSS, SHIELDER, FORMATION, CHARGER,
             GHOST, MIMIC, SPLITTER, EXPLODER, SNIPER, MINIBOSS, SHIELDER, SUMMONER, HEALER, CHARGER, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN, HIDDEN,
             SWIMMER, SWIMMER, SWIMMER, SWIMMER, BLINKER, DROPPER, LEAPER, ORBITER, BOUNCER, STAMPER, MIRROR, KEEPER, KEEPER, KEEPER, KEEPER, KEEPER, KEEPER,
-            ROLLER, HERALD, LASHER, LINER, PULLER, SMEARER, REFLECTOR, ECHOER, HOURGLASS, HERMIT, BREATHER, SWEEPER};
+            ROLLER, HERALD, LASHER, LINER, PULLER, SMEARER, REFLECTOR, ECHOER, HOURGLASS, HERMIT, BREATHER, SWEEPER,
+            SNIPER, STAMPER, SNIPER, EXPLODER, CHARGER, SHIELDER, LEAPER, SPLITTER, STAMPER, SNIPER, BLINKER, BOUNCER};
     /** How many blows of health each has at the start of the game (it grows with the land), by way of fighting. */
     private static final float[] HEALTH = {4, 6, 4, 3, 2, 3, 4, 5, 4, 24, 1.5f, 6, 70, 4, 3, 3.5f, 4, 3, 3, 7, 4, 90, 7, 6, 7, 6, 8, 9, 8, 6, 7, 9, 8, 9};
     /** How wide and tall each is, in squares. */
     static final float[] WIDE = {.95f, .9f, 1.1f, .9f, .9f, .8f, 1.1f, .9f, .95f, .85f, 1.2f, 1.25f, .8f, 1.15f, .8f, .9f, 1.2f, .85f, .95f, 1.5f, 1.1f, .85f, .9f, 1.2f,
             2, 2, 2.4f, 2.2f, 1.8f, 1.6f, .9f, .9f, 1.5f, .8f, .9f, .9f, 1, .8f, .85f, 1.3f, .7f, 2.4f, 2.4f, 2.6f, 2, 2.8f, 1.8f,
-            1.1f, .9f, 1.4f, .9f, 1.15f, 1.2f, 1.2f, .85f, .85f, 1.05f, 1.1f, 1.1f};
+            1.1f, .9f, 1.4f, .9f, 1.15f, 1.2f, 1.2f, .85f, .85f, 1.05f, 1.1f, 1.1f,
+            .8f, 1.1f, .9f, .95f, 1.1f, 1.25f, 1, .9f, 1.3f, .9f, 1, 1};
     static final float[] TALL = {.8f, .85f, .7f, 1.15f, .75f, .85f, .95f, .95f, 1.25f, .75f, 1.5f, 1.35f, .7f, .8f, 1.2f, .85f, .75f, .9f, .75f, 1.45f, .8f, .85f, 1.05f, 1.05f,
             1.8f, 1.7f, 1.6f, 2.4f, 1.9f, 2.4f, .9f, .85f, .6f, 1.1f, .8f, .8f, .85f, .9f, .85f, 1.2f, 1.4f, 2.2f, 1.8f, 2.2f, 2.4f, 2, 2.6f,
-            .8f, 1.05f, .7f, 1.2f, .9f, .8f, .85f, .95f, 1.1f, 1, 1.05f, 1.45f};
+            .8f, 1.05f, .7f, 1.2f, .9f, .8f, .85f, .95f, 1.1f, 1, 1.05f, 1.45f,
+            .85f, .95f, .8f, .8f, .85f, 1.1f, .95f, .95f, 1.4f, 1.15f, .85f, .9f};
     /** How fast each walks, squares a second. */
     static final float[] SPEED = {1.5f, .55f, 1.2f, .9f, 1.3f, .8f, 1.4f, 1.6f, .6f, .9f, 1.1f, .5f, 2.2f, 1.6f, 1, 1.4f, .8f, 1.2f, .9f, .9f, .7f, .7f, .9f, 1.7f,
             1.3f, 1.2f, 1.4f, .8f, 1.5f, 1.3f, 1.4f, 1.2f, 2.4f, .7f, 1.4f, 1.6f, 1.2f, 1, 2.2f, .6f, 3, 1.2f, 1.4f, 1.1f, 1.2f, 1.3f, 1.2f,
-            1.3f, .9f, 1.2f, 1, .7f, .8f, .9f, 1.4f, .8f, .9f, 1.1f, .5f};
+            1.3f, .9f, 1.2f, 1, .7f, .8f, .9f, 1.4f, .8f, .9f, 1.1f, .5f,
+            .9f, .6f, .8f, 1.3f, 1.6f, .5f, 1.2f, .8f, .55f, .8f, 1.4f, 1.2f};
 
     static boolean is(int kind) { return kind >= FIRST && kind < FIRST + COUNT; }
 
@@ -72,8 +88,13 @@ final class RunUniques {
     static int chapter(int kind) {
         int index = index(kind);
         return index < 24 ? index / 2 : index < 30 ? (index - 24) * 2 : index < 34 ? 10 : index < 41 ? 11 : index < 47 ? (index - 41) * 2 + 1
-                : LATER_CHAPTER + (index - 47) / 2;
+                : index < 59 ? LATER_CHAPTER + (index - 47) / 2 : (index - 59) / 2;
     }
+
+    /** Whether it is one of the twelve made of fire, frost and ink; and the first of a chapter's two of them (or -1 past the sixth chapter). */
+    static boolean status(int kind) { return kind >= STATUS_FIRST && kind < STATUS_FIRST + STATUS_COUNT; }
+
+    static int statusOf(int chapter) { return chapter < 0 || chapter > 5 ? -1 : STATUS_FIRST + chapter * 2; }
 
     /** Whether it is one of the twelve of the later chapters; and the first of a later chapter's two (or -1 for a chapter before them). */
     static boolean later(int kind) { return kind >= LATER_FIRST && kind < LATER_FIRST + LATER_COUNT; }
@@ -95,6 +116,43 @@ final class RunUniques {
 
     /** Whether it is one of those who swim in the lagoons. */
     static boolean swims(int kind) { return is(kind) && way(kind) == SWIMMER; }
+
+    /** What one shrugs off (see {@link PlusRun#resists}), by what it is made of, as its name tells it: ink, fire, frost. */
+    static int resists(int kind) {
+        if (!is(kind)) return 0;
+        if (status(kind)) return STATUS_MADE[kind - STATUS_FIRST];
+        String name = name(kind).toLowerCase(java.util.Locale.ROOT);
+        int resists = 0;
+        if (name.contains("ink") || name.contains("blot") || name.contains("squid")) resists |= PlusRun.RESISTS_INK;
+        if (name.contains("ember") || name.contains("flame") || name.contains("fire") || name.contains("candle") || name.contains("cinder") || name.contains("lantern")) resists |= PlusRun.RESISTS_FIRE;
+        if (name.contains("frost") || name.contains("rime") || name.contains("ice") || name.contains("snow") || name.contains("glacier")) resists |= PlusRun.RESISTS_COLD;
+        return resists;
+    }
+
+    /** Whether a touch of one stuns her: the heavy-handed (stampers, rollers, chargers, sweepers). */
+    static boolean stuns(int kind) {
+        if (!is(kind)) return false;
+        int way = way(kind);
+        // (Only the two of the twelve made of nothing in particular are made to stun: the bookend and the clapper.)
+        return status(kind) && STATUS_MADE[kind - STATUS_FIRST] == 0;
+    }
+
+    /** How one is seen going when beaten (see {@link PlusRun#defeatOf}), by what it is made of, as its name tells it. */
+    static int defeat(int kind) {
+        if (!is(kind)) return PlusRun.DEFEAT_FADE;
+        if (status(kind)) {
+            int made = STATUS_MADE[kind - STATUS_FIRST];
+            return made == PlusRun.RESISTS_FIRE ? PlusRun.DEFEAT_ASH : made == PlusRun.RESISTS_COLD ? PlusRun.DEFEAT_SHATTER : made == PlusRun.RESISTS_INK ? PlusRun.DEFEAT_MELT
+                    : PlusRun.DEFEAT_CRUMBLE;
+        }
+        String name = name(kind).toLowerCase(java.util.Locale.ROOT);
+        if (name.contains("slime") || name.contains("jelly") || name.contains("blob")) return PlusRun.DEFEAT_SPLAT;
+        if (name.contains("ink") || name.contains("blot") || name.contains("squid")) return PlusRun.DEFEAT_MELT;
+        if (name.contains("book") || name.contains("tome") || name.contains("page") || name.contains("novel") || name.contains("scroll") || name.contains("bookworm")) return PlusRun.DEFEAT_PAGES;
+        if (name.contains("golem") || name.contains("type") || name.contains("press") || name.contains("stamp") || name.contains("knight")) return PlusRun.DEFEAT_CRUMBLE;
+        if (name.contains("paper") || name.contains("origami") || name.contains("crane") || name.contains("moth") || name.contains("headline") || name.contains("newsreel")) return PlusRun.DEFEAT_CRUMPLE;
+        return PlusRun.DEFEAT_FADE;
+    }
 
     /** Whether it is one of the hidden bosses; and the hidden boss of a chapter. */
     static boolean hidden(int kind) { return is(kind) && way(kind) == HIDDEN; }
@@ -128,7 +186,8 @@ final class RunUniques {
 
     /** How much health one has in a land (in tenths of a blow): its way's, made more as her blows grow with the level the land is for. */
     static int health(int kind, int number) {
-        return Math.round(PlusRun.BLOW * HEALTH[way(kind)] * RunLoot.power(RunLoot.recommended(number)) * (1 + number / 100f));
+        // (The twelve made of fire, frost and ink are tougher than others of their way.)
+        return Math.round(PlusRun.BLOW * HEALTH[way(kind)] * (status(kind) ? STATUS_TOUGHER : 1) * RunLoot.power(RunLoot.recommended(number)) * (1 + number / 100f));
     }
 
     /** The halves of a heart more than a sign's its touch costs: none in the first two chapters, then one (two for a mini-boss), and one more every fifty lands. */

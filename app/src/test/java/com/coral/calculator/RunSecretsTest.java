@@ -78,7 +78,7 @@ public class RunSecretsTest {
     }
 
     @Test public void aHiddenBossDropsThreeThingsGoldOrBetterAndHasItsOwnRose() {
-        assertEquals(59, RunUniques.COUNT);
+        assertEquals(71, RunUniques.COUNT);
         Set<Integer> signatures = new HashSet<>();
         for (int kind = RunUniques.HIDDEN_FIRST; kind < RunUniques.HIDDEN_FIRST + RunUniques.HIDDEN_COUNT; kind++) {
             int signature = RunUniques.signature(kind);
