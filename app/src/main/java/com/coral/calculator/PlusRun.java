@@ -814,6 +814,8 @@ final class PlusRun {
         int level = 1;
         /** The weapon found in the lands that she holds as her own, or 0: what it is counts for more in her hands. */
         int item;
+        /** Her inventory's two weapon places: the secondary weapon's kind (the swap changes the main one for it), and the finds in the main and the secondary place. */
+        int second = UNARMED, itemMain, itemSecond;
         float mercy = 1;
         /** What her skill tree gives her; and the active skills in her slots. */
         RunSkills.Built skills = new RunSkills.Built();
@@ -2606,7 +2608,7 @@ final class PlusRun {
     /** A weapon found is taken in hand in the middle of a land: into her backpack as its kind, counting for more, and in her hands. */
     void hold(int code) {
         int kind = RunArms.kindOf(code);
-        perks.item = code;
+        perks.item = perks.itemMain = code;
         owned |= 1 << kind;
         if (state == PLAYING && disarmed <= 0 && !ranging) {
             previous = weapon;
@@ -2632,6 +2634,9 @@ final class PlusRun {
 
     /** What a swap would put in her hands, or nothing. */
     int nextUp() {
+        // With a secondary weapon in her inventory, the swap is between the main one and that.
+        int other = RunInventory.swapTarget(weapon, perks.main, perks.second, UNARMED);
+        if (other != UNARMED && other != weapon && usable(other)) return other;
         if (previous != weapon && usable(previous)) return previous;
         for (int step = 1; step < RunArms.COUNT; step++) {
             int kind = (Math.max(0, weapon) + step) % RunArms.COUNT;
@@ -3194,7 +3199,7 @@ final class PlusRun {
         lives = perks.lives;
         // What is in her backpack is with her from the start, and what she begins a land with is in her hands.
         for (int kind = 0; kind < PETS; kind++) if ((perks.petWith >> kind & 1) != 0) join(kind, true);
-        owned = perks.pack | (perks.main != UNARMED ? 1 << perks.main : 0);
+        owned = perks.pack | (perks.main != UNARMED ? 1 << perks.main : 0) | (perks.second != UNARMED ? 1 << perks.second : 0);
         weapon = perks.main;
         rounds = perks.shots;
         books = RunArms.BOOKS;
@@ -4344,6 +4349,11 @@ final class PlusRun {
         owned |= now.pack;
         perks.main = now.main;
         if (now.main != UNARMED) owned |= 1 << now.main;
+        perks.second = now.second;
+        if (now.second != UNARMED) owned |= 1 << now.second;
+        perks.itemMain = now.itemMain;
+        perks.itemSecond = now.itemSecond;
+        perks.item = now.itemMain == 0 && now.itemSecond == 0 ? now.item : RunInventory.itemFor(perks, weapon);
         perks.levels = now.levels.clone();
         // What she wears, put on or taken off: a heart that went with it goes with it.
         perks.whole = now.whole;
@@ -4774,6 +4784,8 @@ final class PlusRun {
     /** The same, with the button that uses what she carries held or not. */
     void step(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         seconds = Math.min(seconds, .1f);
+        // (The find in the weapon she holds is the main place's, or the secondary place's when she holds that one.)
+        perks.item = RunInventory.itemFor(perks, weapon);
         while (seconds > 0 && state == PLAYING) {
             float slice = Math.min(STEP, seconds);
             once(slice, left, right, jump, strike);
