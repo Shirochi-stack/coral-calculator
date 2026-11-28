@@ -734,6 +734,11 @@ final class RunStory {
             {"knk4", "Coming through, fists first Sloppy~♡", "H", PLAYER + "She dashes forward into a punch at full speed. Breathless, gleeful."},
     };
 
+    /** A glossary gem, the first time she takes one: pluses count double for a while. */
+    static final String[][] GEM = {
+            {"gem1", "A glossary gem! Every plus counts double while it glows Sloppy~♡", "H", PLAYER + "She picks up a glowing aqua gem and learns every plus is worth double for a while. Delighted, a little greedy."},
+    };
+
     /** The dungeons: the stairway found, going down, between floors, the keeper, cleared, lost, three kinds of floor, and her own double in ink. */
     static final String[][] DUNGEONS = {
             {"dng1", "Stairs going down... a whole dungeon under here! Want to see how deep it goes Sloppy~♡", "H", PLAYER + "She has found a stone stairway leading down into a dungeon. Curious, excited, a little daring."},

@@ -27,7 +27,19 @@ final class VanityLayers {
             // Her swimming: two strokes, a dive, an ink shot.
             {"swim", 4, 1, 256, 208},
             // Her climbing (hand over hand), and the thirteenth weapon class, knuckles: its frames, and the same with nothing in her hands.
-            {"climb", 4, 1, 256, 208}, {"arm18", 12, 1, 500, 248}, {"grip18", 12, 1, 500, 248}};
+            {"climb", 4, 1, 256, 208}, {"arm18", 12, 1, 500, 248}, {"grip18", 12, 1, 500, 248},
+            // Her ground smashes and her wings-spread aerial strikes, one of each for every weapon kind: four frames, in the runart pack.
+            {"aerial_book", 4, 1, 500, 248}, {"aerial_brush", 4, 1, 500, 248}, {"aerial_cannon", 4, 1, 500, 248},
+            {"aerial_greatsword", 4, 1, 500, 248}, {"aerial_gun", 4, 1, 500, 248}, {"aerial_hammer", 4, 1, 500, 248},
+            {"aerial_katana", 4, 1, 500, 248}, {"aerial_keys", 4, 1, 500, 248}, {"aerial_knife", 4, 1, 500, 248}, {"aerial_knuckles", 4, 1, 500, 248},
+            {"aerial_lance", 4, 1, 500, 248}, {"aerial_mace", 4, 1, 500, 248}, {"aerial_pen", 4, 1, 500, 248}, {"aerial_scythe", 4, 1, 500, 248},
+            {"aerial_staff", 4, 1, 500, 248}, {"aerial_sword", 4, 1, 500, 248}, {"aerial_tablet", 4, 1, 500, 248}, {"aerial_wand", 4, 1, 500, 248},
+            {"aerial_whip", 4, 1, 500, 248}, {"smash_book", 4, 1, 500, 248}, {"smash_brush", 4, 1, 500, 256}, {"smash_cannon", 4, 1, 500, 264},
+            {"smash_greatsword", 4, 1, 500, 368}, {"smash_gun", 4, 1, 500, 248}, {"smash_hammer", 4, 1, 500, 276}, {"smash_katana", 4, 1, 500, 312},
+            {"smash_keys", 4, 1, 500, 288}, {"smash_knife", 4, 1, 500, 248}, {"smash_knuckles", 4, 1, 500, 256}, {"smash_lance", 4, 1, 500, 320},
+            {"smash_mace", 4, 1, 500, 276}, {"smash_pen", 4, 1, 500, 248}, {"smash_scythe", 4, 1, 500, 288}, {"smash_staff", 4, 1, 500, 296},
+            {"smash_sword", 4, 1, 500, 248}, {"smash_tablet", 4, 1, 500, 248}, {"smash_unarmed", 4, 1, 500, 248}, {"smash_wand", 4, 1, 500, 260},
+            {"smash_whip", 4, 1, 500, 360}};
 
     static int[] geometry(String sheet) {
         for (Object[] one : SHEETS) {

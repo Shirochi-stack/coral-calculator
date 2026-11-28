@@ -137,6 +137,8 @@ final class RunGame {
     private boolean packOpen;
     /** Her inventory, drawn and touched by its own class. */
     private final RunInventoryUi inventory = new RunInventoryUi(this);
+    /** The pluses as collectibles: coins of four worths, the glossary gem, and what goes with them (see RunCoins). */
+    private final RunCoins coins = new RunCoins(this);
     /**
      * The board of hunts, open over the guild hall: its card; for each hunt on it the button
      * that takes it on or hands it in, and the one that gives it up, which asks once before
@@ -295,7 +297,7 @@ final class RunGame {
     private static final float[] BUFF_LASTS = {0, 8, 0, 10, 6};
 
     private final PlayStage stage;
-    private final Context context;
+    final Context context;
     final boolean dark, haptics;
     final PlaySession session;
     private final CompanionPrefs names;
@@ -2865,6 +2867,10 @@ final class RunGame {
             float x = (drop.x - cameraX) * tile, y = (drop.y - cameraY) * tile;
             if (x < -tile * 2 || x > width + tile * 2) continue;
             if (drop.code == 0) {
+                if (coins.ready()) {
+                    coins.drawDrop(canvas, drop, x, y, tile, clock);
+                    continue;
+                }
                 float turned = Math.max(.2f, Math.abs((float) Math.cos(clock * 5 + drop.x * 3)));
                 paint.setAlpha(255);
                 art(canvas, PLUS_ART, x, y, tile * .5f * turned, false);
@@ -6001,7 +6007,7 @@ final class RunGame {
         audio.play("flap", .9f);
     }
 
-    private int seenRideMet, seenRideBursts;
+    private int seenRideMet, seenRideBursts, seenDropPluses, seenGems;
     private static final float[][] RIDE_WAYS = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
     private boolean seenRideDesperate;
 
@@ -7849,9 +7855,35 @@ final class RunGame {
                 bits.add(new float[]{herX, herY, (random.nextFloat() - .5f) * 5, -random.nextFloat() * 1.6f, .32f, 1});
             }
         }
+        // Coins that fell, taken: a pop on her (bigger for a bigger one), and the counter bumps; a gem: its own sound, a bigger pop, and, the first time, her word.
+        if (run.dropPluses() != seenDropPluses) {
+            int worth = Math.max(1, run.lastWorth());
+            seenDropPluses = run.dropPluses();
+            audio.play("plus", .5f);
+            coins.pop(run.x() + PlusRun.WIDE / 2, run.y() + PlusRun.TALL * .35f, RunCoins.tierOf(worth));
+            if (worth >= 25) audio.play("heart", .7f);
+            seenBonus = run.bonus();
+        }
+        if (run.gems() != seenGems) {
+            seenGems = run.gems();
+            seenBonus = run.bonus();
+            audio.play("form", .8f);
+            audio.play("buff", .6f);
+            buzz(true);
+            coins.pop(run.x() + PlusRun.WIDE / 2, run.y() + PlusRun.TALL * .35f, RunCoins.GEM);
+            if (session.tally("run_gem1") == 0) {
+                session.keep("run_gem1", 1);
+                speak(RunStory.GEM[0], true);
+            }
+        }
         if (run.collected() != seenCollected) {
             seenCollected = run.collected();
             audio.play("plus", .5f);
+            // (One taken from a way off, which a magnet drew in, is seen to go to her; one touched pops where it was.)
+            float herWX = run.x() + PlusRun.WIDE / 2, herWY = run.y() + PlusRun.TALL / 2;
+            if (Math.hypot(run.plusX() - herWX, run.plusY() - herWY) > 1.2) coins.fly(run.plusX(), run.plusY());
+            coins.pop(run.plusX(), run.plusY(), RunCoins.BRONZE);
+            if (run.gem() > 0) seenBonus = run.bonus();
             for (int spark = 0; spark < 7; spark++) {
                 double way = random.nextFloat() * Math.PI * 2;
                 bits.add(new float[]{run.plusX(), run.plusY(), (float) Math.cos(way) * 4.5f, (float) Math.sin(way) * 4.5f - 2, .38f, 0});
@@ -11541,7 +11573,8 @@ final class RunGame {
         drawDoors(canvas, level);
         // The pluses, each bobbing a little and turning as it hangs there.
         drawSecretHints(canvas);
-        for (int[] plus : run.pluses()) {
+        if (coins.ready()) coins.drawWorld(canvas, run, first, last, cameraX, cameraY, tile, clock);
+        else for (int[] plus : run.pluses()) {
             if (plus[0] < first - 1 || plus[0] > last + 1 || run.hidden(plus[0], plus[1])) continue;
             float x = (plus[0] + .5f - cameraX) * tile;
             float y = (plus[1] + .9f - cameraY) * tile + (float) Math.sin(clock * 4 + plus[0]) * tile * .08f;
@@ -11549,6 +11582,7 @@ final class RunGame {
             art(canvas, PLUS_ART, x, y, tile * .78f * turned, false);
         }
         drawScattered(canvas);
+        if (coins.ready()) coins.drawOver(canvas, cameraX, cameraY, tile, run.x() + PlusRun.WIDE / 2, run.y() + PlusRun.TALL / 2);
         // Whoever holds something out, where she waits: her friends, and those met in the villages, each beside what she has.
         for (int[] item : level.items) {
             if (item[3] == 0 || item[1] < first - 3 || item[1] > last + 3) continue;
@@ -13764,6 +13798,7 @@ final class RunGame {
         }
         if (beaming) weapon = PlusRun.TABLET;
         if (RunLoot.ultimate(perks.item) && weapon == RunArms.kindOf(perks.item)) quillAura(canvas, feetX, feetY, tall, leftward);
+        coins.aura(canvas, run, feetX, feetY - tall * .5f, tall, clock);
         // Swimming: two strokes by turns, a dive, and an ink bolt as it goes; bubbles rising off her.
         if (run.swimming()) {
             if (swim == null) swim = BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_swim);
@@ -14937,7 +14972,8 @@ final class RunGame {
         text.setColor(run.lives() <= 1 ? 0xFFE0362F : ink);
         canvas.drawText(lives, livesAt + dp(26), plateMiddle + dp(5.5f), text);
         text.setColor(ink);
-        fitted(canvas, count, livesAt + livesWide, plateMiddle + dp(5.5f), dp(15), dp(400));
+        fitted(canvas, count, livesAt + livesWide, plateMiddle + dp(5.5f), dp(15) * coins.bumpScale(), dp(400));
+        coins.chip(canvas, run, safe.right - margin - dp(104), plateTop + tall + dp(6), clock);
         plate(canvas, pauseButton, tall / 2, 235);
         paint.setColor(ink);
         canvas.drawRoundRect(pauseButton.centerX() - dp(7), pauseButton.centerY() - dp(8), pauseButton.centerX() - dp(2.5f), pauseButton.centerY() + dp(8), dp(1.5f), dp(1.5f), paint);
@@ -15722,6 +15758,10 @@ final class RunGame {
     private Bitmap plusCoin;
 
     private void plusIcon(Canvas canvas, float x, float y, float size, int alpha) {
+        if (coins.ready()) {
+            coins.icon(canvas, x, y, size, alpha, clock);
+            return;
+        }
         if (plusCoin == null) plusCoin = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_plus_coin);
         int which = size < dp(22) ? 1 : 0, side = plusCoin.getHeight();
         source.set(which * side, 0, which * side + side, side);
