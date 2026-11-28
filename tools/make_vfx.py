@@ -30,7 +30,7 @@ RAW = SCRATCH / "raw"
 CANVAS = (1536, 1024)
 COLS, ROWS = 4, 3
 FRAMES = COLS * ROWS
-CENTRED = {"flames", "poison", "stun", "poof", "dust", "plus_coin", "plus_gold", "plus_silver", "plus_prism", "gem_glossary"}
+CENTRED = {"flames", "poison", "stun", "poof", "dust", "plus_coin", "plus_gold", "plus_silver", "plus_prism", "gem_glossary", "clock_shards", "time_sand", "legion_wisps", "petal_storm"}
 
 # name: (what it is, fps, loops, additive, px (the longest side of a frame))
 EFFECTS = {
@@ -104,18 +104,84 @@ EFFECTS = {
                    False, True, 224),
     "explosion": ("a big explosion: a white-yellow flash, an orange fireball swelling with a dark red edge and black-grey smoke, a ring shockwave and flying debris sparks; "
                   "it swells, peaks, and rolls into smoke", 22, False, True, 256),
+
+    # The ultimates' (see RunUltimateFx): drawn as real fire, ink, sand and petals, not as shapes. The auras loop; the others play once.
+    "rampage_body": ("realistic roiling flames that loop, wrapping a hollow column the height of a standing person (narrow and tall): thick tongues of orange and yellow flame with white-hot "
+                     "cores and deep red edges lick up both sides and curl over the top, the middle of the column left empty and dark so a figure can stand in it, with sparks and glowing "
+                     "embers rising off the flames; drawn so that the last frame leads smoothly into the first", 20, True, True, 320),
+    "rampage_crown": ("a crown of dark flames that loops, over the top of a head: a ring of tall wavering tongues of black-red fire with glowing orange edges and a few rising embers, thick "
+                      "smoky black at their tips, seen from the front and low (a flame diadem); drawn so that the last frame leads smoothly into the first", 20, True, False, 192),
+    "rampage_burst": ("an eruption of fire: a ring of realistic flame bursting outward from the middle in one great circle, a white-yellow flash at the start, towering tongues of orange and red flame "
+                      "shooting up and out, a shockwave ring, thick embers and sparks flying in all directions; it erupts, roars, and rolls apart into embers", 24, False, True, 320),
+    "clock_shards": ("a clock shattered in mid-air that loops: a round cracked glass clock face broken into curved, sharp shards of pale blue-white glass that float slowly apart and turn round "
+                     "a hollow middle, with fine cracks of light between them, a few thin gold clock hands and tiny cyan glints; drawn so that the last frame leads smoothly into the first", 14, True, True, 256),
+    "time_sand": ("a spiral of sand that loops: fine golden-white grains of sand and tiny glowing time particles drifting in a slow rising spiral round an empty middle, with a few "
+                  "soft streaks of pale gold light; drawn so that the last frame leads smoothly into the first", 14, True, True, 256),
+    "ink_wave": ("a wave of ink that loops, rushing to the right: a glossy liquid wave of deep blue-black ink with a curling crest, bright cyan and white highlights along its wet rim, thin "
+                 "tendrils of ink peeling off the crest and many round droplets and splashes flying ahead of it; drawn so that the last frame leads smoothly into the first", 22, True, False, 320),
+    "titan_stride": ("a heavy footstep landing: two flat expanding rings of brown dust bursting out along the ground to both sides, a cloud of grey-brown dust rolling up, cracks spreading "
+                     "in the ground and small stones flying; it slams down, spreads, and thins out. Only the dust and stones themselves are drawn: no grey haze, no fog, no veil, no vignette, no "
+                     "dark rectangle round the cloud, and the empty space round it fully transparent in every frame", 20, False, False, 320),
+    "legion_wisps": ("ghostly afterimages that loop: translucent violet and white flowing ribbons of spirit light in the shape of trailing, blurred human silhouettes, drifting up and to the "
+                     "left like smoke, with soft glowing edges and tiny sparkles; drawn so that the last frame leads smoothly into the first", 16, True, True, 256),
+    "petal_storm": ("a storm of rose petals that loops: dozens of pink, red and white rose petals swirling in a tall loose spiral round an empty middle, each petal soft and "
+                    "velvety, a few golden sparkles among them; drawn so that the last frame leads smoothly into the first", 18, True, False, 256),
+    "rose_burst": ("a rose blooming: a closed rose bud in the middle opens at once into a full pink and red rose, soft petals bursting outward in a ring with sparkles and a rising "
+                   "pale pink glow; it opens, flares, and the petals drift away", 22, False, False, 256),
 }
+
+# (The ultimates' are drawn as real fire, ink and petals, not as anime shapes.)
+COMMON_REAL = (" Fully transparent background (a PNG with an alpha channel) in every cell: no backdrop colour, no black or grey box, no ground, no border lines between the cells, no text, no labels, "
+               "no numbers, no characters, no people. Realistic, high-end particle visual effects as in a modern game engine: volumetric, soft, detailed and physically believable, with natural "
+               "colour gradients, motion blur and fine particles, not a cartoon and not a flat vector shape. Each frame is centred in its own cell and well inside it, never touching the "
+               "cell's edge or crossing into another cell.")
+# (Drawn with a flat grey veil over the cell that the model could not leave out: cleaned as a glow is, though it is drawn the normal way.)
+VEILED = {"titan_stride", "petal_storm", "rose_burst", "legion_wisps"}
+REAL = {"rampage_body", "rampage_crown", "rampage_burst", "clock_shards", "time_sand", "ink_wave", "titan_stride", "legion_wisps", "petal_storm", "rose_burst"}
 
 COMMON = (" Fully transparent background (a PNG with an alpha channel) in every cell: no backdrop colour, no black or grey box, no ground, no border lines between the cells, no text, no labels, no numbers, no characters, no "
           "people. Polished anime action-game visual effects as in a high-end mobile gacha game: a hot white core, saturated colour at the edges, sharp clean shapes, glow, "
           "sparks and smear lines. Each frame is centred in its own cell and well inside it, never touching the cell's edge or crossing into another cell.")
 
 
+# The ultimates' effects as they are used now: paler, as the anime's own spell effects (cel-shaded, soft gradients, pastel), to sit with the game's painterly pastel art.
+# (The realistic ones above, COMMON_REAL and REAL, are kept in the tool and not used: put a name in REAL_STYLE to draw it that way again.)
+REAL_STYLE = set()
+COMMON_PALE = (" Fully transparent background (a PNG with an alpha channel) in every cell: no backdrop colour, no black or grey box, no ground, no haze, no fog, no border lines between the cells, no text, "
+               "no labels, no numbers, no characters, no people. Pale, pastel anime spell effects as in a TV anime: cel-shaded with soft gradients, clean flowing shapes, thin light outlines, "
+               "gentle glow, low saturation and low contrast, light airy colours (never dark, never heavy, never photographic or photoreal), still dynamic and spectacular. Each frame is "
+               "centred in its own cell and well inside it, never touching the cell's edge or crossing into another cell.")
+PALE_WHAT = {
+    "rampage_body": "pale anime flames that loop, wrapping a hollow column the height of a standing person (narrow and tall): cel-shaded flame tongues in pale rose-pink, cream and white-gold with "
+                    "thin light outlines and soft glows, curling up both sides and over the top, the middle of the column left empty and clear so a figure can stand in it, a few small light "
+                    "sparks rising; drawn so that the last frame leads smoothly into the first",
+    "rampage_crown": "a crown of pale anime flames that loops, in a flat ring over the top of a head: a ring of tall wavering cel-shaded tongues in pale rose, pink and white-gold with soft glows "
+                     "and a few small sparks, light and airy, no black and no dark smoke; drawn so that the last frame leads smoothly into the first",
+    "rampage_burst": "an eruption of pale anime fire: a ring of cel-shaded flame bursting outward from the middle in one great circle, a white-gold flash at the start, graceful pale rose, pink and "
+                     "cream flame tongues shooting up and out, a thin shockwave ring and light sparks; it erupts, flares, and fades into floating sparks",
+    "clock_shards": "a clock shattered in mid-air that loops: a round pale clock face broken into curved, sharp shards of soft lavender and white glass that float slowly apart and turn round a "
+                    "hollow middle, with thin light cracks between them, thin pale-gold clock hands and tiny glints, cel-shaded with soft gradients; drawn so that the last frame leads smoothly into the first",
+    "time_sand": "a spiral of pale sand that loops: fine cream and pale-gold grains and tiny glowing sparkles drifting in a slow rising spiral round an empty middle, with a few soft light "
+                 "streaks, anime style; drawn so that the last frame leads smoothly into the first",
+    "ink_wave": "a wave of translucent pale-blue ink that loops, rushing to the right: a cel-shaded anime wave in light sky blue and pale periwinkle with a curling crest, white highlights and "
+                "foam-like swirls along its rim, thin pale tendrils and round droplets flying ahead of it; light and see-through, not dark; drawn so that the last frame leads smoothly into the first",
+    "titan_stride": "a heavy footstep landing, in anime style: two flat expanding rings of cream and pale-beige dust bursting out along the ground to both sides, a soft cel-shaded puff of cream "
+                    "dust rolling up, thin pale cracks in the ground and a few small light stones flying; it slams down, spreads, and thins out. Only the dust and stones are drawn: no grey haze, no veil",
+    "legion_wisps": "ghostly afterimages that loop, in anime style: translucent pale lilac and white flowing ribbons of spirit light in the shape of trailing, blurred human silhouettes, drifting up and "
+                    "to the left like soft smoke, cel-shaded with gentle glowing edges and tiny sparkles; drawn so that the last frame leads smoothly into the first",
+    "petal_storm": "a storm of pastel petals that loops: dozens of pale pink, cream and white rose petals swirling in a tall loose spiral round an empty middle, cel-shaded with thin light outlines, "
+                   "and a few small golden sparkles; drawn so that the last frame leads smoothly into the first",
+    "rose_burst": "a pastel rose blooming, in anime style: a closed pale pink rose bud in the middle opens at once into a full soft pink and cream rose with thin light outlines, petals bursting "
+                  "outward in a ring with sparkles and a rising pale glow; it opens, flares, and the petals drift away",
+}
+
+
 def prompt(name):
-    what = EFFECTS[name][0]
+    what = PALE_WHAT[name] if name in PALE_WHAT and name not in REAL_STYLE else EFFECTS[name][0]
+    common = COMMON_PALE if name in PALE_WHAT and name not in REAL_STYLE else COMMON_REAL if name in REAL else COMMON
     return (f"A sprite sheet of a game visual effect: {FRAMES} animation frames of {what}. The frames are laid out in a grid of {COLS} columns and {ROWS} rows (left to right, "
             f"top to bottom), one frame in each cell, in order from the first instant to the last, so that played quickly they make one smooth animation, each frame a little "
-            f"further along than the one before. All {FRAMES} cells are filled.{COMMON}")
+            f"further along than the one before. All {FRAMES} cells are filled.{common}")
 
 
 def make_jobs(names, redo):
@@ -218,7 +284,7 @@ def pack(names):
         frames = []
         for k in range(FRAMES):
             cell = im.crop(((k % COLS) * cw, (k // COLS) * ch, (k % COLS) * cw + cw, (k // COLS) * ch + ch))
-            frames.append(key(np.array(cell)) if opaque else clean(np.array(cell), EFFECTS[name][3], name in SOLID))
+            frames.append(key(np.array(cell)) if opaque else clean(np.array(cell), EFFECTS[name][3] or name in VEILED, name in SOLID))
         # (a cell's own edge is black, and any line the model drew along it is not part of the effect)
         for f in frames:
             f[:3, :, 3] = 0

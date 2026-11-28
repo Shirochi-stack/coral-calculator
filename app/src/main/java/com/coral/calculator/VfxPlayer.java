@@ -206,9 +206,9 @@ final class VfxPlayer {
         return paint;
     }
 
-    void draw(Canvas canvas) {
+    void draw(Canvas canvas, boolean front) {
         for (Inst one : pool) {
-            if (!one.live) continue;
+            if (!one.live || ((one.flags & Vfx.FRONT) != 0) != front) continue;
             Bitmap sheet = sheets[one.id];
             if (sheet == null) continue;
             int frame = (int) (one.age * one.speed * Vfx.FPS[one.id]);

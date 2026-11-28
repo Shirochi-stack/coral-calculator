@@ -39,7 +39,9 @@ final class VanityLayers {
             {"smash_keys", 4, 1, 500, 288}, {"smash_knife", 4, 1, 500, 248}, {"smash_knuckles", 4, 1, 500, 256}, {"smash_lance", 4, 1, 500, 320},
             {"smash_mace", 4, 1, 500, 276}, {"smash_pen", 4, 1, 500, 248}, {"smash_scythe", 4, 1, 500, 288}, {"smash_staff", 4, 1, 500, 296},
             {"smash_sword", 4, 1, 500, 248}, {"smash_tablet", 4, 1, 500, 248}, {"smash_unarmed", 4, 1, 500, 248}, {"smash_wand", 4, 1, 500, 260},
-            {"smash_whip", 4, 1, 500, 360}};
+            {"smash_whip", 4, 1, 500, 360},
+            // The ink gun fired on the move, and the greatsword's charge held, walked with and let go.
+            {"gun_walk", 6, 1, 304, 248}, {"great_charge", 10, 1, 500, 248}};
 
     static int[] geometry(String sheet) {
         for (Object[] one : SHEETS) {

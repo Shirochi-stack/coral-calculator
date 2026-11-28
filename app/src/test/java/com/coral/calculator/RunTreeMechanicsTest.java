@@ -22,6 +22,8 @@ public class RunTreeMechanicsTest {
         PlusRun.Perks perks = new PlusRun.Perks();
         perks.hearts = 20;
         PlusRun run = new PlusRun(level, perks);
+        // (Nothing goes after her: what is tried here is her blows, on creatures that stand where they were put.)
+        run.calm = true;
         if (weapon != PlusRun.UNARMED) run.arm(weapon);
         run.place(10.6f, FLOOR - PlusRun.TALL);
         return run;
