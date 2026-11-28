@@ -31,6 +31,8 @@ import clips_data as data  # noqa: E402
 import clips_fit as cf  # noqa: E402
 import clips_v3_lines as nl  # noqa: E402
 import clips_v4 as v4m  # noqa: E402
+import clips_sfx as sfx  # noqa: E402
+FX5 = bool(os.environ.get("FX5"))
 import make_clips as mk  # noqa: E402
 
 RATE = 48000
@@ -411,8 +413,8 @@ def _build(clip, lang, table, segs, encode_it):
     music *= 10 ** (-33 / 20) / float(numpy.sqrt((music ** 2).mean()))
     music *= numpy.minimum(1, numpy.arange(total) / (.4 * RATE)) * duck
     # effects on the action
-    lib = library()
-    plan = effects_of(number, secs, fps, times, motion, flash)
+    lib = sfx.library() if FX5 else library()
+    plan = [(t, n_, g) for t, n_, g in sfx.CUES[number]] if FX5 else effects_of(number, secs, fps, times, motion, flash)
     fx = numpy.zeros(total, dtype="float32")
     for t, name, gdb in plan:
         s = int(mp(t) * RATE)
@@ -421,9 +423,9 @@ def _build(clip, lang, table, segs, encode_it):
     mix = voice + bed + tone + music + fx
     # a clip must open with sound: a quiet first half second (more than 12 dB under the whole) gets a whoosh at once
     if numpy.sqrt((mix[: RATE // 2] ** 2).mean()) < 10 ** (-12 / 20) * numpy.sqrt((mix ** 2).mean()):
-        x = lib["whoosh"] * 10 ** (-3 / 20)
+        x = lib["whoosh_light" if FX5 else "whoosh"] * 10 ** (-3 / 20)
         mix[int(.05 * RATE):int(.05 * RATE) + len(x)] += x[: len(mix) - int(.05 * RATE)]
-        plan = [(.05, "whoosh", -3)] + list(plan)
+        plan = [(.05, "whoosh_light" if FX5 else "whoosh", -3)] + list(plan)
     # in and out: short fades; loudness: -18 LUFS; true peak under -1 dB
     f = int(.03 * RATE)
     mix[:f] *= numpy.linspace(0, 1, f)
@@ -449,7 +451,7 @@ def _build(clip, lang, table, segs, encode_it):
     peak = 20 * numpy.log10(numpy.abs(up).max() + 1e-9)
     # captions in the language, then the picture, once
     rows = [(s, e, v4[i]["text"][lang].replace("\u2661", "").replace("~", "")) for s, e, i, _ in laid] if v4 else [(s, e, (nl.NEW.get((number, i), {}).get(lang) or clip["lines"][i][2 + LANGS.index(lang)]).replace("\u2661", "")) for s, e, i, _ in laid]
-    target = CLIPS / "review" / f"{clip['id']}-{lang}-{'v4' if v4 else 'v3'}.mp4"
+    target = CLIPS / "review" / f"{clip['id']}-{lang}-{'v5' if FX5 else ('v4' if v4 else 'v3')}.mp4"
     if encode_it and not os.environ.get("DRY"):
         encode(master, a, b, mix, rows, lang, target, mk.HOLDS.get(number, ()), segs)
     if need or not encode_it:

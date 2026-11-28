@@ -188,6 +188,7 @@ final class RunArms {
      * for the rose) and by how late a chapter it was found in.
      */
     static int itemBlows(int code) {
+        if (RunWeapons.named(code)) return RunWeapons.blows(code);
         int rarity = RunLoot.rarity(code);
         // (Paper is weaker than the real thing: a blow less, never more than the plain thing it is used as.)
         if (RunLoot.paper(code)) return -1;
@@ -197,15 +198,15 @@ final class RunArms {
     }
 
     /** How much further it reaches, and how much sooner it can be used again, as parts of what the thing reaches and rests. */
-    static float itemReach(int code) { return RunLoot.paper(code) ? .9f : RunLoot.ultimate(code) ? 1.6f : 1 + .06f * RunLoot.rarity(code); }
+    static float itemReach(int code) { return RunWeapons.named(code) ? RunWeapons.reach(code) : RunLoot.paper(code) ? .9f : RunLoot.ultimate(code) ? 1.6f : 1 + .06f * RunLoot.rarity(code); }
 
-    static float itemRest(int code) { return RunLoot.paper(code) ? 1.1f : 1 - .05f * RunLoot.rarity(code); }
+    static float itemRest(int code) { return RunWeapons.named(code) ? RunWeapons.rest(code) : RunLoot.paper(code) ? 1.1f : 1 - .05f * RunLoot.rarity(code); }
 
     /** A wand's element, from the chapter it was found in: fire, ice, lightning or ink. */
     static final int FIRE = 0, ICE = 1, LIGHTNING = 2, INKY = 3;
     static final String[] ELEMENTS = {"fire", "ice", "lightning", "ink"};
 
-    static int element(int code) { return RunLoot.theme(code) % 4; }
+    static int element(int code) { return RunWeapons.named(code) ? RunWeapons.element(code) : RunLoot.theme(code) % 4; }
 
     /** Whether an ink gun found is a machine gun: one in three of them, and every one red or better. */
     static boolean machine(int code) { return RunLoot.theme(code) % 3 == 2 || RunLoot.rarity(code) >= RunLoot.RED; }

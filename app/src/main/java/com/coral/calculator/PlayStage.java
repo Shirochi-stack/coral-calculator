@@ -1277,6 +1277,11 @@ final class PlayStage extends View {
         }
         stepClock += seconds;
         clock += seconds;
+        // Touched while she owns up: what she was doing is dropped, and she runs home from where she is.
+        if (homeNow) {
+            goHome(seconds);
+            return;
+        }
         switch (game) {
             case SNATCH: snatch(seconds); break;
             case CRACK: crack(seconds); break;
@@ -1771,7 +1776,7 @@ final class PlayStage extends View {
 
     /** She runs back to where she stood, and the stage comes down. */
     private void goHome(float seconds) {
-        if (runTo(homeX, homeY, dp(560), seconds)) {
+        if (runTo(homeX, homeY, dp(340), seconds)) {
             keep(PetArt.IDLE);
             leave();
         }
@@ -1972,8 +1977,13 @@ final class PlayStage extends View {
     private void prankTouch() {
         buzz();
         boolean owningUp = game == SNATCH ? step >= 5 : step >= 2;
-        if (owningUp) leave(); else reveal();
+        // Once she owns up, a touch sends her home: at a run, to where she stood. (It used to take the stage down at once, and she was simply
+        // back there, without the run.)
+        if (owningUp) homeNow = true; else reveal();
     }
+
+    /** Whether a touch has sent her home before the prank's own ending got there. */
+    private boolean homeNow;
 
     // Touches and keys
 

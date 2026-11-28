@@ -58,8 +58,20 @@ if (RES / "run_grip_knuckles.webp").exists():
     EXTRA.append("grip18")
 
 
+# And the ground smashes and the aerial strikes of every weapon: sheets of four, in the runart pack (not in res), a row each.
+LATEST = []
+RUNART = ROOT / "runart/src/main/assets/runart"
+for _path in sorted(RUNART.glob("halgakos_aerial_*.webp")) + sorted(RUNART.glob("halgakos_smash_*.webp")):
+    _size = Image.open(_path).size
+    _key = _path.stem[len("halgakos_"):]
+    SHEETS[_key] = (4, 1, _size[0] // 4, _size[1])
+    LATEST.append(_key)
+
+
 def sheet_file(name):
     """Where a sheet of her is: her own sheets by their name, the weapon-free grips under their weapon's."""
+    if name in LATEST:
+        return RUNART / ("halgakos_%s.webp" % name)
     if name.startswith("grip"):
         if name == "grip18":
             return RES / "run_grip_knuckles.webp"
@@ -139,6 +151,8 @@ def main():
     args = ap.parse_args()
     lines, total, hit = [], 0, 0
     for name, (cols, rows, cw, ch) in SHEETS.items():
+        if name in LATEST:
+            continue
         im = Image.open(sheet_file(name)).convert("RGBA")
         atlas = np.zeros((rows * ch, cols * cw), np.float32)
         tiles = []

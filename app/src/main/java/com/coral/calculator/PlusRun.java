@@ -142,9 +142,13 @@ final class PlusRun {
 
     /** What she has looked at a keepsake for: a chest put down by it, so much in it, the first time. */
     void keepsakeChest(int column, int row, int much) { items.add(new int[]{CHEST, column, row, 0, much}); }
+    /** (Economy) And Aelwyn, the elf merchant, at her wagon's counter in a village: she buys and sells curios. */
+    static final int ELF = 900;
+    /** (Economy) A signpost with a line of a village's lore, to be read: from here up, by the chapter. */
+    static final int SIGN = 1000;
 
     /** And on some floors of the dungeons, the Vampire Merchant's stall (see {@link RunLilith}); and a gift for her, lying on a floor (its fifth number which). */
-    static final int LILITH = 900, GIFT = 50;
+    static final int LILITH = 850, GIFT = 50;
     private int merchantBlows, gifts, lastGift = -1;
     private float merchantCool, lilithMend;
     private boolean lilithAsks, lilithFinishing, lilithMocks;
@@ -942,6 +946,7 @@ final class PlusRun {
                 if (Math.hypot(plus[0] + .5f - it.x, plus[1] + .5f - it.y + .4f) > 1.8f) continue;
                 pluses.remove(index);
                 collected++;
+                if (gem > 0) bonus += GEM_FACTOR - 1;
                 // (Under the gilded elixir every plus is worth two.)
                 if (potionOn[RunPotions.RICHES] > 0) bonus++;
                 plusX = plus[0] + .5f;
@@ -1439,6 +1444,26 @@ final class PlusRun {
      * A dash: in the air, once until she lands, a burst the way she faces with no falling; on the ground, a dodge roll, a moment in
      * which nothing hurts her. Whether she did.
      */
+    /** Whether she has either move at all, the roll or the dash in the air: whether a button for them is worth showing. */
+    boolean hasDash() { return perks.roll || perks.airDash; }
+
+    /** Whether a dash now would go: a roll on the ground, or the one dash of a jump in the air. */
+    boolean canDash() {
+        return state == PLAYING && (onGround ? perks.roll && rollLeft <= 0 : perks.airDash && !dashUsed && !climbing);
+    }
+
+    /** Whether a ground pound could begin now: in the air, with the move, not on a ladder or in water, and not already pounding. */
+    boolean canPound() {
+        return state == PLAYING && perks.pound && !onGround && !climbing && !inWater && poundPhase == 0;
+    }
+
+    /** The pound's own button: as if down were held in the air, for the next step. */
+    void pound() {
+        if (canPound()) poundWanted = true;
+    }
+
+    private boolean poundWanted;
+
     boolean dash() {
         if (state != PLAYING) return false;
         float way = facingLeft ? -1 : 1;
@@ -3012,7 +3037,7 @@ final class PlusRun {
     /** How much of an effect what she wears gives her, with what is in her hands. */
     int gear(int effect) {
         if (effect == RunLoot.DODGE && skillOf(RunSkills.E_IRON) > 0) return 0;
-        int sum = perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect) + (effect == RunLoot.THORNS ? perks.thorns : 0);
+        int sum = perks.worn.of(effect, RunLoot.classOf(weapon)) + skill(effect) + (effect == RunLoot.THORNS ? perks.thorns : 0) + RunArtifacts.effect(effect) + RunWeapons.effect(RunInventory.itemFor(perks, weapon), effect) + (effect == RunLoot.HASTE ? passive.haste(RunInventory.itemFor(perks, weapon)) : 0);
         return GEAR_MOST[effect] > 0 ? Math.min(GEAR_MOST[effect], sum) : sum;
     }
 
@@ -3031,7 +3056,7 @@ final class PlusRun {
     }
 
     /** Her chance to slip a hurt, before iron reflexes make it defence. */
-    private int dodgeRaw() { return Math.min(GEAR_MOST[RunLoot.DODGE], perks.worn.of(RunLoot.DODGE, RunLoot.classOf(weapon)) + skill(RunLoot.DODGE)); }
+    private int dodgeRaw() { return Math.min(GEAR_MOST[RunLoot.DODGE], perks.worn.of(RunLoot.DODGE, RunLoot.classOf(weapon)) + skill(RunLoot.DODGE) + RunArtifacts.effect(RunLoot.DODGE)); }
 
     /** How much of one of the tree's effects she has now: what is felt whatever she holds, what is felt with what is in her hands, and the actives called on. */
     int skillOf(int effect) { return perks.skills.with(effect, RunSkills.classOfWeapon(weapon)) + activeEffect(effect); }
@@ -3928,6 +3953,9 @@ final class PlusRun {
         float x, y, across, down, age;
         final int code;
         boolean resting;
+        /** For a plus (code 0): how many pluses it is worth (1, 5, 25 or 100: bronze, silver, gold, prismatic); or a glossary gem, which multiplies what pluses gain for a time. */
+        int worth = 1;
+        boolean gem;
 
         Drop(float x, float y, float across, float down, int code) {
             this.x = x;
@@ -3941,15 +3969,45 @@ final class PlusRun {
             this(other.x, other.y, other.across, other.down, other.code);
             age = other.age;
             resting = other.resting;
+            worth = other.worth;
+            gem = other.gem;
         }
 
         /** How long a plus lies about before it is gone, and a thing to keep; and for how much of the end of that it blinks. */
-        float life() { return code == 0 ? 11 : 40; }
+        float life() { return code != 0 ? 40 : gem ? 24 : worth >= 25 ? 18 : 11; }
 
-        float blink() { return code == 0 ? 3 : 6; }
+        float blink() { return code != 0 ? 6 : gem || worth >= 25 ? 4 : 3; }
     }
 
     private final List<Drop> scattered = new ArrayList<>();
+
+    /**
+     * Glossary gems: a gem makes what pluses gain count for {@link #GEM_FACTOR} times as much for {@link #GEM_SECONDS} more seconds (the time stacks, up to
+     * {@link #GEM_MOST}; the factor does not). The pluses the lands lay out count by the extra going to what she has to spend, not to how many she picked up (which
+     * the stars are for); a bigger coin counts for its worth.
+     */
+    static final int GEM_FACTOR = 2;
+    static final float GEM_SECONDS = 15, GEM_MOST = 90;
+    private float gem, gemSeen;
+    private int gems, lastWorth = 1;
+
+    /** How much longer gems make pluses count for more; how many gems she has picked up; the factor now; and the worth of the last coin she took. */
+    float gem() { return gem; }
+    int gems() { return gems; }
+    int multiplier() { return gem > 0 ? GEM_FACTOR : 1; }
+    int lastWorth() { return lastWorth; }
+
+    /** The pluses a coin gives: its worth, more while a gem is on. */
+    static int pays(int worth, boolean gemOn) { return worth * (gemOn ? GEM_FACTOR : 1); }
+
+    /** What a creature's pluses are made of, as coins: as many of the big ones as will go, and the rest bronze, so that the same worth falls in fewer, bigger coins. */
+    static int coinWorth(int left) { return left >= 60 ? 25 : left >= 12 ? 5 : 1; }
+
+    /** How much dearer than her own, in tenths, what falls is made: a little more of it, for more pluses all round. */
+    static final int MORE_TENTHS = 1;
+    /** How likely a gem is from a creature (in a thousand), by how hard the land is; bosses always give one. */
+    static int gemChance(int landLevel) { return 10 + landLevel / 4; }
+
     /** How much room a drop takes: half its width, and its height (its place is the middle of its bottom). */
     static final float DROP_HALF = .3f, DROP_TALL = .6f;
     /** The furthest a drop moves before it is looked at again: well under its height, so nothing is ever passed through. */
@@ -3995,6 +4053,12 @@ final class PlusRun {
         }
     }
 
+    /** (Economy: a chest holds a curio about one time in eight, more in a stash or a hideout. Kept out of the step's own method, which must stay small enough for the JIT to compile.) */
+    private void chestCurio() {
+        boolean secret = room >= 0 && (level.rooms.get(room)[0] == RunLevels.STASH || level.rooms.get(room)[0] == RunLevels.HIDEOUT);
+        if (lootRoll(100) < (secret ? 35 : 12) + RunArtifacts.lucky()) found.add(RunArtifacts.found(secret ? RunArtifacts.GREAT : RunArtifacts.CHEST, lootRoll(100), lootRoll(1000)));
+    }
+
     /** Something has fallen: it is let loose where it is, out of anything solid. */
     private void loose(Drop drop) {
         unstick(drop);
@@ -4015,7 +4079,14 @@ final class PlusRun {
         for (int rarity = RunLoot.WHITE; rarity <= RunLoot.ROSE; rarity++) {
             loose(new Drop(atX + 1.4f * rarity + 1, atY, 0, -5, RunLoot.code(rarity % 3, Math.min(11, level.chapter), rarity * 3, rarity)));
         }
-        for (int coin = 0; coin < 8; coin++) loose(new Drop(atX + 3 + coin * .3f, atY - 1, (coin - 4) * .8f, -7, 0));
+        for (int coin = 0; coin < 8; coin++) {
+            Drop drop = new Drop(atX + 3 + coin * .3f, atY - 1, (coin - 4) * .8f, -7, 0);
+            drop.worth = coin < 3 ? 1 : coin < 5 ? 5 : coin < 7 ? 25 : 100;
+            loose(drop);
+        }
+        Drop glossary = new Drop(atX + 3.4f, atY - 1, 0, -8, 0);
+        glossary.gem = true;
+        loose(glossary);
     }
 
     /** What she keeps that has to do with this land: her level among it, which grows while she plays. */
@@ -4028,6 +4099,13 @@ final class PlusRun {
     int xp() { return xp; }
 
     /** A roll of the land's own chance, from 0 to below a number. */
+    private int gemRoll(int bound) {
+        gemDice = gemDice * 6364136223846793005L + 1442695040888963407L;
+        return (int) ((gemDice >>> 33) % bound);
+    }
+
+    private long gemDice = 0x5DEECE66DL;
+
     private int lootRoll(int bound) {
         lootDice = lootDice * 6364136223846793005L + 1442695040888963407L;
         return (int) ((lootDice >>> 33) % bound);
@@ -4055,9 +4133,27 @@ final class PlusRun {
         if (more > 0) coins += (coins * more + lootRoll(100)) / 100;
         // (Under black, half of them, rounded up.)
         if (inked()) coins = (coins + 1) / 2;
+        // (The throws are those of each coin she has always had, rolled in the same order, so that what falls is where it fell before; a tenth more, rounded down,
+        // for pluses all round, and in coins as big as will go, take their throws from those.)
+        float[] ways = new float[coins], ups = new float[coins];
         for (int coin = 0; coin < coins; coin++) {
-            float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
-            loose(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
+            ways[coin] = (lootRoll(1000) / 1000f - .5f) * 1.4f;
+            ups[coin] = -6 - lootRoll(1000) / 250f;
+        }
+        int piece = 0;
+        for (int left = coins + coins * MORE_TENTHS / 10; left > 0; piece++) {
+            int worth = coinWorth(left);
+            left -= worth;
+            int throwOf = Math.min(piece, coins - 1);
+            Drop drop = new Drop(middle, top, ways[throwOf] * (boss ? 7 : 4) * (piece >= coins ? .6f : 1), ups[throwOf] * (piece >= coins ? .9f : 1), 0);
+            drop.worth = worth;
+            loose(drop);
+        }
+        // A glossary gem: from every boss, and now and then from one of the rest (not from a swarm). (Its own dice: what the land's chance made before is made still.)
+        if (!foe.swarm && (boss || gemRoll(1000) < gemChance(landLevel) * (hard ? 2 : 1))) {
+            Drop glossary = new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, 0);
+            glossary.gem = true;
+            loose(glossary);
         }
         if (RunUniques.great(foe.kind)) {
             if (RunUniques.hidden(foe.kind)) {
@@ -4066,6 +4162,10 @@ final class PlusRun {
             } else {
                 keepersBeaten++;
             }
+            // (A coin of a gold's worth from each of the great, and a prismatic one from the hidden.)
+            Drop great = new Drop(middle, top, 1.2f, -9, 0);
+            great.worth = RunUniques.hidden(foe.kind) ? 100 : 25;
+            loose(great);
             int theme = Math.min(RunLoot.THEMES.length - 1, RunUniques.chapter(foe.kind) + 1);
             for (int type = 0; type < 3; type++) {
                 int roll = lootRoll(100), rarity = roll < 10 ? RunLoot.ROSE : roll < 40 ? RunLoot.RED : RunLoot.GOLD;
@@ -4073,6 +4173,8 @@ final class PlusRun {
                 int code = RunLoot.dropped(RunLoot.WAITS, theme, rarity, typeRoll, lootRoll(10000));
                 loose(new Drop(middle, top, (type - 1) * 2.2f, -9, code));
             }
+            // (Economy: and a curio of the better sort, always, from one who waits.)
+            loose(new Drop(middle, top, 3.4f, -9, RunArtifacts.found(RunArtifacts.GREAT, lootRoll(100), lootRoll(1000))));
             return;
         }
         // (Gold and black ink drop as the hardest do.)
@@ -4082,10 +4184,15 @@ final class PlusRun {
             int code = RunLoot.dropped(boss ? RunLoot.WAITS : hard ? RunLoot.HARDEST : RunLoot.ORDINARY, Math.min(RunLoot.THEMES.length - 1, level.chapter), rarity, lootRoll(10000), lootRoll(10000));
             loose(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, code));
         }
+        // (Economy: now and then a curio, rarely from an ordinary creature, often from a boss; a lucky one carried makes it likelier.)
+        if (lootRoll(10000) < RunArtifacts.creatureChance(boss, landLevel) * (100 + RunArtifacts.lucky()) / 100) {
+            loose(new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, RunArtifacts.found(boss ? RunArtifacts.GREAT : RunArtifacts.CREATURE, lootRoll(100), lootRoll(1000))));
+        }
     }
 
     /** What lies about falls, bounces and comes to rest; pluses near her come to her; things to keep are picked up; what has lain long enough is gone. */
     private void scatter(float seconds) {
+        passive.tick(seconds);
         float drawn = gear(RunLoot.MAGNET) / 10f, reach = Math.max(1.4f + drawn, Math.max(perks.reach + drawn, magnet > 0 ? MAGNET_REACH : 0)), herX = x + WIDE / 2, herY = y + TALL / 2;
         for (int index = scattered.size() - 1; index >= 0; index--) {
             Drop drop = scattered.get(index);
@@ -4103,8 +4210,14 @@ final class PlusRun {
                 drop.resting = false;
                 if (far < .55f) {
                     scattered.remove(index);
-                    dropPluses++;
-                    bonus++;
+                    if (drop.gem) {
+                        gem = Math.min(GEM_MOST, gem + GEM_SECONDS);
+                        gems++;
+                    } else {
+                        dropPluses += drop.worth;
+                        bonus += pays(drop.worth, gem > 0);
+                        lastWorth = drop.worth;
+                    }
                 }
                 continue;
             }
@@ -4343,6 +4456,7 @@ final class PlusRun {
         firmX = x;
         firmY = y;
         lootDice = level.number * 977L + 12345;
+        gemDice = level.number * 7919L + 31337;
         findSecrets();
         for (int[] tree : level.trees) trees.add(new int[]{tree[0], tree[1], tree[2], RunCraft.treeHolds(tree[2])});
     }
@@ -4367,6 +4481,8 @@ final class PlusRun {
         shield = other.shield;
         combo = other.combo;
         bonus = other.bonus;
+        gem = other.gem;
+        gems = other.gems;
         airJumps = other.airJumps;
         flaps = other.flaps;
         taken = other.taken;
@@ -6046,6 +6162,7 @@ final class PlusRun {
         }
     }
 
+    // (Careful: this method is within 70 bytes of the JVM's limit of 8000 bytes of bytecode, past which the JIT never compiles it and a land's whole simulation runs five times slower, which turned a ten-minute test run into an hour. Put new rules in methods of their own and call them.)
     private void once(float seconds, boolean left, boolean right, boolean jump, boolean strike) {
         // Stunned, she can do nothing for a moment.
         if (herStun > 0) left = right = jump = strike = false;
@@ -6124,6 +6241,7 @@ final class PlusRun {
         sinceJump = pressed ? 0 : sinceJump + seconds;
         if (rush > 0) rush -= seconds;
         if (magnet > 0) magnet -= seconds;
+        if (gem > 0) gem = Math.max(0, gem - seconds);
         if (notes > 0) notes -= seconds;
         if (onGround) {
             combo = 0;
@@ -6206,12 +6324,13 @@ final class PlusRun {
         if (airDashLeft > 0) speedDown = 0;
         // The ground pound: held down in the air, with the move, she gathers herself for a moment, still in the air, and slams down with what
         // she holds; out of an air dash too, which it cuts short. (Without it, holding down only brings her down faster.)
-        if (perks.pound && down && !onGround && !climbing && !inWater && poundPhase == 0) {
+        if (perks.pound && (down || poundWanted) && !onGround && !climbing && !inWater && poundPhase == 0) {
             poundPhase = 1;
             poundWind = POUND_WIND;
             airDashLeft = 0;
             aerialLeft = 0;
         }
+        poundWanted = false;
         if (poundPhase != 0 && (onGround || climbing || inWater)) poundPhase = 0;
         if (poundPhase == 1) {
             speedDown = 0;
@@ -6327,6 +6446,7 @@ final class PlusRun {
             if (drawn || x < plus[0] + .8f && x + WIDE > plus[0] + .2f && y < plus[1] + .8f && y + TALL > plus[1] + .2f) {
                 pluses.remove(index);
                 collected++;
+                if (gem > 0) bonus += GEM_FACTOR - 1;
                 // (Under the gilded elixir every plus is worth two.)
                 if (potionOn[RunPotions.RICHES] > 0) bonus++;
                 plusX = plus[0] + .5f;
@@ -6469,6 +6589,7 @@ final class PlusRun {
                     chests++;
                     lastChest = item.length > 4 && item[4] > 0 ? item[4] : 10;
                     bonus += lastChest;
+                    chestCurio();
                     if (room >= 0 && level.rooms.get(room)[0] == RunLevels.STASH && (roomsDone & 1 << room) == 0) {
                         roomsDone |= 1 << room;
                         roomWins++;
@@ -7127,6 +7248,32 @@ final class PlusRun {
         with = by;
         beat(foe);
         with = PLAIN;
+        // (Economy: a burst where it landed, or a jump to the next creature, for half the force.)
+        if (!passiveBusy && (passive.burst || passive.arc)) {
+            boolean burst = passive.burst, arc = passive.arc;
+            passive.burst = passive.arc = false;
+            passiveBusy = true;
+            if (burst) blast(foeX, foeY, 1.7f, by);
+            if (arc) {
+                Foe next = null;
+                float best = 4.5f * 4.5f;
+                for (Foe other : foes) {
+                    if (other == foe || other.flat || absent(other) || other.kind == RunLevels.TARGET) continue;
+                    float across = other.x + other.wide() / 2 - foeX, down = other.y + other.tall() / 2 - foeY, far = across * across + down * down;
+                    if (far < best) {
+                        best = far;
+                        next = other;
+                    }
+                }
+                if (next != null) {
+                    float kept = blowScale;
+                    blowScale = .5f;
+                    beat(next, by);
+                    blowScale = kept;
+                }
+            }
+            passiveBusy = false;
+        }
         // Ink splashes where it lands (no more than a few at once).
         if (splashes.size() < 12) splashes.add(new float[]{foe.x + foe.wide() / 2, foe.y + foe.tall() * .5f, 0});
         // A mace's smash, and a hammer's blow worked on to the last step, leave what they hit reeling (not those who wait).
@@ -7217,6 +7364,16 @@ final class PlusRun {
 
     private boolean dashCut;
 
+    /** (Economy) What the named weapon in her hands does as she strikes, and what her armour does when she is hurt: see {@link RunWeaponPassives}. */
+    private final RunWeaponPassives.State passive = new RunWeaponPassives.State();
+    private final java.util.Random passiveDice = new java.util.Random(7);
+    private boolean passiveBusy;
+
+    int passiveProcs() { return passive.procs; }
+    int passiveKind() { return passive.lastProc; }
+    float passiveX() { return passive.procX; }
+    float passiveY() { return passive.procY; }
+
     private void fell(Foe foe, int by) {
         int thing = thingOf(by), way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : thing == UNARMED ? -1 : RunHunts.wayOf(thing);
         fells.add(new int[]{foe.kind, way});
@@ -7267,6 +7424,11 @@ final class PlusRun {
         // (Her tree makes some blows harder: on one nearly beaten, on one not yet hurt, after a rest.)
         boolean hers = thingOf(with) != UNARMED;
         if (!waits && hers) dealt = Math.max(1, Math.round(dealt * (1 + bonus(foe) / 100f)));
+        // (Economy: the named weapon's passive: more blows, or a burst or a jump when this one is done.)
+        if (hers && !passiveBusy) {
+            int held = RunInventory.itemFor(perks, weapon);
+            if (held != 0) dealt += passive.hit(held, dealt, foe.most > 0 ? (float) foe.left / foe.most : 1, foeX, foeY, passiveDice, BLOW);
+        }
         // A shield in the way: a blow too weak rings off it; a strong one takes a piece of it (two, with the tree's shieldbreaking at its
         // strongest), and the last one breaks it.
         if (!waits && atShield(foe)) {
@@ -7326,6 +7488,7 @@ final class PlusRun {
             flattened++;
             fell(foe, with);
             if (hers || with == LANDED || with == PLUNGED) killed();
+            if (hers) passive.kill(RunInventory.itemFor(perks, weapon), foeX, foeY);
             if (RunLevels.flier(foe.kind)) fliers++;
             // A paper target is only hit: two pluses for it. And where signs keep coming, each one dealt with counts, and is a plus.
             if (foe.kind == RunLevels.TARGET) {
@@ -8419,6 +8582,11 @@ final class PlusRun {
             if (!fell) return true;
         } else {
             hurts++;
+            if (!fell && passive.hurt(perks.worn.armour, x + WIDE / 2, y + TALL / 2) && !passiveBusy) {
+                passiveBusy = true;
+                blast(x + WIDE / 2, y + TALL / 2, 2.6f, SURE);
+                passiveBusy = false;
+            }
             if (room >= 0 && wave > 0) arenaHurts++;
             // A letter that has been through a hurt is not one to hand over.
             if (quest == ASKED && level.quest == RunLevels.LETTER) fail();

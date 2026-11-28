@@ -23,6 +23,8 @@ import android.widget.Toast;
 import java.util.List;
 
 public final class MainActivity extends Activity implements CalculatorLayout.Listener, CalculatorSession.Listener {
+    /** An extra: the calculator was put under a screen Halgakos opened, to begin the app's one task, and is not to open the games itself. */
+    static final String UNDER = "under";
     /** Shared with the companion's mini calculator, which may change them while this is open. */
     private CalculatorSession session;
     private CalculatorEngine engine;
@@ -46,8 +48,9 @@ public final class MainActivity extends Activity implements CalculatorLayout.Lis
         setContentView(layout);
         // Opened from its icon, the app may start on the games, with the calculator one step back: a setting of hers.
         Intent opened = getIntent();
+        // (Not when it was put under a screen Halgakos opened from over another app: that screen is already on its way.)
         if (state == null && opened != null && Intent.ACTION_MAIN.equals(opened.getAction()) && opened.hasCategory(Intent.CATEGORY_LAUNCHER)
-                && new CompanionPrefs(this).startGames()) {
+                && !opened.getBooleanExtra(UNDER, false) && new CompanionPrefs(this).startGames()) {
             startActivity(new Intent(this, PlayActivity.class));
         }
         configureInsets();

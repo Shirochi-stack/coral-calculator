@@ -29,7 +29,7 @@ def captions(path):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    raw, films = MAIN / "res" / "raw", MAIN / "assets" / "films"
+    raw, films = MAIN.parent.parent.parent / "films" / "src" / "main" / "assets" / "films", MAIN / "assets" / "films"
     for name, picture, base, foot in (("prologue", "run_film_prologue.mp4", "prologue_h", None), ("idol-upright", "run_film_idol_tall.mp4", "idol_h", .78),
                                       ("idol-wide", "run_film_idol_wide.mp4", "idol_h", None)):
         if "--no-idol" in sys.argv and name != "prologue":
