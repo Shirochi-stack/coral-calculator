@@ -298,7 +298,7 @@ def build():
 def lyrics():
     rows = ["THE TRUE GRIMOIRE: Halgakos's fight anthem against the sloppy (150 bpm, 44 bars, 70.4 s, loops from bar 4)", "",
             "[Intro, 4 bars]", INTRO[0][1], "", "[Verse 1]"] + VERSE1 + ["", "[Chorus]"] + CHORUS + ["", "[Verse 2]"] + VERSE2 + ["", "[Chorus]"] + CHORUS2 + ["", "[Final chorus]"] + FINAL
-    rows = [r + "   [mild language]" if re.search(r"\b(damn|hell|crap|screw|fuck)\b", r) and not r.startswith("[") else r for r in rows]
+    rows = [r + ("   [STRONG: the f-word]" if re.search(r"fuck", r, re.I) else "   [language: mild]") if re.search(r"\b(damn|hell|crap|screw|fuck)\b", r, re.I) and not r.startswith("[") else r for r in rows]
     rows.append("")
     rows.append("Language (marked above): damn, hell, crap, screw, and the f-word twice (second chorus and final chorus, aimed at sloppiness). The chorus is sung by the five in unison with her whisper under it; the verses are hers alone.")
     return "\n".join(rows)
