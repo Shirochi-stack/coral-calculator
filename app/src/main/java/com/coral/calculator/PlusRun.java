@@ -3373,6 +3373,19 @@ final class PlusRun {
         return true;
     }
 
+    /** For looking at a place off the land in a build made for testing: she is put straight into the first of a kind, as if through its door. */
+    void visit(int kind) {
+        for (int at = 0; at < level.rooms.size(); at++) {
+            int[] one = level.rooms.get(at);
+            if (one[0] != kind) continue;
+            room = at;
+            roomsFound |= 1 << at;
+            revealed |= 1 << at;
+            put(one[6], one[11]);
+            return;
+        }
+    }
+
     private void put(int column, int floor) {
         x = column + (1 - WIDE) / 2;
         y = floor - TALL;

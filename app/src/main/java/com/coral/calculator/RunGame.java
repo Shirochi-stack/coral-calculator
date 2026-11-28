@@ -486,6 +486,10 @@ final class RunGame {
     private final int[] pillActions = new int[3];
     private int pillCount;
     private final RectF[] lands = new RectF[RunLevels.TOTAL];
+    /** How many lands of a chapter are in each of its rows on the map: all of them in portrait; fewer in landscape, where chapters stand side by side. */
+    private final int[] mapPerRow = new int[3];
+    /** Whether the screen is short and wide (a phone on its side): the map's tabs are put up beside the line under its name. */
+    private boolean mapShort;
     private final RectF[] tabs = {new RectF(), new RectF(), new RectF()}, tabs3 = {new RectF(), new RectF(), new RectF()}, stallWares = {new RectF(), new RectF(), new RectF(), new RectF()};
     private final RectF stallButton = new RectF();
     /** Which volume's lands the map shows; and from where the counter was opened, to go back there. */
@@ -1841,6 +1845,186 @@ final class RunGame {
             return true;
         }
         return false;
+    }
+
+
+    // How places under the ground look
+
+    /** The squares of the dungeons by band (tops, then fills), and of the lagoons and the cellars (seabed, sea rock, cellar floor; sand, rock, brick). */
+    private Bitmap depthSquares, roomSquares, lagoonBack, cellarBack;
+    private final Bitmap[] deeps = new Bitmap[4];
+    private Bitmap abyss;
+    private static final int[] DEEPS = {R.drawable.run_depths_deep_catacomb, R.drawable.run_depths_deep_inkcrypt, R.drawable.run_depths_deep_papercave,
+            R.drawable.run_depths_deep_vault};
+    private static final int SEABED = 0, SEA_ROCK_TOP = 1, CELLAR_FLOOR = 2, SAND = 3, SEA_ROCK = 4, BRICK = 5;
+    /** How each band of a dungeon is lit: a cool dusk, a grimy green murk, a violet dark. */
+    private static final int[] BAND_TINT = {0xFF0E0C22, 0xFF0C1610, 0xFF140820};
+    /** Water as it gets deeper: pale and clear at the top, deep blue below. */
+    private android.graphics.LinearGradient waterShade, lagoonShade;
+    private final android.graphics.Matrix waterMatrix = new android.graphics.Matrix();
+
+    /** Which kind of place she is in, off the land: a lagoon, a hideout or a cellar of waves, which have pictures of their own; or -1. */
+    private int roomKind() {
+        if (run == null || run.room() < 0) return -1;
+        return run.level().rooms.get(run.room())[0];
+    }
+
+    /** Whether the place she is in is one of those under the ground (a hideout, or a cellar of waves): a basement. */
+    private boolean basement() { int kind = roomKind(); return kind == RunLevels.HIDEOUT || kind == RunLevels.ARENA; }
+
+    /** One square of a sheet of squares, drawn over a square of the land, turned about every other one so the same one side by side shows no pattern. */
+    private void groundSquare(Canvas canvas, Bitmap sheet, int which, float left, float y, int column, int row, boolean capped) {
+        int square = sheet.getHeight();
+        source.set(which * square + 1, 1, which * square + square - 1, square - 1);
+        target.set(left - 1, y - 1, left + tile + 1, y + tile + 1);
+        canvas.save();
+        canvas.scale(column % 2 == 0 ? 1 : -1, capped || row % 2 == 0 ? 1 : -1, left + tile / 2, y + tile / 2);
+        canvas.drawBitmap(sheet, source, target, paint);
+        canvas.restore();
+    }
+
+    /**
+     * A square of rock in a place under the ground or in a dungeon, if it has squares of its own: a lagoon's seabed and sea rock, a basement's
+     * floor and brick, a dungeon's stone of its band. Returns whether it drew it.
+     */
+    private boolean underSquare(Canvas canvas, int column, int row, float left, float y) {
+        boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
+        int kind = roomKind();
+        if (kind == RunLevels.LAGOON || kind == RunLevels.HIDEOUT || kind == RunLevels.ARENA) {
+            if (roomSquares == null) roomSquares = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ground_rooms);
+            int[] in = run.level().rooms.get(run.room());
+            int which;
+            if (kind == RunLevels.LAGOON) which = capped ? (row >= in[11] ? SEABED : SEA_ROCK_TOP) : row >= in[11] ? SAND : SEA_ROCK;
+            else which = capped ? CELLAR_FLOOR : BRICK;
+            groundSquare(canvas, roomSquares, which, left, y, column, row, capped);
+            return true;
+        }
+        if (delve >= 0 && run.room() < 0) {
+            if (depthSquares == null) depthSquares = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ground_depths);
+            int band = RunDungeons.band(delveFloor);
+            groundSquare(canvas, depthSquares, capped ? band : RunDungeons.BANDS + band, left, y, column, row, capped);
+            return true;
+        }
+        return false;
+    }
+
+    /** A place's own picture behind it, where it has one: under the sea for a lagoon, a basement for a hideout. Returns whether it drew one. */
+    private boolean drawRoomBack(Canvas canvas) {
+        int kind = roomKind();
+        Bitmap back;
+        if (kind == RunLevels.LAGOON) {
+            if (lagoonBack == null) lagoonBack = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_room_lagoon);
+            back = lagoonBack;
+        } else if (kind == RunLevels.HIDEOUT) {
+            if (cellarBack == null) cellarBack = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_room_cellar);
+            back = cellarBack;
+        } else {
+            return false;
+        }
+        float tall = height, wide = tall * back.getWidth() / back.getHeight(), drift = cameraX * tile * .2f % (wide * 2);
+        paint.setAlpha(255);
+        for (int copy = 0; copy * wide - drift < width; copy++) {
+            float left = copy * wide - drift;
+            target.set(left - 1, 0, left + wide + 1, tall);
+            canvas.save();
+            if (copy % 2 != 0) canvas.scale(-1, 1, left + wide / 2, 0);
+            canvas.drawBitmap(back, null, target, paint);
+            canvas.restore();
+        }
+        return true;
+    }
+
+    /**
+     * Deep water, drawn a run of it down each column at a time, with no squares to be seen: pale and clear at its top, deeper blue the
+     * further down, and its top line moving. Drawn from the top square of each run that is in view; the rest of the run is drawn with it.
+     */
+    private void drawWater(Canvas canvas, int column, int row, int bottom, float left) {
+        if (run.at(column, row - 1) == RunLevels.WATER && row > (int) Math.floor(cameraY)) return;
+        int surface = row;
+        while (surface > 0 && run.at(column, surface - 1) == RunLevels.WATER) surface--;
+        int end = row;
+        while (end + 1 <= bottom && run.at(column, end + 1) == RunLevels.WATER) end++;
+        if (waterShade == null) {
+            waterShade = new android.graphics.LinearGradient(0, 0, 0, 1, new int[]{0x9070C8EC, 0xB0389CD8, 0xD01E5EA8, 0xE0103C78},
+                    new float[]{0, .18f, .55f, 1}, android.graphics.Shader.TileMode.CLAMP);
+        }
+        // (In a lagoon, whose picture behind is already under the sea, the water itself is lighter.)
+        if (lagoonShade == null) {
+            lagoonShade = new android.graphics.LinearGradient(0, 0, 0, 1, new int[]{0x5088D8F4, 0x5848A8DC, 0x702466AE, 0x88124484},
+                    new float[]{0, .18f, .55f, 1}, android.graphics.Shader.TileMode.CLAMP);
+        }
+        android.graphics.LinearGradient shade = roomKind() == RunLevels.LAGOON ? lagoonShade : waterShade;
+        float top = (surface - cameraY) * tile, from = (row - cameraY) * tile, to = (end + 1 - cameraY) * tile;
+        waterMatrix.setScale(1, tile * 11);
+        waterMatrix.postTranslate(0, top);
+        shade.setLocalMatrix(waterMatrix);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setShader(shade);
+        paint.setAlpha(255);
+        // (Column against column with no overlap: where two half-clear columns overlapped, a line would show.)
+        canvas.drawRect(Math.round(left), from, Math.round(left + tile), to, paint);
+        paint.setShader(null);
+        if (row == surface) {
+            // Its top: a light line that rises and falls.
+            float wave = (float) Math.sin(clock * 2.6f + column * .9f) * tile * .05f;
+            paint.setColor(0xCCE6F8FF);
+            canvas.drawRect(Math.round(left), from + wave, Math.round(left + tile), from + wave + tile * .07f, paint);
+            paint.setColor(0x55FFFFFF);
+            canvas.drawRect(Math.round(left), from + wave + tile * .07f, Math.round(left + tile), from + wave + tile * .16f, paint);
+        }
+        paint.setColor(Color.BLACK);
+    }
+
+    /** Over a lagoon: light coming down through the water in slanting rays; over a basement: dust drifting in the lantern light. */
+    private void drawRoomOver(Canvas canvas) {
+        int kind = roomKind();
+        if (kind == RunLevels.LAGOON) {
+            int[] in = run.level().rooms.get(run.room());
+            float waterTop = (in[12] + 3 - cameraY) * tile, floor = (in[11] - cameraY) * tile;
+            paint.setStyle(Paint.Style.FILL);
+            for (int ray = 0; ray < 6; ray++) {
+                float at = ((ray * 7.3f + in[3] + 6) - cameraX) * tile + (float) Math.sin(clock * .6f + ray) * tile * .4f, wide = tile * (.6f + ray % 3 * .35f);
+                path.reset();
+                path.moveTo(at, waterTop);
+                path.lineTo(at + wide, waterTop);
+                path.lineTo(at + wide + tile * 2.2f, floor);
+                path.lineTo(at + tile * 1.6f, floor);
+                path.close();
+                paint.setColor(Color.argb(Math.round(26 + 14 * (float) Math.sin(clock * 1.3f + ray * 2)), 220, 245, 255));
+                canvas.drawPath(path, paint);
+            }
+            // Little lights on the seabed where the rays come down, moving.
+            for (int glint = 0; glint < 14; glint++) {
+                float x = ((in[3] + 6 + glint * 2.6f) - cameraX) * tile + (float) Math.sin(clock * 1.7f + glint) * tile * .3f;
+                paint.setColor(Color.argb(Math.round(60 + 40 * (float) Math.sin(clock * 3 + glint)), 230, 250, 255));
+                canvas.drawOval(x - tile * .25f, floor - tile * .06f, x + tile * .25f, floor + tile * .02f, paint);
+            }
+            paint.setColor(Color.BLACK);
+        } else if (basement()) {
+            paint.setStyle(Paint.Style.FILL);
+            for (int mote = 0; mote < 22; mote++) {
+                float drift = (clock * (.05f + mote % 5 * .015f) + mote * .137f) % 1;
+                float x = (mote * 97 % 100) / 100f * width + (float) Math.sin(clock * .7f + mote) * tile * .5f, y = height * (1 - drift);
+                paint.setColor(Color.argb(Math.round(110 * (float) Math.sin(drift * Math.PI)), 255, 236, 200));
+                canvas.drawCircle(x, y, tile * (.025f + mote % 3 * .012f), paint);
+            }
+            paint.setColor(Color.BLACK);
+        }
+    }
+
+    /** The backdrop of a dungeon's floor, by its band: its own picture for the first five floors, a grittier one for the next five, the abyss deeper. */
+    private Bitmap depthsBack() {
+        int band = RunDungeons.band(delveFloor), which = RunDungeons.backdrop(delve);
+        if (band == 0) {
+            if (depths[which] == null) depths[which] = BitmapFactory.decodeResource(context.getResources(), DEPTHS[which]);
+            return depths[which];
+        }
+        if (band == 1) {
+            if (deeps[which] == null) deeps[which] = BitmapFactory.decodeResource(context.getResources(), DEEPS[which]);
+            return deeps[which];
+        }
+        if (abyss == null) abyss = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_depths_abyss);
+        return abyss;
     }
 
     /**
@@ -3555,8 +3739,41 @@ final class RunGame {
         closeButton.set(pauseButton);
         soundButton.set(closeButton.left - dp(8) - small, closeButton.top, closeButton.left - dp(8), closeButton.bottom);
         // The map: a page for each volume, with a row of lands for each of its chapters under the chapter's name, and the button that goes on under them all.
+        // (On a screen wider than it is tall, the width is used: its chapters side by side, each in rows of its own, the lands as large as fit.)
         float room = safe.height() - dp(92) - dp(150) - dp(44);
-        for (int volume = 0; volume < 3; volume++) {
+        for (int volume = 0; volume < 3; volume++) mapPerRow[volume] = eachOf(volume);
+        mapShort = safe.width() > safe.height() * 1.15f && safe.height() < dp(460);
+        float mapTop = mapShort ? dp(94) : dp(136);
+        for (int volume = 0; volume < 3 && safe.width() > safe.height() * 1.15f; volume++) {
+            int each = eachOf(volume), from = firstOf(volume), chapters = (lastOf(volume) - from) / each;
+            float gap = dp(7), colGap = dp(22), label = dp(24), bandGap = dp(10), roomH = safe.height() - mapTop - dp(74), availW = safe.width() - dp(36);
+            float best = 0;
+            int bestCols = 1, bestPer = each;
+            for (int cols = 1; cols <= chapters; cols++) {
+                for (int per : new int[]{each, (each + 1) / 2, (each + 2) / 3}) {
+                    int rows = (each + per - 1) / per, bands = (chapters + cols - 1) / cols;
+                    float colW = (availW - colGap * (cols - 1)) / cols;
+                    if (colW < dp(110)) continue;
+                    float side = Math.min(dp(84), Math.min((colW - gap * (per - 1)) / per, (roomH / bands - label - bandGap - gap * (rows - 1)) / rows));
+                    if (side > best + dp(1)) {
+                        best = side;
+                        bestCols = cols;
+                        bestPer = per;
+                    }
+                }
+            }
+            float side = Math.max(dp(22), best);
+            int cols = bestCols, per = bestPer, rows = (each + per - 1) / per;
+            mapPerRow[volume] = per;
+            float blockW = per * side + gap * (per - 1), blockH = label + rows * side + gap * (rows - 1) + bandGap;
+            float left = safe.centerX() - (cols * blockW + colGap * (cols - 1)) / 2, top = safe.top + mapTop;
+            for (int index = 0; index < lastOf(volume) - from; index++) {
+                int chapter = index / each, at = index % each, col = chapter % cols, band = chapter / cols;
+                float x = left + col * (blockW + colGap) + at % per * (side + gap), down = top + band * blockH + label + at / per * (side + gap);
+                lands[from + index].set(x, down, x + side, down + side);
+            }
+        }
+        for (int volume = 0; volume < 3 && safe.width() <= safe.height() * 1.15f; volume++) {
             int each = eachOf(volume), from = firstOf(volume);
             float gap = volume == 0 ? dp(8) : dp(5);
             float side = Math.max(dp(22), Math.min(dp(54), Math.min((safe.width() - dp(28) - gap * (each - 1)) / each, room / RunLevels.CHAPTERS - dp(34))));
@@ -3576,6 +3793,22 @@ final class RunGame {
         float third = Math.min(dp(96), (safe.width() - dp(36) - dp(84) - dp(52) - dp(12)) / 3);
         for (int volume = 0; volume < 3; volume++) {
             tabs3[volume].set(safe.left + dp(18) + volume * (third + dp(6)), tabs[0].top, safe.left + dp(18) + volume * (third + dp(6)) + third, tabs[0].bottom);
+        }
+        if (mapShort) {
+            // (A phone on its side: the tabs, the tree and the backpack in a row at the right, beside the line under the name, so the lands have the height.)
+            float y0 = safe.top + dp(58), y1 = y0 + dp(32), tabWide = dp(100);
+            gearButton.set(safe.right - dp(18) - dp(76), y0, safe.right - dp(18), y1);
+            skillButton.set(gearButton.left - dp(8) - dp(44), y0, gearButton.left - dp(8), y1);
+            float right = skillButton.left - dp(10);
+            for (int volume = 2; volume >= 0; volume--) {
+                tabs3[volume].set(right - tabWide * .86f, y0, right, y1);
+                right = tabs3[volume].left - dp(6);
+            }
+            right = skillButton.left - dp(10);
+            for (int volume = 1; volume >= 0; volume--) {
+                tabs[volume].set(right - tabWide, y0, right, y1);
+                right = tabs[volume].left - dp(6);
+            }
         }
         // The button that changes what she holds: over the one that uses it, a little smaller.
         float swaps = Math.max(dp(44), size * .66f);
@@ -3618,8 +3851,16 @@ final class RunGame {
     private void turnTo(int volume) {
         page = volume;
         int from = firstOf(volume), last = lastOf(volume) - 1;
-        float under = lands[last].bottom + dp(16);
-        goButton.set(lands[from].left, under, lands[last].right, under + dp(48));
+        float lowest = 0, leftmost = Float.MAX_VALUE, rightmost = 0;
+        for (int index = from; index <= last; index++) {
+            lowest = Math.max(lowest, lands[index].bottom);
+            leftmost = Math.min(leftmost, lands[index].left);
+            rightmost = Math.max(rightmost, lands[index].right);
+        }
+        float under = lowest + dp(16);
+        // (In landscape, clear of the way into the gallery at the foot on the right.)
+        if (safe.width() > safe.height() * 1.15f) rightmost = Math.min(rightmost, safe.right - dp(14) - dp(66) - dp(12));
+        goButton.set(leftmost, under, rightmost, under + dp(48));
         text.setTextSize(dp(26));
         float from0 = safe.left + dp(18) + text.measureText("Plus run") + dp(12), to = soundButton.left - dp(8);
         shopButton.set(Math.max(from0, to - dp(160)), soundButton.top + dp(3), to, soundButton.bottom - dp(4));
@@ -4195,9 +4436,7 @@ final class RunGame {
 
     /** Behind a dungeon's floor: one of four backdrops, mirrored side by side, darker the deeper she is. */
     private void drawDepths(Canvas canvas, float drift) {
-        int which = RunDungeons.backdrop(delve);
-        if (depths[which] == null) depths[which] = BitmapFactory.decodeResource(context.getResources(), DEPTHS[which]);
-        Bitmap back = depths[which];
+        Bitmap back = depthsBack();
         float wide = height * (float) back.getWidth() / back.getHeight();
         paint.setAlpha(255);
         for (int copy = (int) (drift / wide); copy * wide - drift < width; copy++) {
@@ -4208,7 +4447,8 @@ final class RunGame {
             canvas.drawBitmap(back, null, target, paint);
             canvas.restore();
         }
-        canvas.drawColor(Color.argb(Math.min(150, 20 + delveFloor * 16), 8, 6, 20));
+        int tint = BAND_TINT[RunDungeons.band(delveFloor)];
+        canvas.drawColor(Color.argb(Math.min(160, 30 + delveFloor % RunDungeons.BAND_FLOORS * 18 + RunDungeons.band(delveFloor) * 20), Color.red(tint), Color.green(tint), Color.blue(tint)));
     }
 
     /** Over a dungeon's floor: on a lightless one, the dark, but for a ring of light about her; and the keeper's name and what it has left, while it is near. */
@@ -4428,6 +4668,8 @@ final class RunGame {
         }
         // And, for the same, she may start in a colour, as from a ribbon, and with something in her hands.
         if (BuildConfig.DEBUG && session.tally("run_wear") > 0) run.lend(session.tally("run_wear"));
+        // (And straight into a place off the land of a kind, kind and one, for looking at it.)
+        if (BuildConfig.DEBUG && session.tally("run_go_kind") > 0) run.visit(session.tally("run_go_kind") - 1);
         // And the white that is truly hers, which the story has yet to give.
         if (BuildConfig.DEBUG && session.tally("run_true") > 0) run.master();
         PlusRun.ceiling = BuildConfig.DEBUG && session.tally("run_ceiling") > 0 ? session.tally("run_ceiling") : PlusRun.CEILING;
@@ -10341,6 +10583,7 @@ final class RunGame {
                     }
                 }
                 if (here == RunLevels.AIR) continue;
+                if (here == RunLevels.BLOCK && underSquare(canvas, column, row, left, y)) continue;
                 if (here == RunLevels.BLOCK && run.room() >= 0) {
                     // In a place off the land, its walls are dark, of the colour of the place, with a lighter board where they are stood on.
                     boolean capped = run.at(column, row - 1) != RunLevels.BLOCK;
@@ -10433,7 +10676,9 @@ final class RunGame {
                     stroke.setAlpha(255);
                 } else if (here == RunLevels.SLICK) {
                     square(canvas, SLICK_ART, left, y, column % 2 != 0, false);
-                } else if (here == RunLevels.LAVA || here == RunLevels.WATER) {
+                } else if (here == RunLevels.WATER) {
+                    drawWater(canvas, column, row, bottom, left);
+                } else if (here == RunLevels.LAVA) {
                     boolean surface = run.at(column, row - 1) != here;
                     if (here == RunLevels.WATER) paint.setAlpha(215);
                     square(canvas, (here == RunLevels.LAVA ? LAVA_ART : WATER_ART) + (surface ? 0 : 1), left,
@@ -10760,6 +11005,7 @@ final class RunGame {
         }
         paint.setColorFilter(null);
         drawShields(canvas, first, last);
+        drawRoomOver(canvas);
         drawForeground(canvas);
         drawHits(canvas, first, last);
         // How tough a creature is: one that takes more than a blow has a mark over it for each it still takes, so that it is seen to be going.
@@ -11091,6 +11337,7 @@ final class RunGame {
 
     /** The inside of a place off the land, behind everything in it: one picture, side by side with itself turned about, drifting a little as she goes. */
     private void drawInside(Canvas canvas) {
+        if (drawRoomBack(canvas)) return;
         int look = look();
         Bitmap inside;
         if (look < 0) {
@@ -12655,6 +12902,20 @@ final class RunGame {
             return;
         }
         if (run.inWater()) bubbles(canvas, feetX, feetY - tall * .85f, tall);
+        // Climbing a vine, a ladder or a shelf: hand over hand, a picture for each step of the way up or down, held still where she stops.
+        // Dressed as she is, where what she wears has its pictures of climbing; where it has not yet, the rise of her jump in it, so that
+        // she never climbs in her own look while she wears another.
+        if (run.climbing()) {
+            int step = Math.floorMod((int) Math.floor(run.y() * 2.4f), 4);
+            if (vanityCovers("climb")) {
+                if (climb == null) climb = BitmapFactory.decodeResource(context.getResources(), R.drawable.halgakos_climb);
+                frame(canvas, dressed("climb", formed(climb, climbs)), step, 4, feetX, feetY, tall, leftward);
+            } else {
+                frame(canvas, herJump(), step % 2 == 0 ? RISE : TOP, JUMP_FRAMES, feetX, feetY, tall, leftward);
+            }
+            paint.setAlpha(255);
+            return;
+        }
         // In the middle of one of her moves, it is drawn, whatever she holds.
         int move = run.moveShown();
         if (move != PlusRun.NO_MOVE) {
@@ -13025,8 +13286,40 @@ final class RunGame {
         return dressed("moves", formed(moves, movesDyed));
     }
 
-    /** Her swimming and her moves in the colour of each form she has been drawn in, kept as they are made. */
-    private final android.util.SparseArray<Bitmap> swims = new android.util.SparseArray<>(), movesDyed = new android.util.SparseArray<>();
+    /** Her swimming, her moves and her climbing in the colour of each form she has been drawn in, kept as they are made. */
+    private final android.util.SparseArray<Bitmap> swims = new android.util.SparseArray<>(), movesDyed = new android.util.SparseArray<>(), climbs = new android.util.SparseArray<>();
+    /** Her climbing: four pictures, hand over hand. */
+    private Bitmap climb;
+    /** For each sheet and look, whether what she wears has its pictures of that sheet in the app (her own look always has). */
+    private final java.util.Map<String, Boolean> covered = new java.util.HashMap<>();
+
+    /**
+     * Whether what she wears now has its pictures of a sheet: an outfit drawn whole has its own picture of it, one dyed has its mask, and
+     * each head part (ears, horns) its patch. Where something has not, the sheet would show her own look, and is not to be used.
+     */
+    private boolean vanityCovers(String sheet) {
+        RunVanity.Style style = vanityNow();
+        if (style == null) return true;
+        String key = sheet + "|" + style.key();
+        Boolean known = covered.get(key);
+        if (known != null) return known;
+        boolean all = true;
+        if (style.art != null) all = asset("vanity/" + style.art + "/" + sheet + ".webp");
+        else if (style.mid != 0) all = VanityLayers.geometry(sheet) != null && context.getResources().getIdentifier("vanity_mask_" + sheet, "drawable", context.getPackageName()) != 0;
+        String horns = RunVanity.HORNS_ART[style.horns], ears = RunVanity.EARS_ART[style.ears];
+        if (horns != null) all &= asset("vanity/heads/" + horns + "/" + sheet + ".webp");
+        if (ears != null) all &= asset("vanity/heads/" + ears + "/" + sheet + ".webp");
+        covered.put(key, all);
+        return all;
+    }
+
+    private boolean asset(String path) {
+        try (java.io.InputStream in = context.getAssets().open(path)) {
+            return in != null;
+        } catch (java.io.IOException missing) {
+            return false;
+        }
+    }
 
     /** A sheet of her in the colour she is drawn in now: as it is in her own colour, or dyed once and kept. */
     private Bitmap formed(Bitmap from, android.util.SparseArray<Bitmap> kept) {
@@ -14957,7 +15250,7 @@ final class RunGame {
         text.setTextSize(dp(26));
         canvas.drawText(title, safe.left + dp(18), safe.top + dp(42), text);
         text.setColor(soft);
-        fitted(canvas, under, safe.left + dp(18), safe.top + dp(66), dp(14.5f), safe.width() - dp(36));
+        fitted(canvas, under, safe.left + dp(18), safe.top + dp(66), dp(14.5f), mapShort && screen == MAP ? tabOf(0).left - safe.left - dp(30) : safe.width() - dp(36));
         plate(canvas, closeButton, closeButton.height() / 2, 235);
         stroke.setColor(ink);
         stroke.setStrokeWidth(dp(2));
@@ -15056,6 +15349,10 @@ final class RunGame {
                 text.setTextAlign(Paint.Align.LEFT);
                 text.setColor(land <= open ? ink : soft);
                 text.setTextSize(dp(14));
+                // (As wide as its row of lands, and no wider: in landscape another chapter stands beside it.)
+                float block = lands[Math.min(lastShown - 1, index + mapPerRow[page] - 1)].right - where.left;
+                text.setTextSize(dp(14));
+                if (text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]) > block) text.setTextSize(dp(14) * block / text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]));
                 canvas.drawText(RunStory.CHAPTERS[RunLevels.chapterOf(land)], where.left, where.top - dp(8), text);
                 // The levels of its lands: how tough they are.
                 float named = text.measureText(RunStory.CHAPTERS[RunLevels.chapterOf(land)]);
@@ -15063,7 +15360,8 @@ final class RunGame {
                 int low = RunLoot.recommended(land), high = RunLoot.recommended(Math.min(RunLevels.TOTAL, land + each - 1));
                 text.setColor(soft);
                 text.setTextSize(dp(11.5f));
-                canvas.drawText(low == high ? "level " + low : "levels " + low + " to " + high, where.left + named + dp(26), where.top - dp(8), text);
+                String levels = low == high ? "level " + low : "levels " + low + " to " + high;
+                if (named + dp(26) + text.measureText(levels) <= block) canvas.drawText(levels, where.left + named + dp(26), where.top - dp(8), text);
                 text.setColor(land <= open ? ink : soft);
                 text.setTextSize(dp(14));
                 if (session.tally("run_medal_" + RunLevels.chapterOf(land)) != 0) {

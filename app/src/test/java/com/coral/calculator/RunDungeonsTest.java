@@ -244,6 +244,20 @@ public class RunDungeonsTest {
         assertTrue(run.gateOpen());
     }
 
+    @Test public void everyFiveFloorsAreABandOfTheirOwnGrittierTheDeeper() {
+        for (int floor = 0; floor < 5; floor++) assertEquals(0, RunDungeons.band(floor));
+        for (int floor = 5; floor < 10; floor++) assertEquals(1, RunDungeons.band(floor));
+        // (Past the tenth floor, if floors ever go so deep, the deepest look.)
+        for (int floor = 10; floor < 40; floor++) assertEquals(RunDungeons.BANDS - 1, RunDungeons.band(floor));
+        // The deepest dungeons reach the second band.
+        assertTrue(RunDungeons.band(RunDungeons.floors(RunDungeons.COUNT - 1) - 1) >= 1);
+        // Each band has its backdrops and its squares in the app.
+        for (String picture : new String[]{"run_depths_deep_catacomb", "run_depths_deep_inkcrypt", "run_depths_deep_papercave", "run_depths_deep_vault",
+                "run_depths_abyss", "run_ground_depths", "run_ground_rooms", "run_room_lagoon", "run_room_cellar", "halgakos_climb"}) {
+            assertTrue(picture, new java.io.File("src/main/res/drawable-nodpi/" + picture + ".webp").isFile());
+        }
+    }
+
     @Test public void heartsAndLivesAreCarriedDown() {
         PlusRun run = new PlusRun(RunLevels.dungeon(3, 1, 9), new PlusRun.Perks());
         run.carry(PlusRun.HALF * 3, 1);

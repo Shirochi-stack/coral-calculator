@@ -49,6 +49,11 @@ final class RunDungeons {
     /** The level it is for, as the land it is in. */
     static int recommended(int dungeon) { return RunLoot.recommended(LANDS[dungeon]); }
 
+    /** Which band of depth a floor is in: every five floors look different, grittier the deeper (0 floors 1 to 5, 1 floors 6 to 10, 2 and on deeper still). */
+    static final int BAND_FLOORS = 5, BANDS = 3;
+
+    static int band(int floor) { return Math.max(0, Math.min(BANDS - 1, floor / BAND_FLOORS)); }
+
     /** How much harder a floor is than the land: a step more every third floor down. */
     static int deeper(int floor) { return floor / 3; }
 
