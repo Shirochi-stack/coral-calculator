@@ -65,6 +65,12 @@ final class RunGrips {
 
     /** The handle and tip of a weapon icon, by its place in the sheet; or null. */
     static short[] axis(int icon) {
+        // (Economy: a named weapon's handle and tip are measured from its picture.)
+        if (icon >= RunWeapons.ICON_BASE) {
+            int at = icon - RunWeapons.ICON_BASE;
+            short[] one = at >= 0 && at < RunWeaponData.COUNT ? RunWeaponData.AXES[at] : null;
+            return one == null ? null : new short[]{(short) icon, one[0], one[1], one[2], one[3]};
+        }
         for (short[] one : ICON_AXES) if (one[0] == icon) return one;
         return null;
     }

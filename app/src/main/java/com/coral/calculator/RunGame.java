@@ -904,6 +904,7 @@ final class RunGame {
         kept.slotted = RunSkills.slotted(taken, skillSlots());
         // What she wears of what she has found.
         kept.worn = RunLoot.worn(session.note("run_worn"));
+        RunArtifacts.refresh(session);
         // The weapon found that she has taken in hand: in her backpack as its kind, and what she begins every land with.
         int hand = handCode();
         if (hand != 0) {
@@ -2878,6 +2879,16 @@ final class RunGame {
 
     /** One of the pictures in the sheet, as a square of a size about a place. */
     void drawIcon(Canvas canvas, int index, float x, float y, float size) {
+        // (Economy: curios and the named weapons have a sheet of their own, in the runart pack.)
+        if (RunEconomyArt.extra(index)) {
+            android.graphics.Bitmap extra = RunEconomyArt.sheet(context, index);
+            if (extra != null) {
+                RunEconomyArt.source(index, source);
+                target.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2);
+                canvas.drawBitmap(extra, source, target, paint);
+            }
+            return;
+        }
         if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
         int column = index % LOOT_COLUMNS, row = index / LOOT_COLUMNS;
         source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
@@ -8506,6 +8517,15 @@ final class RunGame {
         // Things to keep, picked up: into her bag, and named in a card in the colour of what they are.
         while (seenFound < run.found().size()) {
             int code = run.found().get(seenFound++);
+            // (Economy: a curio goes to her curios, not her bag.)
+            if (RunArtifacts.is(code)) {
+                RunArtifacts.add(session, RunArtifacts.idOf(code), 1);
+                int curio = RunArtifacts.rarity(RunArtifacts.idOf(code));
+                toast(RunLoot.RARITIES[curio] + " curio: " + RunArtifacts.name(RunArtifacts.idOf(code)), RunArtifacts.flavour(RunArtifacts.idOf(code)) + "  ·  worth " + RunArtifacts.value(RunArtifacts.idOf(code)), LOOT_PICTURE + code);
+                toastRarity = curio >= RunLoot.GOLD ? 2 : curio >= RunLoot.BLUE ? 1 : 0;
+                audio.play(curio >= RunLoot.GOLD ? "unlock" : "tap", 1);
+                continue;
+            }
             session.keepNote("run_bag", RunLoot.note(RunLoot.add(RunLoot.bag(session.note("run_bag")), code)));
             int rarity = RunLoot.rarity(code);
             toast(RunLoot.RARITIES[rarity] + ": " + RunLoot.name(code), "In her bag  ·  " + RunLoot.TYPES[RunLoot.type(code)]
@@ -8525,6 +8545,7 @@ final class RunGame {
             audio.play("page", .8f);
             buzz(false);
         }
+        passiveProcs();
         // A loose floorboard comes up: what was under it is there.
         if (run.lifted() != seenLifted) {
             seenLifted = run.lifted();
@@ -10434,11 +10455,22 @@ final class RunGame {
     // Her inventory (her backpack and her bag as one): see RunInventory and RunInventoryUi
 
     /** Her inventory is opened: from a land, where the land waits; from the pause; or from the map. */
-    private void openPack(int from) {
+    /** (Economy) Pluses into her bank (what a sale brings), what she has to spend in words, and her pack opened at a merchant, to sell. */
+    void bankAdd(int pluses) { session.keep("run_bank", bank() + pluses); }
+
+    String purseWords() { return "She has + " + bank(); }
+
+    void openPackToSell(int from) {
+        openPack(from, true);
+    }
+
+    private void openPack(int from) { openPack(from, false); }
+
+    private void openPack(int from, boolean sell) {
         packOpen = true;
         packFrom = from;
         swapFinger = -1;
-        inventory.open(from != MAP && run != null);
+        inventory.open(from != MAP && run != null, sell);
         goLeft = goRight = goJump = goStrike = false;
         jumpPressed = strikePressed = false;
         audio.play("page", .6f);
@@ -13436,7 +13468,43 @@ final class RunGame {
     }
 
     /** Halgakos as she is at this moment of the run, her feet at a place: empty-handed, or carrying what she fights with; tinted by what afflicts her. */
+    /** (Economy) Gear of gold and better shows: a glow about her and sparks, in the look of what she holds or wears; and what a passive does as it goes off. */
+    private float auraAt;
+    private int seenProcs;
+
+    private void gearAura(Canvas canvas, float feetX, float feetY, float tall, boolean leftward) {
+        if (!vfxStarted) {
+            Vfx.init(context);
+            vfxStarted = true;
+        }
+        PlusRun.Perks p = run.perks();
+        int held = RunInventory.itemFor(p, run.weapon());
+        int best = RunWeaponFx.best(held, p.worn.armour, p.worn.first, p.worn.second);
+        if (best < 0) return;
+        RunWeaponFx.Style style = held != 0 && RunWeapons.named(held) && RunLoot.rarity(held) >= RunLoot.GOLD ? RunWeaponFx.of(held) : new RunWeaponFx.Style(Vfx.SPARKLE, best == RunLoot.ROSE ? RunLoot.rose(clock) : RunLoot.COLOURS[best]);
+        float pulse = .5f + .5f * (float) Math.sin(clock * 3.2f);
+        Vfx.glow(canvas, feetX, feetY - tall * .5f, tall * (.5f + .1f * (best - RunLoot.GOLD)), style.colour, RunWeaponFx.glow(best, pulse));
+        if (clock - auraAt > RunWeaponFx.every(best)) {
+            auraAt = clock;
+            float side = leftward ? -1 : 1, across = feetX / tile + cameraX, down = feetY / tile + cameraY;
+            float spread = (random.nextFloat() - .5f) * .9f;
+            vfx(style.effect == Vfx.POISON ? Vfx.SPARKLE : style.effect, across + side * (.35f + spread * .4f), down - tall / tile * (.35f + random.nextFloat() * .45f), .7f + .12f * (best - RunLoot.GOLD), 0, style.colour, 0);
+        }
+    }
+
+    private void passiveProcs() {
+        if (run.passiveProcs() == seenProcs) return;
+        seenProcs = run.passiveProcs();
+        int kind = run.passiveKind();
+        PlusRun.Perks p = run.perks();
+        int rarity = kind == RunWeaponPassives.NOVA ? RunLoot.rarity(p.worn.armour) : RunLoot.rarity(RunInventory.itemFor(p, run.weapon()));
+        int tint = RunWeaponFx.of(RunInventory.itemFor(p, run.weapon())).colour;
+        vfx(RunWeaponFx.procEffect(kind), run.passiveX(), run.passiveY(), RunWeaponFx.procSize(kind) + (rarity >= RunLoot.ROSE ? .6f : 0), kind == RunWeaponPassives.ARC ? random.nextFloat() * 360 : 0, kind == RunWeaponPassives.NOVA ? Vfx.WHITE : tint, 0);
+        audio.play(kind == RunWeaponPassives.BURST || kind == RunWeaponPassives.NOVA ? "unlock" : "star", .5f);
+    }
+
     private void her(Canvas canvas, float feetX, float feetY, float tall, int weapon, boolean leftward, int alpha) {
+        gearAura(canvas, feetX, feetY, tall, leftward);
         android.graphics.ColorFilter tint = run.herBurn() > 0 ? BURNT_TINT : run.herChill() > 0 ? CHILLED_TINT : run.herPoison() > 0 ? POISONED_TINT : null;
         if (tint != null) paint.setColorFilter(tint);
         herDrawn(canvas, feetX, feetY, tall, weapon, leftward, alpha);
@@ -14062,13 +14130,20 @@ final class RunGame {
         canvas.rotate((float) Math.toDegrees(angle));
         canvas.scale(scale, scale);
         canvas.translate(-hx, -hy);
-        if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
-        int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
-        source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        // (Economy: a named weapon's picture is in the weapons' own sheet.)
+        android.graphics.Bitmap sheet = RunEconomyArt.extra(icon) ? RunEconomyArt.sheet(context, icon) : null;
+        if (sheet == null && !RunEconomyArt.extra(icon)) {
+            if (lootIcons == null) lootIcons = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_loot_icons);
+            sheet = lootIcons;
+            int column = icon % LOOT_COLUMNS, row = icon / LOOT_COLUMNS;
+            source.set(column * LOOT_ICON, row * LOOT_ICON, (column + 1) * LOOT_ICON, (row + 1) * LOOT_ICON);
+        } else if (sheet != null) {
+            RunEconomyArt.source(icon, source);
+        }
         target.set(0, 0, LOOT_ICON, LOOT_ICON);
         int was = paint.getAlpha();
         paint.setAlpha(alpha);
-        canvas.drawBitmap(lootIcons, source, target, paint);
+        if (sheet != null) canvas.drawBitmap(sheet, source, target, paint);
         paint.setAlpha(was);
         canvas.restore();
     }
