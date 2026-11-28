@@ -1655,22 +1655,47 @@ final class FightGame {
             }
             stroke.setAlpha(255);
         }
+        // Glass: no disc, only a soft shade deepening towards the middle so the mark reads over any stage, a thin ring of light, and a
+        // wash of coral while it is held. The ultimate's ring is gold.
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0x26000000);
-        canvas.drawCircle(x, y + dp(2), round + dp(2), paint);
-        paint.setColor(down ? CalculatorLayout.CORAL : grand ? GOLD : Color.WHITE);
-        paint.setAlpha(down ? 235 : grand ? 235 : 135);
-        canvas.drawCircle(x, y, round, paint);
-        paint.setAlpha(255);
-        stroke.setColor(Color.WHITE);
-        stroke.setAlpha(down ? 255 : 215);
-        stroke.setStrokeWidth(dp(1.6f));
-        canvas.drawCircle(x, y, round - dp(.8f), stroke);
+        if (down) {
+            paint.setColor(CalculatorLayout.CORAL);
+            paint.setAlpha(160);
+            canvas.drawCircle(x, y, round * .95f, paint);
+        } else {
+            paint.setColor(Color.BLACK);
+            for (int ring = 0; ring < 4; ring++) {
+                paint.setAlpha(grand ? 22 : 14);
+                canvas.drawCircle(x, y, round * (1 - ring * .2f), paint);
+            }
+        }
+        stroke.setColor(Color.BLACK);
+        stroke.setAlpha(45);
+        stroke.setStrokeWidth(dp(3));
+        canvas.drawCircle(x, y, round - dp(1), stroke);
+        stroke.setColor(grand ? GOLD : Color.WHITE);
+        stroke.setAlpha(down || grand ? 255 : 200);
+        stroke.setStrokeWidth(dp(grand ? 2.6f : 1.6f));
+        canvas.drawCircle(x, y, round - dp(1), stroke);
         stroke.setAlpha(255);
-        int mark = down ? Color.WHITE : 0xFF3A3340;
-        paint.setColor(mark);
-        paint.setAlpha(down ? 255 : 215);
         float reach = round * .42f;
+        // The mark is drawn twice: a dark copy a little lower, then white over it, so it stands out on bright ground and dark alike.
+        if (which != SPECIAL) {
+            canvas.save();
+            canvas.translate(0, dp(1.5f));
+            mark(canvas, which, mine, x, y, round, reach, down, grand, true);
+            canvas.restore();
+        }
+        mark(canvas, which, mine, x, y, round, reach, down, grand, false);
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+    }
+
+    /** What is on a round button; in shade, a dark copy of it to sit under the white one. */
+    private void mark(Canvas canvas, int which, Fight.Fighter mine, float x, float y, float round, float reach, boolean down, boolean grand, boolean shade) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(shade ? Color.BLACK : Color.WHITE);
+        paint.setAlpha(shade ? 80 : down ? 255 : 235);
         if (which == LEFT || which == RIGHT || which == JUMP) {
             path.reset();
             path.moveTo(reach, 0);
@@ -1697,7 +1722,7 @@ final class FightGame {
             canvas.save();
             if (mine.facingLeft) canvas.scale(-1, 1, x, y);
             // (A little softer while its dodge rests: the dash still goes, but without the moment nothing can touch her.)
-            paint.setAlpha(down ? 255 : mine.dodgeRest > 0 ? 140 : 215);
+            if (!shade) paint.setAlpha(down ? 255 : mine.dodgeRest > 0 ? 140 : 235);
             canvas.drawCircle(x + reach * .7f, y - reach * .85f, reach * .36f, paint);
             canvas.save();
             canvas.rotate(24, x + reach * .35f, y + reach * .2f);
@@ -1722,9 +1747,9 @@ final class FightGame {
                 else path.lineTo(x + (float) Math.cos(angle) * far, y + (float) Math.sin(angle) * far);
             }
             path.close();
-            if (grand) paint.setColor(down ? Color.WHITE : FightCast.COLOURS[mine.kind]);
+            if (grand && !shade) paint.setColor(down ? Color.WHITE : FightCast.COLOURS[mine.kind]);
             canvas.drawPath(path, paint);
-            if (grand) {
+            if (grand && !shade) {
                 // Her face in the middle of it.
                 face(canvas, mine.kind, x, y, round * 1.5f, false, false);
             }
