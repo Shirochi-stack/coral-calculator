@@ -8802,7 +8802,65 @@ final class RunGame {
         if (smithOpen) drawSmithy(canvas);
         if (marketOpen) drawMarket(canvas);
         if (treeOpen) drawTree(canvas);
+        // A toast that comes while one of those is open: over it, at the top.
+        if (run != null && screen == PLAY && overlaid()) drawToastCard(canvas, safe.top + dp(8));
     }
+
+    /**
+     * Something won, named in a small bright card at the top left, under whatever is there already: it slides in, stays a moment,
+     * and goes by itself. What it is flies to the card from where she won it. Its rim says how much of a find it is: plain, gold, or
+     * violet with a sparkle. Returns how far down what comes under it goes.
+     */
+    private float drawToastCard(Canvas canvas, float under) {
+        if (toastLeft <= 0 || toastTitle == null) return under;
+        float margin = dp(10);
+            float fade = Math.min(1, toastLeft / .35f), in = Math.min(1, (TOAST - toastLeft) / .22f), high = dp(46);
+            text.setTextSize(dp(14));
+            float title = text.measureText(toastTitle);
+            text.setTextSize(dp(11.5f));
+            float wide = Math.min(safe.width() - margin * 2 - (run.pet() >= 0 ? dp(50) : 0), Math.max(title, text.measureText(toastWords)) + dp(66)), from = safe.left + margin - (1 - in) * dp(46);
+            int rim = toastPicture >= LOOT_PICTURE ? rarityColour(RunLoot.rarity(toastPicture - LOOT_PICTURE)) : toastRarity == 2 ? 0xFF8E5BE8 : toastRarity == 1 ? 0xFFE0A21A : 0xFFB9BEC2;
+            canvas.saveLayerAlpha(from - dp(8), under - dp(8), from + wide + dp(8), under + high + dp(10), Math.round(255 * fade));
+            box.set(from, under, from + wide, under + high);
+            plate(canvas, box, dp(15), 248);
+            stroke.setColor(rim);
+            stroke.setStrokeWidth(dp(toastRarity == 0 ? 1.5f : 2.5f));
+            canvas.drawRoundRect(from, under, from + wide, under + high, dp(15), dp(15), stroke);
+            // What it is: flying in from where it was won for the first moment, then at rest at the head of the card.
+            float iconX = from + dp(25), iconY = under + high / 2, fly = Math.min(1, (TOAST - toastLeft) / .45f), eased = fly * fly * (3 - 2 * fly);
+            float wonX = (toastX - cameraX) * tile, wonY = (toastY - cameraY) * tile;
+            float atX = wonX + (iconX - wonX) * eased, atY = wonY + (iconY - wonY) * eased - (float) Math.sin(eased * Math.PI) * dp(46);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setTextSize(dp(14));
+            text.setColor(ink);
+            fitted(canvas, toastTitle, from + dp(50), under + dp(19), dp(14), wide - dp(60));
+            text.setColor(soft);
+            fitted(canvas, toastWords, from + dp(50), under + dp(36), dp(11.5f), wide - dp(60));
+            if (toastRarity == 2) {
+                // A sparkle along its top.
+                for (int star = 0; star < 3; star++) {
+                    float twinkle = .5f + .5f * (float) Math.sin(clock * 9 + star * 2.1f);
+                    paint.setAlpha(Math.round(255 * twinkle));
+                    art(canvas, STAR_ART, from + wide * (.3f + .28f * star), under + dp(3), dp(9) + dp(4) * twinkle, false);
+                }
+                paint.setAlpha(255);
+            }
+            canvas.restore();
+            paint.setAlpha(Math.round(255 * fade));
+            float size = dp(34) * (1 + .5f * (float) Math.sin(eased * Math.PI));
+            if (toastPicture >= LOOT_PICTURE) {
+                box.set(atX - size * .55f, atY - size * .55f, atX + size * .55f, atY + size * .55f);
+                lootFrame(canvas, toastPicture - LOOT_PICTURE, new RectF(box), false);
+            } else if (toastPicture == -HER_PICTURE) round(canvas, 0, atX, atY, size * .5f);
+            else if (toastPicture < 0) prizePicture(canvas, -toastPicture, atX, atY, size);
+            else pieceIn(canvas, four, toastPicture, atX, atY, size, 0);
+            paint.setAlpha(255);
+            under += high + dp(6);
+        return under;
+    }
+
+    /** Whether a card is open over the land, under which a toast would be hidden: the smithy, the backpack, the bag, the hunts, the market, the tree. */
+    private boolean overlaid() { return smithOpen || packOpen || bagOpen || huntsOpen || marketOpen || treeOpen; }
 
     // Creatures' shields
 
@@ -13777,53 +13835,8 @@ final class RunGame {
                 under += high + dp(8);
             }
         }
-        // Something won, named in a small bright card at the top left, under whatever is there already: it slides in, stays a moment,
-        // and goes by itself. What it is flies to the card from where she won it. Its rim says how much of a find it is: plain, gold, or
-        // violet with a sparkle.
-        if (toastLeft > 0 && toastTitle != null) {
-            float fade = Math.min(1, toastLeft / .35f), in = Math.min(1, (TOAST - toastLeft) / .22f), high = dp(46);
-            text.setTextSize(dp(14));
-            float title = text.measureText(toastTitle);
-            text.setTextSize(dp(11.5f));
-            float wide = Math.min(safe.width() - margin * 2 - (run.pet() >= 0 ? dp(50) : 0), Math.max(title, text.measureText(toastWords)) + dp(66)), from = safe.left + margin - (1 - in) * dp(46);
-            int rim = toastPicture >= LOOT_PICTURE ? rarityColour(RunLoot.rarity(toastPicture - LOOT_PICTURE)) : toastRarity == 2 ? 0xFF8E5BE8 : toastRarity == 1 ? 0xFFE0A21A : 0xFFB9BEC2;
-            canvas.saveLayerAlpha(from - dp(8), under - dp(8), from + wide + dp(8), under + high + dp(10), Math.round(255 * fade));
-            box.set(from, under, from + wide, under + high);
-            plate(canvas, box, dp(15), 248);
-            stroke.setColor(rim);
-            stroke.setStrokeWidth(dp(toastRarity == 0 ? 1.5f : 2.5f));
-            canvas.drawRoundRect(from, under, from + wide, under + high, dp(15), dp(15), stroke);
-            // What it is: flying in from where it was won for the first moment, then at rest at the head of the card.
-            float iconX = from + dp(25), iconY = under + high / 2, fly = Math.min(1, (TOAST - toastLeft) / .45f), eased = fly * fly * (3 - 2 * fly);
-            float wonX = (toastX - cameraX) * tile, wonY = (toastY - cameraY) * tile;
-            float atX = wonX + (iconX - wonX) * eased, atY = wonY + (iconY - wonY) * eased - (float) Math.sin(eased * Math.PI) * dp(46);
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setTextSize(dp(14));
-            text.setColor(ink);
-            fitted(canvas, toastTitle, from + dp(50), under + dp(19), dp(14), wide - dp(60));
-            text.setColor(soft);
-            fitted(canvas, toastWords, from + dp(50), under + dp(36), dp(11.5f), wide - dp(60));
-            if (toastRarity == 2) {
-                // A sparkle along its top.
-                for (int star = 0; star < 3; star++) {
-                    float twinkle = .5f + .5f * (float) Math.sin(clock * 9 + star * 2.1f);
-                    paint.setAlpha(Math.round(255 * twinkle));
-                    art(canvas, STAR_ART, from + wide * (.3f + .28f * star), under + dp(3), dp(9) + dp(4) * twinkle, false);
-                }
-                paint.setAlpha(255);
-            }
-            canvas.restore();
-            paint.setAlpha(Math.round(255 * fade));
-            float size = dp(34) * (1 + .5f * (float) Math.sin(eased * Math.PI));
-            if (toastPicture >= LOOT_PICTURE) {
-                box.set(atX - size * .55f, atY - size * .55f, atX + size * .55f, atY + size * .55f);
-                lootFrame(canvas, toastPicture - LOOT_PICTURE, new RectF(box), false);
-            } else if (toastPicture == -HER_PICTURE) round(canvas, 0, atX, atY, size * .5f);
-            else if (toastPicture < 0) prizePicture(canvas, -toastPicture, atX, atY, size);
-            else pieceIn(canvas, four, toastPicture, atX, atY, size, 0);
-            paint.setAlpha(255);
-            under += high + dp(6);
-        }
+        // (Over a card open over the land, it is drawn over that card instead, where it can be seen.)
+        if (!overlaid()) under = drawToastCard(canvas, under);
         // What is asked of her in this land, and how it stands: a scroll, and a few words.
         int asked = run.level().quest, stands = run.quest();
         if (asked != 0 && stands != 0 && (stands == PlusRun.ASKED || stands == PlusRun.DONE || sinceAsked < 4)) {
