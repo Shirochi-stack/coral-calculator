@@ -637,6 +637,15 @@ final class RunStory {
             {"u3k", "Smog with wings. Hold your breath, it's all poison Sloppy~♡", "H", PLAYER + "A fuzzy moth of green ink smoke darts at her trailing poison. Covering her nose, bossy."},
             {"u3l", "Clap clap, crackle! One hit and my ears ring Sloppy~♡", "H", PLAYER + "A creature of two brass book covers bounces and claps with sparks that stun. Startled, dizzy joke."},
     };
+    /** The first time she finds each of the six later hidden bosses in its hideout: who it is, and what to look out for. */
+    static final String[][] HIDDEN2 = {
+            {"hb2a", "An overdue notice the size of a house! It stamps, so stay off the ground Sloppy~♡", "H", PLAYER + "A hulking giant library due-date stamp on stubby legs, a mane of overdue slips, slams its stamp face down in ink shockwaves. Startled, then cheeky."},
+            {"hb2b", "A queen folded out of paper. Those fans are sharp, mind your whiskers Sloppy~♡", "H", PLAYER + "A tall elegant origami queen of white and gold paper slashes fans of sharp paper blades. Impressed, a little catty, careful."},
+            {"hb2c", "A bookworm in gold armour, chewing my pages. Hey, those are mine Sloppy~♡", "H", PLAYER + "A giant plump bookworm with gold-leaf book-spine segments and round glasses chomps through pages and spits paper scraps. Indignant, possessive."},
+            {"hb2d", "A tyrant made of sealing wax. Don't get stamped shut Sloppy~♡", "H", PLAYER + "A squat armoured tyrant of dripping royal purple sealing wax with a candle-flame crown swings a seal-stamp mace in hot wax splashes. Wary, joking."},
+            {"hb2e", "The Footnote King. So many tiny marks, and every one is aimed at me Sloppy~♡", "H", PLAYER + "A round regal king made of a swarm of tiny footnote marks with a crown of asterisks flings streams of marks with a pointer staff. Overwhelmed, wry."},
+            {"hb2f", "The last librarian. She looks so tired. I'll be gentle, but I won't lose Sloppy~♡", "H", PLAYER + "A tall gaunt ghostly old librarian with a lantern and a huge chained tome casts beams of pale words. Softer, respectful, then determined."},
+    };
     /** The first time she meets each of the later chapters' twelve creatures: what to look out for. */
     static final String[][] LATER_UNIQUES = {
             {"u2a", "A newspaper bug! Don't let it roll you flat Sloppy~♡", "H", PLAYER + "She meets a pill bug made of rolled newspaper that curls up and bowls along the ground. Wary, quick warning."},
@@ -1361,6 +1370,7 @@ final class RunStory {
         groups.add(KNUCKLES);
         groups.add(LATER_UNIQUES);
         groups.add(STATUS_UNIQUES);
+        groups.add(HIDDEN2);
         groups.add(MIRROR);
         groups.add(ECHOES);
         groups.add(ECHO_ANSWERS);

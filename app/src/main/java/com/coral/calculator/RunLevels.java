@@ -2152,7 +2152,7 @@ final class RunLevels {
             ledge(from + 7, FLOOR - 3, 4);
             ledge(from + 16, FLOOR - 5, 4);
             ledge(to - 10, FLOOR - 3, 4);
-            level.foes.add(new int[]{RunUniques.hiddenOf(chapterOf(number)), to - 5, FLOOR - 1, 1, 0, 2});
+            level.foes.add(new int[]{RunUniques.hiddenIn(number), to - 5, FLOOR - 1, 1, 0, 2});
             pluses(from + 3, from + 6, FLOOR - 1);
             level.rooms.add(new int[]{HIDEOUT, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], 0, FLOOR, ceiling, -1, 0});
         }
