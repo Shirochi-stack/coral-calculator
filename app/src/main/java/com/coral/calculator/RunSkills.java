@@ -91,7 +91,9 @@ final class RunSkills {
             E_SPECIAL = 29, E_WARD_HIT = 30, E_CHAIN = 31, E_ECHO = 32, E_REFLECT = 33, E_QUAKE = 34, E_POOL = 35, E_EXECUTE = 36, E_AMBUSH = 37,
             E_SHIELD_BREAK = 38, E_KILL_HEAL = 39, E_KILL_ENERGY = 40, E_SPEED = 41, E_SWIM = 42, E_CLIMB = 43, E_FORMS = 44, E_METER = 45,
             E_SECOND_WIND = 46, E_BLOOD = 47, E_IRON = 48, E_PET = 49, E_STOMP = 50, E_RICOCHET = 51, E_CHARGE = 52, E_LAST_STAND = 53, E_FRENZY = 54,
-            E_EFFECTS = 55;
+            E_POUND_AREA = 55, E_POUND_HIT = 56, E_GLIDE = 57, E_AERIAL_TIME = 58, E_AERIAL_HIT = 59, E_SKYBORNE = 60,
+            E_RED = 61, E_BLUE = 62, E_BROWN = 63, E_GREEN = 64, E_YELLOW = 65, E_PURPLE = 66, E_WHITE = 67, E_MONO = 68,
+            E_EFFECTS = 69;
 
     /**
      * Whether an effect is felt only with the weapons of the class that gives it (a class's own way of fighting), or always, whatever is in
@@ -100,7 +102,8 @@ final class RunSkills {
     static boolean bound(int effect) {
         switch (effect) {
             case E_HP_PCT: case E_SHIELD: case E_REGEN: case E_SECOND_WIND: case E_BLOOD: case E_IRON: case E_AIR: case E_SWIM: case E_CLIMB: case E_FORMS:
-            case E_MAGNET: case E_PLUSES: case E_SHRUG: case E_DP: case E_ENERGY: case E_WARD_HIT:
+            case E_MAGNET: case E_PLUSES: case E_SHRUG: case E_DP: case E_ENERGY: case E_WARD_HIT: case E_GLIDE: case E_AERIAL_TIME: case E_SKYBORNE:
+            case E_RED: case E_BLUE: case E_BROWN: case E_GREEN: case E_YELLOW: case E_PURPLE: case E_WHITE: case E_MONO:
                 return false;
             default:
                 return true;
@@ -167,6 +170,20 @@ final class RunSkills {
             case E_CHARGE: return "a blow after a second and a half at rest is " + n + "% harder";
             case E_LAST_STAND: return "+" + n + "% attack while at a third of her HP or less";
             case E_FRENZY: return n + "% faster attacks for three seconds after she beats a creature";
+            case E_POUND_AREA: return "her ground pound reaches " + n + "% wider";
+            case E_POUND_HIT: return "her ground pound strikes " + n + "% harder";
+            case E_GLIDE: return "she glides " + n + "% slower, and so further";
+            case E_AERIAL_TIME: return "her aerial strike holds her up " + n + "% longer";
+            case E_AERIAL_HIT: return "her aerial strike hits " + n + "% harder";
+            case E_SKYBORNE: return "she cannot attack on the ground";
+            case E_RED: return n >= 100 ? "in red, every blow burns" : "in red, " + n + "% chance a blow burns";
+            case E_BLUE: return n >= 100 ? "in blue, every blow chills" : "in blue, " + n + "% chance a blow chills (three freeze solid)";
+            case E_BROWN: return "in brown, +" + n + "% defence";
+            case E_GREEN: return "in green, she rises " + n + "% faster";
+            case E_YELLOW: return "in yellow, " + n + "% faster attacks";
+            case E_PURPLE: return "in purple, " + n + "% chance to shrug off a hurt";
+            case E_WHITE: return "in white, +" + n + "% attack";
+            case E_MONO: return "only one ribbon at a time";
             default: return "";
         }
     }
@@ -252,6 +269,11 @@ final class RunSkills {
     /** Where each kind begins in it, and how many of each a class has. */
     static final int PER_CLASS = 7, HYBRIDS = CLASS_COUNT * PER_CLASS, CORE_PASSIVES = HYBRIDS + CLASS_COUNT, CORE_PASSIVE_COUNT = 30,
             CORE_ACTIVES = CORE_PASSIVES + CORE_PASSIVE_COUNT, CORE_ACTIVE_COUNT = 8, CORE_KEYSTONES = CORE_ACTIVES + CORE_ACTIVE_COUNT, CORE_KEYSTONE_COUNT = 6;
+    /** The moves of the air, added after: the ring round her seed (four passives and Skyborne), and the classes' own, with their classes. */
+    static final int SKY = CORE_KEYSTONES + CORE_KEYSTONE_COUNT, SKY_COUNT = 5, SKY_CLASSES = SKY + SKY_COUNT;
+    static final int[] SKY_CLASS = {8, 12, 9, 2, 1};
+    /** The ribbons' notables, added after those: seven felt in a colour, four of their mixes, six actives and Monochrome. */
+    static final int RIBBONS = SKY_CLASSES + 5, RIBBON_COUNT = 18;
     /** A class's seven, by their places: the one by the start, the two clusters' outward, the two actives' clusters, the deep one and the keystone. */
     static final int EARLY = 0, OUTER_LEFT = 1, OUTER_RIGHT = 2, ACTIVE_LEFT = 3, ACTIVE_RIGHT = 4, DEEP = 5, CLASS_KEYSTONE = 6;
 
@@ -413,7 +435,37 @@ final class RunSkills {
             n("Iron Reflexes", KEYSTONE, 0, E_IRON, 1, E_DEF_PCT, 10),
             n("Unbreakable", KEYSTONE, 0, E_SHIELD, 3, E_SHRUG, 10, E_SPEED, -15),
             n("Avatar of Ink", KEYSTONE, 0, E_DP, 200, E_ENERGY, -30),
-            n("Perfect Form", KEYSTONE, 0, E_FORMS, 100, E_DEF_PCT, 15, E_ATK_PCT, -15)
+            n("Perfect Form", KEYSTONE, 0, E_FORMS, 100, E_DEF_PCT, 15, E_ATK_PCT, -15),
+            // (Added after: the moves of the air, in a ring round her seed, and a few of the classes' own, at the edges of their regions.)
+            n("Heavy Descent", PASSIVE, 0, E_POUND_AREA, 25, E_POUND_HIT, 25),
+            n("Updraft", PASSIVE, 0, E_GLIDE, 35),
+            n("Hang Time", PASSIVE, 0, E_AERIAL_TIME, 30),
+            n("Sky Dancer", PASSIVE, 0, E_AERIAL_HIT, 25, E_AERIAL_TIME, 15),
+            n("Skyborne", KEYSTONE, 0, E_AERIAL_HIT, 100, E_AERIAL_TIME, 30, E_SKYBORNE, -1),
+            n("Quake Slam", PASSIVE, 1 << 8, E_POUND_AREA, 40, E_POUND_HIT, 20),
+            n("Meteor Fist", PASSIVE, 1 << 12, E_POUND_HIT, 50, E_STUN, 10),
+            n("Sky Sigil", PASSIVE, 1 << 9, E_AERIAL_HIT, 40, E_AERIAL_TIME, 10),
+            n("Falling Star", PASSIVE, 1 << 2, E_POUND_HIT, 35, E_POUND_AREA, 15),
+            n("Swallow Dive", PASSIVE, 1 << 1, E_AERIAL_HIT, 30, E_AERIAL_TIME, 20),
+            // (Added after: the ribbons, each felt only in its colour; their mixes; actives that call on a colour; and Monochrome.)
+            n("Kindled Ink", PASSIVE, 0, E_RED, 35),
+            n("Undertow", PASSIVE, 0, E_BLUE, 30, E_SWIM, 30),
+            n("Bedrock", PASSIVE, 0, E_BROWN, 25),
+            n("Tailwind", PASSIVE, 0, E_GREEN, 35),
+            n("Quicksilver", PASSIVE, 0, E_YELLOW, 20),
+            n("Mirrorglass", PASSIVE, 0, E_PURPLE, 20),
+            n("Prism Heart", PASSIVE, 0, E_WHITE, 15, E_FORMS, 25),
+            n("Steamcraft", PASSIVE, 0, E_RED, 20, E_BLUE, 20),
+            n("Comet Trail", PASSIVE, 0, E_RED, 20, E_YELLOW, 12),
+            n("Tidecaller", PASSIVE, 0, E_BLUE, 20, E_GREEN, 20),
+            n("Gale Rider", PASSIVE, 0, E_GREEN, 20, E_YELLOW, 12),
+            n("Crimson Burst", ACTIVE, 0, E_RED, 100, E_AREA, 40),
+            n("Tidal Wave", ACTIVE, 0, E_BLUE, 100, E_AREA, 30),
+            n("Stoneskin", ACTIVE, 0, E_BROWN, 50, E_THORNS, 3),
+            n("Gale Force", ACTIVE, 0, E_GREEN, 80, E_SPEED, 20),
+            n("Lightning Step", ACTIVE, 0, E_YELLOW, 45, E_SPEED, 30),
+            n("Looking Glass", ACTIVE, 0, E_PURPLE, 50, E_REFLECT, 100),
+            n("Monochrome", KEYSTONE, 0, E_FORMS, 100, E_ATK_PCT, 30, E_MONO, -1)
         // (end of the table)
         };
         NOTABLES = Collections.unmodifiableList(new ArrayList<>(MAKING));
@@ -480,6 +532,8 @@ final class RunSkills {
             for (int clazz = 0; clazz < CLASS_COUNT; clazz++) region(clazz);
             for (int clazz = 0; clazz < CLASS_COUNT; clazz++) crossings(clazz);
             core();
+            skyward();
+            ribbons();
             return nodes;
         }
 
@@ -775,10 +829,202 @@ final class RunSkills {
                 link(b, clazz % 2 == 0 && clazz < 12 ? notable(CORE, keystone++, deep) : root(CORE, clazz % STATS, JEWEL_FIGURES, deep));
             }
         }
+        /**
+         * The moves of the air, laid after everything else so that no node before them changes its number: round her seed, in the clear
+         * space at the heart of the core, a ring of their four passives, each reached from the core's inner notables by a step, with Skyborne
+         * on a spur off the ring; and each class's own at the edge of its region, where there is room, on a spur of two steps from one of its
+         * small nodes. Every place is tried against what is already there, so that nothing lies over anything or under a link.
+         */
+        void skyward() {
+            int before = nodes.size();
+            double round = 12.5;
+            int[] ring = new int[SKY_COUNT - 1];
+            double[] angles = new double[SKY_COUNT - 1];
+            // Each passive, as near its quarter as it can be laid with a clear way out to the core's inner ring, and that way laid with it.
+            for (int at = 0; at < ring.length; at++) {
+                double target = Math.PI / 4 + at * Math.PI / 2;
+                for (int tries = 0; tries <= 60 && angles[at] == 0; tries++) {
+                    double angle = target + (tries % 2 == 0 ? 1 : -1) * ((tries + 1) / 2) * Math.PI / 180;
+                    double[] p = polar(round, angle);
+                    if (!room(p, .8)) continue;
+                    List<Integer> near = new ArrayList<>();
+                    for (int id = 1; id < before; id++) {
+                        Node node = nodes.get(id);
+                        double out = Math.hypot(node.x, node.y);
+                        if (node.path == CORE && out > 23 && out < 31 && node.next.size() >= 2 && !nextToEnd(id)) near.add(id);
+                    }
+                    near.sort((one, two) -> Double.compare(far(nodes.get(one), p[0], p[1]), far(nodes.get(two), p[0], p[1])));
+                    for (int id : near) {
+                        Node into = nodes.get(id);
+                        double length = far(into, p[0], p[1]);
+                        if (length > 18) break;
+                        int steps = (int) Math.ceil(length / 3.4) - 1;
+                        double[][] way = new double[steps][];
+                        boolean fits = clear(p[0], p[1], into.x, into.y, id, -1);
+                        for (int step = 0; step < steps && fits; step++) {
+                            way[step] = new double[]{p[0] + (into.x - p[0]) * (step + 1) / (steps + 1), p[1] + (into.y - p[1]) * (step + 1) / (steps + 1)};
+                            fits = room(way[step], .38);
+                        }
+                        if (!fits) continue;
+                        angles[at] = angle;
+                        ring[at] = notable(CORE, SKY + at, p);
+                        int previous = ring[at];
+                        for (double[] point : way) {
+                            int small = statSmall(CORE, point);
+                            link(previous, small);
+                            previous = small;
+                        }
+                        link(previous, id);
+                        break;
+                    }
+                }
+            }
+            // The ring itself: small nodes along it from each passive to the next.
+            List<Integer> smalls = new ArrayList<>();
+            for (int at = 0; at < ring.length; at++) {
+                int next = (at + 1) % ring.length, previous = ring[at];
+                double from = angles[at], to = angles[next];
+                if (to <= from) to += Math.PI * 2;
+                int count = Math.max(1, (int) Math.round((to - from) * round / 5.2) - 1);
+                for (int step = 1; step <= count; step++) {
+                    int small = statSmall(CORE, polar(round, from + (to - from) * step / (count + 1)));
+                    smalls.add(small);
+                    link(previous, small);
+                    previous = small;
+                }
+                link(previous, ring[next]);
+            }            // Skyborne, on a spur off the ring: outward from one of its small nodes where there is room, or else in toward her seed.
+            boolean laid = false;
+            for (double[] way : new double[][]{{3.2, 6.4}, {3.6, 7.2}, {-3, -5.8}}) {
+                for (int small : smalls) {
+                    if (laid) break;
+                    Node from = nodes.get(small);
+                    double angle = Math.atan2(from.y, from.x), out = Math.hypot(from.x, from.y);
+                    double[] step = {Math.cos(angle) * (out + way[0]), Math.sin(angle) * (out + way[0])}, end = {Math.cos(angle) * (out + way[1]), Math.sin(angle) * (out + way[1])};
+                    if (!room(step, .38) || !room(end, 1.05) || !clear(from.x, from.y, end[0], end[1], small, -1)) continue;
+                    int one = statSmall(CORE, step);
+                    link(small, one);
+                    link(one, notable(CORE, SKY + SKY_COUNT - 1, end));
+                    laid = true;
+                }
+            }
+            for (int which = 0; which < SKY_CLASS.length; which++) {
+                int clazz = SKY_CLASS[which];
+                double best = Double.MAX_VALUE;
+                double[] spot = null;
+                int near = -1;
+                for (double out = 46; out <= 86; out += 1) {
+                    for (double side = -16; side <= 16; side += 1) {
+                        double[] p = at(clazz, out, side);
+                        if (Math.hypot(p[0], p[1]) > REACH - 4 || !room(p, .8)) continue;
+                        for (Node node : nodes) {
+                            if (node.path != clazz || node.type != SMALL || node.next.size() != 2 || nextToEnd(node.id)) continue;
+                            double length = far(node, p[0], p[1]);
+                            if (length < 6 || length > 9 || length >= best) continue;
+                            double[] one = {node.x + (p[0] - node.x) / 3, node.y + (p[1] - node.y) / 3}, two = {node.x + (p[0] - node.x) * 2 / 3, node.y + (p[1] - node.y) * 2 / 3};
+                            if (!room(one, .38) || !room(two, .38) || !clear(node.x, node.y, p[0], p[1], node.id, -1)) continue;
+                            best = length;
+                            spot = p;
+                            near = node.id;
+                        }
+                    }
+                }
+                Node from = nodes.get(near);
+                int previous = near;
+                for (int step = 1; step <= 2; step++) {
+                    int small = classSmall(clazz, new double[]{from.x + (spot[0] - from.x) * step / 3, from.y + (spot[1] - from.y) * step / 3});
+                    link(previous, small);
+                    previous = small;
+                }
+                link(previous, notable(clazz, SKY_CLASSES + which, spot));
+            }
+        }
+
+        /**
+         * The ribbons' notables, laid after everything so that nothing before them changes its number: each on a spur of two steps from a
+         * small node of the core's outer ring or of a region next to it, wherever there is room, going round from the top.
+         */
+        void ribbons() {
+            for (int which = 0; which < RIBBON_COUNT; which++) {
+                double best = Double.MAX_VALUE;
+                double[] spot = null;
+                int near = -1;
+                double turn = which * Math.PI * 2 / RIBBON_COUNT + .17;
+                for (double out = 44; out <= 70 && spot == null; out += 2) {
+                    for (double sway = 0; sway <= .6 && spot == null; sway += .03) {
+                        for (int side = -1; side <= 1; side += 2) {
+                            double[] p = polar(out, turn + side * sway);
+                            if (!room(p, which == RIBBON_COUNT - 1 ? 1.05 : .8)) continue;
+                            for (Node node : nodes) {
+                                if (node.type != SMALL || node.next.size() != 2 || nextToEnd(node.id)) continue;
+                                double length = far(node, p[0], p[1]);
+                                if (length < 6 || length > 9 || length >= best) continue;
+                                double[] one = {node.x + (p[0] - node.x) / 3, node.y + (p[1] - node.y) / 3}, two = {node.x + (p[0] - node.x) * 2 / 3, node.y + (p[1] - node.y) * 2 / 3};
+                                if (!room(one, .38) || !room(two, .38) || !clear(node.x, node.y, p[0], p[1], node.id, -1)) continue;
+                                best = length;
+                                spot = p;
+                                near = node.id;
+                            }
+                            if (spot != null) break;
+                        }
+                    }
+                }
+                Node from = nodes.get(near);
+                int previous = near;
+                for (int step = 1; step <= 2; step++) {
+                    int small = statSmall(from.path, new double[]{from.x + (spot[0] - from.x) * step / 3, from.y + (spot[1] - from.y) * step / 3});
+                    link(previous, small);
+                    previous = small;
+                }
+                link(previous, notable(from.path, RIBBONS + which, spot));
+            }
+        }
+
+        static double far(Node node, double x, double y) { return Math.hypot(node.x - x, node.y - y); }
+
+        /** Whether a node is next to a dead end. */
+        boolean nextToEnd(int id) {
+            for (int other : nodes.get(id).next) if (nodes.get(other).next.size() == 1) return true;
+            return false;
+        }
+
+        /** How big a node is drawn, as the tree draws it: what nothing may lie over. */
+        static double sized(Node node) {
+            if (node.type == CENTRE) return 0;
+            if (node.type == START) return 1.25;
+            if (node.type == NOTABLE) return keystone(node) ? 1.05 : .8;
+            return node.type == ROOT ? .58 : .38;
+        }
+
+        /** Whether a node of a size has room at a point: clear of every node, and of every link. */
+        boolean room(double[] p, double size) {
+            for (Node node : nodes) {
+                if (node.id == 0) continue;
+                if (far(node, p[0], p[1]) < (size + sized(node)) * 1.35 + .35) return false;
+                for (int other : node.next) {
+                    if (other < node.id || other == 0) continue;
+                    Node b = nodes.get(other);
+                    if (gap(p[0], p[1], node.x, node.y, b.x, b.y) < size * 1.1 + .2) return false;
+                }
+            }
+            return true;
+        }
+
+        /** Whether a link from one point to another runs clear of every node but those it joins. */
+        boolean clear(double ax, double ay, double bx, double by, int one, int two) {
+            for (Node node : nodes) {
+                if (node.id == 0 || node.id == one || node.id == two) continue;
+                if (gap(node.x, node.y, ax, ay, bx, by) < sized(node) * 1.1 + .25) return false;
+            }
+            return true;
+        }
+
+        static double gap(double px, double py, double ax, double ay, double bx, double by) {
+            double dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+            return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+        }
     }
-
     // Taken
-
     /** Points: one a level after the first, and one more every tenth. */
     static int pointsFor(int level) { return Math.max(0, level - 1) + Math.max(0, level - 1) / 10; }
 

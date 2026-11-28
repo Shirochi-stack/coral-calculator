@@ -33,7 +33,7 @@ public class RunSecretsTest {
                 boss = foe[0];
                 assertTrue(foe[1] > room[3] && foe[1] < room[4]);
             }
-            assertEquals(RunUniques.hiddenOf(RunLevels.chapterOf(number)), boss);
+            assertEquals(RunUniques.hiddenIn(number), boss);
             bosses.add(boss);
             // Up on a ledge out of reach of a double jump, or behind a crack.
             if (RunLevels.hideoutHigh(number)) {
@@ -47,7 +47,8 @@ public class RunSecretsTest {
         }
         assertTrue("lands " + lands, lands >= 25 && lands <= 40);
         assertTrue(high >= 8 && cracks >= 8);
-        assertEquals(RunUniques.HIDDEN_COUNT, bosses.size());
+        // (One of its own for each chapter with hideouts, and the last chapter's two by turns.)
+        assertEquals(RunUniques.HIDDEN_COUNT + RunUniques.HIDDEN2_COUNT, bosses.size());
         for (int chapter = 0; chapter < 12; chapter++) assertTrue(RunUniques.hidden(RunUniques.hiddenOf(chapter)));
     }
 
@@ -78,16 +79,17 @@ public class RunSecretsTest {
     }
 
     @Test public void aHiddenBossDropsThreeThingsGoldOrBetterAndHasItsOwnRose() {
-        assertEquals(59, RunUniques.COUNT);
+        assertEquals(93, RunUniques.COUNT);
         Set<Integer> signatures = new HashSet<>();
-        for (int kind = RunUniques.HIDDEN_FIRST; kind < RunUniques.HIDDEN_FIRST + RunUniques.HIDDEN_COUNT; kind++) {
+        for (int at = 0; at < 12; at++) {
+            int kind = at < 6 ? RunUniques.HIDDEN_FIRST + at : RunUniques.HIDDEN2_FIRST + at - 6;
             int signature = RunUniques.signature(kind);
             assertEquals(RunLoot.ROSE, RunLoot.rarity(signature));
             signatures.add(signature);
             assertTrue(RunUniques.health(kind, 40) > RunUniques.health(RunUniques.FIRST + 10, 40));
             assertTrue(RunUniques.bite(kind, 10) >= 2);
         }
-        assertEquals(6, signatures.size());
+        assertEquals(12, signatures.size());
         // Beaten: three things, a weapon, an armour and an accessory, all gold or better.
         RunLevels.Level flat = new RunLevels.Level(40, 60);
         for (int column = 0; column < 60; column++) for (int row = RunLevels.FLOOR; row < RunLevels.ROWS; row++) flat.land[row][column] = RunLevels.BLOCK;

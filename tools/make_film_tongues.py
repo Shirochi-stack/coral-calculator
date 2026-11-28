@@ -19,7 +19,7 @@ import soundfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DIST = pathlib.Path(r"C:\Users\ADMIN\Documents\ChatGPT\Calculator APP\dist\cutscenes")
-RAW = ROOT / "app" / "src" / "main" / "res" / "raw"
+RAW = ROOT / "films" / "src" / "main" / "assets" / "films"
 FILMS = ROOT / "app" / "src" / "main" / "assets" / "films"
 SPECS = {"prologue": ("prologue-mc", "opening/prologue-halgakos"), "idol": ("idol-mc", "idol/songs/idol-halgakos")}
 LANGS = ("en", "ja", "ko", "zh")

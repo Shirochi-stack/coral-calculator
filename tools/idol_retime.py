@@ -555,7 +555,7 @@ def ship(shape, lang, mix, rows, words, spec):
 
     app = ROOT / "app" / "src" / "main"
     name = f"idol_{'tall' if shape == '9x16' else 'wide'}_h" + ("" if lang == "en" else f"_{lang}")
-    out = av.open(str(app / "res" / "raw" / f"run_film_{name}.m4a"), "w")
+    out = av.open(str(ROOT / "films" / "src" / "main" / "assets" / "films" / f"run_film_{name}.m4a"), "w")
     stream = out.add_stream("aac", rate=RATE, layout="mono")
     stream.bit_rate = 96000
     pcm = numpy.clip(mix, -1, 1).astype("float32")

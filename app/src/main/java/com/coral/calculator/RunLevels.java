@@ -215,6 +215,10 @@ final class RunLevels {
 
     /** The insides of homes: six of them, after the buildings' own; which one a home has goes by the land and which room it is. */
     static final int HOME_LOOKS = 6, HOME_LOOK = 14;
+    /** Those who may live in a home, from Somi to Moru; and whoever lives in a home (from Somi), or -1 for a room that is not one. */
+    static final int OWNERS = 8;
+
+    static int ownerOf(int[] room) { return room.length > 15 && room[0] == HOUSE ? room[15] : -1; }
 
     /** The diary pages there are to find, one at a time, in the homes; and what a home's secret is, if it has one: 0 a hidden room, 1 a loose floorboard, 2 a diary page out on its table, -1 none. */
     static int homeSecret(int number, int room) { return Math.floorMod(number * 5 + room * 3, 4) - 1; }
@@ -293,7 +297,7 @@ final class RunLevels {
     /** Where in an arena something may come in: on its floor, on a platform, on a high perch, or in the open air. */
     static final int ON_FLOOR = 0, ON_PLATFORM = 1, ON_PERCH = 2, IN_AIR = 3;
     /** One of the last wave that is outsized is its kind and this much more. */
-    static final int GIANT = 100;
+    static final int GIANT = 1000;
     /** How many times over the troop of a wave comes; and how many outsized ones the last wave ends on. */
     static final int SWELL = 20, GIANTS = 4;
 
@@ -554,8 +558,10 @@ final class RunLevels {
             for (int column : taken) clear &= Math.abs(column - spot[0]) >= 9;
             for (int[] foe : level.foes) if (uniqueSpec(foe)) clear &= Math.abs(foe[1] - spot[0]) >= 9;
             if (!clear) continue;
-            // (From the sixth chapter on, the chapter's two later ones as well: four to choose from.)
-            int later = RunUniques.laterOf(chapter), pick = random.nextInt(later < 0 ? 2 : 4);
+            // (From the sixth chapter on, the chapter's two later ones as well: four to choose from; before it, its two made of fire, frost and ink.)
+            int later = RunUniques.laterOf(chapter);
+            if (later < 0) later = RunUniques.statusOf(chapter);
+            int pick = random.nextInt(later < 0 ? 2 : 4);
             int kind = pick < 2 ? first + pick : later + pick - 2;
             if (RunUniques.way(kind) == RunUniques.MINIBOSS) kind = kind == first ? first + 1 : first;
             taken.add(spot[0]);
@@ -1834,8 +1840,11 @@ final class RunLevels {
             if (!clear) continue;
             int kind = kinds[random.nextInt(kinds.length)];
             // (One in five is one of its chapter's own; never its mini-boss, nor its hornets.)
-            if (random.nextInt(5) == 0) {
-                int own = chapterFirst + random.nextInt(2);
+            // (Never in the mirror: only her shadows live there.)
+            if (random.nextInt(5) == 0 && dungeon != RunDungeons.MIRROR) {
+                int own = chapterFirst + random.nextInt(2), status = RunUniques.statusOf(Math.min(11, level.chapter));
+                // (And in the first six chapters' dungeons, every other time, one of its two made of fire, frost and ink.)
+                if (status >= 0 && spot[0] % 2 == 0) own = status + own - chapterFirst;
                 if (RunUniques.way(own) != RunUniques.MINIBOSS && !RunUniques.flies(own)) kind = own;
             }
             int way = RunUniques.way(kind);
@@ -1862,6 +1871,14 @@ final class RunLevels {
                 int[] spot = spots.get(random.nextInt(spots.size()));
                 level.items.add(new int[]{PlusRun.BREAD, spot[0], spot[1] - 1, 0});
             }
+        }
+        // In the mirror: on its third, sixth, ninth and twelfth floors the shadow of one she knows, by turns; on its fifth and tenth an Echo, a her
+        // from a timeline that ended badly. Two thirds of the way along, where she meets it at the end of what she has come through.
+        if (dungeon == RunDungeons.MIRROR && !spots.isEmpty() && (floor % 3 == 2 && floor < 12 || floor == 4 || floor == 9)) {
+            int kind = floor == 4 || floor == 9 ? RunUniques.ECHO_FIRST + random.nextInt(RunUniques.ECHO_COUNT) : RunUniques.CAST_FIRST + random.nextInt(RunUniques.CAST_COUNT);
+            int[] spot = spots.get(Math.min(spots.size() - 1, spots.size() * 2 / 3));
+            int row = RunUniques.floats(kind) ? spot[1] - 3 : spot[1] - 1;
+            level.foes.add(new int[]{kind, spot[0], row, 1, 0, 2});
         }
         // The keeper, in the middle of its hall; and pluses along the hall for the fight.
         if (hall >= 0) {
@@ -2139,7 +2156,7 @@ final class RunLevels {
             ledge(from + 7, FLOOR - 3, 4);
             ledge(from + 16, FLOOR - 5, 4);
             ledge(to - 10, FLOOR - 3, 4);
-            level.foes.add(new int[]{RunUniques.hiddenOf(chapterOf(number)), to - 5, FLOOR - 1, 1, 0, 2});
+            level.foes.add(new int[]{RunUniques.hiddenIn(number), to - 5, FLOOR - 1, 1, 0, 2});
             pluses(from + 3, from + 6, FLOOR - 1);
             level.rooms.add(new int[]{HIDEOUT, want[1], want[2], from, to, want[4], from + 1, want[3], -1, want[5], 0, FLOOR, ceiling, -1, 0});
         }
@@ -2197,7 +2214,7 @@ final class RunLevels {
          * something for her, and a few pluses on the floor.
          */
         void house(int[] want) {
-            int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL;
+            int number = level.number, sort = want[6], ceiling = FLOOR - ROOM_TALL, owner = -1;
             wall(2);
             int from = at;
             open(sort == PET_SHOP ? 19 : sort == GUILD_HALL || sort == MARKET || sort == BOUTIQUE ? 16 : sort == SMITHY ? 18 : sort == HOME ? 19 : 14);
@@ -2248,6 +2265,7 @@ final class RunLevels {
                 }
                 level.items.add(new int[]{GIVES[who - SOMI], from + 8, FLOOR - 1, who});
                 pluses(from + 3, from + 6, FLOOR - 1);
+                owner = who - SOMI;
                 // And its secret, if it has one: a false wall at its far end with a little room behind it, a chest and a diary page in it; a loose
                 // floorboard with a chest under it; or a diary page left out.
                 int secret = homeSecret(number, level.rooms.size()), page = Math.floorMod(number * 31 + level.rooms.size() * 17 + number / 7, DIARY_PAGES);
@@ -2261,9 +2279,12 @@ final class RunLevels {
                 } else if (secret == 2) {
                     level.items.add(new int[]{PlusRun.DIARY, from + 12, FLOOR - 1, 0, page});
                 }
+                // And what is dear to whoever lives there, to be walked up to and looked at.
+                level.items.add(new int[]{PlusRun.SPOT, from + 11, FLOOR - 1, 0, PlusRun.KEEPSAKE + owner});
             }
             int look = sort == HOME ? HOME_LOOK + Math.floorMod(number * 3 + level.rooms.size(), HOME_LOOKS) : sort == BOUTIQUE ? HOME_LOOK + 1 : LOOKS + sort;
-            level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, look, sort});
+            // (A home's sixteenth number is whoever lives in it, from Somi; -1 for any other building.)
+            level.rooms.add(new int[]{HOUSE, want[1], want[2], from, to, want[4], from + 1, 0, -1, want[5], 0, FLOOR, ceiling, look, sort, owner});
         }
 
         /** Some columns of a place off the land: floor under them, ceiling over them, and nothing between. */

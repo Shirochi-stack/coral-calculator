@@ -1,0 +1,13 @@
+plugins {
+    id 'com.android.asset-pack'
+}
+
+// The films (Plus run's prologue, idol song and the clips: the pictures and the voice tracks of each language), and the gallery's pictures, kept out of the base module,
+// which is near Play's 200 MB limit. Delivered with the install; the debug build (the GitHub APK) carries the same files, see app/build.gradle.
+// The player opens them by name from assets (FilmFiles.java): the .mp4 and .m4a are stored uncompressed, and a file that were compressed is copied once to the cache.
+assetPack {
+    packName = 'films'
+    dynamicDelivery {
+        deliveryType = 'install-time'
+    }
+}
