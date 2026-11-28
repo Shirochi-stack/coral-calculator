@@ -389,6 +389,27 @@ final class RunLevels {
     static final char VINE = 'v', FAKE = 'x';
 
     static final char THIN = '-', CRUMBLE = 'c', BELT_RIGHT = '>', BELT_LEFT = '<', SLICK = '~', DRAUGHT = 'u', DOOR = 'D', LAVA = 'L', WATER = 'w';
+
+    /**
+     * Cracked ground: a square of the floor that looks sound until you look at it, and that only a ground pound breaks. Walking on it, striking
+     * at it and falling onto it do nothing; a pound of the step that is asked for (one, two or three, by which of the three it is) breaks it,
+     * and what is under it is there to be dropped into. Cracked paper, slate, old floorboards or ice, by the land.
+     */
+    static final char CRACK = 'k', CRACK2 = 'j', CRACK3 = 'q';
+
+    /** How strong a ground pound has to be to break a square: 1, 2 or 3; 0 for a square that is not cracked. */
+    static int crackNeed(char square) { return square == CRACK ? 1 : square == CRACK2 ? 2 : square == CRACK3 ? 3 : 0; }
+
+    /**
+     * What lies under cracked ground. A vault: a small chamber with chests and something rare. A shortcut: a long low way under the land that
+     * comes up again further on. A basement: a few creatures to beat, and then the chest they guard. A cache, in a dungeon: a lower chamber with
+     * a chest that may hold a blessing or a relic. Each has a vine up out of it, so that there is always a way back.
+     */
+    static final int V_VAULT = 0, V_SHORTCUT = 1, V_BASEMENT = 2, V_CACHE = 3;
+    /** The two ways between layers that a vault has, in a land's list of them: the shaft under its cracked ground, and the vine that comes up out of it. */
+    static final int WAY_SHAFT = 4, WAY_CLIMB = 5;
+    /** The first of the bits of a land's found places that are for vaults (the places of the doors take the low ones). */
+    static final int VAULT_BIT = 24;
     /** The signs that get in her way: a minus walks, a times walks and cannot be landed on, a divide hops, and Zero is the last of them. */
     static final int MINUS = 0, TIMES = 1, DIVIDE = 2, ZERO = 3;
     /** And two that fight back from where they are: a minus that throws knives, and a divide that shoots its dots. */
@@ -1117,7 +1138,8 @@ final class RunLevels {
     /** One land: its squares, what is in it, and where it begins and ends. */
     static final class Level {
         final int number, chapter, columns;
-        final char[][] land;
+        /** Its squares (a dungeon's floor is let down a layer deeper when it has a place under it). */
+        char[][] land;
         /** The pluses: the column and row of each. */
         final List<int[]> pluses = new ArrayList<>();
         /** The signs in her way: the kind, the column and the row each starts in. */
@@ -1174,6 +1196,12 @@ final class RunLevels {
         boolean[] under;
         /** The hatches in its ground that drop into a cave, the vines up from one, and its high ledges' ways up: the column and row of each, and what it is (0 hatch, 1 vine foot, 2 hidden). */
         final List<int[]> ways = new ArrayList<>();
+        /**
+         * The places under cracked ground, for each: its kind; the column of its shaft and the row of the ground over it; the first and last columns
+         * of the cracked patch; how many squares deep the crack is where the shaft is; how strong a pound breaks it (1 to 3); the first and last
+         * columns of the chamber, and its floor row; and the column of the vine up out of it and the row of the hatch it comes up through.
+         */
+        final List<int[]> vaults = new ArrayList<>();
 
         Level(int number, int columns) { this(number, columns, ROWS); }
 
@@ -1234,6 +1262,7 @@ final class RunLevels {
         level.made.addAll(base.made);
         level.nooks.addAll(base.nooks);
         level.ways.addAll(base.ways);
+        level.vaults.addAll(base.vaults);
         level.under = new boolean[level.columns];
         // Under the land proper, rock; but under its pits nothing, as deep as ever.
         for (int column = 0; column < level.main; column++) {
@@ -1242,6 +1271,9 @@ final class RunLevels {
         }
         int caves = 1 + (level.chapter >= CHAPTERS ? 1 : 0) + (dice.nextInt(3) == 0 ? 1 : 0);
         for (int tries = 0; tries < 160 && caves > 0; tries++) if (cave(level, dice)) caves--;
+        // Under cracked ground, the places that only a ground pound gets into: laid in what room the caves leave (towards the ends of the land, which
+        // is where they leave it), from numbers of their own, so that the caves and the high ledges come out of the same numbers as ever.
+        crackedPlaces(level, new Random(play * 6700417L + base.number * 15485863L + 11));
         // (More heights than there were: routes over and under the way along.)
         int heights = 2 + (dice.nextInt(2) == 0 ? 1 : 0) + (level.chapter >= CHAPTERS * 2 ? 1 : 0);
         for (int tries = 0; tries < 160 && heights > 0; tries++) if (heights(level, dice)) heights--;
@@ -1279,7 +1311,11 @@ final class RunLevels {
         int wide = 24 + dice.nextInt(17), last = layersTo(level) - wide;
         if (last <= 18) return false;
         int from = 16 + dice.nextInt(last - 16), to = from + wide - 1;
-        for (int column = from - 8; column <= to + 8; column++) if (column >= 0 && column < level.columns && level.under[column]) return false;
+        for (int column = from - 8; column <= to + 8; column++) {
+            if (column < 0 || column >= level.columns || !level.under[column]) continue;
+            // (A chamber under cracked ground asks only a few squares of rock between it and a cave.)
+            if (!chamber(level, column) || column >= from - 3 && column <= to + 3) return false;
+        }
         // (Its walls are rock under the ground, not under a pit, which would let her fall out of it.)
         if (level.land[ROWS - 1][from - 1] != BLOCK || level.land[ROWS - 1][to + 1] != BLOCK) return false;
         // Its hatch near its near end, and the vine up near its far end, each in plain ground.
@@ -1422,6 +1458,165 @@ final class RunLevels {
         return true;
     }
 
+    // Under cracked ground
+
+    /**
+     * Places in a land that only a ground pound opens, from the second land on: one, then two from the third chapter, then three from the
+     * seventh. Each is a patch of cracked ground (the strength of pound it takes grows with the chapter) over a shaft that drops into a chamber
+     * under the land; and from the chamber a vine climbs back up. The first of them is a vault, then a shortcut, then a basement, and so round.
+     */
+    private static void crackedPlaces(Level level, Random dice) {
+        if (level.number < 2 || level.under == null) return;
+        int want = 1 + (level.chapter >= 2 ? 1 : 0) + (level.chapter >= 6 ? 1 : 0);
+        int[] kinds = {V_VAULT, V_SHORTCUT, V_BASEMENT};
+        for (int tries = 0; tries < 4000 && want > 0; tries++) {
+            // (The kind that is its turn; and, if there is no room for that one, a vault, which is the smallest.)
+            int kind = tries < 2000 ? kinds[(level.vaults.size() + level.number) % kinds.length] : V_VAULT;
+            if (vault(level, dice, kind, needIn(level.chapter, dice), layersTo(level), false)) want--;
+        }
+    }
+
+    /** How strong a pound the cracked ground of a chapter asks for: the first, in the first chapters; up to the third, in the later ones. */
+    private static int needIn(int chapter, Random dice) { return chapter < 2 ? 1 : chapter < 5 ? 1 + dice.nextInt(2) : 1 + dice.nextInt(3); }
+
+    /**
+     * Whether ground is sound for cracked squares or a hatch: level for so many squares to either side, open sky over it, rock all the way down
+     * under it, and nothing laid on or by it. (Less to ask than a cave's hatch, which wants room for a jump and for nobody to stand by it: a creature
+     * that walks over cracked ground is no harm to it.)
+     */
+    private static boolean sound(Level level, int column, int around) {
+        int floor = top(level, column);
+        if (floor < 6 || floor >= ROWS) return false;
+        for (int near = column - around; near <= column + around; near++) {
+            if (near < 0 || near >= level.columns || top(level, near) != floor) return false;
+            for (int row = floor - 2; row < floor; row++) if (level.land[row][near] != AIR) return false;
+        }
+        for (int row = floor; row < ROWS; row++) if (level.land[row][column] != BLOCK) return false;
+        for (int[] item : level.items) if (Math.abs(item[1] - column) < 2) return false;
+        for (int[] decor : level.decor) if (Math.abs(decor[1] - column) < 2) return false;
+        for (int flag : level.flags) if (Math.abs(flag - column) < 2) return false;
+        for (int[] mover : level.movers) if (Math.abs(mover[0] - column) < 3) return false;
+        return true;
+    }
+
+    /** Whether a column is one that a chamber under cracked ground lies under. */
+    private static boolean chamber(Level level, int column) {
+        for (int[] vault : level.vaults) if (column >= vault[7] && column <= vault[8]) return true;
+        return false;
+    }
+
+    /** Whether a column is clear of what a vault's shaft or its vine would be in the way of: doors, things to pick up, trees, other ways, other vaults. */
+    private static boolean clearOf(Level level, int column) {
+        for (int[] room : level.rooms) if (Math.abs(room[1] - column) < 5 || Math.abs(room[5] - column) < 5) return false;
+        for (int[] door : level.doors) if (Math.abs(door[0] - column) < 3) return false;
+        for (int[] weapon : level.weapons) if (Math.abs(weapon[1] - column) < 3) return false;
+        for (int[] tree : level.trees) if (Math.abs(tree[0] - column) < 3) return false;
+        for (int[] way : level.ways) if (Math.abs(way[0] - column) < 4) return false;
+        return true;
+    }
+
+    /** A floor of a dungeon let down to as deep as a land's rows go, if it was not already: the rock under its ground, and a lower layer that nothing was in. */
+    private static void deepen(Level level) {
+        if (level.land.length < ROWS + LOWER) {
+            char[][] deeper = new char[ROWS + LOWER][level.columns];
+            for (char[] row : deeper) java.util.Arrays.fill(row, AIR);
+            for (int row = 0; row < level.land.length; row++) System.arraycopy(level.land[row], 0, deeper[row], 0, level.columns);
+            level.land = deeper;
+        }
+        if (level.under == null) level.under = new boolean[level.columns];
+    }
+
+    /**
+     * One place under cracked ground, if there is room for it where chance puts it. A chamber lies under the land, its floor at the foot of the
+     * lower layer; its shaft comes up near its near end to cracked ground (a stack of squares as deep as the pound it takes is strong, and a
+     * patch of cracked squares to either side of it, wider for a stronger one), and a vine goes up near its far end to a hatch that cannot be
+     * dropped through from above (so the way in is the crack and only the crack). Nothing in it can hurt her but what walks there.
+     */
+    private static boolean vault(Level level, Random dice, int kind, int need, int limit, boolean dungeon) {
+        // The shaft goes where there is plain ground, and the vine comes up in plain ground a way along: so far for a vault, further for a basement, further still for a shortcut.
+        int span = kind == V_SHORTCUT ? 18 + dice.nextInt(7) : kind == V_BASEMENT ? 11 + dice.nextInt(4) : 8 + dice.nextInt(2);
+        int last = limit - span - 3;
+        if (last <= 22) return false;
+        int shaft = 20 + dice.nextInt(last - 20), exit = -1;
+        // The cracked patch: deepest over the shaft, a single layer of it to either side (wider for a stronger pound), on ground level a square past it.
+        int side = need >= 3 ? 2 : need == 2 ? 1 : dice.nextInt(2);
+        if (!sound(level, shaft, side + (dungeon ? 0 : 1)) || !clearOf(level, shaft)) return false;
+        for (int nudge = 0; nudge <= 2 && exit < 0; nudge++) {
+            for (int sign = -1; sign <= 1 && exit < 0; sign += 2) {
+                int column = shaft + span + sign * nudge;
+                if (sound(level, column, 1) && clearOf(level, column)) exit = column;
+            }
+        }
+        if (exit < 0) return false;
+        int from = shaft - 2, to = exit + 2, wide = to - from + 1;
+        // (Clear of any cave or other chamber by a few squares; under rock all along, and not under a pit.)
+        for (int column = Math.max(0, from - 2); column <= Math.min(level.columns - 1, to + 2); column++) if (level.under != null && level.under[column]) return false;
+        for (int column = from - 1; column <= to + 1; column++) if (level.land[ROWS - 1][column] != BLOCK) return false;
+        deepen(level);
+        int ground = top(level, shaft), hatch = top(level, exit), stack = need >= 2 ? 2 : 1;
+        int floor = CAVE_FLOOR - 1, high = kind == V_SHORTCUT ? 3 : 4, ceiling = floor - high + 1;
+        // Rock under all of it, and the chamber cut out of the rock.
+        for (int column = from - 1; column <= to + 1; column++) for (int row = ROWS; row < ROWS + LOWER; row++) level.land[row][column] = BLOCK;
+        for (int column = from; column <= to; column++) {
+            level.under[column] = true;
+            for (int row = ceiling; row <= floor; row++) level.land[row][column] = AIR;
+        }
+        // The shaft: clear from under the cracked squares down into the chamber.
+        for (int row = ground + stack; row < ceiling; row++) level.land[row][shaft] = AIR;
+        // The vine up, from the chamber's floor to a hatch in the ground.
+        for (int row = hatch + 1; row <= floor; row++) level.land[row][exit] = VINE;
+        level.land[hatch][exit] = THIN;
+        // The cracked ground.
+        char crack = need >= 3 ? CRACK3 : need == 2 ? CRACK2 : CRACK;
+        for (int column = shaft - side; column <= shaft + side; column++) {
+            for (int row = ground; row < ground + (column == shaft ? stack : 1); row++) level.land[row][column] = crack;
+        }
+        level.vaults.add(new int[]{kind, shaft, ground, shaft - side, shaft + side, stack, need, from, to, floor, exit, hatch});
+        level.ways.add(new int[]{shaft, ground, WAY_SHAFT});
+        level.ways.add(new int[]{exit, hatch, WAY_CLIMB});
+        // What is in it.
+        int chapter = level.chapter, rich = 10 * need + 5 * dice.nextInt(3);
+        if (kind == V_VAULT) {
+            // Two chests, one of them a rich one, and something rare beside them; pluses between.
+            level.items.add(new int[]{PlusRun.CHEST, from + wide / 2, floor, 0, 50 + rich + 4 * chapter});
+            level.items.add(new int[]{PlusRun.CHEST, from + wide / 2 + 2, floor, 0, 25 + rich});
+            if (!dungeon) level.items.add(new int[]{secretPrize(dice), from + wide / 2 - 2, floor, 0});
+            for (int along = from + 2; along <= to - 2; along += 2) if (Math.abs(along - shaft) > 1 && Math.abs(along - exit) > 1) level.pluses.add(new int[]{along, floor - 1});
+        } else if (kind == V_SHORTCUT) {
+            // A long low way under the land, with pluses along it and one chest half way; it comes up a good way further on.
+            for (int along = shaft + 3; along <= exit - 2; along += 2) level.pluses.add(new int[]{along, floor - 1});
+            level.items.add(new int[]{PlusRun.CHEST, (shaft + exit) / 2, floor, 0, 30 + rich});
+        } else if (kind == V_BASEMENT) {
+            // A few creatures walking it, and at the far end the chest they guard.
+            int[] walkers = walkersOf(level);
+            int creatures = 3 + chapter / 4 + dice.nextInt(2);
+            for (int one = 0; one < Math.min(5, creatures); one++) {
+                int along = shaft + 4 + (exit - shaft - 6) * one / Math.max(1, Math.min(5, creatures) - 1);
+                level.foes.add(new int[]{walkers[dice.nextInt(walkers.length)], Math.max(from + 4, Math.min(to - 3, along)), floor});
+            }
+            level.items.add(new int[]{PlusRun.CHEST, Math.min(to - 1, exit + 2), floor, 0, 60 + rich + 3 * chapter});
+            for (int along = shaft + 2; along < exit; along += 4) level.pluses.add(new int[]{along, floor - 1});
+        } else {
+            // A cache, in a dungeon: one chest, marked, that may hold a blessing or a relic; and a few pluses by it.
+            int middle = from + wide / 2;
+            level.items.add(new int[]{PlusRun.CHEST, middle, floor, 0, 60 + rich, PlusRun.CACHE});
+            for (int along = middle - 3; along <= middle + 3; along += 2) if (along != middle) level.pluses.add(new int[]{along, floor - 1});
+        }
+        return true;
+    }
+
+    /**
+     * The places under cracked ground on a floor of a dungeon: from the second floor, a cache with a chest that may hold a blessing or a relic,
+     * and, from the fourth, a vault as well. Drawn from numbers of their own, so that the floor is as it was. (Not in the mirror.)
+     */
+    private static void crackedCaches(Level level, int dungeon, int floor, int hall, long dive) {
+        if (floor < 1 || dungeon == RunDungeons.MIRROR) return;
+        Random dice = new Random(dive * 15485863L + dungeon * 104729L + floor * 31L + 5);
+        int limit = (hall >= 0 ? hall : level.gate) - 12, need = Math.min(3, 1 + floor / 2);
+        for (int tries = 0; tries < 1500; tries++) if (vault(level, dice, V_CACHE, need, limit, true)) break;
+        if (floor >= 3) for (int tries = 0; tries < 1500; tries++) if (vault(level, dice, V_VAULT, need, limit, true)) break;
+    }
+
     /** Which chapter a land belongs to, from 0; lands are numbered from 1. */
     static int chapterOf(int number) { return number > COUNT ? CHAPTERS + (number - COUNT - 1) / IN_LATER_CHAPTER : (number - 1) / IN_CHAPTER; }
 
@@ -1541,7 +1736,8 @@ final class RunLevels {
 
     static int top(Level level, int column) {
         int row = ROWS;
-        while (row > 0 && level.land[row - 1][column] == BLOCK) row--;
+        // (Cracked ground is ground: it is only that a pound breaks it.)
+        while (row > 0 && (level.land[row - 1][column] == BLOCK || crackNeed(level.land[row - 1][column]) > 0)) row--;
         return row == ROWS ? -1 : row;
     }
 
@@ -1795,6 +1991,7 @@ final class RunLevels {
         for (int flag : level.flags) level.weapons.add(new int[]{(number + floor + dungeon + 3) % PlusRun.GUN, flag + 1, top(level, flag + 1) - 1});
         level.foes.addAll(draft.lodgers);
         delve(level, dungeon, floor, sort, hall, hallFloor, random);
+        crackedCaches(level, dungeon, floor, hall, dive);
         return level;
     }
 

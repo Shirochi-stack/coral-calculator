@@ -112,6 +112,8 @@ final class PlusRun {
     static final int CAKE = 8, DROPOFF = 9;
     /** A chest in a place off the land: opened by touching it, and what is in it is kept. */
     static final int CHEST = 20;
+    /** A chest's sixth number, where it has one, when it is a cache (in a chamber under cracked ground in a dungeon): what is in it may be a blessing or a relic. */
+    static final int CACHE = 77;
     /**
      * And what else is in such places: a key, which opens the locked door of the place it
      * lies in; a lever, which raises that place's bridge for good; a plate, which lifts its
@@ -1039,6 +1041,103 @@ final class PlusRun {
     int poundShields() { return poundShields; }
     int popped() { return popped; }
 
+    /**
+     * Cracked ground, which only a pound breaks: those squares that have been (column times 64 plus row, as the ledges that crumble are kept), each
+     * with the pound that broke it in the log (column, row, the square it was, and which burst it was part of); how many bursts there have been
+     * (a pound that broke something); how many pounds met cracked ground that was too strong for them, and where; and how many times she has
+     * come to stand on ground that is cracked, and how many of the places under it she has dropped into.
+     */
+    private final java.util.Set<Integer> shattered = new java.util.HashSet<>();
+    private final List<int[]> crackLog = new ArrayList<>();
+    private int crackBursts, crackHolds, crackStood, vaultsOpened;
+    private float crackX, crackY, holdX, holdY;
+    private int crackLevel;
+    /** How many squares to either side of her a pound of each step reaches in cracked ground (the tree widens it): the one under her always breaks. */
+    static final int[] CRACK_SIDES = {0, 1, 2, 3};
+
+    int crackBursts() { return crackBursts; }
+    int crackHolds() { return crackHolds; }
+    int crackStood() { return crackStood; }
+    int vaultsOpened() { return vaultsOpened; }
+    /** How many caches (a chest, in a dungeon, under cracked ground, that may hold a blessing or a relic) she has opened. */
+    int caches() { return caches; }
+    private int caches;
+    float crackX() { return crackX; }
+    float crackY() { return crackY; }
+    int crackLevel() { return crackLevel; }
+    float holdX() { return holdX; }
+    float holdY() { return holdY; }
+    /** Every square a pound has broken, in order. */
+    List<int[]> crackLog() { return crackLog; }
+
+    /** Whether a square of cracked ground has been broken. */
+    boolean shattered(int column, int row) { return shattered.contains(column * 64 + row); }
+
+    /** How many squares to either side of her the pound she has reaches in cracked ground, with the tree's help. */
+    int crackSides() {
+        int level = Math.min(3, Math.max(1, perks.poundLevel));
+        return (int) Math.floor(CRACK_SIDES[level] * (1 + Math.max(0, skillOf(RunSkills.E_POUND_AREA)) / 100f) + .001f);
+    }
+
+    /**
+     * A pound lands: every square of cracked ground that she stands on, or that is beside her within the pound's reach, and that is no stronger
+     * than the pound, breaks, together with whatever is stacked under it, as deep as the crack goes (three squares at most). One too strong for
+     * the pound stays, and is told of. Where a pound has broken the ground over a place under it, she has found that place.
+     */
+    private void smashCracks(int pound, float middle, float feet) {
+        int row0 = (int) Math.floor(feet + .05f), here = (int) Math.floor(middle), sides = crackSides(), broke = 0, held = 0;
+        for (int column = here - sides; column <= here + sides; column++) {
+            for (int row = row0; row < row0 + 3 && row < level.land.length && column >= 0 && column < columns; row++) {
+                char square = level.land[row][column];
+                int need = RunLevels.crackNeed(square);
+                if (need == 0 || shattered.contains(column * 64 + row)) break;
+                if (need > pound) {
+                    held++;
+                    break;
+                }
+                shattered.add(column * 64 + row);
+                crackLog.add(new int[]{column, row, square, crackBursts + 1});
+                broke++;
+            }
+        }
+        if (broke > 0) {
+            crackBursts++;
+            crackX = middle;
+            crackY = feet;
+            crackLevel = pound;
+            for (int index = 0; index < level.vaults.size(); index++) {
+                int[] one = level.vaults.get(index);
+                if (index < 8 && shattered.contains(one[1] * 64 + one[2]) && (roomsFound >> (RunLevels.VAULT_BIT + index) & 1) == 0) {
+                    roomsFound |= 1 << (RunLevels.VAULT_BIT + index);
+                    vaultsOpened++;
+                }
+            }
+        } else if (held > 0) {
+            crackHolds++;
+            holdX = middle;
+            holdY = feet;
+        }
+    }
+
+    private boolean onCrack;
+
+    /** Whether she is standing on cracked ground, and a count of the times she has come to. */
+    private void standOnCrack() {
+        boolean now = false;
+        if (onGround && riding < 0) {
+            int row = (int) Math.floor(y + TALL + .05f);
+            for (int column = (int) Math.floor(x + .08f); column <= (int) Math.floor(x + WIDE - .08f); column++) now |= RunLevels.crackNeed(at(column, row)) > 0;
+        }
+        if (now && !onCrack) crackStood++;
+        onCrack = now;
+    }
+
+    /** Whether the hatch of a vault's vine is at a square: one she climbs up through, and cannot be let down through from above. */
+    private boolean oneWay(int column, int row) {
+        for (int[] one : level.vaults) if (one[10] == column && one[11] == row) return true;
+        return false;
+    }
+
     /** How far the ground pound reaches, now: by its step, and the tree's. */
     float poundReach() {
         int level = Math.max(1, perks.poundLevel);
@@ -1225,6 +1324,8 @@ final class PlusRun {
             poundHits++;
             pounded(foe, level >= 3 ? 99 : level >= 2 ? 2 : 1, poundHarder());
         }
+        // Whatever is cracked under her, or beside her within reach, and not too strong for the pound, breaks.
+        smashCracks(level, middle, feet);
         if (level >= 3) {
             waveX = middle;
             waveFeet = feet;
@@ -4178,6 +4279,13 @@ final class PlusRun {
         wiped = other.wiped;
         wet = other.wet;
         crumble.putAll(other.crumble);
+        shattered.addAll(other.shattered);
+        crackLog.addAll(other.crackLog);
+        crackBursts = other.crackBursts;
+        crackHolds = other.crackHolds;
+        crackStood = other.crackStood;
+        vaultsOpened = other.vaultsOpened;
+        caches = other.caches;
         columns = other.columns;
         pluses.addAll(other.pluses);
         total = other.total;
@@ -4392,6 +4500,8 @@ final class PlusRun {
         char here = level.land[row][column];
         // A ledge that has crumbled is not there until it is back.
         if (here == RunLevels.CRUMBLE && !crumble.isEmpty() && crumbling(column, row) < 0) return RunLevels.AIR;
+        // Cracked ground that a pound has broken is gone for good.
+        if (!shattered.isEmpty() && RunLevels.crackNeed(here) > 0 && shattered.contains(column * 64 + row)) return RunLevels.AIR;
         // In a place off the land: a door is a wall until its key is taken, a bridge is nothing until its lever is pulled, and bars are
         // a wall but while they are lifted.
         if (here == RunLevels.LOCKED) return (unlocked >> placeOf(column) & 1) != 0 ? RunLevels.AIR : RunLevels.BLOCK;
@@ -4402,7 +4512,7 @@ final class PlusRun {
 
     static boolean solid(char square) {
         return square == RunLevels.BLOCK || square == RunLevels.LEDGE || square == RunLevels.CRUMBLE || square == RunLevels.BELT_RIGHT
-                || square == RunLevels.BELT_LEFT || square == RunLevels.SLICK;
+                || square == RunLevels.BELT_LEFT || square == RunLevels.SLICK || RunLevels.crackNeed(square) > 0;
     }
 
     /**
@@ -6164,6 +6274,7 @@ final class PlusRun {
                 // A chest is opened: ten pluses in it, whatever else; and a stash is done with when its chest is.
                 if (item[0] == CHEST) {
                     chests++;
+                    if (item.length > 5 && item[5] == CACHE) caches++;
                     lastChest = item.length > 4 && item[4] > 0 ? item[4] : 10;
                     bonus += lastChest;
                     if (room >= 0 && level.rooms.get(room)[0] == RunLevels.STASH && (roomsDone & 1 << room) == 0) {
@@ -6292,6 +6403,7 @@ final class PlusRun {
         if (fly(seconds)) return;
         moves(seconds);
         if (poundNow) poundWave();
+        standOnCrack();
         for (Foe foe : foes) {
             // Whoever is arriving, changing or out of sight is not there to be touched.
             // (Coming down onto a small one she may be a hair to one side of it: what is forgiven is the landing, never a touch.)
@@ -8258,7 +8370,7 @@ final class PlusRun {
         if (!onGround || riding >= 0) return false;
         int row = (int) Math.floor(y + TALL + .05f), column = (int) Math.floor(x + WIDE / 2);
         char under = at(column, row);
-        return (under == RunLevels.THIN || under == RunLevels.LEDGE) && lands(column, row);
+        return (under == RunLevels.THIN || under == RunLevels.LEDGE) && lands(column, row) && !oneWay(column, row);
     }
 
     /** Whether, under a square, the first thing there is can be stood on. */
@@ -8274,7 +8386,7 @@ final class PlusRun {
             char here = at(column, below);
             if (here == RunLevels.AIR) continue;
             return here == RunLevels.THIN || here == RunLevels.LEDGE || here == RunLevels.BLOCK || here == RunLevels.CRUMBLE || here == RunLevels.BELT_LEFT
-                    || here == RunLevels.BELT_RIGHT || here == RunLevels.SLICK || here == RunLevels.VINE;
+                    || here == RunLevels.BELT_RIGHT || here == RunLevels.SLICK || here == RunLevels.VINE || RunLevels.crackNeed(here) > 0;
         }
         return false;
     }
@@ -8289,7 +8401,7 @@ final class PlusRun {
         if (by > 0) {
             int row = (int) Math.floor(y + TALL);
             // With the button that lets her down held, a thin ledge does not hold her, if there is something under it to come down on.
-            boolean through = down && lands((int) Math.floor(x + WIDE / 2), row);
+            boolean through = down && lands((int) Math.floor(x + WIDE / 2), row) && !oneWay((int) Math.floor(x + WIDE / 2), row);
             for (int column = left; column <= right; column++) {
                 char here = at(column, row);
                 boolean thin = here == RunLevels.THIN || here == RunLevels.LEDGE;

@@ -47,7 +47,7 @@ public class RunLayersTest {
                     char was = base.land[row][column], now = level.land[row][column];
                     if (was == now) continue;
                     boolean way = now == RunLevels.THIN || now == RunLevels.VINE || now == RunLevels.LEDGE || now == RunLevels.SPRING
-                            || now == RunLevels.AIR && level.under[column];
+                            || now == RunLevels.AIR && level.under[column] || RunLevels.crackNeed(now) > 0;
                     assertTrue("land " + number + " column " + column + " row " + row + ": " + was + " became " + now, way);
                 }
             }
