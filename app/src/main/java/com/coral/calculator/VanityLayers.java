@@ -23,7 +23,9 @@ final class VanityLayers {
             {"grip2", 8, 1, 304, 248}, {"grip12", 12, 1, 500, 248}, {"grip5", 8, 1, 304, 248}, {"grip15", 12, 1, 500, 248}, {"grip8", 14, 1, 400, 248}, {"grip1", 8, 1, 304, 248},
             {"grip14", 12, 1, 500, 248}, {"grip0", 8, 1, 304, 248}, {"grip17", 12, 1, 500, 248}, {"grip13", 12, 1, 500, 248}, {"grip4", 8, 1, 304, 248}, {"grip16", 12, 1, 500, 248},
             // Her moves: flips, air dash, ground pound, roll, cling, glide.
-            {"moves", 8, 1, 256, 208}};
+            {"moves", 8, 1, 256, 208},
+            // Her swimming: two strokes, a dive, an ink shot.
+            {"swim", 4, 1, 256, 208}};
 
     static int[] geometry(String sheet) {
         for (Object[] one : SHEETS) {

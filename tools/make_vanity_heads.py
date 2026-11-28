@@ -60,11 +60,11 @@ GRIPS = ["grip%d" % k for k in outfit.layers.GRIP]
 
 def frames_list():
     """Every frame: those of the sheets she had first, then those of the sheets that came later (as grids of their own, so that the grids drawn before stay the same)."""
-    out, later, grips, moves = [], [], [], []
+    out, later, grips, moves, swims = [], [], [], [], []
     for name in SHEETS:
         for idx, c in cells(name):
-            (moves if name == "moves" else grips if name in GRIPS else later if name in LATER else out).append((name, idx, c))
-    return out, later, grips, moves
+            (swims if name == "swim" else moves if name == "moves" else grips if name in GRIPS else later if name in LATER else out).append((name, idx, c))
+    return out, later, grips, moves, swims
 
 
 def make_jobs(variant, redo=False):
@@ -80,9 +80,9 @@ def make_jobs(variant, redo=False):
         while any((work / "raw" / ("%s_r%d.png" % (j, n))).exists() for j in weak):
             n += 1
         suffix = "_r%d" % n
-    first, later, grips, moves = frames_list()
-    allf = first + later + grips + moves
-    groups = [x[i:i + COLS * ROWS] for x in (first, later, grips, moves) for i in range(0, len(x), COLS * ROWS)]
+    first, later, grips, moves, swims = frames_list()
+    allf = first + later + grips + moves + swims
+    groups = [x[i:i + COLS * ROWS] for x in (first, later, grips, moves, swims) for i in range(0, len(x), COLS * ROWS)]
     cw, ch = CANVAS[0] // COLS, CANVAS[1] // ROWS
     for gnum, group in enumerate(groups):
         name = "%s_%02d" % (variant, gnum)
@@ -126,7 +126,7 @@ def components(mask, least):
     return out
 
 
-def pack(variant):
+def pack(variant, only=None):
     work = WORK.parent / "heads" / variant
     manifest = json.loads((work / "manifest.json").read_text())
     out = HEADS / variant
@@ -134,6 +134,8 @@ def pack(variant):
     patch, mask = {}, {}
     seen, failed, scores = 0, [], []
     for name, group in manifest.items():
+        if only and not any(fr["sheet"] in only for fr in group):
+            continue
         draws = [d for d in sorted((work / "raw").glob(name + "*.png")) if d.stem == name or d.stem.startswith(name + "_r")]
         if not draws:
             failed += [(name, "no draw")]
@@ -141,6 +143,8 @@ def pack(variant):
         opened = [cleaned(Image.open(d)) for d in draws]
         for fr in group:
             sheet, idx = fr["sheet"], fr["index"]
+            if only and sheet not in only:
+                continue
             cols, rows, cw, ch = SHEETS[sheet]
             orig = [c for i, c in cells(sheet) if i == idx][0]
             bx, by, bw, bh = fr["crop"]
@@ -270,7 +274,7 @@ def pack(variant):
         by_sheet.setdefault(sheet_, []).append(sc)
     weak = sorted({name_ for name_, sheet_, idx_, sc in scores if sc < 0.3 * float(np.median(by_sheet[sheet_])) or sc < 40} | {f[0] for f in failed if len(f) > 2})
     report = {"variant": variant, "frames": seen, "failed": failed, "bytes": size, "weak_jobs": weak}
-    (work / "report.json").write_text(json.dumps(report))
+    (work / ("report_only.json" if only else "report.json")).write_text(json.dumps(report))
     print(json.dumps(report))
 
 
@@ -357,5 +361,6 @@ if __name__ == "__main__":
     ap.add_argument("what", choices=["jobs", "pack", "offsets"])
     ap.add_argument("variant")
     ap.add_argument("--redo", action="store_true")
+    ap.add_argument("--only", nargs="*", default=None)
     a = ap.parse_args()
-    {"jobs": lambda: make_jobs(a.variant, a.redo), "pack": lambda: pack(a.variant), "offsets": lambda: offsets(a.variant)}[a.what]()
+    {"jobs": lambda: make_jobs(a.variant, a.redo), "pack": lambda: pack(a.variant, only=set(a.only) if a.only else None), "offsets": lambda: offsets(a.variant)}[a.what]()

@@ -42,6 +42,9 @@ for kind, (gname, frames, wide) in GRIP.items():
 # The moves (flips, air dash, ground pound, roll, cling, glide): one sheet of eight, once it is in the game.
 if (RES / "halgakos_moves.webp").exists():
     SHEETS["moves"] = (8, 1, 256, 208)
+# Her swimming (two strokes, a dive, an ink shot).
+if (RES / "halgakos_swim.webp").exists():
+    SHEETS["swim"] = (4, 1, 256, 208)
 
 
 def sheet_file(name):
