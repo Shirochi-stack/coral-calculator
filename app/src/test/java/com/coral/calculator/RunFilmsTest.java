@@ -305,7 +305,13 @@ public class RunFilmsTest {
             assertFalse(item.name, item.title.isEmpty() || item.hint.isEmpty());
             if (item.rule.equals("ending:1")) unmade++;
             if (item.rule.equals("ending:2")) truly++;
-            if (item.rule.startsWith("ending:")) assertEquals("an ending is not told of beforehand", "An ending", item.hint);
+            if (item.rule.startsWith("ending:")) assertEquals("an ending is not told of beforehand", "Reach an ending", item.hint);
+        }
+        // A locked thing is named by its kind and how it opens, never by its own title, nor by which ending.
+        for (RunGallery.Item item : RunGallery.all(text)) {
+            String label = RunGallery.lockedLabel(item);
+            assertFalse(item.name + ": " + label, label.contains(item.title) || label.toLowerCase(java.util.Locale.ROOT).contains("true ending"));
+            assertTrue(item.name, label.startsWith("A ") || label.startsWith("An "));
         }
         // (When the pictures of the endings are in, each ending has five of its own at the least.)
         assertTrue(unmade == 0 || unmade >= 5);

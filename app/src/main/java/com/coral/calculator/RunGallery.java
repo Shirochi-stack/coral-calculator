@@ -41,7 +41,8 @@ final class RunGallery {
         }
     }
 
-    private static final String FIRST = "After the first boss", TRUE = "The true ending", LAST = "In the last land";
+    /** How a locked thing opens: what to do, said without giving away what happens there. */
+    private static final String FIRST = "Beat the first boss", TRUE = "Finish the whole story", LAST = "Reach the last land";
     /** The films, and what belongs to them. */
     static final Item[] FIXED = {
             new Item(VIDEOS, "video_prologue", "Prologue", FIRST, "film:1", RunFilms.PROLOGUE),
@@ -55,6 +56,25 @@ final class RunGallery {
     };
 
     private RunGallery() {}
+
+    /**
+     * What a locked thing is called: the kind of thing it is, never its own title, which could
+     * give the story away (a film, a storyboard, a cast sheet, a picture, an outfit picture).
+     */
+    static String lockedName(Item item) {
+        switch (item.shelf) {
+            case VIDEOS: return "A film";
+            case BOARDS: {
+                String title = item.title.toLowerCase(java.util.Locale.ROOT);
+                return title.contains("cast") || title.contains("costume") ? "A cast sheet" : "A storyboard";
+            }
+            case VANITY: return "An outfit picture";
+            default: return "A picture";
+        }
+    }
+
+    /** What a locked thing shows under it: what it is, and how it opens. */
+    static String lockedLabel(Item item) { return lockedName(item) + "\n" + item.hint; }
 
     /** The pictures in a table of them: a row each, "name, title, hint, rule" with tabs between; a row that is not that, or begins with #, is left out. */
     static List<Item> pictures(String table) {

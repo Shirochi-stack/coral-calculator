@@ -82,21 +82,21 @@ l91_02_someone_small	Someone small lives here	Reach land 91	open:91
 l100_01_last_land	The last land	Reach land 100	open:100
 l100_02_everyone_together	Everyone, together	Reach land 100	open:100
 l100_03_dawn	Dawn on the page	Win land 100	land:100
-mt_01_rises	The Mother Tongue rises	An ending	ending:4
-mt_02_page_storm	Page storm	An ending	ending:4
-mt_03_ink_fire	Ink fire	An ending	ending:4
-mt_04_wings_torn	Wings of pages	An ending	ending:4
-bad_01_white	Everything unwritten	An ending	ending:1
-bad_02_empty_friends	Where are they?	An ending	ending:1
-bad_03_mawang_far	Far away, watching	An ending	ending:1
-bad_04_book_shut	The book shuts	An ending	ending:1
-bad_05_last_sum	The last sum	An ending	ending:1
-bad_06_unwritten_plaza	An unwritten plaza	An ending	ending:1
-true_01_everyone	Everyone, on the last page	An ending	ending:2
-true_02_ice_cream	My mint ice cream	An ending	ending:2
-true_03_going_home	Going home	An ending	ending:2
-true_04_volume_three_not_due	Not due yet	An ending	ending:2
-true_05_heroine_everyone	Heroine: everyone	An ending	ending:2
-true_06_friends_picnic	A picnic of friends	An ending	ending:2
-true_07_bat_mended	A mended bat	An ending	ending:2
-true_08_read_to_the_end	Read to the end	An ending	ending:2
+mt_01_rises	The Mother Tongue rises	Reach an ending	ending:4
+mt_02_page_storm	Page storm	Reach an ending	ending:4
+mt_03_ink_fire	Ink fire	Reach an ending	ending:4
+mt_04_wings_torn	Wings of pages	Reach an ending	ending:4
+bad_01_white	Everything unwritten	Reach an ending	ending:1
+bad_02_empty_friends	Where are they?	Reach an ending	ending:1
+bad_03_mawang_far	Far away, watching	Reach an ending	ending:1
+bad_04_book_shut	The book shuts	Reach an ending	ending:1
+bad_05_last_sum	The last sum	Reach an ending	ending:1
+bad_06_unwritten_plaza	An unwritten plaza	Reach an ending	ending:1
+true_01_everyone	Everyone, on the last page	Reach an ending	ending:2
+true_02_ice_cream	My mint ice cream	Reach an ending	ending:2
+true_03_going_home	Going home	Reach an ending	ending:2
+true_04_volume_three_not_due	Not due yet	Reach an ending	ending:2
+true_05_heroine_everyone	Heroine: everyone	Reach an ending	ending:2
+true_06_friends_picnic	A picnic of friends	Reach an ending	ending:2
+true_07_bat_mended	A mended bat	Reach an ending	ending:2
+true_08_read_to_the_end	Read to the end	Reach an ending	ending:2
