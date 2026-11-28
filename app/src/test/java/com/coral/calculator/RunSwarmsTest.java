@@ -6,14 +6,14 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-/** D3: swarms, twenty to fifty times what a land was laid with, gathered in groups, on the ground and on ledges; and creatures with shields. */
+/** D3: swarms, thirty to fifty-five times what a land was laid with, gathered in groups, on the ground and on ledges; and creatures with shields. */
 public class RunSwarmsTest {
     private static final float STEP = 1 / 60f;
     private static final int FLOOR = RunLevels.FLOOR;
 
-    @Test public void landsHaveTwentyToFiftyTimesTheirCreaturesInSwarms() {
-        assertEquals(20, RunLevels.swarmOf(1));
-        assertEquals(50, RunLevels.swarmOf(RunLevels.TOTAL));
+    @Test public void landsHaveThirtyToFiftyFiveTimesTheirCreaturesInSwarms() {
+        assertEquals(30, RunLevels.swarmOf(1));
+        assertEquals(55, RunLevels.swarmOf(RunLevels.TOTAL));
         for (int number = 4; number <= RunLevels.TOTAL; number++) assertTrue(RunLevels.swarmOf(number) >= RunLevels.swarmOf(number - 1));
         int onLedges = 0, short_ = 0;
         long grand = 0, grandWanted = 0;
@@ -40,7 +40,7 @@ public class RunSwarmsTest {
                 for (int[] other : level.foes) if (other != foe && RunLevels.swarmed(other) && Math.abs(other[1] - foe[1]) <= 3) near++;
                 if (near >= 2) grouped++;
             }
-            int wanted = Math.max(1, laid) * RunLevels.swarmOf(number);
+            int wanted = RunLevels.swarmBase(number, laid) * RunLevels.swarmOf(number);
             // As many as wanted, short only where a land is short of room (and never by more than a third).
             assertTrue("land " + number + " has " + all + " of " + wanted, all <= wanted && all >= wanted * (RunLevels.bossOf(number) >= 0 ? 1 : 2) / (RunLevels.bossOf(number) >= 0 ? 4 : 5));
             if (all < wanted) short_++;
@@ -50,7 +50,8 @@ public class RunSwarmsTest {
         }
         assertTrue("on ledges " + onLedges, onLedges > 2000);
         System.out.println("SWARMS " + grand + " of " + grandWanted + " wanted, short in " + short_ + " lands");
-        assertTrue("short " + short_, short_ <= 70);
+        // (With so many more asked of each, more of the lands are short of room for them: the room is what runs out.)
+        assertTrue("short " + short_, short_ <= 95);
         assertTrue(grand * 10L >= grandWanted * 6L);
     }
 

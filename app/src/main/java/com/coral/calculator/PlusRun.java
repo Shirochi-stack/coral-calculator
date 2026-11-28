@@ -1393,6 +1393,15 @@ final class PlusRun {
             }
             return;
         }
+        // Not near enough to get at her where it stands, but it has seen her: it comes, up and down and across as she goes.
+        if (foe.stance >= 2 && goesAfter(foe, way) && (foe.stance == 3 || !(near && level_ < 1.3f))) {
+            chaseWalk(foe, seconds, false, 0);
+            return;
+        }
+        if (foe.stance == 1 && goesAfter(foe, way)) {
+            foe.leftward = toLeft;
+            return;
+        }
         switch (way) {
             case RunUniques.CHARGER:
             case RunUniques.SPLITTER:
@@ -3624,6 +3633,15 @@ final class PlusRun {
         int leaping;
         /** For how much longer a blow of hers has knocked it off its feet: it does everything at a crawl, and can still be hit. */
         float stunned;
+        /**
+         * Going after her (see mood): whether it has seen her and is after her, and has been put where it is; how long it has been, how long it
+         * has lost sight of her, and how long it has been unable to get nearer; the moment of alarm when it first sees her; how long it will not look for her
+         * after giving up, and how long it has to get home; where it was put; how long until it lunges again, how long it crouches first, and how much
+         * longer it lunges; how long until it looks again for a way up; how fast one that flies is going, across and down; and what it is up to now.
+         */
+        boolean hunting, rooted;
+        float hunt, lost, stuck, alert, sulk, homing, spawnX, spawnY, cool, wind, lunge, hopWait, leapLasts, vx, vy;
+        int stance;
 
         Foe(int kind) {
             this.kind = kind;
@@ -4243,12 +4261,31 @@ final class PlusRun {
             foe.fall = from.fall;
             foe.leaping = from.leaping;
             foe.stunned = from.stunned;
+            foe.hunting = from.hunting;
+            foe.rooted = from.rooted;
+            foe.hunt = from.hunt;
+            foe.lost = from.lost;
+            foe.stuck = from.stuck;
+            foe.alert = from.alert;
+            foe.sulk = from.sulk;
+            foe.homing = from.homing;
+            foe.spawnX = from.spawnX;
+            foe.spawnY = from.spawnY;
+            foe.cool = from.cool;
+            foe.wind = from.wind;
+            foe.lunge = from.lunge;
+            foe.hopWait = from.hopWait;
+            foe.leapLasts = from.leapLasts;
+            foe.vx = from.vx;
+            foe.vy = from.vy;
+            foe.stance = from.stance;
             foes.add(foe);
         }
         for (int[] tree : other.trees) trees.add(tree.clone());
         System.arraycopy(other.paperCut, 0, paperCut, 0, paperCut.length);
         treesCut = other.treesCut;
         inWater = other.inWater;
+        calm = other.calm;
         swimming = other.swimming;
         breath = other.breath;
         breathTick = other.breathTick;
@@ -8356,7 +8393,23 @@ final class PlusRun {
     }
 
     private void move(Foe foe, float seconds) {
-        moveFoe(foe, seconds);
+        // A blow, or a freezing, in the middle of a leap or a lunge: it comes down where it is, and the lunge is off.
+        if ((foe.leaping != 0 || foe.wind > 0 || foe.lunge > 0) && (foe.dazed > 0 || foe.iced > 0 || foe.frozen > 0 || foe.flat) && hunts(foe)) {
+            if (foe.leaping == 2) foe.ground = foe.y;
+            foe.leaping = 0;
+            foe.wind = foe.lunge = 0;
+        }
+        // Left asleep in the middle of a leap (she has gone far off): it lands where it was going, rather than hang in the air.
+        if ((foe.leaping == 1 || foe.leaping == 2) && Math.abs(foe.x - x) > WAKES && hunts(foe)) {
+            if (foe.leaping == 2) {
+                foe.x = foe.leapTX;
+                foe.ground = foe.y = foe.leapTY;
+            }
+            foe.leaping = 0;
+        }
+        // In the middle of a leap it does nothing else, whatever it was about: the arc is finished first.
+        if (foe.leaping != 0 && hunts(foe) && !foe.flat) goTo(foe, seconds, 0, 0, 0);
+        else moveFoe(foe, seconds);
         if (foe.swarm && !foe.flat && Math.abs(foe.x - foe.home) > LEASH) {
             float was = foe.x;
             foe.x = foe.home + Math.signum(foe.x - foe.home) * LEASH;
@@ -8477,6 +8530,8 @@ final class PlusRun {
             waits(foe, seconds, middle, away, toLeft);
             return;
         }
+        // (Those that go after her make up their minds first: see mood.)
+        foe.stance = hunts(foe) ? mood(foe, seconds) : 0;
         if (RunUniques.is(foe.kind)) {
             unique(foe, seconds, middle, away, toLeft);
             return;
@@ -8487,29 +8542,42 @@ final class PlusRun {
         }
         if (foe.kind == RunLevels.DIVIDE || foe.kind == RunLevels.GUNNER) {
             float before = (foe.clock - seconds) % HOP_EVERY / HOP_EVERY, turn = foe.clock % HOP_EVERY / HOP_EVERY;
-            foe.y = foe.ground - (float) Math.sin(turn * Math.PI) * HOP_HIGH;
+            if (foe.leaping == 0) foe.y = foe.ground - (float) Math.sin(turn * Math.PI) * HOP_HIGH;
             if (foe.kind == RunLevels.GUNNER) {
                 foe.leftward = toLeft;
                 if (before < .5f && turn >= .5f && (int) (foe.clock / HOP_EVERY) % 2 == 0 && away < DOT_REACH) {
-                    shoot(DOT, false, middle, foe.y + .25f, toLeft ? -DOT_SPEED : DOT_SPEED, 0, 1.2f);
-                    thrown++;
+                    // (Along the ground, to be jumped; at her, where she is above or below it.)
+                    if (Math.abs(y + TALL - foe.ground - foe.tall()) > 1.2f) {
+                        aim(DOT, middle, foe.y + .25f, DOT_SPEED, 0, 1.2f);
+                    } else {
+                        shoot(DOT, false, middle, foe.y + .25f, toLeft ? -DOT_SPEED : DOT_SPEED, 0, 1.2f);
+                        thrown++;
+                    }
                 }
             }
+            if (foe.stance > 0) chaseWalk(foe, seconds, foe.kind == RunLevels.DIVIDE, foe.kind == RunLevels.GUNNER ? 3.8f : 0);
             return;
         }
         if (foe.kind == RunLevels.THROWER) {
             foe.leftward = toLeft;
             // It holds its knife until she is near enough to throw it at.
             foe.wait = Math.max(foe.wait - seconds, away < THROW_REACH + 1.5f ? -1 : WARNING);
-            if (foe.wait <= 0 && away < THROW_REACH && Math.abs(y + TALL - foe.y - foe.tall()) < 2.5f) {
+            if (foe.wait <= 0 && away < THROW_REACH && Math.abs(y + TALL - foe.y - foe.tall()) < 5.5f) {
                 foe.wait = THROW_EVERY;
-                shoot(KNIFE, false, middle, foe.y + foe.tall() - .45f, toLeft ? -THROWN : THROWN, 0, 1.9f);
-                thrown++;
+                // (Along the ground, to be jumped; at her, where she is above or below it.)
+                if (Math.abs(y + TALL - foe.y - foe.tall()) < 2.5f) {
+                    shoot(KNIFE, false, middle, foe.y + foe.tall() - .45f, toLeft ? -THROWN : THROWN, 0, 1.9f);
+                    thrown++;
+                } else {
+                    aim(KNIFE, middle, foe.y + foe.tall() - .45f, THROWN, 0, 1.9f);
+                }
             }
+            if (foe.stance > 0) chaseWalk(foe, seconds, false, 3.8f);
             return;
         }
         if (foe.guard > 0 && away < 5 && Math.abs(y + TALL - foe.y - foe.tall()) < 1.5f) foe.leftward = toLeft;
-        walk(foe, SPEED[foe.kind] * seconds, true);
+        if (foe.stance > 0) chaseWalk(foe, seconds, true, 0);
+        else walk(foe, SPEED[foe.kind] * seconds, true);
     }
 
     /**
@@ -8716,6 +8784,396 @@ final class PlusRun {
         return true;
     }
 
+    // Going after her
+
+    /**
+     * Every sign has eyes. One that walks, hops, flies or floats (but not one who waits, nor a paper target, nor the
+     * shadows, the hidden ones, the burrowers and the others that keep to their own odd ways) notices her when she comes within
+     * {@link #noticeRange}: it stops, shows a red "!", and then comes after her. On the ground it walks at her, steps down off ledges
+     * (never into water, lava, spikes or a fall too far), jumps up onto ledges and across gaps it can clear, and does not turn back at
+     * the end of its own platform. In the air it homes in, a little too fast to stop, so that it overshoots and can be dodged. Near
+     * enough, it crouches (which is to be seen) and lunges where she was, and rests a while before the next. It is never as quick as she
+     * is; the earlier the land, the slower it is, the sooner it tires, and the less far it notices her. It gives up when she is too far,
+     * when it has been after her too long or has gone too far from where it was put, when it can get no nearer, or when she is where
+     * it cannot follow (a village, a place off the land, behind a door), and then goes home and goes on as it was.
+     */
+    static final float START_CALM = 3.5f, HUNT_ALERT = .55f, LUNGE_LASTS = .28f, LUNGE_FROM = 2.6f, MOST_JUMP_ACROSS = 4.2f, MOST_DROP = 7;
+    /** Counts that only go up: those that noticed her, those that lunged, those that jumped up or across, and those that gave up. */
+    private int chasesBegun, chaseLunges, chaseJumps, chasesGivenUp;
+    /** Whether nothing goes after her: for a test of something else, where the creatures are to stand as they were put. */
+    boolean calm;
+
+    /** The first moments of a land are over: for a test of the creatures that come, which should not wait for them to be. */
+    void awaken() { time = Math.max(time, START_CALM); }
+
+    int chasesBegun() { return chasesBegun; }
+    int chaseLunges() { return chaseLunges; }
+    int chaseJumps() { return chaseJumps; }
+    int chasesGivenUp() { return chasesGivenUp; }
+
+    /** How far into the land, from nothing at the first land to the whole of it at the seventieth, a creature's land is. */
+    private float lateness() { return Math.min(1, level.number / 70f); }
+
+    /** Whether a creature is one of those that go after her. */
+    private boolean hunts(Foe foe) {
+        int kind = foe.kind;
+        if (calm || foe.flat || foe.spawned || RunLevels.boss(kind) || kind == RunLevels.TARGET || kind == RunLevels.WORD || kind == RunLevels.WISP) return false;
+        return !RunUniques.is(kind) || goesAfter(foe, RunUniques.way(kind));
+    }
+
+    /** Which of the unique creatures that walk may be sent after her: those whose ways are to run, shove, burst or spring at her. */
+    private boolean goesAfter(Foe foe, int way) {
+        int kind = foe.kind;
+        if (!walks(kind) || RunUniques.shadow(kind) || RunUniques.copy(kind) || RunUniques.echo(kind) || RunUniques.castShadow(kind)) return false;
+        return way == RunUniques.CHARGER || way == RunUniques.SHIELDER || way == RunUniques.EXPLODER || way == RunUniques.SPLITTER || way == RunUniques.LEAPER
+                || way == RunUniques.BOUNCER || (way == RunUniques.MIMIC || way == RunUniques.DROPPER) && foe.turn != 0;
+    }
+
+    /** How near she must come, in squares, for it to notice her: those that shoot and fly see further; every land on, further. */
+    private float noticeRange(Foe foe) {
+        int kind = foe.kind;
+        boolean far = RunLevels.flier(kind) || kind == RunLevels.DRAGON || kind == RunLevels.THROWER || kind == RunLevels.GUNNER;
+        return (far ? 8.5f : RunUniques.is(kind) ? 7.5f : 6.5f) * (1 + .45f * lateness());
+    }
+
+    /** How fast it goes after her: quicker than it walks about, and never near as quick as she runs. */
+    private float paceOf(Foe foe) {
+        float late = lateness(), walking = SPEED[foe.kind] > 0 ? SPEED[foe.kind] : 1.8f;
+        return Math.min(walking * (1.3f + .5f * late), RUN * (.5f + .3f * late));
+    }
+
+    /** How fast a lunge goes, for its moment; how long it crouches first; and how long it rests after. */
+    private float lungeSpeed() { return RUN * (.8f + .2f * lateness()); }
+
+    private float windOf() { return .6f - .25f * lateness(); }
+
+    private float restOf() { return 2.1f - .9f * lateness(); }
+
+    /** Whether a place is in a village, or by a homestead's stall: there nothing goes after her. */
+    private boolean quietAt(float column) {
+        if (level.town >= 0 && column >= level.town - 2 && column <= level.town + RunLevels.townWide(RunLevels.townOf(level.number).length)) return true;
+        for (int[] item : items) if (item[0] == STALL && column >= item[1] - 18 && column <= item[1] + 7) return true;
+        return false;
+    }
+
+    /** Whether a door, bars or a lock stands between a creature and her, on her row or its own. */
+    private boolean shutOff(Foe foe) {
+        float px = x + WIDE / 2, cx = foe.x + foe.wide() / 2;
+        int from = (int) Math.floor(Math.min(px, cx)), to = (int) Math.floor(Math.max(px, cx));
+        int[] rows = {(int) Math.floor(y + TALL - .5f), (int) Math.floor(foe.ground + foe.tall() - .5f)};
+        for (int row : rows) {
+            if (row < 0 || row >= level.land.length) continue;
+            for (int column = Math.max(0, from); column <= Math.min(columns - 1, to); column++) {
+                char square = level.land[row][column];
+                if (square == RunLevels.DOOR || square == RunLevels.LOCKED || square == RunLevels.GRILLE) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Where nothing goes into the place where someone waits at the end of a land, nor follows her into it. */
+    private boolean bounded(Foe foe, float at) {
+        return !(level.arena >= 0 && foe.x < level.arena && at > level.arena - 1.5f);
+    }
+
+    /**
+     * What a creature that goes after her is up to: 0 about its own business; 1 it has just seen her and is still; 2 after her; 3 going back
+     * to where it was put, having given up. This is where it notices her, loses her and gives up.
+     */
+    private int mood(Foe foe, float seconds) {
+        if (!foe.rooted) {
+            foe.rooted = true;
+            foe.spawnX = foe.x;
+            foe.spawnY = foe.ground;
+        }
+        float px = x + WIDE / 2, cx = foe.x + foe.wide() / 2, herFeet = y + TALL, feet = foe.ground + foe.tall();
+        float away = Math.abs(px - cx), range = noticeRange(foe), late = lateness();
+        foe.sulk = Math.max(0, foe.sulk - seconds);
+        // (Nothing has noticed her in the first moments of a land: she is given time to look about before anything comes.)
+        boolean quiet = time < START_CALM || room >= 0 || roomOf(foe) >= 0 || state != PLAYING || doorWait > 0 || quietAt(px) || quietAt(cx) || shutOff(foe);
+        if (!foe.hunting) {
+            if (!quiet && foe.sulk <= 0 && away < range && Math.abs(herFeet - feet) < 6.5f) {
+                foe.hunting = true;
+                foe.hunt = foe.lost = foe.stuck = 0;
+                foe.alert = HUNT_ALERT - .25f * late;
+                foe.homing = 0;
+                chasesBegun++;
+                return 1;
+            }
+        } else {
+            foe.hunt += seconds;
+            if (away > range * 1.7f) foe.lost += seconds;
+            else foe.lost = Math.max(0, foe.lost - seconds);
+            boolean tired = foe.hunt > 7 + 7 * late, far = Math.abs(foe.x - foe.spawnX) > (foe.swarm ? LEASH - .4f : 13 + 8 * late);
+            if (quiet || tired || far || foe.lost > 2.5f || foe.stuck > 3) {
+                foe.hunting = false;
+                foe.sulk = foe.stuck > 3 ? 6 : 3;
+                foe.wind = foe.lunge = foe.alert = 0;
+                foe.homing = 9;
+                chasesGivenUp++;
+            } else if (foe.alert > 0) {
+                foe.alert -= seconds;
+                return 1;
+            } else {
+                return 2;
+            }
+        }
+        if (foe.homing > 0) {
+            foe.homing -= seconds;
+            if (Math.abs(foe.x - foe.spawnX) < .6f && Math.abs(feet - foe.spawnY - foe.tall()) < .6f || foe.homing <= 0) {
+                foe.homing = 0;
+                foe.home = foe.spawnX;
+                return 0;
+            }
+            return 3;
+        }
+        return 0;
+    }
+
+    /**
+     * One that walks (or hops) after her: it waits out its "!", crouches and lunges when she is near and level with it, and otherwise goes to
+     * where she is. A lunger that shoots keeps off to {@code keep} squares, and does not lunge.
+     */
+    private void chaseWalk(Foe foe, float seconds, boolean lunges, float keep) {
+        float px = x + WIDE / 2, cx = foe.x + foe.wide() / 2, herFeet = y + TALL, feet = foe.ground + foe.tall(), away = Math.abs(px - cx);
+        boolean toLeft = px < cx, home = foe.stance == 3;
+        if (foe.stance == 1) {
+            foe.leftward = toLeft;
+            return;
+        }
+        if (foe.leaping == 0) {
+            if (foe.wind > 0) {
+                // Crouched, to be seen: it springs where she was.
+                foe.leftward = toLeft;
+                if ((foe.wind -= seconds) <= 0) foe.lunge = LUNGE_LASTS;
+                return;
+            }
+            if (foe.lunge > 0) {
+                foe.lunge -= seconds;
+                if (!walk(foe, lungeSpeed() * seconds, false)) foe.lunge = 0;
+                if (foe.lunge <= 0) foe.cool = restOf();
+                return;
+            }
+            foe.cool -= seconds;
+            if (!home && lunges && foe.cool <= 0 && away < LUNGE_FROM && Math.abs(herFeet - feet) < 1.1f && held(foe)) {
+                foe.wind = windOf();
+                foe.leftward = toLeft;
+                chaseLunges++;
+                return;
+            }
+            if (!home && keep > 0 && away < keep && Math.abs(herFeet - feet) < 1.6f) {
+                foe.leftward = toLeft;
+                return;
+            }
+        }
+        float goalX = home ? foe.spawnX + foe.wide() / 2 : px, goalFeet = home ? foe.spawnY + foe.tall() : herFeet;
+        goTo(foe, seconds, home ? Math.min(paceOf(foe), RUN * .5f) : paceOf(foe), goalX, goalFeet);
+        if (!home && away < 4 && foe.leaping == 0) foe.leftward = toLeft;
+    }
+
+    /**
+     * One step toward a place on the ground: along it, down off a ledge where the fall is safe, or a jump up onto a ledge or across a gap
+     * (a crouch, and then an arc). Where it can get no nearer it keeps still, and counts how long.
+     */
+    private void goTo(Foe foe, float seconds, float pace, float goalX, float goalFeet) {
+        if (foe.leaping == 1) {
+            if ((foe.leap -= seconds) <= 0) {
+                foe.leaping = 2;
+                foe.leap = 0;
+                foe.leapFX = foe.x;
+                foe.leapFY = foe.ground;
+            }
+            return;
+        }
+        if (foe.leaping == 2) {
+            foe.leap += seconds;
+            float through = Math.min(1, foe.leap / foe.leapLasts), high = Math.max(1.1f, foe.leapFY - foe.leapTY + .9f);
+            foe.x = foe.leapFX + (foe.leapTX - foe.leapFX) * through;
+            foe.y = foe.leapFY + (foe.leapTY - foe.leapFY) * through - (float) Math.sin(through * Math.PI) * high;
+            if (through >= 1) {
+                foe.leaping = 0;
+                foe.ground = foe.y = foe.leapTY;
+                foe.dropping = 0;
+                foe.hopWait = .4f;
+            }
+            return;
+        }
+        // (Off a ledge it is coming down, and settles as anything does.)
+        if (!held(foe)) return;
+        float cx = foe.x + foe.wide() / 2, feet = foe.ground + foe.tall(), dx = goalX - cx, dy = goalFeet - feet;
+        boolean above = dy < -.9f, below = dy > .9f;
+        float dir = dx >= 0 ? 1 : -1, by = pace * seconds;
+        foe.hopWait -= seconds;
+        int row = (int) Math.floor(feet - .001f);
+        if (below && Math.abs(dx) < 1.4f) {
+            dir = dropWay(foe, dir);
+        } else if (Math.abs(dx) < .25f && !above) {
+            foe.stuck = Math.max(0, foe.stuck - seconds);
+            return;
+        }
+        float lead = dir < 0 ? foe.x - by : foe.x + foe.wide() + by;
+        int column = (int) Math.floor(lead);
+        boolean wall = lead < 0 || lead > columns || solid(at(column, row)) || !bounded(foe, lead);
+        boolean edge = !wall && !standable(at(column, row + 1));
+        boolean spike = !wall && at(column, row) == RunLevels.SPIKE;
+        if ((above || wall || edge && !below) && foe.hopWait <= 0) {
+            if (planJump(foe, dir, goalX, goalFeet)) return;
+            foe.hopWait = .35f;
+        }
+        if (wall || spike || edge && !(below && safeDrop(foe, column, row))) {
+            foe.stuck += seconds;
+            return;
+        }
+        foe.x += dir * by;
+        foe.leftward = dir < 0;
+        foe.stuck = Math.max(0, foe.stuck - seconds * 2);
+    }
+
+    /** Whether something solid (but not a ledge, which can be jumped up through) is in the way of one at a place. */
+    private boolean clear(Foe foe, float fx, float fy) {
+        if (fx < 0 || fx + foe.wide() > columns || fy < 0) return false;
+        for (int column = (int) Math.floor(fx + .05f); column <= (int) Math.floor(fx + foe.wide() - .05f); column++) {
+            for (int row = (int) Math.floor(fy + .05f); row <= (int) Math.floor(fy + foe.tall() - .05f); row++) {
+                char square = at(column, row);
+                if (solid(square) && square != RunLevels.LEDGE) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Looks for a jump, the way it faces, that lands it nearer to where it is going: up onto a ledge no higher than it can reach, across a gap,
+     * onto a ledge a little below. The arc has to be clear and the landing has to be ground. If there is one it crouches for it.
+     */
+    private boolean planJump(Foe foe, float dir, float goalX, float goalFeet) {
+        // (One of a swarm keeps to its own ledge: it comes at her along it, and neither leaps nor drops.)
+        if (foe.swarm) return false;
+        float feet = foe.ground + foe.tall(), cx = foe.x + foe.wide() / 2;
+        int feetRow = (int) Math.floor(feet + .05f), up = lateness() > .5f ? 3 : 2;
+        float best = Math.abs(goalX - cx) + 1.6f * Math.abs(goalFeet - feet) - .7f, toX = Float.NaN, toY = 0, bestAcross = 0;
+        for (float across = .5f; across <= MOST_JUMP_ACROSS; across += .5f) {
+            float lands = foe.x + dir * across;
+            if (lands < 0 || lands + foe.wide() > columns || !bounded(foe, lands)) continue;
+            for (int top = feetRow - up; top <= feetRow + 2; top++) {
+                float ly = top - foe.tall();
+                if (!standsAt(foe, lands, top) || !clear(foe, lands, ly - .02f)) continue;
+                int under = (int) Math.floor(lands + foe.wide() / 2);
+                if (at(under, top - 1) == RunLevels.SPIKE || at(under, top) == RunLevels.SPIKE) continue;
+                float score = Math.abs(goalX - (lands + foe.wide() / 2)) + 1.6f * Math.abs(goalFeet - top);
+                if (score >= best) continue;
+                float high = Math.max(1.1f, foe.ground - ly + .9f);
+                boolean open = true;
+                for (int step = 1; step < 6 && open; step++) {
+                    float t = step / 6f;
+                    open = clear(foe, foe.x + (lands - foe.x) * t, foe.ground + (ly - foe.ground) * t - (float) Math.sin(t * Math.PI) * high);
+                }
+                if (!open) continue;
+                best = score;
+                toX = lands;
+                toY = ly;
+                bestAcross = across;
+            }
+        }
+        if (Float.isNaN(toX)) return false;
+        foe.y = foe.ground;
+        foe.leaping = 1;
+        foe.leap = .3f - .12f * lateness();
+        foe.leapTX = toX;
+        foe.leapTY = toY;
+        foe.leapLasts = .32f + .035f * bestAcross;
+        foe.leftward = dir < 0;
+        chaseJumps++;
+        return true;
+    }
+
+    /** Whether stepping off a ledge into a column lands it on something to stand on, not too far down, and never in water, lava or on spikes. */
+    private boolean safeDrop(Foe foe, int column, int row) {
+        if (foe.swarm || !bounded(foe, column)) return false;
+        for (int under = row + 1; under < level.land.length; under++) {
+            char square = at(column, under);
+            if (square == RunLevels.WATER || square == RunLevels.LAVA || square == RunLevels.SPIKE) return false;
+            if (standable(square)) return under - (row + 1) <= MOST_DROP;
+        }
+        return false;
+    }
+
+    /** Which way along its ledge to the nearest edge it can safely step off, when she is below it and about under it. */
+    private float dropWay(Foe foe, float dir) {
+        int row = (int) Math.floor(foe.ground + foe.tall() - .001f), from = (int) Math.floor(foe.x + foe.wide() / 2), nearest = 99;
+        float way = dir;
+        for (float side : new float[]{dir, -dir}) {
+            for (int step = 1; step <= 16; step++) {
+                int column = from + (int) side * step;
+                if (column < 0 || column >= columns || solid(at(column, row))) break;
+                if (!standable(at(column, row + 1))) {
+                    if (safeDrop(foe, column, row) && step < nearest) {
+                        nearest = step;
+                        way = side;
+                    }
+                    break;
+                }
+            }
+        }
+        return way;
+    }
+
+    /**
+     * One that flies after her: it steers toward where she is (a little above, as it is told) with some give in it, so that it overshoots when she
+     * changes her way; and, if it is one that lunges, crouches and rushes at where she was. It does not fly into the ground.
+     */
+    private void flyAfter(Foe foe, float seconds, boolean lunges, float over) {
+        float px = x + WIDE / 2, py = y + TALL * .45f, cx = foe.x + foe.wide() / 2, cy = foe.ground + foe.tall() / 2;
+        boolean home = foe.stance == 3, toLeft = px < cx;
+        float goalX = home ? foe.spawnX + foe.wide() / 2 : px, goalY = home ? foe.spawnY + foe.tall() / 2 : py - over;
+        if (foe.wind > 0) {
+            foe.vx = foe.vy = 0;
+            foe.leftward = toLeft;
+            if ((foe.wind -= seconds) <= 0) {
+                float far = Math.max(.3f, (float) Math.hypot(px - cx, py - cy));
+                foe.vx = (px - cx) / far * lungeSpeed();
+                foe.vy = (py - cy) / far * lungeSpeed();
+                foe.lunge = LUNGE_LASTS;
+            }
+        } else if (foe.lunge > 0) {
+            if ((foe.lunge -= seconds) <= 0) {
+                foe.cool = restOf();
+                foe.vx *= .3f;
+                foe.vy *= .3f;
+            }
+        } else if (foe.stance == 1) {
+            foe.vx = foe.vy = 0;
+            foe.leftward = toLeft;
+        } else {
+            foe.cool -= seconds;
+            if (lunges && !home && foe.cool <= 0 && Math.hypot(px - cx, py - cy) < LUNGE_FROM + .6f) {
+                foe.wind = windOf();
+                foe.vx = foe.vy = 0;
+                chaseLunges++;
+            } else {
+                float dx = goalX - cx, dy = goalY - cy, far = Math.max(.01f, (float) Math.hypot(dx, dy)), want = Math.min(paceOf(foe), far * 2.5f);
+                float give = Math.min(1, seconds * 2.2f);
+                foe.vx += (dx / far * want - foe.vx) * give;
+                foe.vy += (dy / far * want - foe.vy) * give;
+                foe.leftward = home ? foe.vx < 0 : toLeft;
+            }
+        }
+        float nx = foe.x + foe.vx * seconds, ny = foe.ground + foe.vy * seconds;
+        if (roomFor(foe, nx, foe.y)) foe.x = nx;
+        else foe.vx = 0;
+        if (roomFor(foe, foe.x, ny)) foe.ground = ny;
+        else foe.vy = 0;
+        foe.y = foe.ground + (float) Math.sin(foe.clock * 2.4f) * .3f;
+    }
+
+    /** Draws the place a ring or a dragon circles toward her (or back to where it began): where it flies about is what moves. */
+    private void shiftHome(Foe foe, float seconds, float lift) {
+        float px = x + WIDE / 2 - foe.wide() / 2, step = paceOf(foe) * seconds;
+        boolean home = foe.stance == 3;
+        float toX = home ? foe.spawnX : px, toY = home ? foe.spawnY : y + TALL - lift;
+        foe.home += Math.max(-step, Math.min(step, toX - foe.home));
+        foe.ground += Math.max(-step, Math.min(step, toY - foe.ground));
+    }
+
     /** Counts down the ledges that crumble: one she stands on begins to, falls, and after a while is back. */
     private void crumbling(float seconds) {
         if (onGround && riding < 0) {
@@ -8759,12 +9217,16 @@ final class PlusRun {
             case RunLevels.POGO: {
                 boolean slime = foe.kind == RunLevels.SLIME;
                 float every = slime ? .8f : 1.1f, turn = foe.clock % every / every;
-                foe.y = foe.ground - (float) Math.sin(turn * Math.PI) * (slime ? .6f : 2.4f);
+                if (foe.leaping == 0) foe.y = foe.ground - (float) Math.sin(turn * Math.PI) * (slime ? .6f : 2.4f);
                 if (slime && away < 8) foe.leftward = toLeft;
-                if (turn > .12f) walk(foe, SPEED[foe.kind] * seconds, !slime || away >= 8);
+                if (turn > .12f) {
+                    if (foe.stance > 0) chaseWalk(foe, seconds, true, 0);
+                    else walk(foe, SPEED[foe.kind] * seconds, !slime || away >= 8);
+                }
                 break;
             }
             case RunLevels.DRAGON: {
+                if (foe.stance >= 2) shiftHome(foe, seconds, 0);
                 if (Math.abs(foe.x - foe.home) > 3) foe.leftward = foe.x > foe.home;
                 foe.x += (foe.leftward ? -1 : 1) * SPEED[foe.kind] * seconds;
                 foe.y = foe.ground - 2.6f - (float) Math.sin(foe.clock * 2);
@@ -8777,7 +9239,8 @@ final class PlusRun {
             case RunLevels.BAR: {
                 // Tiptoeing (0); seen her, and gathering itself (1); dashing (2); getting its breath back (3).
                 if (foe.mode == 0) {
-                    walk(foe, SPEED[foe.kind] * seconds, true);
+                    if (foe.stance > 0) chaseWalk(foe, seconds, false, 0);
+                    else walk(foe, SPEED[foe.kind] * seconds, true);
                     if (away < 4.5f && Math.abs(y + TALL - foe.ground - foe.tall()) < 1.5f) {
                         foe.mode = 1;
                         foe.act = .5f;
@@ -8793,6 +9256,10 @@ final class PlusRun {
                 break;
             }
             case RunLevels.FAN: {
+                if (foe.stance > 0) {
+                    chaseWalk(foe, seconds, true, 0);
+                    break;
+                }
                 if (away < 7 && away > .2f) {
                     foe.leftward = toLeft;
                     walk(foe, SPEED[foe.kind] * seconds, false);
@@ -8825,6 +9292,10 @@ final class PlusRun {
             case RunLevels.MITE: {
                 // To and fro over where it began, bobbing: a tittle quicker, and each a little after the one before it in the line.
                 boolean mite = foe.kind == RunLevels.MITE;
+                if (foe.stance > 0) {
+                    flyAfter(foe, seconds, true, 0);
+                    break;
+                }
                 if (Math.abs(foe.x - foe.home) > (mite ? 4 : 3.5f)) foe.leftward = foe.x > foe.home;
                 foe.x += (foe.leftward ? -1 : 1) * SPEED[foe.kind] * seconds;
                 foe.y = foe.ground + (float) Math.sin(foe.clock * (mite ? 3.2f : 2.4f)) * (mite ? .4f : .45f);
@@ -8833,6 +9304,7 @@ final class PlusRun {
             case RunLevels.SWOOPER: {
                 // Hanging (0); it has marked her (1); the dive, down through where she stood and up the other side (2); getting its height back (3).
                 if (foe.mode == 0) {
+                    if (foe.stance > 0) flyAfter(foe, seconds, false, 3.4f);
                     foe.y = foe.ground + (float) Math.sin(foe.clock * 2) * .25f;
                     foe.leftward = toLeft;
                     if ((foe.wait -= seconds) <= 0 && away < 4.5f && y + TALL > foe.y + 1.5f) {
@@ -8872,9 +9344,14 @@ final class PlusRun {
                 break;
             }
             case RunLevels.BOMBER: {
-                if (Math.abs(foe.x - foe.home) > 6) foe.leftward = foe.x > foe.home;
-                foe.x += (foe.leftward ? -1 : 1) * SPEED[foe.kind] * seconds;
-                foe.y = foe.ground + (float) Math.sin(foe.clock * 1.6f) * .2f;
+                if (foe.stance > 0) {
+                    // (Over her, to let go of what it carries where she is.)
+                    flyAfter(foe, seconds, false, 4.2f);
+                } else {
+                    if (Math.abs(foe.x - foe.home) > 6) foe.leftward = foe.x > foe.home;
+                    foe.x += (foe.leftward ? -1 : 1) * SPEED[foe.kind] * seconds;
+                    foe.y = foe.ground + (float) Math.sin(foe.clock * 1.6f) * .2f;
+                }
                 // What it lets go falls straight down: one every so often while she is anywhere under its way; it puffs itself up first.
                 foe.wait = Math.max(away < 5 ? -1 : .45f, foe.wait - seconds);
                 foe.mode = foe.wait < .45f && away < 5 ? 1 : 0;
@@ -8898,6 +9375,7 @@ final class PlusRun {
                         thrown++;
                     }
                 } else {
+                    if (foe.stance >= 2 && away > 5) flyAfter(foe, seconds, false, 1.8f);
                     // It keeps its distance: from nearer than four squares it backs off, as far as it may go from where it began.
                     float to = foe.x + (toLeft ? 1 : -1) * SPEED[foe.kind] * seconds;
                     if (away < 4 && Math.abs(to - foe.home) <= 5) foe.x = to;
@@ -8924,6 +9402,7 @@ final class PlusRun {
             }
             case RunLevels.RIME: {
                 // Round and round where it began.
+                if (foe.stance >= 2) shiftHome(foe, seconds, 1.1f);
                 foe.x = foe.home + (float) Math.cos(foe.clock * SPEED[foe.kind]) * 2;
                 foe.y = foe.ground + (float) Math.sin(foe.clock * SPEED[foe.kind]) * 1.2f;
                 foe.leftward = toLeft;
