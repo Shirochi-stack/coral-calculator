@@ -206,6 +206,8 @@ final class RunSkills {
         final int kind, classes, index, icon;
         final boolean keystone;
         final int[] effects, figures;
+        /** Which of the ultimates it is (see {@link RunUltimates}), or 0: an ultimate is an active with rules of its own instead of numbers. */
+        int ultimate;
 
         Notable(String name, int kind, int classes, int index, int[] pairs) {
             this.name = name;
@@ -237,6 +239,7 @@ final class RunSkills {
 
         /** What it does, said plainly: with which weapons, what always, and what it costs. */
         String said() {
+            if (ultimate > 0) return RunUltimates.does(ultimate);
             List<String> withThem = new ArrayList<>(), always = new ArrayList<>(), costs = new ArrayList<>();
             for (int at = 0; at < effects.length; at++) {
                 String words = phrase(effects[at], figures[at]);
@@ -274,6 +277,8 @@ final class RunSkills {
     static final int[] SKY_CLASS = {8, 12, 9, 2, 1};
     /** The ribbons' notables, added after those: seven felt in a colour, four of their mixes, six actives and Monochrome. */
     static final int RIBBONS = SKY_CLASSES + 5, RIBBON_COUNT = 18;
+    /** The ultimates, added after those: the last active of six branches, each on a long spur past its class's actives (see {@link RunUltimates}). */
+    static final int ULTIMATES = RIBBONS + RIBBON_COUNT;
     /** A class's seven, by their places: the one by the start, the two clusters' outward, the two actives' clusters, the deep one and the keystone. */
     static final int EARLY = 0, OUTER_LEFT = 1, OUTER_RIGHT = 2, ACTIVE_LEFT = 3, ACTIVE_RIGHT = 4, DEEP = 5, CLASS_KEYSTONE = 6;
 
@@ -282,6 +287,13 @@ final class RunSkills {
     private static Notable n(String name, int kind, int classes, int... pairs) {
         Notable made = new Notable(name, kind, classes, MAKING.size(), pairs);
         MAKING.add(made);
+        return made;
+    }
+
+    /** An ultimate: an active whose rules are its own, the last of its class's branch. */
+    private static Notable ultimate(int which) {
+        Notable made = n(RunUltimates.NAMES[which], ACTIVE, 0);
+        made.ultimate = which;
         return made;
     }
 
@@ -465,7 +477,10 @@ final class RunSkills {
             n("Gale Force", ACTIVE, 0, E_GREEN, 80, E_SPEED, 20),
             n("Lightning Step", ACTIVE, 0, E_YELLOW, 45, E_SPEED, 30),
             n("Looking Glass", ACTIVE, 0, E_PURPLE, 50, E_REFLECT, 100),
-            n("Monochrome", KEYSTONE, 0, E_FORMS, 100, E_ATK_PCT, 30, E_MONO, -1)
+            n("Monochrome", KEYSTONE, 0, E_FORMS, 100, E_ATK_PCT, 30, E_MONO, -1),
+            // (Added after: the ultimates, in the order of RunUltimates.)
+            ultimate(RunUltimates.BERSERK), ultimate(RunUltimates.STILL), ultimate(RunUltimates.TIDE), ultimate(RunUltimates.TITAN),
+            ultimate(RunUltimates.LEGION), ultimate(RunUltimates.BLOOM)
         // (end of the table)
         };
         NOTABLES = Collections.unmodifiableList(new ArrayList<>(MAKING));
@@ -534,6 +549,7 @@ final class RunSkills {
             core();
             skyward();
             ribbons();
+            ultimates();
             return nodes;
         }
 
@@ -980,6 +996,54 @@ final class RunSkills {
             }
         }
 
+        /**
+         * The ultimates, laid after everything so that nothing before them changes its number: each at the end of a long spur of three steps
+         * out of a ring of its class's clusters of actives (where there is room; else off any small node of the class), drawn as large as a
+         * keystone. A spur is tried in every direction and every length from nine to twelve, the shortest that fits.
+         */
+        void ultimates() {
+            for (int which = 1; which <= RunUltimates.COUNT; which++) {
+                int clazz = RunUltimates.BRANCH[which];
+                double best = Double.MAX_VALUE;
+                double[] spot = null;
+                int near = -1;
+                for (int pass = 0; pass < 2 && spot == null; pass++) {
+                    List<Integer> from = new ArrayList<>();
+                    if (pass == 0) {
+                        for (int side = 2; side <= 3; side++) for (int id : rings[clazz][side]) from.add(id);
+                    } else {
+                        for (Node node : nodes) if (node.path == clazz && node.type == SMALL) from.add(node.id);
+                    }
+                    for (int id : from) {
+                        Node node = nodes.get(id);
+                        if (node.type != SMALL || node.next.size() != 2 || nextToEnd(id)) continue;
+                        for (int turn = 0; turn < 36; turn++) {
+                            double angle = turn * Math.PI / 18;
+                            for (double length = 9; length <= 12 && length < best; length += 1) {
+                                double[] p = {node.x + Math.cos(angle) * length, node.y + Math.sin(angle) * length};
+                                if (Math.hypot(p[0], p[1]) > REACH - 4 || !room(p, 1.05)) continue;
+                                double[] one = {node.x + (p[0] - node.x) / 4, node.y + (p[1] - node.y) / 4}, two = {node.x + (p[0] - node.x) / 2, node.y + (p[1] - node.y) / 2},
+                                        three = {node.x + (p[0] - node.x) * 3 / 4, node.y + (p[1] - node.y) * 3 / 4};
+                                if (!room(one, .38) || !room(two, .38) || !room(three, .38) || !clear(node.x, node.y, p[0], p[1], node.id, -1)) continue;
+                                best = length;
+                                spot = p;
+                                near = id;
+                                break;
+                            }
+                        }
+                    }
+                }
+                Node from = nodes.get(near);
+                int previous = near;
+                for (int step = 1; step <= 3; step++) {
+                    int small = classSmall(clazz, new double[]{from.x + (spot[0] - from.x) * step / 4, from.y + (spot[1] - from.y) * step / 4});
+                    link(previous, small);
+                    previous = small;
+                }
+                link(previous, notable(clazz, ULTIMATES + which - 1, spot));
+            }
+        }
+
         static double far(Node node, double x, double y) { return Math.hypot(node.x - x, node.y - y); }
 
         /** Whether a node is next to a dead end. */
@@ -992,7 +1056,7 @@ final class RunSkills {
         static double sized(Node node) {
             if (node.type == CENTRE) return 0;
             if (node.type == START) return 1.25;
-            if (node.type == NOTABLE) return keystone(node) ? 1.05 : .8;
+            if (node.type == NOTABLE) return grand(node) ? 1.05 : .8;
             return node.type == ROOT ? .58 : .38;
         }
 
@@ -1031,8 +1095,36 @@ final class RunSkills {
     /** Whether a node can be taken, with these taken already: not taken, and next to one that is (the hidden root, which every start hangs from, always is). */
     static boolean canTake(java.util.BitSet taken, int id) {
         if (id <= 0 || id >= tree().size() || taken.get(id)) return false;
+        if (ultimateNeeds(taken, id) != null) return false;
         for (int other : tree().get(id).next) if (other == 0 || taken.get(other)) return true;
         return false;
+    }
+
+    /** What an ultimate costs to take, in points: a good many (every other node costs one). */
+    static int costOf(int id) {
+        Notable notable = notableAt(id);
+        return notable != null && notable.ultimate > 0 ? RunUltimates.POINTS : 1;
+    }
+
+    /** The node of a notable, by its number in the list (-1 if there is none). */
+    static int nodeOf(int notable) {
+        for (Node node : tree()) if (node.type == NOTABLE && node.notable == notable) return node.id;
+        return -1;
+    }
+
+    /**
+     * An ultimate is the last active of its branch: it can be taken only once both of its class's own actives are. Says which are missing, as
+     * "Needs Thousand Cuts and Flash Draw first", or null for a node that is not an ultimate or has what it needs.
+     */
+    static String ultimateNeeds(java.util.BitSet taken, int id) {
+        Notable notable = notableAt(id);
+        if (notable == null || notable.ultimate <= 0) return null;
+        List<String> missing = new ArrayList<>();
+        for (int which : new int[]{ACTIVE_LEFT, ACTIVE_RIGHT}) {
+            int index = RunUltimates.BRANCH[notable.ultimate] * PER_CLASS + which;
+            if (!taken.get(nodeOf(index))) missing.add(NOTABLES.get(index).name);
+        }
+        return missing.isEmpty() ? null : "Needs " + String.join(" and ", missing) + " first";
     }
 
     /** What respeccing costs, in pluses: by how many are taken. */
@@ -1091,6 +1183,9 @@ final class RunSkills {
     /** Whether a node is a keystone. */
     static boolean keystone(Node node) { return node.type == NOTABLE && NOTABLES.get(node.notable).keystone; }
 
+    /** Whether a node is drawn large: a keystone, or an ultimate. */
+    static boolean grand(Node node) { return node.type == NOTABLE && (NOTABLES.get(node.notable).keystone || NOTABLES.get(node.notable).ultimate > 0); }
+
     /** A node in a few words: what it is, then what it gives. */
     static String title(Node node) {
         if (node.type == CENTRE) return "Her seed";
@@ -1107,7 +1202,7 @@ final class RunSkills {
         if (node.type == SMALL) return "Small node · " + region;
         if (node.type == ROOT) return (node.figure >= JEWEL_FIGURES[node.stat] ? "Jewel" : "Root") + " · " + region;
         Notable notable = NOTABLES.get(node.notable);
-        return (notable.keystone ? "Keystone" : notable.kind == ACTIVE ? "Active" : "Passive") + " · " + region;
+        return (notable.keystone ? "Keystone" : notable.ultimate > 0 ? "Ultimate" : notable.kind == ACTIVE ? "Active" : "Passive") + " · " + region;
     }
 
     /** What a node does, said plainly. */
@@ -1118,6 +1213,7 @@ final class RunSkills {
         if (node.type == NOTABLE) {
             Notable notable = NOTABLES.get(node.notable);
             String said = notable.said();
+            if (notable.ultimate > 0) return said + ". " + RunUltimates.costs(notable.ultimate);
             return notable.kind == ACTIVE ? said + ", for " + (int) ACTIVE_LASTS + " seconds when called on from a slot (" + (int) ACTIVE_COST + " energy, then "
                     + (int) ACTIVE_REST + " seconds to rest)" : notable.keystone ? said + ". A keystone: it changes a build" : notable.classes == 0 ? said + ", always" : said;
         }
@@ -1157,7 +1253,11 @@ final class RunSkills {
     }
 
     /** Points spent. */
-    static int spent(java.util.BitSet taken) { return taken.cardinality(); }
+    static int spent(java.util.BitSet taken) {
+        int sum = 0;
+        for (int id = taken.nextSetBit(0); id >= 0; id = taken.nextSetBit(id + 1)) sum += costOf(id);
+        return sum;
+    }
 
     /** The three slots for actives, as the nodes in them (0 for none). */
     static final int SLOTS = 3;

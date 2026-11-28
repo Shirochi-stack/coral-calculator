@@ -5839,6 +5839,13 @@ final class RunGame {
         hinted = saidRoom = 0;
         seenAsked = seenDone = seenFailed = seenCalled = seenBursts = seenWoken = 0;
         seenRoused = seenShuts = seenDrunk = seenGrounded = seenFizzled = seenDives = seenCurses = 0;
+        seenUltStarts = seenUltEnds = seenCleaves = seenTitanSteps = seenReleases = seenBlooms = seenTideStrikes = seenEchoStrikes = 0;
+        ultFlash = 0;
+        ultShout = 0;
+        ultShoutAge = 9;
+        ultLoopsFor = 0;
+        java.util.Arrays.fill(ultLoops, -1);
+        RunUltimateFx.clearBits();
         darkened = 0;
         roverKind = -1;
         roverAge = 9;
@@ -8221,6 +8228,7 @@ final class RunGame {
                 speak(RunStory.BLACKENED[0], true);
             }
         }
+        ultimateEffects(herX, herY, seconds);
         if (darkened > 0) darkened -= seconds;
         if (hintMix && run.time() > 1.2f && captionLeft <= 0 && personLeft <= 0) {
             hintMix = false;
@@ -11050,7 +11058,7 @@ final class RunGame {
             audio.play("tap", .3f);
         } else if (asked == RunTree.TAKE) {
             java.util.BitSet taken = skillsTaken();
-            if (!RunSkills.canTake(taken, id) || skillPoints() - RunSkills.spent(taken) <= 0) {
+            if (!RunSkills.canTake(taken, id) || skillPoints() - RunSkills.spent(taken) < RunSkills.costOf(id)) {
                 audio.play("no", .5f);
                 return;
             }
@@ -11115,14 +11123,14 @@ final class RunGame {
             if (skill == null) continue;
             RectF where = slotButtons[slot];
             float rest = run.activeRest(slot), on = run.activeLeft(slot);
-            boolean ready = rest <= 0 && run.canSpend(PlusRun.ACTIVE_COST);
+            boolean ready = rest <= 0 && run.canSpend(run.activeCost(slot));
             if (on > 0) glowAt(canvas, where.centerX(), where.centerY(), where.width() * .85f, 0xFFFFD24A, 200);
             plate(canvas, where, where.height() / 2, 235);
             tree().icon(canvas, skill.icon, where.centerX(), where.centerY(), where.width() * .94f, ready || on > 0 ? 255 : 110);
             if (rest > 0) {
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0x88000000);
-                canvas.drawArc(where, -90, 360 * rest / PlusRun.ACTIVE_REST, true, paint);
+                canvas.drawArc(where, -90, 360 * rest / run.activeRests(slot), true, paint);
                 text.setTextAlign(Paint.Align.CENTER);
                 text.setColor(Color.WHITE);
                 fitted(canvas, String.valueOf((int) Math.ceil(rest)), where.centerX(), where.centerY() + dp(5), dp(14), where.width());
@@ -11130,7 +11138,7 @@ final class RunGame {
             if (on > 0) {
                 stroke.setColor(0xFFFFD24A);
                 stroke.setStrokeWidth(dp(3));
-                canvas.drawArc(where.left + dp(1.5f), where.top + dp(1.5f), where.right - dp(1.5f), where.bottom - dp(1.5f), -90, 360 * on / PlusRun.ACTIVE_LASTS, false, stroke);
+                canvas.drawArc(where.left + dp(1.5f), where.top + dp(1.5f), where.right - dp(1.5f), where.bottom - dp(1.5f), -90, 360 * on / run.activeLasts(slot), false, stroke);
             }
             if (keyed) {
                 paint.setStyle(Paint.Style.FILL);
@@ -11779,6 +11787,9 @@ final class RunGame {
         }
         // The ground jumps when something heavy comes down on it.
         if (shake > 0) canvas.translate((random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4), (random.nextFloat() - .5f) * tile * .28f * Math.min(1, shake * 4));
+        // In the stilled hour the world goes grey (all but her, drawn after it is let out of its layer, and what is held on the creatures).
+        greyed = run.ultimateOn(RunUltimates.STILL);
+        if (greyed) canvas.saveLayer(0, 0, width, height, RunUltimateFx.greyscale());
         paint.setAlpha(255);
         // What stands in its villages, behind everything else.
         if (level.town > 0 && !level.decor.isEmpty()) drawButterflies(canvas, level.town, level.decor.get(0)[2], RunLevels.townWide(RunLevels.townOf(level.number).length));
@@ -12599,6 +12610,11 @@ final class RunGame {
         drawPanel(canvas);
         drawPetThings(canvas);
         drawPet(canvas);
+        if (greyed) {
+            // (Out of the layer, the view is as it was shaken before it.)
+            canvas.restore();
+            RunUltimateFx.held(canvas, run, cameraX, cameraY, tile, clock, paint, text);
+        }
         // (Going up in the teleporter's light she fades away; coming down in it, she comes back.)
         float gone = pull(), eased = gone * gone * (3 - 2 * gone);
         if (gone > 0) {
@@ -12612,6 +12628,14 @@ final class RunGame {
         }
         drawHer(canvas);
         if (gone > 0) canvas.restore();
+        // The ultimates' sheets that go in front of her (flames over her shoulders, the wave of ink, petals), and the bits that fly.
+        if (vfxStarted) {
+            canvas.save();
+            canvas.translate(-cameraX * tile, -cameraY * tile);
+            Vfx.drawFront(canvas);
+            canvas.restore();
+        }
+        RunUltimateFx.drawBits(canvas, cameraX, cameraY, tile, clock);
         // What has just been won, rising from where it was won.
         text.setTextAlign(Paint.Align.CENTER);
         text.setTextSize(tile * .42f);
@@ -12649,7 +12673,170 @@ final class RunGame {
         }
         // A flash when her hair turns, or when someone changes.
         if (flash > 0) canvas.drawColor(Color.argb(Math.round(120 * Math.min(1, flash / .3f)), 255, 255, 255));
+        // And over the whole screen, the light of the ultimate that is going: red in a rage, a clock in the stilled hour, and so on.
+        RunUltimateFx.screen(canvas, run, width, height, clock, paint, ultFlash, ultShout, ultShoutAge);
     }
+
+    /**
+     * What the ultimates do that is seen and heard, as the rules count it: one beginning (a flash, a shout, a shake, its own sound and its own
+     * burst of light), one ending, and the doings between: berserk's cleaves, the giant's steps, the held blows landing together, the tide's
+     * strikes, the echoes' strikes and the roses' bursts. All of it drawn over her as she is, in whatever she is dressed in.
+     */
+    private void ultimateEffects(float herX, float herY, float seconds) {
+        if (ultFlash > 0) ultFlash -= seconds;
+        if (run.ultimateStarts() != seenUltStarts) {
+            seenUltStarts = run.ultimateStarts();
+            int which = run.lastUltimate();
+            int colour = RunUltimates.COLOURS[which];
+            audio.play(RunUltimates.START_SOUND[which], 1f);
+            buzz(true);
+            ultFlash = .5f;
+            shake = Math.max(shake, which == RunUltimates.TITAN ? .6f : .3f);
+            // (Named on a banner of its own, away from whatever she is saying.)
+            ultShout = which;
+            ultShoutAge = 0;
+            switch (which) {
+                case RunUltimates.BERSERK: vfx(Vfx.RAMPAGE_BURST, herX, herY - 1.3f, 8, 0, Vfx.WHITE, Vfx.BLOOM | Vfx.FRONT); break;
+                case RunUltimates.STILL: vfx(Vfx.SHOCKWAVE, herX, herY - .6f, 8, 0, colour, Vfx.BLOOM); break;
+                case RunUltimates.TIDE:
+                    vfx(Vfx.INK_EXPLOSION, herX, herY - .8f, 6, 0, Vfx.WHITE, 0);
+                    RunUltimateFx.splash(herX, herY);
+                    break;
+                case RunUltimates.TITAN:
+                    vfx(Vfx.TITAN_STRIDE, herX, herY - 1.2f, 9, 0, Vfx.WHITE, 0);
+                    vfx(Vfx.SHOCKWAVE, herX, herY - .3f, 9, 0, colour, 0);
+                    break;
+                case RunUltimates.LEGION: vfx(Vfx.SPARKLE, herX, herY - .9f, 5, 0, colour, Vfx.BLOOM); break;
+                default:
+                    vfx(Vfx.ROSE_BURST, herX, herY - 1, 6, 0, Vfx.WHITE, Vfx.FRONT);
+                    RunUltimateFx.petals(herX, herY - 1);
+            }
+        }
+        if (run.ultimateEnds() != seenUltEnds) {
+            seenUltEnds = run.ultimateEnds();
+            int which = run.lastEnded();
+            audio.play(RunUltimates.END_SOUND[which], .9f);
+            ultFlash = .3f;
+            shake = Math.max(shake, which == RunUltimates.TITAN ? .45f : .15f);
+            vfx(which == RunUltimates.TIDE ? Vfx.INK_SPLASH : which == RunUltimates.BLOOM ? Vfx.ROSE_BURST : Vfx.POOF, herX, herY - .7f, which == RunUltimates.TIDE ? 5 : 4, 0, Vfx.WHITE, 0);
+            if (which == RunUltimates.TIDE) RunUltimateFx.splash(herX, herY);
+            pop(herX, herY - 2 * run.size(), which == RunUltimates.BERSERK ? "Spent..." : "Ended");
+        }
+        if (run.cleaves() != seenCleaves) {
+            seenCleaves = run.cleaves();
+            audio.play("slash", .7f);
+            shake = Math.max(shake, .1f);
+            vfx(Vfx.SLASH_CRESCENT, herX, herY - .7f, 4.5f, run.facingLeft() ? 180 : 0, RunUltimates.COLOURS[RunUltimates.BERSERK], Vfx.BLOOM);
+        }
+        if (run.titanSteps() != seenTitanSteps) {
+            seenTitanSteps = run.titanSteps();
+            audio.play("quake", .8f);
+            shake = Math.max(shake, .35f);
+            vfx(Vfx.TITAN_STRIDE, herX, herY - .9f, 7, 0, Vfx.WHITE, 0);
+            vfx(Vfx.SHOCKWAVE, herX, herY - .2f, 6, 0, RunUltimates.COLOURS[RunUltimates.TITAN], 0);
+            RunUltimateFx.pebbles(herX, herY);
+        }
+        if (run.releases() != seenReleases) {
+            seenReleases = run.releases();
+            ultFlash = .5f;
+            shake = Math.max(shake, .35f);
+            hitStop = Math.max(hitStop, .08f);
+            audio.play("clang", .9f);
+        }
+        if (run.tideStrikes() != seenTideStrikes) {
+            seenTideStrikes = run.tideStrikes();
+            audio.play("splash", .7f);
+            vfx(Vfx.INK_SPLASH, herX + (run.tideWay() > 0 ? .8f : -.8f), herY - .8f, 3.2f, 0, Vfx.WHITE, 0);
+        }
+        if (run.echoStrikes() != seenEchoStrikes) {
+            seenEchoStrikes = run.echoStrikes();
+            audio.play("page", .35f);
+            for (int echo = 0; echo < RunUltimates.ECHOES; echo++) {
+                float[] at = run.echoAt(echo);
+                if (at != null) vfx(Vfx.SLASH_LIGHT, at[0] + PlusRun.WIDE / 2, at[1] + PlusRun.TALL * .5f, 2.2f, at[2] > 0 ? 180 : 0, RunUltimates.COLOURS[RunUltimates.LEGION], Vfx.BLOOM);
+            }
+        }
+        if (run.blooms() != seenBlooms) {
+            seenBlooms = run.blooms();
+            java.util.List<float[]> booms = run.booms();
+            if (!booms.isEmpty()) {
+                float[] last = booms.get(booms.size() - 1);
+                vfx(Vfx.ROSE_BURST, last[0], last[1], Math.max(2.4f, last[2] * 1.5f), 0, Vfx.WHITE, Vfx.FRONT);
+                vfx(Vfx.SPARKLE, last[0], last[1], Math.max(2, last[2]) * 1.2f, 0, Vfx.WHITE, 0);
+                RunUltimateFx.petals(last[0], last[1]);
+            }
+            audio.play("heart", .5f);
+        }
+        if (ultShoutAge < 3) ultShoutAge += seconds;
+        ultimateLoops(herX, herY);
+        RunUltimateFx.update(run, seconds, herX, herY, tile * 1.62f * run.size() / tile);
+    }
+
+    /** The banner naming the ultimate that has begun, and how long ago. */
+    private int ultShout;
+    private float ultShoutAge = 9;
+    /** The animated sheets kept on her while an ultimate goes: which ultimate they are for, and each one's handle. */
+    private int ultLoopsFor;
+    private final int[] ultLoops = {-1, -1, -1, -1};
+
+    /**
+     * The looping sheets of the ultimate that is going, begun when it begins, kept on her (or on her echoes) as she goes, and stopped when it ends:
+     * flames round her body and a crown of dark flames over her head in a rage; shards of a broken clock and a spiral of sand in the stilled
+     * hour; the wave of ink she is; ghostly wisps on each echo; a storm of petals in the bloom. Some are drawn behind her, some in front.
+     */
+    private void ultimateLoops(float herX, float herY) {
+        int which = run.ultimate();
+        if (which != ultLoopsFor) {
+            for (int at = 0; at < ultLoops.length; at++) {
+                if (ultLoops[at] >= 0) Vfx.stop(ultLoops[at]);
+                ultLoops[at] = -1;
+            }
+            ultLoopsFor = which;
+            float size = run.size(), middle = herY - .62f * size;
+            switch (which) {
+                case RunUltimates.BERSERK:
+                    ultLoops[0] = vfx(Vfx.RAMPAGE_BODY, herX, middle - .35f, 3.8f, 0, Vfx.WHITE, Vfx.BLOOM);
+                    ultLoops[1] = vfx(Vfx.RAMPAGE_CROWN, herX, herY - 1.95f * size, 2.1f, 0, Vfx.WHITE, Vfx.FRONT);
+                    break;
+                case RunUltimates.STILL:
+                    ultLoops[0] = vfx(Vfx.CLOCK_SHARDS, herX, middle, 4.2f, 0, Vfx.WHITE, Vfx.BLOOM);
+                    ultLoops[1] = vfx(Vfx.TIME_SAND, herX, middle, 4.2f, 0, Vfx.WHITE, Vfx.FRONT);
+                    break;
+                case RunUltimates.TIDE:
+                    ultLoops[0] = vfx(Vfx.INK_WAVE, herX, middle, 5.2f, 0, Vfx.WHITE, Vfx.FRONT | (run.tideWay() < 0 ? Vfx.MIRROR : 0));
+                    break;
+                case RunUltimates.LEGION:
+                    for (int echo = 0; echo < RunUltimates.ECHOES; echo++) ultLoops[echo] = vfx(Vfx.LEGION_WISPS, herX, middle, 3.2f, 0, Vfx.WHITE, Vfx.BLOOM);
+                    break;
+                case RunUltimates.BLOOM:
+                    ultLoops[0] = vfx(Vfx.PETAL_STORM, herX, middle, 4.4f, 0, Vfx.WHITE, Vfx.FRONT);
+                    break;
+                default:
+            }
+        }
+        if (which == 0) return;
+        float middle = herY - .62f * run.size();
+        switch (which) {
+            case RunUltimates.BERSERK:
+                if (ultLoops[0] >= 0) Vfx.move(ultLoops[0], herX * tile, (middle - .35f) * tile);
+                if (ultLoops[1] >= 0) Vfx.move(ultLoops[1], herX * tile, (herY - 1.95f) * tile);
+                break;
+            case RunUltimates.LEGION:
+                for (int echo = 0; echo < RunUltimates.ECHOES; echo++) {
+                    float[] at = run.echoAt(echo);
+                    if (at != null && ultLoops[echo] >= 0) Vfx.move(ultLoops[echo], (at[0] + PlusRun.WIDE / 2) * tile, (at[1] + PlusRun.TALL * .5f) * tile);
+                }
+                break;
+            default:
+                for (int at = 0; at < 2; at++) if (ultLoops[at] >= 0) Vfx.move(ultLoops[at], herX * tile, middle * tile);
+        }
+    }
+
+    /** Whether the world is being drawn grey, in a layer of its own (the stilled hour). */
+    private boolean greyed;
+    /** How long since an ultimate began or ended, for the flash it makes; and the counts of each seen. */
+    private float ultFlash;
+    private int seenUltStarts, seenUltEnds, seenCleaves, seenTitanSteps, seenReleases, seenBlooms, seenTideStrikes, seenEchoStrikes;
 
     /** The inside of a place off the land, behind everything in it: one picture, side by side with itself turned about, drifting a little as she goes. */
     private void drawInside(Canvas canvas) {
@@ -14092,9 +14279,20 @@ final class RunGame {
     private void drawHer(Canvas canvas) {
         float feetX = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, feetY = (run.y() + PlusRun.TALL - cameraY) * tile;
         boolean lost = run.state() == PlusRun.LOST, leftward = run.facingLeft();
-        float way = leftward ? -1 : 1, tall = tile * 1.62f;
+        // (The giant is two and a half times as big, standing where she stood.)
+        float way = leftward ? -1 : 1, tall = tile * 1.62f * run.size();
         int weapon = run.weapon();
         if (!lost) {
+            // The ultimate that is going: its aura behind her (her own pictures, whatever she is dressed in, are tinted over, not drawn again),
+            // and the legion's echoes, ghosts of her a little behind.
+            RunUltimateFx.aura(canvas, run, feetX, feetY - tall * .45f, tall, clock, paint, stroke);
+            for (int echo = 0; echo < RunUltimates.ECHOES; echo++) {
+                float[] at = run.echoAt(echo);
+                if (at == null) continue;
+                paint.setColorFilter(RunUltimateFx.ECHO);
+                her(canvas, (at[0] + PlusRun.WIDE / 2 - cameraX) * tile, (at[1] + PlusRun.TALL - cameraY) * tile, tall, weapon, at[2] > 0, 130);
+                paint.setColorFilter(null);
+            }
             if (run.notes() > 0) {
                 // The notes: a gold light about her, beating.
                 paint.setStyle(Paint.Style.FILL);
@@ -14277,6 +14475,8 @@ final class RunGame {
     private void her(Canvas canvas, float feetX, float feetY, float tall, int weapon, boolean leftward, int alpha) {
         gearAura(canvas, feetX, feetY, tall, leftward);
         android.graphics.ColorFilter tint = run.herBurn() > 0 ? BURNT_TINT : run.herChill() > 0 ? CHILLED_TINT : run.herPoison() > 0 ? POISONED_TINT : null;
+        // (An ultimate tints her over whatever she wears: red in a rage, ink blue as the tide, gold as the giant, pink in the bloom.)
+        if (tint == null && paint.getColorFilter() == null) tint = RunUltimateFx.tint(run.ultimate(), clock);
         if (tint != null) paint.setColorFilter(tint);
         herDrawn(canvas, feetX, feetY, tall, weapon, leftward, alpha);
         if (tint != null) paint.setColorFilter(null);
