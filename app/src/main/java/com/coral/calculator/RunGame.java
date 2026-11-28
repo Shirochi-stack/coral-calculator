@@ -6674,7 +6674,7 @@ final class RunGame {
         control(canvas, jumpButton, goJump, 270, false);
         control(canvas, downButton, goDown, 90, false);
         RectF where = strikeButton;
-        button(canvas, where, goStrike, CalculatorLayout.CORAL);
+        glass(canvas, where, goStrike, CalculatorLayout.CORAL);
         stroke.setColor(0xFFE9C96A);
         stroke.setStrokeWidth(dp(3));
         canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2 - dp(2), stroke);
@@ -7192,7 +7192,7 @@ final class RunGame {
         control(canvas, jumpButton, goJump, 270, false);
         control(canvas, downButton, goDown, 90, false);
         RectF where = strikeButton;
-        button(canvas, where, goStrike, CalculatorLayout.CORAL);
+        glass(canvas, where, goStrike, CalculatorLayout.CORAL);
         stroke.setColor(0xFFE9C96A);
         stroke.setStrokeWidth(dp(3));
         canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2 - dp(2), stroke);
@@ -9788,7 +9788,7 @@ final class RunGame {
                 float herAt = (run.x() + PlusRun.WIDE / 2 - cameraX) * tile, herFeet = (run.y() + PlusRun.TALL - cameraY) * tile;
                 boolean over = herAt > downButton.left - tile * .6f && herAt < downButton.right + tile * .6f && herFeet > downButton.top - tile * .2f
                         && herFeet - tile * 1.7f < downButton.bottom;
-                if (!lets) canvas.saveLayerAlpha(downButton.left - dp(6), downButton.top - dp(6), downButton.right + dp(6), downButton.bottom + dp(8), over ? 36 : 105);
+                if (!lets) canvas.saveLayerAlpha(downButton.left - dp(6), downButton.top - dp(6), downButton.right + dp(6), downButton.bottom + dp(8), over ? 50 : 160);
                 control(canvas, downButton, goDown, 90, false);
                 if (!lets) canvas.restore();
                 // In the first land the arrows glow until she has moved, and the jump until she has jumped; and the palette, when she has
@@ -10597,17 +10597,13 @@ final class RunGame {
         int next = run.nextUp();
         RectF where = swapButton;
         boolean held = swapFinger >= 0;
-        paint.setStyle(Paint.Style.FILL);
-        // (It lies over the ground she walks on, as the button that lets her down does: so it is faint until it is touched.)
-        paint.setColor(held ? CalculatorLayout.CORAL : cardColor);
-        paint.setAlpha(held ? 235 : 150);
-        canvas.drawCircle(where.centerX(), where.centerY(), where.width() / 2, paint);
-        paint.setColor(Color.BLACK);
-        paint.setAlpha(held ? 255 : 200);
+        // (It lies over the ground she walks on, as the button that lets her down does: so it is see-through until it is touched.)
+        glass(canvas, where, held, CalculatorLayout.CORAL);
+        paint.setAlpha(held ? 255 : 225);
         boolean upright = next != PlusRun.GUN && next != PlusRun.BOOK && next < PlusRun.TABLET;
         thing(canvas, next, where.centerX(), where.centerY(), where.height() * (upright ? .62f : .5f), upright ? 35 : 0, false, false);
         // Two small arrows on its corner: this changes one thing for another.
-        stroke.setColor(held ? Color.WHITE : 0xFF8A5A33);
+        stroke.setColor(Color.WHITE);
         stroke.setStrokeWidth(dp(1.8f));
         float cx = where.right - dp(9), cy = where.top + dp(9), arm = dp(5);
         canvas.drawLine(cx - arm, cy - dp(2), cx + arm, cy - dp(2), stroke);
@@ -15270,9 +15266,41 @@ final class RunGame {
         return round;
     }
 
+    /**
+     * The see-through body of a button she plays with: no disc, only a soft shade that deepens towards the middle (so what is drawn on it
+     * reads over sky or cave alike), a thin ring of light round its edge, and, while it is held, a wash of its colour and a little smaller.
+     */
+    private float glass(Canvas canvas, RectF where, boolean held, int colour) {
+        float x = where.centerX(), y = where.centerY(), round = where.width() / 2 * (held ? .93f : 1);
+        paint.setStyle(Paint.Style.FILL);
+        if (held) {
+            paint.setColor(colour);
+            paint.setAlpha(150);
+            canvas.drawCircle(x, y, round, paint);
+        } else {
+            paint.setColor(Color.BLACK);
+            for (int ring = 0; ring < 4; ring++) {
+                paint.setAlpha(14);
+                canvas.drawCircle(x, y, round * (1 - ring * .2f), paint);
+            }
+        }
+        stroke.setColor(Color.BLACK);
+        stroke.setAlpha(45);
+        stroke.setStrokeWidth(dp(3));
+        canvas.drawCircle(x, y, round - dp(1), stroke);
+        stroke.setColor(Color.WHITE);
+        stroke.setAlpha(held ? 255 : 200);
+        stroke.setStrokeWidth(dp(1.6f));
+        canvas.drawCircle(x, y, round - dp(1), stroke);
+        stroke.setAlpha(255);
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+        return round;
+    }
+
     /** A round button with an arrowhead in it pointing some way round; pink, when the arrows have been turned about on her. */
     private void control(Canvas canvas, RectF where, boolean held, float turn, boolean charmed) {
-        float reach = button(canvas, where, held, charmed ? 0xFFFF6FB5 : CalculatorLayout.CORAL) * .3f;
+        float reach = glass(canvas, where, held, charmed ? 0xFFFF6FB5 : CalculatorLayout.CORAL) * .3f;
         path.reset();
         path.moveTo(-reach * .5f, -reach);
         path.lineTo(reach * .6f, 0);
@@ -15280,8 +15308,13 @@ final class RunGame {
         canvas.save();
         canvas.translate(where.centerX(), where.centerY());
         canvas.rotate(turn);
-        stroke.setColor(held ? Color.WHITE : charmed ? 0xFFE8479A : 0xFF3A3F45);
-        stroke.setStrokeWidth(where.width() * .085f);
+        // A dark edge under a white arrowhead, so it shows on bright ground as well as dark.
+        stroke.setColor(Color.BLACK);
+        stroke.setAlpha(70);
+        stroke.setStrokeWidth(where.width() * .125f);
+        canvas.drawPath(path, stroke);
+        stroke.setColor(held ? Color.WHITE : charmed ? 0xFFFF9BD0 : Color.WHITE);
+        stroke.setStrokeWidth(where.width() * .08f);
         canvas.drawPath(path, stroke);
         canvas.restore();
     }
@@ -15290,7 +15323,7 @@ final class RunGame {
     private void strikeControl(Canvas canvas) {
         RectF where = strikeButton;
         int weapon = run.weapon();
-        button(canvas, where, goStrike, CalculatorLayout.CORAL);
+        glass(canvas, where, goStrike, CalculatorLayout.CORAL);
         boolean upright = weapon != PlusRun.GUN && weapon != PlusRun.BOOK;
         paint.setAlpha(255);
         boolean casts = run.has(PlusRun.RED) || run.has(PlusRun.BLUE), both = run.has(PlusRun.RED) && run.has(PlusRun.BLUE), white = run.white();
@@ -15338,8 +15371,10 @@ final class RunGame {
         if (weapon == PlusRun.GUN || weapon == PlusRun.BOOK) {
             text.setTextSize(dp(12));
             text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(goStrike ? Color.WHITE : 0xFF292B2A);
+            text.setColor(Color.WHITE);
+            text.setShadowLayer(dp(2), 0, dp(1), Color.BLACK);
             canvas.drawText(String.valueOf(weapon == PlusRun.GUN ? run.rounds() : run.books()), where.centerX(), where.bottom - dp(8), text);
+            text.clearShadowLayer();
         }
         if (weapon >= 0 && perks.levels[weapon] > 0) {
             // How far the smith has worked on it: its level, on the button's corner.
