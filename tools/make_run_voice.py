@@ -88,6 +88,7 @@ VOICES = {
     "e": ("upbeat-bee-0979__design-voice-ac8b681f", 1.0, 1.0),  # a voice designed as a bratty little sister ("Lucy 02"), the user's pick of twelve
     # Aelwyn, the elf merchant of the villages: a voice designed as a warm, quick, sly young travelling shopkeeper (kept in the Inworld account as "Aelwyn").
     "g": ("upbeat-bee-0979__design-voice-e234a3af", 1.0, 1.0),
+    "h": ("upbeat-bee-0979__design-voice-998daa04", 1.0, 1.1),  # the Vampire Merchant: the tender melancholic anime voice the user chose (round 3, "Vampire Merchant v3 melancholic-tender high"), lifted a tenth
     # The Mother Tongue.
     "f":("upbeat-bee-0979__design-voice-53058b3d", 1.0, 1.0),  # a voice designed as a cold, regal queen, the user's pick of seventeen
 }
@@ -123,6 +124,7 @@ MANNER = {
     "c": "Pulmu is a young dwarf armourer, Moru's sister: a loud, sunny, warm young woman's voice, laughing easily, big-hearted, in clear American English. ",
     "e": "Lucy is a small dragon child, a bratty little-sister type, voiced like a Japanese anime voice actress playing a cheeky, spoiled little girl: high, loud and sing-song, taunting, quick to pout and quick to cry, in clear American English. Sounds written in her lines are performed, never read out as words: 'Bleh!' is her sticking her tongue out with a short, rude raspberry; 'Ow!' is a real yelp of pain; 'Hmph!' is a huffy snort; 'Nyeh-nyeh' is a sing-song taunt. ",
     "f": "The Mother Tongue is a vast, ancient elder dragon and a mother: a grand, cold, regal woman's voice, low and unhurried, perfectly composed, certain that she knows best, never shouting, in clear English. ",
+    "h": "The Vampire Merchant is an ageless vampire woman with white twin tails and red eyes who keeps a stall in the dungeons, voiced like a Japanese anime voice actress playing a lonely, gentle vampire: high, soft and tender, a little wistful, teasing when she is amused, quiet and cold when she warns, in clear American English. ",
     "g": "Aelwyn is a young elf merchant who travels every land with her wagon of curios: a warm, bright, quick, slightly husky voice with a smile in it, playful and sly when she bargains, never shrill, in clear American English. ",
     "d": "Sutdol is a young dwarf jeweller-smith, Moru's sister: a calm, level, exact young woman's voice, quiet and dry, never old or deep, in clear American English. ",
 }

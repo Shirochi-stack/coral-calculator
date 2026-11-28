@@ -675,8 +675,8 @@ final class RunStory {
      * The Vampire Merchant (h), at her stall in the dungeons: her greeting the first time, then by how she feels about Halgakos (cold, wary,
      * warm, fond, devoted, beloved); her three warnings, each colder, and the fight; what she says when, too strong yet to be beaten, she
      * laughs and goes, when she is spared, and when she is finished; and to gifts she likes and does not, to what is bought, and to too
-     * little to buy it with. Her name is never said in them. Halgakos's answers (H) after. Her voice waits for its approval: her lines are
-     * read by tools/make_run_voice.py, but are not among the groups the game checks for recordings until they are recorded.
+     * little to buy it with. Her name is never said in them. Halgakos's answers (H) after. Her voice is the tender melancholic one the user
+     * chose; her lines are in the voices pack.
      */
     static final String[][] MERCHANT = {
             {"lil0", "Welcome, little cat. My wares are rare, and my patience rarer. Do look, but touch with coin.", "h", "An elegant, teasing vampire noblewoman, passing as an ordinary merchant, greets a cat-eared girl at her candlelit stall deep in a dungeon. Velvet, amused, guarded."},
@@ -1454,6 +1454,10 @@ final class RunStory {
         groups.add(KEEPSAKES);
         groups.add(KEEPSAKE_REPLIES);
         groups.add(MERCHANT_ANSWERS);
+        groups.add(MERCHANT);
+        groups.add(MERCHANT_WARN);
+        groups.add(MERCHANT_GIFT);
+        groups.add(MERCHANT_SHOP);
         groups.add(POUCH);
         groups.add(MIRROR);
         groups.add(ECHOES);

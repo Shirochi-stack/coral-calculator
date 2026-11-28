@@ -1,0 +1,477 @@
+{
+ "about": "Every voice designed for the Vampire Merchant, kept on the user's Inworld account. Pitch is the median of voiced frames (Halgakos measures about 271 Hz the same way). 'lift' is the pitch factor applied after synthesis. No keys are kept here.",
+ "voices": [
+  {
+   "name": "round1-elegant-teasing-vampire-noble-1",
+   "round": 1,
+   "account_name": "Vampire Merchant",
+   "voice_id": "upbeat-bee-0979__design-voice-c93b74cc",
+   "style": "elegant teasing vampire noble",
+   "prompt": "An adult woman's voice for an ageless vampire noblewoman in a gothic anime game: elegant, velvety and smooth, mid-low and intimate, unhurried, with a teasing, amused purr and a soft aristocratic poise; beneath the play, a quiet lonely warmth. Clearly a grown woman. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-elegant-teasing-vampire-noble-1.ogg",
+    "assets/voice-bank/round1/sample-01-greeting.ogg",
+    "assets/voice-bank/round1/sample-02-gift-thanks.ogg",
+    "assets/voice-bank/round1/sample-03-warning-one.ogg",
+    "assets/voice-bank/round1/sample-04-warning-two.ogg",
+    "assets/voice-bank/round1/sample-05-warning-three.ogg",
+    "assets/voice-bank/round1/sample-06-fight-taunt.ogg",
+    "assets/voice-bank/round1/sample-07-high-affinity.ogg",
+    "assets/voice-bank/round1/sample-08-low-prices.ogg"
+   ]
+  },
+  {
+   "name": "round1-elegant-teasing-vampire-noble-2",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 elegant-teasing-vampire-noble-2",
+   "voice_id": "upbeat-bee-0979__design-voice-dd5b39f2",
+   "style": "elegant teasing vampire noble",
+   "prompt": "An adult woman's voice for an ageless vampire noblewoman in a gothic anime game: elegant, velvety and smooth, mid-low and intimate, unhurried, with a teasing, amused purr and a soft aristocratic poise; beneath the play, a quiet lonely warmth. Clearly a grown woman. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-elegant-teasing-vampire-noble-2.ogg"
+   ]
+  },
+  {
+   "name": "round1-elegant-teasing-vampire-noble-3",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 elegant-teasing-vampire-noble-3",
+   "voice_id": "upbeat-bee-0979__design-voice-9485f336",
+   "style": "elegant teasing vampire noble",
+   "prompt": "An adult woman's voice for an ageless vampire noblewoman in a gothic anime game: elegant, velvety and smooth, mid-low and intimate, unhurried, with a teasing, amused purr and a soft aristocratic poise; beneath the play, a quiet lonely warmth. Clearly a grown woman. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-elegant-teasing-vampire-noble-3.ogg"
+   ]
+  },
+  {
+   "name": "round1-sweet-gothic-lolita-vampire-1",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 sweet-gothic-lolita-vampire-1",
+   "voice_id": "upbeat-bee-0979__design-voice-3d4184ad",
+   "style": "sweet gothic lolita vampire",
+   "prompt": "An adult woman's voice for a gothic lolita vampire merchant in an anime gacha game: sweet and silky on the surface, a little high and lilting, playful and coy, with a cold, knowing edge underneath and an ancient calm. Clearly a grown woman, never childish. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-sweet-gothic-lolita-vampire-1.ogg"
+   ]
+  },
+  {
+   "name": "round1-sweet-gothic-lolita-vampire-2",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 sweet-gothic-lolita-vampire-2",
+   "voice_id": "upbeat-bee-0979__design-voice-a6b6082c",
+   "style": "sweet gothic lolita vampire",
+   "prompt": "An adult woman's voice for a gothic lolita vampire merchant in an anime gacha game: sweet and silky on the surface, a little high and lilting, playful and coy, with a cold, knowing edge underneath and an ancient calm. Clearly a grown woman, never childish. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-sweet-gothic-lolita-vampire-2.ogg"
+   ]
+  },
+  {
+   "name": "round1-sweet-gothic-lolita-vampire-3",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 sweet-gothic-lolita-vampire-3",
+   "voice_id": "upbeat-bee-0979__design-voice-770c6794",
+   "style": "sweet gothic lolita vampire",
+   "prompt": "An adult woman's voice for a gothic lolita vampire merchant in an anime gacha game: sweet and silky on the surface, a little high and lilting, playful and coy, with a cold, knowing edge underneath and an ancient calm. Clearly a grown woman, never childish. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-sweet-gothic-lolita-vampire-3.ogg"
+   ]
+  },
+  {
+   "name": "round1-husky-lonely-immortal-1",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 husky-lonely-immortal-1",
+   "voice_id": "upbeat-bee-0979__design-voice-0b4199c5",
+   "style": "husky lonely immortal",
+   "prompt": "An adult woman's voice for an immortal vampire who has lived for centuries: low, husky and breathy, slow and amused, refined and theatrical, gently mocking, with a hint of melancholy and loneliness. Clearly a grown woman. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-husky-lonely-immortal-1.ogg"
+   ]
+  },
+  {
+   "name": "round1-husky-lonely-immortal-2",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 husky-lonely-immortal-2",
+   "voice_id": "upbeat-bee-0979__design-voice-a653878b",
+   "style": "husky lonely immortal",
+   "prompt": "An adult woman's voice for an immortal vampire who has lived for centuries: low, husky and breathy, slow and amused, refined and theatrical, gently mocking, with a hint of melancholy and loneliness. Clearly a grown woman. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-husky-lonely-immortal-2.ogg"
+   ]
+  },
+  {
+   "name": "round1-husky-lonely-immortal-3",
+   "round": 1,
+   "account_name": "Vampire Merchant v1 husky-lonely-immortal-3",
+   "voice_id": "upbeat-bee-0979__design-voice-43c5c819",
+   "style": "husky lonely immortal",
+   "prompt": "An adult woman's voice for an immortal vampire who has lived for centuries: low, husky and breathy, slow and amused, refined and theatrical, gently mocking, with a hint of melancholy and loneliness. Clearly a grown woman. Speaks clear, natural American English with no foreign accent. Clean close-mic studio recording.",
+   "pitch_hz": null,
+   "lift": 1.0,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round1/candidate-husky-lonely-immortal-3.ogg"
+   ]
+  },
+  {
+   "name": "round2-haughty-ojou",
+   "round": 2,
+   "account_name": "Vampire Merchant v2 haughty-ojou high",
+   "voice_id": "upbeat-bee-0979__design-voice-5a2d0815",
+   "style": "haughty-ojou",
+   "prompt": "A VERY high-pitched, soprano high-pitched anime ojou-sama voice for a noble vampire girl in a gothic anime game dub: bright, high and haughty, crisp and proud, with a teasing 'ohohoho' laugh in it, sugary-sweet condescension, elegant and playful, a sharp vampire edge underneath. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 331,
+   "lines_hz": [
+    343,
+    381,
+    267,
+    320
+   ],
+   "lift": 1.165,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round2/haughty-ojou-beloved.ogg",
+    "assets/voice-bank/round2/haughty-ojou-gift-thanks.ogg",
+    "assets/voice-bank/round2/haughty-ojou-greeting.ogg",
+    "assets/voice-bank/round2/haughty-ojou-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round2-singsong-cold",
+   "round": 2,
+   "account_name": "Vampire Merchant v2 singsong-cold",
+   "voice_id": "upbeat-bee-0979__design-voice-1e9a37d8",
+   "style": "singsong-cold",
+   "prompt": "A sweet, sing-song, high anime voice for a vampire merchant in an anime game dub: light, lilting and musical, airy and charming, able to drop suddenly into a cold, quiet, menacing whisper when angered. High pitch, bright tone. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 298,
+   "lines_hz": [
+    293,
+    333,
+    242,
+    304
+   ],
+   "lift": 1.2,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round2/singsong-cold-beloved.ogg",
+    "assets/voice-bank/round2/singsong-cold-gift-thanks.ogg",
+    "assets/voice-bank/round2/singsong-cold-greeting.ogg",
+    "assets/voice-bank/round2/singsong-cold-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round2-fanged-tease",
+   "round": 2,
+   "account_name": "Vampire Merchant v2 fanged-tease",
+   "voice_id": "upbeat-bee-0979__design-voice-c6b1c9e6",
+   "style": "fanged-tease",
+   "prompt": "A breathy, playful, high anime voice for a teasing vampire girl in an anime dub: soft and kittenish, giggly, coy and flirtatious in a harmless way, with a slight cute lisp as if speaking around little fangs, a mischievous smile in every word. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 322,
+   "lines_hz": [
+    324,
+    375,
+    257,
+    320
+   ],
+   "lift": 1.2,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round2/fanged-tease-beloved.ogg",
+    "assets/voice-bank/round2/fanged-tease-gift-thanks.ogg",
+    "assets/voice-bank/round2/fanged-tease-greeting.ogg",
+    "assets/voice-bank/round2/fanged-tease-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round2-tsundere-vampire",
+   "round": 2,
+   "account_name": "Vampire Merchant v2 tsundere-vampire high",
+   "voice_id": "upbeat-bee-0979__design-voice-fa7e6a31",
+   "style": "tsundere-vampire",
+   "prompt": "A VERY high-pitched, soprano bright, energetic, high anime tsundere voice for a proud vampire girl in an anime game dub: quick, snappy and indignant, huffy and flustered, then suddenly shy and sweet; lively, high, crisp, with a little vampire haughtiness. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 331,
+   "lines_hz": [
+    348,
+    333,
+    229,
+    329
+   ],
+   "lift": 1.176,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round2/tsundere-vampire-beloved.ogg",
+    "assets/voice-bank/round2/tsundere-vampire-gift-thanks.ogg",
+    "assets/voice-bank/round2/tsundere-vampire-greeting.ogg",
+    "assets/voice-bank/round2/tsundere-vampire-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round2-melancholic-high",
+   "round": 2,
+   "account_name": "Vampire Merchant v2 melancholic-high",
+   "voice_id": "upbeat-bee-0979__design-voice-e98539b1",
+   "style": "melancholic-high",
+   "prompt": "A soft, melancholic, high-pitched anime voice for a lonely ancient vampire girl in an anime dub: gentle, fragile and wistful, airy and hushed, pure high tone with a quiet ache, tender and sincere, still a little regal. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 318,
+   "lines_hz": [
+    312,
+    369,
+    258,
+    324
+   ],
+   "lift": 1.2,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round2/melancholic-high-beloved.ogg",
+    "assets/voice-bank/round2/melancholic-high-gift-thanks.ogg",
+    "assets/voice-bank/round2/melancholic-high-greeting.ogg",
+    "assets/voice-bank/round2/melancholic-high-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round3-tsundere-proud",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 tsundere-proud",
+   "voice_id": "upbeat-bee-0979__design-voice-cc2dce90",
+   "style": "tsundere-proud",
+   "prompt": "A high, sharp, proud anime ojou-tsundere voice for a noble vampire girl in an anime game dub: crisp, imperious and quick, haughty huffs, every word precise, then a brief breathy shy turn on soft lines. Soprano, bright, high pitch. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 300,
+   "lines_hz": [
+    293,
+    343,
+    267,
+    308
+   ],
+   "lift": 1.096,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round3/tsundere-proud-beloved.ogg",
+    "assets/voice-bank/round3/tsundere-proud-gift-thanks.ogg",
+    "assets/voice-bank/round3/tsundere-proud-greeting.ogg",
+    "assets/voice-bank/round3/tsundere-proud-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round3-tsundere-pouty",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 tsundere-pouty high",
+   "voice_id": "upbeat-bee-0979__design-voice-a583fe8f",
+   "style": "tsundere-pouty",
+   "prompt": "A very high, soprano, bratty, pouty anime tsundere voice for a vampire girl in an anime dub: whiny huffs and quick indignant snaps, sulky and cute, then a sudden small shy mumble that is very soft and breathy. Very high, bright, youthful-sounding adult. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 285,
+   "lines_hz": [
+    258,
+    324,
+    240,
+    312
+   ],
+   "lift": 1.1,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round3/tsundere-pouty-beloved.ogg",
+    "assets/voice-bank/round3/tsundere-pouty-gift-thanks.ogg",
+    "assets/voice-bank/round3/tsundere-pouty-greeting.ogg",
+    "assets/voice-bank/round3/tsundere-pouty-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round3-tsundere-husky",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 tsundere-husky high",
+   "voice_id": "upbeat-bee-0979__design-voice-09b0d4bd",
+   "style": "tsundere-husky",
+   "prompt": "A very high, soprano anime tsundere voice with a slightly husky edge for a vampire girl in an anime game dub: snappy and confident, a little smoky and teasing, then melting warmer, softer and sincere on tender lines. Bright high pitch with a warm low-texture undertone. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 251,
+   "lines_hz": [
+    229,
+    289,
+    197,
+    273
+   ],
+   "lift": 1.1,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round3/tsundere-husky-beloved.ogg",
+    "assets/voice-bank/round3/tsundere-husky-gift-thanks.ogg",
+    "assets/voice-bank/round3/tsundere-husky-greeting.ogg",
+    "assets/voice-bank/round3/tsundere-husky-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round3-melancholic-smiling",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 melancholic-smiling",
+   "voice_id": "upbeat-bee-0979__design-voice-e837a134",
+   "style": "melancholic-smiling",
+   "prompt": "A soft, high, melancholic anime voice for a lonely vampire girl in an anime dub who is trying to smile through it: gentle, a little brighter and hopeful, wistful, with a brave small smile in the tone. High pure pitch. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 298,
+   "lines_hz": [
+    289,
+    312,
+    241,
+    308
+   ],
+   "lift": 1.068,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round3/melancholic-smiling-beloved.ogg",
+    "assets/voice-bank/round3/melancholic-smiling-gift-thanks.ogg",
+    "assets/voice-bank/round3/melancholic-smiling-greeting.ogg",
+    "assets/voice-bank/round3/melancholic-smiling-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round3-melancholic-ghostly",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 melancholic-ghostly",
+   "voice_id": "upbeat-bee-0979__design-voice-f606228b",
+   "style": "melancholic-ghostly",
+   "prompt": "A whispery, ethereal, almost ghostly high anime voice for an ancient lonely vampire girl in an anime dub: airy and breathy, floating, hushed and otherworldly, fragile and wistful, very soft. High pitch. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 272,
+   "lines_hz": [
+    277,
+    304,
+    230,
+    267
+   ],
+   "lift": 1.1,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": [
+    "assets/voice-bank/round3/melancholic-ghostly-beloved.ogg",
+    "assets/voice-bank/round3/melancholic-ghostly-gift-thanks.ogg",
+    "assets/voice-bank/round3/melancholic-ghostly-greeting.ogg",
+    "assets/voice-bank/round3/melancholic-ghostly-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round3-melancholic-tender",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 melancholic-tender high",
+   "voice_id": "upbeat-bee-0979__design-voice-998daa04",
+   "style": "melancholic-tender",
+   "prompt": "A tender, warm, very high soprano anime voice for a lonely vampire girl in an anime dub: soft, sincere and loving, gently sad, the voice breaking a little on sad words, intimate and kind. High pitch, warm tone. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 297,
+   "lines_hz": [
+    282,
+    338,
+    249,
+    312
+   ],
+   "lift": 1.1,
+   "saved_to_account": true,
+   "assigned_to": "Lilith (the Vampire Merchant)",
+   "clips": [
+    "assets/voice-bank/round3/melancholic-tender-beloved.ogg",
+    "assets/voice-bank/round3/melancholic-tender-gift-thanks.ogg",
+    "assets/voice-bank/round3/melancholic-tender-greeting.ogg",
+    "assets/voice-bank/round3/melancholic-tender-warning-three.ogg"
+   ]
+  },
+  {
+   "name": "round2-haughty-ojou-first",
+   "round": 2,
+   "account_name": "Vampire Merchant v2 haughty-ojou",
+   "voice_id": "upbeat-bee-0979__design-voice-c844632f",
+   "style": "haughty-ojou (first design, lower)",
+   "prompt": "A high-pitched anime ojou-sama voice for a noble vampire girl in a gothic anime game dub: bright, high and haughty, crisp and proud, with a teasing 'ohohoho' laugh in it, sugary-sweet condescension, elegant and playful, a sharp vampire edge underneath. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 270,
+   "lift": 1.2,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": []
+  },
+  {
+   "name": "round2-tsundere-vampire-first",
+   "round": 2,
+   "account_name": "Vampire Merchant v2 tsundere-vampire",
+   "voice_id": "upbeat-bee-0979__design-voice-f43346c6",
+   "style": "tsundere-vampire (first design, lower)",
+   "prompt": "A bright, energetic, high anime tsundere voice for a proud vampire girl in an anime game dub: quick, snappy and indignant, huffy and flustered, then suddenly shy and sweet; lively, high, crisp, with a little vampire haughtiness. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 259,
+   "lift": 1.101,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": []
+  },
+  {
+   "name": "round3-tsundere-pouty-first",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 tsundere-pouty",
+   "voice_id": "upbeat-bee-0979__design-voice-99638d13",
+   "style": "tsundere-pouty (first design, lower)",
+   "prompt": "A high, bratty, pouty anime tsundere voice for a vampire girl in an anime dub: whiny huffs and quick indignant snaps, sulky and cute, then a sudden small shy mumble that is very soft and breathy. Very high, bright, youthful-sounding adult. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 259,
+   "lift": 1.1,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": []
+  },
+  {
+   "name": "round3-tsundere-husky-first",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 tsundere-husky",
+   "voice_id": "upbeat-bee-0979__design-voice-12c68dbb",
+   "style": "tsundere-husky (first design, lower)",
+   "prompt": "A high anime tsundere voice with a slightly husky edge for a vampire girl in an anime game dub: snappy and confident, a little smoky and teasing, then melting warmer, softer and sincere on tender lines. Bright high pitch with a warm low-texture undertone. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 202,
+   "lift": 1.1,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": []
+  },
+  {
+   "name": "round3-melancholic-tender-first",
+   "round": 3,
+   "account_name": "Vampire Merchant v3 melancholic-tender",
+   "voice_id": "upbeat-bee-0979__design-voice-5b1cd315",
+   "style": "melancholic-tender (first design, lower)",
+   "prompt": "A tender, warm, high anime voice for a lonely vampire girl in an anime dub: soft, sincere and loving, gently sad, the voice breaking a little on sad words, intimate and kind. High pitch, warm tone. Speaks clear, natural American English. Clean close-mic studio recording. A grown young woman, never a child.",
+   "pitch_hz": 242,
+   "lift": 1.1,
+   "saved_to_account": true,
+   "assigned_to": "unassigned, for future NPCs",
+   "clips": []
+  }
+ ]
+}

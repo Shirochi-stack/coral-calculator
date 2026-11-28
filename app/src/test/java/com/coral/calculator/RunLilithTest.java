@@ -186,6 +186,8 @@ public class RunLilithTest {
             for (String[] line : group) {
                 assertEquals("h", line[2]);
                 assertFalse(line[1], line[1].contains(RunLilith.NAME) || line[1].contains("Sloppy"));
+                assertTrue(line[0], RunVoicesTest.recorded(line[0]));
+                assertTrue(line[0], RunVoicesTest.packed(line[0]).isFile());
             }
         }
         for (String[] line : RunStory.MERCHANT_ANSWERS) {
