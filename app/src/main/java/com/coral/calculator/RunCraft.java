@@ -65,7 +65,12 @@ final class RunCraft {
     static int rose(int base) { return RunLoot.code(RunLoot.WEAPON, 11, base, RunLoot.ROSE); }
 
     /** And the Mother Tongue's Quill: every Rose made first, then golden pages, gold leaf and pluses, at a level. */
-    static final int QUILL_GOLDEN = 30, QUILL_LEAF = 12, QUILL_PLUSES = 9999, QUILL_LEVEL = 90, ALL_ROSES = (1 << 12) - 1;
+    static final int QUILL_GOLDEN = 30, QUILL_LEAF = 12, QUILL_PLUSES = 9999, QUILL_LEVEL = 90, ALL_ROSES = (1 << 13) - 1;
+    /** The twelve Roses there were before the knuckles: a save with all of them made has the knuckles' Rose given it, so that none is set back. */
+    static final int FIRST_ROSES = (1 << 12) - 1, KINDS = 13;
+
+    /** What a save's Roses are, the knuckles' given where every one of the first twelve was made. */
+    static int roses(int made) { return (made & FIRST_ROSES) == FIRST_ROSES ? made | 1 << RunLoot.KNUCKLES : made; }
 
     static boolean quillOpen(int rosesMade, int level) { return rosesMade == ALL_ROSES && level >= QUILL_LEVEL; }
 }

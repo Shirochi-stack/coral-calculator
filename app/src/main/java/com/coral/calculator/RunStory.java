@@ -572,6 +572,7 @@ final class RunStory {
             {"skill1", "My skill tree woke up. Points to spend, so spend them Sloppy~♡", "H", PLAYER + "She has just found that her skill tree has points waiting and urges the player to open it and spend them. Excited, a little bossy, eager to grow stronger."},
             {"skill2", "Divine power! Every blow lands three times Sloppy~♡", "H", PLAYER + "In the middle of a fight her divine power fills and bursts out; for a few seconds she hits three times as hard. Triumphant, radiant, a battle cry."},
             {"skill3", "All of it back? Fine. Choose better this time Sloppy~♡", "H", PLAYER + "The player has just taken back every point of her skill tree to spend them again. Mock exasperated, teasing, but secretly glad of the fresh start."},
+            {"skill4", "My tree got redrawn! Every point came back, so spend them Sloppy~♡", "H", PLAYER + "Her skill tree has just been redrawn into a great new web of regions and routes, and every point she had spent has come back to her to spend again. Delighted, a little bossy, eager to explore it."},
     };
 
     /** Her moves from the counter: the second wind, which leaves her half a heart once a land. */
@@ -611,6 +612,14 @@ final class RunStory {
             {"sq3c", "Three dungeons! Now metal, five of each kind, for all three anvils!", "c", "A loud, sunny dwarf armourer girl, cheers the hero for clearing three dungeons and asks for five of each metal. Loud, thrilled."},
             {"sq3d", "Weighed. All fifteen. Last: the Inkwell Depths. Its keeper's ink sets the seal.", "d", "A calm, exact dwarf jeweller-smith girl, has weighed all the metal and sends the hero to clear the Inkwell Depths. Calm, exact, solemn."},
             {"sq3e", "Three anvils. One seal. Yours. ...Proud of you. Don't make it weird.", "W", "A blunt, short-spoken dwarf smith girl, gives the hero the seal the three sisters forged together. Gruff, proud, embarrassed."},
+    };
+
+    /** Knuckles: the first time she holds them, her first uppercut, her first haymaker, and her first dash punch. */
+    static final String[][] KNUCKLES = {
+            {"knk1", "Knuckles! No more swinging things. I'll just punch it Sloppy~♡", "H", PLAYER + "She puts on golden gauntlets for the first time and grins, cracking her knuckles. Cheeky, fired up."},
+            {"knk2", "Jab, jab, and up you go Sloppy~♡", "H", PLAYER + "She lands a quick combo ending in an uppercut. Snappy, rhythmic, pleased."},
+            {"knk3", "Shields? Not against this fist Sloppy~♡", "H", PLAYER + "Her charged haymaker has just smashed through a shield. Smug, powerful."},
+            {"knk4", "Coming through, fists first Sloppy~♡", "H", PLAYER + "She dashes forward into a punch at full speed. Breathless, gleeful."},
     };
 
     /** The dungeons: the stairway found, going down, between floors, the keeper, cleared, lost, three kinds of floor, and her own double in ink. */
@@ -1271,6 +1280,7 @@ final class RunStory {
         groups.add(WATER);
         groups.add(DUNGEONS);
         groups.add(SMITH_QUESTS);
+        groups.add(KNUCKLES);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {

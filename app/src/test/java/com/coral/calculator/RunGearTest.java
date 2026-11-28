@@ -71,15 +71,15 @@ public class RunGearTest {
     }
 
     @Test public void everyAccessoryIsForAClassOrAnyAndGrowsWithRarity() {
-        assertEquals(30, RunLoot.ACCESSORIES.length);
-        assertEquals(30, RunLoot.ACCESSORY_DOES.length);
+        assertEquals(31, RunLoot.ACCESSORIES.length);
+        assertEquals(31, RunLoot.ACCESSORY_DOES.length);
         int[] forClass = new int[RunLoot.CLASSES];
         int any = 0;
-        for (int base = 0; base < 30; base++) {
+        for (int base = 0; base < RunLoot.ACCESSORIES.length; base++) {
             int[] white = RunLoot.does(accessory(base, RunLoot.WHITE)), gold = RunLoot.does(accessory(base, RunLoot.GOLD)), red = RunLoot.does(accessory(base, RunLoot.RED));
             if (white[0] == RunLoot.ANY) any++;
             else forClass[white[0]]++;
-            if (base != RunLoot.ROSE_OF_HALGAKOS) {
+            if (base != RunLoot.ROSE_OF_HALGAKOS && base != RunLoot.CHAMPION_WRAPS) {
                 // One thing at white; a second from gold; a third from red.
                 assertEquals(3, white.length);
                 assertEquals(5, gold.length);
@@ -88,7 +88,9 @@ public class RunGearTest {
             assertTrue(RunLoot.said(white[1], white[2]).length() > 5);
             assertTrue(red[2] >= white[2]);
         }
-        for (int count : forClass) assertTrue(count >= 2);
+        // (Every class has two of its own at least; the knuckle fighters' one, the Champion's Wraps, which does four things at any rarity.)
+        for (int clazz = 0; clazz < RunLoot.CLASSES; clazz++) assertTrue(forClass[clazz] >= (clazz == RunLoot.BRAWLERS ? 1 : 2));
+        assertEquals(9, RunLoot.does(accessory(RunLoot.CHAMPION_WRAPS, RunLoot.WHITE)).length);
         assertTrue(any >= 8);
         // Bigger numbers: a Venom Nib poisons more often the rarer it is.
         assertTrue(RunLoot.does(accessory(17, RunLoot.RED))[2] > RunLoot.does(accessory(17, RunLoot.BLUE))[2]);

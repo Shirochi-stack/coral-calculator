@@ -47,10 +47,15 @@ final class RunHunts {
     /** The ways: how each is said, and how many are asked at first. */
     private static final String[] WAY_WORDS = {"by landing on them", "with the pen", "with a knife", "with a thrown book", "with the brush", "with the sword", "with the ink gun",
             "with the tablet-book", "with her keys", "with the katana", "with the lance", "with the cannon", "with the whip", "with a greatsword", "with a summoning staff",
-            "with a mace", "with a war hammer", "with a wand", "with a scythe", "paper trees"};
-    private static final int[] WAY_MANY = {12, 8, 8, 6, 8, 8, 8, 10, 8, 10, 10, 8, 10, 8, 10, 8, 8, 10, 8, 4};
-    /** The way that is no way of beating anything: paper trees cut down, from the land they are first in. */
-    static final int TREES = RunArms.COUNT + 1;
+            "with a mace", "with a war hammer", "with a wand", "with a scythe", "paper trees", "with knuckles"};
+    private static final int[] WAY_MANY = {12, 8, 8, 6, 8, 8, 8, 10, 8, 10, 10, 8, 10, 8, 10, 8, 8, 10, 8, 4, 10};
+    /** The way that is no way of beating anything: paper trees cut down, from the land they are first in. (As it always was numbered.) */
+    static final int TREES = 19;
+    /** Knuckles' way, after the trees': came later. */
+    static final int KNUCKLE_WAY = 20;
+
+    /** The way of beating something with a thing she fights with. */
+    static int wayOf(int weapon) { return weapon == RunArms.KNUCKLES ? KNUCKLE_WAY : weapon + 1; }
 
     /** What the smith works with, which hunts pay: the names of the three. */
     static final String[] MATERIALS = {"Type metal", "Ink crystal", "Gold leaf"};
@@ -101,7 +106,7 @@ final class RunHunts {
                 } else {
                     of.add(new int[]{sort, LANDING});
                     if (open >= RunLevels.TREES_FROM) of.add(new int[]{sort, TREES});
-                    for (int weapon = 0; weapon < RunArms.COUNT; weapon++) if ((owned >> weapon & 1) != 0) of.add(new int[]{sort, weapon + 1});
+                    for (int weapon = 0; weapon < RunArms.COUNT; weapon++) if ((owned >> weapon & 1) != 0) of.add(new int[]{sort, wayOf(weapon)});
                 }
                 // Which of a sort comes first goes round with the hunts that have gone up.
                 int from = of.isEmpty() ? 0 : Math.floorMod(serial / turns.length * 5 + serial * 3, of.size());

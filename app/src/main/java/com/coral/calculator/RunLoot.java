@@ -55,25 +55,32 @@ final class RunLoot {
     static final int WEAPON = 0, ARMOUR = 1, ACCESSORY = 2;
     static final String[] TYPES = {"weapon", "armour", "accessory"};
     /** The twelve kinds of weapon. */
-    static final String[] WEAPONS = {"Sword", "Katana", "Greatsword", "Book", "Summoning Staff", "Knife", "Pen", "Mace", "Hammer", "Wand", "Ink Gun", "Scythe"};
+    static final String[] WEAPONS = {"Sword", "Katana", "Greatsword", "Book", "Summoning Staff", "Knife", "Pen", "Mace", "Hammer", "Wand", "Ink Gun", "Scythe", "Knuckles"};
+    /** The knuckles' place among the kinds of weapon. */
+    static final int KNUCKLES = 12;
     /** The thirty armours, and the thirty accessories. */
     static final String[] ARMOURS = {"Paper Vest", "Linen Tunic", "Bookbinder's Apron", "Leather Jerkin", "Ribbon Mail", "Footnote Coat", "Archivist's Robe", "Inkproof Cloak",
             "Margin Plate", "Errata Brigandine", "Folio Cuirass", "Gilded Spine", "Index Scale", "Quill-Feather Mantle", "Vellum Gown", "Ledger Hauberk",
             "Chapter Breastplate", "Serif Lamellar", "Typeset Armour", "Gazette Duster", "Lantern Coat", "Slime-Glaze Shell", "Appendix Harness",
-            "Tidewrack Raiment", "Palace Regalia", "Bookmark Banner Coat", "Dragonhide Jacket", "Colophon Aegis", "Mother Tongue Vestment", "Rosebound Armour"};
+            "Tidewrack Raiment", "Palace Regalia", "Bookmark Banner Coat", "Dragonhide Jacket", "Colophon Aegis", "Mother Tongue Vestment", "Rosebound Armour",
+            "Brawler's Gi"};
+    /** The armour that leans to every class; the knuckle fighters' armour; and how many armours drop as a chapter's own (the class gear drops apart). */
+    static final int ROSEBOUND = 29, BRAWLER_GI = 30, ARMOUR_DROPS = 30;
     static final String[] ACCESSORIES = {"Heartstring Locket", "Margin Ward Brooch", "Inkwell Heart", "Thimble of Turning", "Second Wind Feather", "Lucky Plus Coin",
             "Lodestone Compass", "Hare's-Foot Anklet", "Thornbriar Ring", "Hourglass Pendant", "Bladesong Charm", "Whetstone Earring", "Duelist's Ribbon",
             "Archivist's Seal", "Footnote Venom Tag", "Summoner's Bell", "Quickdraw Quill Brooch", "Venom Nib Pendant", "Ricochet Charm", "Anvil Heart", "Quake Bangle",
             "Ironbound Amulet", "Gunslinger's Drum Pendant", "Ember Vial Pendant", "Frostglass Focus", "Stormcall Gem", "Reaper's Hook Earring", "Crescent Pin",
-            "Colophon Signet", "Rose of Halgakos"};
+            "Colophon Signet", "Rose of Halgakos", "Champion's Wraps"};
+    /** The knuckle fighters' accessory. */
+    static final int CHAMPION_WRAPS = 30;
 
     // Classes: the weapons a thing she wears is for
 
     /** The classes of weapon, each a few of the things she fights with; and, for what is for none in particular, any. */
-    static final int ANY = -1, BLADES = 0, TOMES = 1, THROWING = 2, HEAVY = 3, GUNS = 4, WANDS = 5, REAPERS = 6, CLASSES = 7;
-    static final String[] CLASS_NAMES = {"Blades", "Tomes", "Throwing", "Heavy", "Ink guns", "Wands", "Reapers"};
+    static final int ANY = -1, BLADES = 0, TOMES = 1, THROWING = 2, HEAVY = 3, GUNS = 4, WANDS = 5, REAPERS = 6, BRAWLERS = 7, CLASSES = 8;
+    static final String[] CLASS_NAMES = {"Blades", "Tomes", "Throwing", "Heavy", "Ink guns", "Wands", "Reapers", "Brawlers"};
     static final String[] CLASS_HOLDS = {"swords, katanas, greatswords and the brush", "books, the tablet-book and summoning staffs", "pens, knives and API keys",
-            "maces, hammers and the ink-well cannon", "ink guns", "wands", "scythes, the ribbon whip and the fountain-pen lance"};
+            "maces, hammers and the ink-well cannon", "ink guns", "wands", "scythes, the ribbon whip and the fountain-pen lance", "knuckles"};
 
     /** The class of a thing she fights with, by its number in {@link RunArms}; or none, empty-handed. */
     static int classOf(int kind) {
@@ -84,6 +91,7 @@ final class RunLoot {
             case RunArms.CANNON: return HEAVY;
             case RunArms.GUN: return GUNS;
             case RunArms.WHIP: case RunArms.LANCE: return REAPERS;
+            case RunArms.KNUCKLES: return BRAWLERS;
             default: return ANY;
         }
     }
@@ -143,12 +151,14 @@ final class RunLoot {
             {REAPERS, LEECH, 5, POWER, 10, REACH, 15},
             {REAPERS, REACH, 20, HASTE, 10, LEECH, 3},
             {ANY, CRIT, 10, CRITX, 60, POWER, 10},
-            {ANY, POWER, 15, REGEN, 2, WARD, 1, ENERGY, 25}};
+            {ANY, POWER, 15, REGEN, 2, WARD, 1, ENERGY, 25},
+            // (Champion's Wraps: for knuckles only, and much of it: faster, harder, great blows, and a piece of shield back now and then.)
+            {BRAWLERS, HASTE, 25, POWER, 20, CRIT, 15, WARD_HIT, 10}};
     /** The accessory only gold and better is, and the one only the rose is. */
     static final int SIGNET = 28, ROSE_OF_HALGAKOS = 29;
 
     /** The class an armour leans to: its blows with that class land harder. The last of them leans to every class. */
-    static int leansTo(int base) { return base == ARMOURS.length - 1 ? ANY : base % CLASSES; }
+    static int leansTo(int base) { return base == ROSEBOUND ? ANY : base == BRAWLER_GI ? BRAWLERS : base % 7; }
 
     /**
      * What a thing she wears does, as effect and figure pairs, with its class first: an accessory as the table says, by its rarity; an
@@ -167,6 +177,11 @@ final class RunLoot {
                 out[2 + pair * 2] = figure(row[1 + pair * 2], row[2 + pair * 2], rarity);
             }
             return out;
+        }
+        if (type == ARMOUR && base == BRAWLER_GI) {
+            // The Brawler's Gi: light, for slipping blows, and for punching harder: a chance to dodge, harder blows with knuckles, and from gold life back.
+            int[] out = {ANY, DODGE, figure(DODGE, 8, rarity), POWER, figure(POWER, 15, rarity), HASTE, figure(HASTE, 10, rarity), REGEN, figure(REGEN, 1, rarity)};
+            return rarity >= GOLD ? out : java.util.Arrays.copyOf(out, 7);
         }
         if (type == ARMOUR) {
             int pairs = rarity >= RED ? 4 : rarity >= GOLD ? 3 : 2;
@@ -219,7 +234,7 @@ final class RunLoot {
                 for (int pair = 0; pair * 2 + 2 < does.length; pair++) {
                     int effect = does[1 + pair * 2], figure = does[2 + pair * 2];
                     // An armour's harder blows are for the class it leans to.
-                    int to = type(code) == ARMOUR && effect == POWER ? leansTo(base(code)) : does[0];
+                    int to = type(code) == ARMOUR && (effect == POWER || base(code) == BRAWLER_GI && effect == HASTE) ? leansTo(base(code)) : does[0];
                     if (to == ANY) any[effect] += figure;
                     else byClass[to][effect] += figure;
                 }
@@ -315,6 +330,8 @@ final class RunLoot {
     static final int PAPER = 13, SCYTHE = 11;
     /** Of the paper weapons, those that drop (the rest are folded at the smithy); and where each kind's picture is (the scythe's first, the rest after the katana blades). */
     static final int[] PAPER_DROPS = {SCYTHE};
+    /** The knuckles' pictures: the twelve chapters', the rose's, the paper ones', the Brawler's Gi and the Champion's Wraps. */
+    static final int KNUCKLE_ICONS = 256, KNUCKLE_ROSE_ICON = 268, KNUCKLE_PAPER_ICON = 269, GI_ICON = 270, WRAPS_ICON = 271;
     static final int PAPER_ICONS = 229, MORE_PAPER_ICONS = 243;
 
     /**
@@ -354,6 +371,8 @@ final class RunLoot {
     static int dropped(int from, int theme, int rarity, int typeRoll, int baseRoll) {
         int[] kinds = KINDS[from];
         int type = typeRoll < kinds[0] ? WEAPON : typeRoll < kinds[0] + kinds[1] ? ARMOUR : ACCESSORY;
+        // (From one who waits, gold or better, now and then the knuckle fighters' own gear: rare.)
+        if (from == WAITS && rarity >= GOLD && type != WEAPON && baseRoll % 17 == 0) return code(type, theme, type == ARMOUR ? BRAWLER_GI : CHAMPION_WRAPS, rarity);
         if (type == ACCESSORY) {
             if (from == ORDINARY) rarity = Math.min(rarity, BLUE);
             if (from == WAITS) rarity = Math.max(rarity, PURPLE);
@@ -369,7 +388,7 @@ final class RunLoot {
         if (type == WEAPON && theme <= 2 && rarity <= BLUE && baseRoll / WEAPONS.length % 2 == 0) {
             for (int paperBase : PAPER_DROPS) if (baseRoll % WEAPONS.length == paperBase) return code(WEAPON, PAPER, paperBase, rarity);
         }
-        int count = type == WEAPON ? WEAPONS.length : ARMOURS.length;
+        int count = type == WEAPON ? WEAPONS.length : ARMOUR_DROPS;
         // (The better armours come from the later chapters: of thirty, a chapter's run of them goes up with it.)
         int base = type == WEAPON ? baseRoll % count : Math.min(count - 1, theme * 2 + baseRoll % 8);
         return code(type, theme, base, rarity);
@@ -380,11 +399,14 @@ final class RunLoot {
 
     static int iconOf(int code) {
         if (addition(code)) return ADDITION_ICON;
-        if (paper(code)) return paperIndex(code) == SCYTHE ? PAPER_ICONS : MORE_PAPER_ICONS + paperIndex(code);
+        if (paper(code)) return paperIndex(code) == SCYTHE ? PAPER_ICONS : paperIndex(code) == KNUCKLES ? KNUCKLE_PAPER_ICON : MORE_PAPER_ICONS + paperIndex(code);
         if (ultimate(code)) return QUILL_ICON;
         int type = type(code), base = base(code);
+        if (type == WEAPON && base == KNUCKLES) return rarity(code) == ROSE ? KNUCKLE_ROSE_ICON : KNUCKLE_ICONS + Math.min(11, theme(code));
         if (type == WEAPON) return rarity(code) == ROSE ? ROSE_ICONS + base % 12 : base % 12 * 12 + Math.min(11, theme(code));
-        return type == ARMOUR ? ARMOUR_ICONS + base % ARMOURS.length : ACCESSORY_ICONS + base % ACCESSORIES.length;
+        if (type == ARMOUR && base == BRAWLER_GI) return GI_ICON;
+        if (type == ACCESSORY && base == CHAMPION_WRAPS) return WRAPS_ICON;
+        return type == ARMOUR ? ARMOUR_ICONS + base % ARMOUR_DROPS : ACCESSORY_ICONS + base % 30;
     }
 
     // Her level

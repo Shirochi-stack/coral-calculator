@@ -25,24 +25,26 @@ final class RunArms {
      * And six more, found as weapons in the lands (never lying about as the first six do): a greatsword, a summoning staff, a mace, a
      * war hammer, a wand and a scythe. Each, held, has something heavy too.
      */
-    static final int GREATSWORD = 12, STAFF = 13, MACE = 14, HAMMER = 15, WAND = 16, SCYTHE = 17, COUNT = 18;
+    static final int GREATSWORD = 12, STAFF = 13, MACE = 14, HAMMER = 15, WAND = 16, SCYTHE = 17;
+    /** And knuckles, the thirteenth kind found: fast punches at no reach at all, a combo, a dash punch and a haymaker. */
+    static final int KNUCKLES = 18, COUNT = 19;
     static final String[] NAMES = {"Pen", "Knife", "Book", "Brush", "Sword", "Ink gun", "Tablet-book", "API keys", "Katana", "Fountain-pen lance", "Ink-well cannon",
-            "Ribbon whip", "Greatsword", "Summoning staff", "Mace", "War hammer", "Wand", "Scythe"};
+            "Ribbon whip", "Greatsword", "Summoning staff", "Mace", "War hammer", "Wand", "Scythe", "Knuckles"};
     /** Those she may begin a land with, in the order they are kept: the two that were always hers to have, and the four won in the black arena. */
     static final int[] MAINS = {TABLET, KEYS, KATANA, LANCE, CANNON, WHIP};
     /** How a thing is used: thrown straight, lobbed, or swung. */
     static final int THROWN = 0, LOBBED = 1, SWUNG = 2;
-    private static final int[] WAY = {THROWN, THROWN, LOBBED, SWUNG, SWUNG, THROWN, THROWN, THROWN, SWUNG, SWUNG, LOBBED, SWUNG, SWUNG, THROWN, SWUNG, SWUNG, THROWN, SWUNG};
+    private static final int[] WAY = {THROWN, THROWN, LOBBED, SWUNG, SWUNG, THROWN, THROWN, THROWN, SWUNG, SWUNG, LOBBED, SWUNG, SWUNG, THROWN, SWUNG, SWUNG, THROWN, SWUNG, SWUNG};
     /** How long each rests between one use and the next, in seconds. */
-    private static final float[] REST = {.42f, .24f, .75f, .42f, .3f, .15f, .4f, .3f, .34f, .45f, 1, .5f, .62f, .8f, .45f, .7f, .32f, .55f};
+    private static final float[] REST = {.42f, .24f, .75f, .42f, .3f, .15f, .4f, .3f, .34f, .45f, 1, .5f, .62f, .8f, .45f, .7f, .32f, .55f, .2f};
     /** How fast what is thrown flies, in squares a second; nothing, for what is swung. */
-    private static final float[] SPEED = {13, 19, 7.5f, 0, 0, 22, 25, 16, 0, 0, 8, 0, 0, 11, 0, 0, 18, 0};
+    private static final float[] SPEED = {13, 19, 7.5f, 0, 0, 22, 25, 16, 0, 0, 8, 0, 0, 11, 0, 0, 18, 0, 0};
     /** How far it reaches, in squares: how far what is thrown flies, where what is lobbed comes down, how far ahead of her a swing takes. */
-    private static final float[] REACH = {13, 9.5f, 5.5f, 1.05f, .9f, 19.8f, 5, 7, 2.6f, 2.6f, 6, 3.4f, 2.1f, 9, 1.4f, 1.3f, 11, 2.5f};
+    private static final float[] REACH = {13, 9.5f, 5.5f, 1.05f, .9f, 19.8f, 5, 7, 2.6f, 2.6f, 6, 3.4f, 2.1f, 9, 1.4f, 1.3f, 11, 2.5f, .95f};
     /** How wide what it hits is, in squares: a book's burst, a brush's sweep from over her head to her feet, a sword's stroke; nothing for a single thing thrown. */
-    private static final float[] AREA = {0, 0, 2.3f, 2.1f, 1.35f, 0, 0, 0, 1.3f, .75f, 2.6f, 2.6f, 2.4f, 0, 1.6f, 2.6f, 0, 2.1f};
+    private static final float[] AREA = {0, 0, 2.3f, 2.1f, 1.35f, 0, 0, 0, 1.3f, .75f, 2.6f, 2.6f, 2.4f, 0, 1.6f, 2.6f, 0, 2.1f, 1.1f};
     /** How many pieces of a shield a blow of it takes. A book's is its burst's. */
-    private static final float[] BITE = {1, 1, 3, 1, 2, .5f, 1, 1, 2, 1.5f, 3, 1, 3, 1, 3, 3, 1, 2};
+    private static final float[] BITE = {1, 1, 3, 1, 2, .5f, 1, 1, 2, 1.5f, 3, 1, 3, 1, 3, 3, 1, 2, 1};
 
     /** How many books she has to throw in a land, how many more a find of books gives, and how many shots a find of ink puts in the gun. */
     static final int BOOKS = 6, PAGES = 2, INK = 8;
@@ -50,7 +52,9 @@ final class RunArms {
     static final float BOOSTED = 15, BOOST_FAR = 1.3f, BOOST_SWING = .5f, BOOST_BITE = 1;
     /** How long the button is held before the heavy thing a tablet-book or a ring of keys does; and how long each rests after it. */
     static final float CHARGE = .45f;
-    private static final float[] HEAVY_REST = {0, 0, 0, 0, 0, 0, .9f, .8f, 1, 1.1f, 1.6f, 1, 1.3f, 2.4f, 1.1f, 1.5f, 1, 1.2f};
+    private static final float[] HEAVY_REST = {0, 0, 0, 0, 0, 0, .9f, .8f, 1, 1.1f, 1.6f, 1, 1.3f, 2.4f, 1.1f, 1.5f, 1, 1.2f, 1.4f};
+    /** Knuckles: within how long of one punch the next is the next of the combo; how far the dash punch goes; how far the haymaker's blow carries. */
+    static final float PUNCH_RHYTHM = .6f, DASH_PUNCH = 2.4f, HAYMAKER_REACH = 3.2f;
     /**
      * The katana: within how long of one cut the next tap is the next of three in a row;
      * how much further and heavier the third is; how far she dashes; and how long after the
@@ -67,7 +71,7 @@ final class RunArms {
     private RunArms() {}
 
     static int way(int weapon) { return WAY[weapon]; }
-    static float rest(int weapon, int level) { return REST[weapon]; }
+    static float rest(int weapon, int level) { return weapon == KNUCKLES && level >= 1 ? REST[weapon] * .8f : REST[weapon]; }
     static float heavyRest(int weapon) { return HEAVY_REST[weapon]; }
     static float speed(int weapon) { return SPEED[weapon]; }
     /** (A katana, a lance and a whip the smith has worked on reach further.) */
@@ -150,7 +154,8 @@ final class RunArms {
             {"What it hits reels longer.", "Its whirl goes round twice.", "A piece more off a shield with every blow."},
             {"Its shockwave goes further.", "Its leap goes higher and its slam wider.", "A blow of it stuns everything near."},
             {"Its bolts go further.", "Two bolts at a time.", "Its bolts go on through what they meet."},
-            {"A wider arc.", "The spin goes round twice.", "The hook pulls from further off."}};
+            {"A wider arc.", "The spin goes round twice.", "The hook pulls from further off."},
+            {"Faster jabs.", "The uppercut throws what it hits up and leaves it reeling longer.", "The haymaker's blow carries twice as far."}};
 
     /** What the step that takes a thing to a level adds: for a level from one to three. */
     static String step(int weapon, int level) { return STEPS[weapon][level - 1]; }
@@ -164,7 +169,7 @@ final class RunArms {
     static float pace(int weapon, int level) { return 1 / rest(weapon, level); }
 
     /** What a weapon found in the lands is, of the twelve kinds: which of the things she fights with it is used as. */
-    static final int[] OF_KIND = {SWORD, KATANA, GREATSWORD, BOOK, STAFF, KNIFE, PEN, MACE, HAMMER, WAND, GUN, SCYTHE};
+    static final int[] OF_KIND = {SWORD, KATANA, GREATSWORD, BOOK, STAFF, KNIFE, PEN, MACE, HAMMER, WAND, GUN, SCYTHE, KNUCKLES};
 
     /** Where a thing she fights with is among the twelve kinds of weapon found (its pictures are by it); the first if it is none of them. */
     static int baseOf(int kind) {
@@ -223,6 +228,8 @@ final class RunArms {
             case HAMMER: return "Slammed down in front of her, it sends a shockwave along the ground both ways. Held, she leaps and slams, and the wave is far wider.";
             case WAND: return "A bolt of its element: fire burns where it lands, ice makes what it hits reel, lightning jumps on, ink splashes. Held, a fan of bolts.";
             case SCYTHE: return "A wide arc in front of her and behind her too. Held, a reaping spin that goes round her, and its hook pulls what is in front of her close.";
+            case KNUCKLES: return "Quick punches at arm's length: jab, jab and an uppercut that leaves what it hits reeling. At a run, a dash punch. Held, a haymaker that "
+                    + "breaks any shield in front of her outright.";
             default: return "A tap throws a key that leaves what it sticks in unlocked: the next blow on it counts twice. Held, the whole ring goes out in a fan. Now and then a key fails: 401.";
         }
     }
@@ -247,6 +254,7 @@ final class RunArms {
             case HAMMER: return "Good for crowds on the ground. Nothing for what flies.";
             case WAND: return "Good at range, and its element is chosen by where it was found. Light on a shield.";
             case SCYTHE: return "Good for being surrounded, behind as much as in front.";
+            case KNUCKLES: return "Good for shields and for one thing close up, fast. No reach: she must be in it.";
             default: return "Good for big ones and for shields, with something else to follow. Light by itself.";
         }
     }
