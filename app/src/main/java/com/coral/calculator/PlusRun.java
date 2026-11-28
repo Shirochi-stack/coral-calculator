@@ -1119,6 +1119,8 @@ final class PlusRun {
      */
     private void unique(Foe foe, float seconds, float middle, float away, boolean toLeft) {
         int way = RunUniques.way(foe.kind);
+        // A mini-boss, a hidden boss and a keeper come for her where she stands, as those who wait do.
+        if ((way == RunUniques.MINIBOSS || way == RunUniques.HIDDEN || way == RunUniques.KEEPER) && reach(foe, seconds, foe.home - 14, foe.home + 14, foe.mode == 0)) return;
         float speed = SPEED[foe.kind] * seconds, feet = y + TALL, down = feet - foe.y - foe.tall(), level_ = Math.abs(down);
         boolean near = away < 9 && level_ < 3;
         foe.wait -= seconds;
@@ -1483,6 +1485,132 @@ final class PlusRun {
         }
     }
 
+    // Reaching her wherever she stands
+
+    /** How long she may stand above one of them before it comes for her; its wind-up; its leap; and how fast it falls. */
+    static final float PERCH = 1.6f, LEAP_WIND = .55f, LEAP_TIME = .7f, BOSS_FALL = 24;
+    /** Leaps made up to her, shots sent up at her where it could not leap, and falls back down. */
+    private int bossLeaps, bossReaches, bossDrops;
+
+    int bossLeaps() { return bossLeaps; }
+    int bossReaches() { return bossReaches; }
+    int bossDrops() { return bossDrops; }
+
+    /** Whether something solid (or a ledge) is under one at a place, under both its edges. */
+    private boolean standsAt(Foe foe, float fx, float feet) {
+        int row = (int) Math.floor(feet + .05f);
+        return standable(at((int) Math.floor(fx + .15f), row)) || standable(at((int) Math.floor(fx + foe.wide() - .15f), row));
+    }
+
+    private boolean standable(char square) {
+        return solid(square) || square == RunLevels.LEDGE || square == RunLevels.THIN;
+    }
+
+    /**
+     * One who waits (and a mini-boss, a hidden boss, a keeper) is never to be stood above for nothing: once she has stood on a ledge over
+     * it for a moment, it crouches, glowing, and leaps up onto where she is, coming down with a slam that runs along the ledge; where it
+     * cannot fit there, it sends something up at her instead. When she is below it again, or the ledge is gone from under it, it comes
+     * down. Returns whether it is in the middle of that, so that what it does otherwise waits.
+     */
+    private boolean reach(Foe foe, float seconds, float lo, float hi, boolean free) {
+        if (foe.flat || absent(foe) || foe.away) return false;
+        float feet = foe.ground + foe.tall(), herFeet = y + TALL, px = x + WIDE / 2, middle = foe.x + foe.wide() / 2;
+        if (foe.base == 0) foe.base = foe.ground;
+        switch (foe.leaping) {
+            case 1:
+                // The wind-up: crouched and glowing.
+                if ((foe.leap -= seconds) <= 0) {
+                    foe.leaping = 2;
+                    foe.leap = 0;
+                    foe.leapFX = foe.x;
+                    foe.leapFY = foe.y;
+                }
+                return true;
+            case 2: {
+                foe.leap += seconds;
+                float through = Math.min(1, foe.leap / LEAP_TIME), high = 2.2f + Math.max(0, foe.leapFY - foe.leapTY);
+                foe.x = foe.leapFX + (foe.leapTX - foe.leapFX) * through;
+                foe.y = foe.leapFY + (foe.leapTY - foe.leapFY) * through - (float) Math.sin(through * Math.PI) * high;
+                if (through >= 1) {
+                    foe.leaping = 0;
+                    foe.ground = foe.y = foe.leapTY;
+                    foe.perch = 0;
+                    // The slam it comes down with, along the ledge both ways.
+                    float under = foe.ground + foe.tall();
+                    shoot(SHOCK, false, foe.x + foe.wide() / 2 - .5f, under - .3f, -7, 0, .9f);
+                    shoot(SHOCK, false, foe.x + foe.wide() / 2 + .5f, under - .3f, 7, 0, .9f);
+                }
+                return true;
+            }
+            case 3: {
+                // Coming down: falling until there is something to stand on, and never through the floor it began on.
+                foe.fall += BOSS_FALL * seconds;
+                float next = foe.y + foe.fall * seconds;
+                if (next >= foe.base || standsAt(foe, foe.x, next + foe.tall()) && Math.floor(next + foe.tall()) > Math.floor(foe.y + foe.tall())) {
+                    float landed = next >= foe.base ? foe.base : (float) Math.floor(next + foe.tall()) - foe.tall();
+                    foe.ground = foe.y = landed;
+                    foe.leaping = 0;
+                    foe.fall = 0;
+                    foe.perch = 0;
+                } else {
+                    foe.y = next;
+                }
+                return true;
+            }
+            default:
+                break;
+        }
+        // Raised up and with nothing under it any more, or with her down below again for a moment: down it comes.
+        boolean raised = foe.ground < foe.base - .2f;
+        if (raised && (!standsAt(foe, foe.x, feet) || herFeet > feet + 1.2f && (foe.perch -= seconds) < -1)) {
+            foe.leaping = 3;
+            foe.fall = 0;
+            bossDrops++;
+            return true;
+        }
+        // Stood above it, on a ledge, within its reach: it comes for her.
+        boolean above = onGround && herFeet < feet - 1.2f && Math.abs(px - middle) < 15 && room == roomOf(foe);
+        if (!above) {
+            if (!raised) foe.perch = Math.max(0, foe.perch - seconds * 2);
+            return false;
+        }
+        if (!free || (foe.perch += seconds) < PERCH) return false;
+        foe.perch = 0;
+        float want = Math.max(lo, Math.min(hi, px - foe.wide() / 2)), top = herFeet - foe.tall();
+        float to = Float.NaN;
+        for (float shift : new float[]{0, -.5f, .5f, -1, 1, -1.5f, 1.5f, -2, 2}) {
+            float at = Math.max(lo, Math.min(hi, want + shift));
+            if (roomFor(foe, at, top - .02f) && standsAt(foe, at, herFeet)) {
+                to = at;
+                break;
+            }
+        }
+        if (Float.isNaN(to)) {
+            // No room up there for it: what it has, aimed at her where she stands.
+            float cy = foe.y + foe.tall() * .4f, toX = px - middle, toY = y + TALL * .45f - cy, far = Math.max(.5f, (float) Math.hypot(toX, toY));
+            for (int one = -1; one <= 1; one++) shoot(DOT, false, middle, cy, toX / far * 7 + one * .8f, toY / far * 7, 2.4f);
+            bossReaches++;
+            return false;
+        }
+        foe.leaping = 1;
+        foe.leap = LEAP_WIND;
+        foe.leapTX = to;
+        foe.leapTY = top;
+        foe.leftward = px < middle;
+        bossLeaps++;
+        return true;
+    }
+
+    /** Which place a creature is in: the land (-1), or the place off it whose walls it stands between. */
+    private int roomOf(Foe foe) {
+        if (foe.x < level.main) return -1;
+        for (int at = 0; at < level.rooms.size(); at++) {
+            int[] one = level.rooms.get(at);
+            if (foe.x >= one[3] - 1 && foe.x <= one[4] + 1) return at;
+        }
+        return -1;
+    }
+
     /** Whether a keeper still stands in the land: while one does, the way out stays shut. */
     boolean keeperStands() {
         for (Foe foe : foes) if (RunUniques.keeper(foe.kind) && !foe.flat) return true;
@@ -1806,10 +1934,10 @@ final class PlusRun {
     }
 
     /** What a blow must count for (in tenths, as creatures' health is) to tell on a shield in a land: what the level the land is for gives, and more. */
-    static int shieldNeeds(int number) { return Math.round(BLOW * RunLoot.power(RunLoot.recommended(number)) * (1.5f + 2.5f * number / RunLevels.TOTAL)); }
+    static int shieldNeeds(int number) { return Math.round(BLOW * RunLoot.power(RunLoot.recommended(number)) * (2.5f + 1.5f * number / RunLevels.TOTAL)); }
 
-    /** How many strong blows break one. */
-    static int shieldHolds(int number) { return 3 + number / 20; }
+    /** How many strong blows break one: five from the first, more further on. */
+    static int shieldHolds(int number) { return 5 + number / 25; }
 
     static int shieldKind(int number) { return number < 25 ? 0 : number < 50 ? 1 : number < 80 ? 2 : 3; }
 
@@ -2452,6 +2580,12 @@ final class PlusRun {
          */
         int guard, guardMost, guardNeeds, guardKind;
         float guardMet = 9;
+        /**
+         * Reaching her: how long she has stood above it, where it stands to begin with, what it is doing about her (0 nothing, 1 crouched
+         * to leap, 2 in the air, 3 coming down) and for how long, where its leap is from and to, and how fast it falls.
+         */
+        float perch, base, leap, leapFX, leapFY, leapTX, leapTY, fall;
+        int leaping;
 
         Foe(int kind) {
             this.kind = kind;
@@ -3051,6 +3185,15 @@ final class PlusRun {
             foe.guardKind = from.guardKind;
             foe.guardMet = from.guardMet;
             foe.struck = from.struck;
+            foe.perch = from.perch;
+            foe.base = from.base;
+            foe.leap = from.leap;
+            foe.leapFX = from.leapFX;
+            foe.leapFY = from.leapFY;
+            foe.leapTX = from.leapTX;
+            foe.leapTY = from.leapTY;
+            foe.fall = from.fall;
+            foe.leaping = from.leaping;
             foes.add(foe);
         }
         for (int[] tree : other.trees) trees.add(tree.clone());
@@ -3371,6 +3514,19 @@ final class PlusRun {
         }
         entered++;
         return true;
+    }
+
+    /** For looking at a place off the land in a build made for testing: she is put straight into the first of a kind, as if through its door. */
+    void visit(int kind) {
+        for (int at = 0; at < level.rooms.size(); at++) {
+            int[] one = level.rooms.get(at);
+            if (one[0] != kind) continue;
+            room = at;
+            roomsFound |= 1 << at;
+            revealed |= 1 << at;
+            put(one[6], one[11]);
+            return;
+        }
     }
 
     private void put(int column, int floor) {
@@ -4056,13 +4212,13 @@ final class PlusRun {
             case RunLevels.GUARD:
             case RunLevels.WYRM:
             case RunLevels.GECKO:
-                return 2;
+                return 3;
             case RunLevels.BUTLER:
-                return 2;
+                return 3;
             case RunLevels.ILLYA:
             case RunLevels.TSUBAKIEH:
             case RunLevels.BLOT:
-                return 3;
+                return 4;
             case RunLevels.ZERO:
             case RunLevels.BYEORU:
             case RunLevels.GOKHAE:
@@ -7259,13 +7415,16 @@ final class PlusRun {
         }
         int phase = phase(foe);
         // Each third of the fight she is quicker to begin and quicker to recover.
-        float quick = 1 - .14f * phase, floor = foe.ground + foe.tall(), px = x + WIDE / 2;
+        float quick = 1 - .14f * phase, px = x + WIDE / 2;
         // She keeps to the open: never nearer the ends of her place than this.
         float lo = level.arena >= 0 ? level.arena + 2 : foe.home - 12, hi = level.arena >= 0 ? level.gate - 1.5f - foe.wide() : foe.home + 2.5f;
         if (foe.spawned && room >= 0) {
             lo = level.rooms.get(room)[3] + 1;
             hi = level.rooms.get(room)[4] - foe.wide();
         }
+        // Stood above her, on a ledge: she comes for her there (between one thing she does and the next).
+        if (reach(foe, seconds, lo, hi, foe.step != 1)) return;
+        float floor = foe.ground + foe.tall();
         if ((foe.act -= seconds) <= 0) {
             int what = foe.kind * 10 + foe.mode;
             if (foe.step == 1) done(foe, what, phase, px, floor);

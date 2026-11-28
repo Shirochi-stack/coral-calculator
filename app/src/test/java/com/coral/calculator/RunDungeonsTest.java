@@ -244,6 +244,44 @@ public class RunDungeonsTest {
         assertTrue(run.gateOpen());
     }
 
+    @Test public void everyFiveFloorsAreABandOfTheirOwnGrittierTheDeeper() {
+        for (int floor = 0; floor < 5; floor++) assertEquals(0, RunDungeons.band(floor));
+        for (int floor = 5; floor < 10; floor++) assertEquals(1, RunDungeons.band(floor));
+        // (Past the tenth floor, if floors ever go so deep, the deepest look.)
+        for (int floor = 10; floor < 40; floor++) assertEquals(RunDungeons.BANDS - 1, RunDungeons.band(floor));
+        // The deepest dungeons reach the second band.
+        assertTrue(RunDungeons.band(RunDungeons.floors(RunDungeons.COUNT - 1) - 1) >= 1);
+        // Each band has its backdrops and its squares in the app.
+        for (String picture : new String[]{"run_depths_deep_catacomb", "run_depths_deep_inkcrypt", "run_depths_deep_papercave", "run_depths_deep_vault",
+                "run_depths_abyss", "run_ground_depths", "run_ground_rooms", "run_room_lagoon", "run_room_cellar", "halgakos_climb"}) {
+            assertTrue(picture, new java.io.File("src/main/res/drawable-nodpi/" + picture + ".webp").isFile());
+        }
+    }
+
+    /** A mini-boss, a hidden boss and a keeper each come up to her on a ledge over them, or reach her there, within eight seconds. */
+    @Test public void theGreatOnesReachHerOnALedge() {
+        int[] kinds = {RunUniques.FIRST + 10, RunUniques.FIRST + 19, RunUniques.HIDDEN_FIRST, RunUniques.HIDDEN_FIRST + 3, RunUniques.KEEPER_FIRST, RunUniques.KEEPER_FIRST + 5};
+        for (int kind : kinds) {
+            RunLevels.Level level = new RunLevels.Level(40, 60);
+            for (int c = 0; c < 60; c++) for (int r = FLOOR; r < RunLevels.ROWS; r++) level.land[r][c] = RunLevels.BLOCK;
+            for (int c = 16; c <= 25; c++) level.land[FLOOR - 4][c] = RunLevels.LEDGE;
+            level.gate = 57;
+            level.foes.add(new int[]{kind, 32, FLOOR - 1, 1, 0, 2});
+            PlusRun.Perks perks = new PlusRun.Perks();
+            perks.hearts = 30;
+            PlusRun run = new PlusRun(level, perks);
+            run.place(20, FLOOR - 4 - PlusRun.TALL - .02f);
+            float gone = 0;
+            while (gone < 8 && run.hurts() == 0) {
+                run.step(STEP, false, false, false);
+                gone += STEP;
+            }
+            System.out.println("GREAT " + RunUniques.name(kind) + " hurt her after " + Math.round(gone * 10) / 10f + " s, leaps " + run.bossLeaps() + ", shots up " + run.bossReaches());
+            assertTrue(RunUniques.name(kind) + " never reached her", run.hurts() > 0);
+            assertTrue(RunUniques.name(kind), run.bossLeaps() + run.bossReaches() > 0 || gone < 3);
+        }
+    }
+
     @Test public void heartsAndLivesAreCarriedDown() {
         PlusRun run = new PlusRun(RunLevels.dungeon(3, 1, 9), new PlusRun.Perks());
         run.carry(PlusRun.HALF * 3, 1);
