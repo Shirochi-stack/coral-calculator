@@ -575,6 +575,19 @@ final class RunGame {
     /** The dash's own button, over the arrows between the two, once she has the roll or the dash in the air; and when it was last tapped. */
     private final RectF dashButton = new RectF();
     private float dashTapped = -9;
+    /** Where the down button goes alone, and beside the dash; and the ground pound's own button, shown only in the air, with when it was tapped. */
+    private final RectF downAlone = new RectF(), downBeside = new RectF(), poundButton = new RectF();
+    private float poundTapped = -9;
+
+    /** The down button in the middle over the arrows, or beside the dash once she has one. */
+    private void dashButtonsPlaced() {
+        downButton.set(run != null && run.hasDash() && finale == NO_FINALE ? downBeside : downAlone);
+    }
+
+    /** Whether the ground pound's button is up: in the air, with the move, where a pound could begin. */
+    private boolean poundShown() {
+        return finale == NO_FINALE && run != null && run.canPound();
+    }
     /** What a card that names something won is: plain, good, or rare. And where what was won flies from, in squares. */
     private int toastRarity;
     /** A toast's picture that is a thing found: this much and its number. */
@@ -4402,15 +4415,20 @@ final class RunGame {
                 right = tabs[volume].left - dp(6);
             }
         }
-        // The button that lets her down through a thin ledge, and that slams the ground from the air: with the strike and the jump, over the
-        // gap between them, so that the thumb that strikes rolls onto it. (The arrows' thumb has only the arrows.)
-        float downs = Math.max(dp(46), size * .66f), gap = (strikeButton.right + jumpButton.left) / 2;
-        downButton.set(gap - downs / 2, y - dp(10) - downs, gap + downs / 2, y - dp(10));
-        // The dash: the same size, over the arrows and between them, so that the arrows' thumb rolls up onto it from either.
-        float mid = (leftButton.right + rightButton.left) / 2;
-        dashButton.set(mid - downs / 2, y - dp(10) - downs, mid + downs / 2, y - dp(10));
-        // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the down button.
-        float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, downButton.left - dp(8));
+        // The button that lets her down through a thin ledge: back over the arrows, where the thumb that holds them reaches it. Beside it, the
+        // dash, the same size: the two of them side by side over the middle of the arrows (the down button alone in the middle when she has
+        // no dash yet; see dashButtonsPlaced).
+        float downs = Math.max(dp(46), size * .66f), mid = (leftButton.right + rightButton.left) / 2, pair = dp(10);
+        downButton.set(mid - downs / 2, y - dp(10) - downs, mid + downs / 2, y - dp(10));
+        dashButton.set(mid + pair / 2, y - dp(10) - downs, mid + pair / 2 + downs, y - dp(10));
+        downAlone.set(downButton);
+        downBeside.set(mid - pair / 2 - downs, y - dp(10) - downs, mid - pair / 2, y - dp(10));
+        // The ground pound's own button, there only while she is in the air with the move: with the strike and the jump, over the gap
+        // between them, where the thumb that strikes rolls onto it.
+        float gap = (strikeButton.right + jumpButton.left) / 2;
+        poundButton.set(gap - downs / 2, y - dp(10) - downs, gap + downs / 2, y - dp(10));
+        // The button that changes what she holds: over the one that uses it, a little smaller, and to the left of the pound's place.
+        float swaps = Math.max(dp(44), size * .66f), swapRight = Math.min(strikeButton.centerX() + swaps / 2, poundButton.left - dp(8));
         swapButton.set(swapRight - swaps, strikeButton.top - dp(12) - swaps, swapRight, strikeButton.top - dp(12));
         // Her active slots, in a row to the left of it, the first leftmost.
         float slotSide = Math.max(dp(40), size * .6f), slotGap = dp(6), slotsFrom = swapButton.left - between - 3 * slotSide - 2 * slotGap;
@@ -4419,8 +4437,8 @@ final class RunGame {
             slotPlaces[slot].set(slotLeft, swapButton.centerY() - slotSide / 2, slotLeft + slotSide, swapButton.centerY() + slotSide / 2);
         }
         turnTo(page);
-        // The stall in a land, or a door: its button over the jump, where her thumb already is, and over the down button too.
-        float stallBottom = Math.min(jumpButton.top - dp(14), downButton.top - dp(8));
+        // The stall in a land, or a door: its button over the jump, where her thumb already is, and over the pound's place too.
+        float stallBottom = Math.min(jumpButton.top - dp(14), poundButton.top - dp(8));
         stallButton.set(jumpButton.left, stallBottom - size, jumpButton.right, stallBottom);
         // The fifth button, on the right in the row with the rest, so that it never lies over her or over what she is about to walk into:
         // the ribbon that calls on a colour of hers, with a small one on its corner that chooses which.
@@ -5279,6 +5297,12 @@ final class RunGame {
         number = land;
         blackRung = 0;
         delve = -1;
+        // (In a build made for testing, a land with a stairway can go straight down it, when asked.)
+        if (BuildConfig.DEBUG && session.tally("run_dive_now") != 0 && RunDungeons.inLand(land) >= 0) {
+            begin(land, true);
+            openStairs();
+            return;
+        }
         String[][] intro = RunStory.intro(land);
         // Where the story moves on, it is told as she stands at the start of the land, the first time.
         // It is told in the bubble at the top, a line after another, while she is already on her way: nothing waits for it.
@@ -5575,7 +5599,7 @@ final class RunGame {
             float screenX = (atX - cameraX) * tile, feet = (item[2] + 1 - cameraY) * tile;
             if (x < screenX - tile * .75f || x > screenX + tile * .75f || y < feet - tile * 1.6f || y > feet + tile * .1f) continue;
             // (Not where a button lies over them.)
-            if (stallButton.contains(x, y) || downButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y) || slotAt(x, y) >= 0) return false;
+            if (stallButton.contains(x, y) || downButton.contains(x, y) || dashButton.contains(x, y) || poundButton.contains(x, y) || swapButton.contains(x, y) || jumpButton.contains(x, y) || strikeButton.contains(x, y) || slotAt(x, y) >= 0) return false;
             int stage = talkStage();
             session.keep("run_talk_" + stage, session.tally("run_talk_" + stage) | 1 << index);
             audio.play("tap", .5f);
@@ -9146,7 +9170,12 @@ final class RunGame {
                 pills("Back to the land", RESUME, "Guild counter", COUNTER);
                 return;
             }
-            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && finale == NO_FINALE && run.hasDash()
+            dashButtonsPlaced();
+            if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && poundShown()
+                    && near(poundButton, event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
+                poundTapped = clock;
+                run.pound();
+            } else if ((action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) && finale == NO_FINALE && run.hasDash()
                     && near(dashButton, event.getX(event.getActionIndex()), event.getY(event.getActionIndex()))) {
                 dashTapped = clock;
                 if (run.dash()) {
@@ -9573,6 +9602,7 @@ final class RunGame {
                 }
                 // (A finger on the dash is on the dash, not on the arrow under it.)
                 if (finale == NO_FINALE && run != null && run.hasDash() && near(dashButton, x, y)) continue;
+                if (poundShown() && near(poundButton, x, y)) continue;
                 if (y < low) continue;
                 if (x < between) left = true;
                 else if (x < arrows) right = true;
@@ -9801,6 +9831,7 @@ final class RunGame {
             if (screen == PLAY) {
                 // (While keys are used, the buttons are all but gone; a touch brings them back.)
                 if (keyed) canvas.saveLayerAlpha(0, 0, width, height, 60);
+                dashButtonsPlaced();
                 // Charmed, the arrows are the wrong way round, and show it.
                 boolean charmed = run.charmed() > 0;
                 control(canvas, leftButton, goLeft, 180, charmed);
@@ -9816,6 +9847,7 @@ final class RunGame {
                 control(canvas, downButton, goDown, 90, false);
                 if (!lets) canvas.restore();
                 if (finale == NO_FINALE && run.hasDash()) dashControl(canvas);
+                if (poundShown() || clock - poundTapped < .15f) poundControl(canvas);
                 // In the first land the arrows glow until she has moved, and the jump until she has jumped; and the palette, when she has
                 // been told of it, until she opens it.
                 if (number == 1 && !hintMoved) {
@@ -12709,9 +12741,12 @@ final class RunGame {
     /** Something that helps, by its kind: what lay about in the first volume, what her friends hold out in the second, and the ribbons. */
     private void help(Canvas canvas, int kind, float x, float y, float size) {
         if (kind >= PlusRun.PET) {
-            // A pet that lies waiting: it sits there, and hops now and then.
-            float hop = Math.abs((float) Math.sin(clock * 3 + x)) * size * .12f;
-            cell(canvas, petArt(kind - PlusRun.PET), (int) (clock * 1.2f) % 4 == 0 ? 5 : 0, 6, x, y + size * .62f - hop, size * 1.5f, false);
+            // A pet that lies waiting: it sits there, and hops now and then, one hop at a time. (Timed by where it lies in the land, not where
+            // it is on the screen: by the screen, it jittered as the view moved along.)
+            float beat = clock * 1.2f + (x / tile + cameraX) * .37f, phase = beat - (float) Math.floor(beat);
+            boolean hopping = (int) Math.floor(beat) % 4 == 0;
+            float hop = hopping ? (float) Math.sin(phase * Math.PI) * size * .14f : 0;
+            cell(canvas, petArt(kind - PlusRun.PET), hopping ? 5 : 0, 6, x, y + size * .62f - hop, size * 1.5f, false);
             return;
         }
         if (kind == PlusRun.KEY) {
@@ -15478,6 +15513,45 @@ final class RunGame {
         stroke.setAlpha(255);
         canvas.restore();
         if (!ready && !held) canvas.restore();
+    }
+
+    /** The ground pound's button, up while she is in the air: a heavy arrow down onto a line of ground, with cracks going out from it. */
+    private void poundControl(Canvas canvas) {
+        RectF where = poundButton;
+        boolean held = clock - poundTapped < .15f;
+        float round = glass(canvas, where, held, 0xFFFF8A3D), reach = round * .34f;
+        canvas.save();
+        canvas.translate(where.centerX(), where.centerY());
+        for (int pass = 0; pass < 2; pass++) {
+            canvas.save();
+            if (pass == 0) canvas.translate(0, dp(1.5f));
+            int colour = pass == 0 ? Color.BLACK : Color.WHITE;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(colour);
+            paint.setAlpha(pass == 0 ? 70 : 255);
+            path.reset();
+            path.moveTo(-reach * .32f, -reach * 1.05f);
+            path.lineTo(reach * .32f, -reach * 1.05f);
+            path.lineTo(reach * .32f, reach * .05f);
+            path.lineTo(reach * .75f, reach * .05f);
+            path.lineTo(0, reach * .75f);
+            path.lineTo(-reach * .75f, reach * .05f);
+            path.lineTo(-reach * .32f, reach * .05f);
+            path.close();
+            canvas.drawPath(path, paint);
+            stroke.setColor(colour);
+            stroke.setAlpha(pass == 0 ? 70 : 255);
+            stroke.setStrokeWidth(where.width() * .055f);
+            canvas.drawLine(-reach * 1.25f, reach * 1.05f, reach * 1.25f, reach * 1.05f, stroke);
+            stroke.setStrokeWidth(where.width() * .035f);
+            canvas.drawLine(-reach * .9f, reach * .7f, -reach * 1.3f, reach * .35f, stroke);
+            canvas.drawLine(reach * .9f, reach * .7f, reach * 1.3f, reach * .35f, stroke);
+            canvas.restore();
+        }
+        paint.setAlpha(255);
+        paint.setColor(Color.BLACK);
+        stroke.setAlpha(255);
+        canvas.restore();
     }
 
     /** A round button with an arrowhead in it pointing some way round; pink, when the arrows have been turned about on her. */

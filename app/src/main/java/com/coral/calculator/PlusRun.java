@@ -1170,6 +1170,18 @@ final class PlusRun {
         return state == PLAYING && (onGround ? perks.roll && rollLeft <= 0 : perks.airDash && !dashUsed && !climbing);
     }
 
+    /** Whether a ground pound could begin now: in the air, with the move, not on a ladder or in water, and not already pounding. */
+    boolean canPound() {
+        return state == PLAYING && perks.pound && !onGround && !climbing && !inWater && poundPhase == 0;
+    }
+
+    /** The pound's own button: as if down were held in the air, for the next step. */
+    void pound() {
+        if (canPound()) poundWanted = true;
+    }
+
+    private boolean poundWanted;
+
     boolean dash() {
         if (state != PLAYING) return false;
         float way = facingLeft ? -1 : 1;
@@ -5926,12 +5938,13 @@ final class PlusRun {
         if (airDashLeft > 0) speedDown = 0;
         // The ground pound: held down in the air, with the move, she gathers herself for a moment, still in the air, and slams down with what
         // she holds; out of an air dash too, which it cuts short. (Without it, holding down only brings her down faster.)
-        if (perks.pound && down && !onGround && !climbing && !inWater && poundPhase == 0) {
+        if (perks.pound && (down || poundWanted) && !onGround && !climbing && !inWater && poundPhase == 0) {
             poundPhase = 1;
             poundWind = POUND_WIND;
             airDashLeft = 0;
             aerialLeft = 0;
         }
+        poundWanted = false;
         if (poundPhase != 0 && (onGround || climbing || inWater)) poundPhase = 0;
         if (poundPhase == 1) {
             speedDown = 0;

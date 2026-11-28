@@ -1400,9 +1400,28 @@ final class Companion implements FoldState.Listener, CalculatorSession.Listener 
         start(new Intent(app, CompanionSettingsActivity.class));
     }
 
+    /**
+     * Opens one of the app's screens from over another app, always in the app's one task: the one already open is brought forward and the
+     * screen goes on top of it; with none open, the calculator goes first, under it, as when the app is opened from its icon. (A task begun
+     * by her on a screen of its own would be a second one, and Android shows only the newest of an app's tasks in the recent apps: the game
+     * left in the other could then be reached only through her.)
+     */
     private void start(Intent intent) {
         try {
-            app.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            ActivityManager manager = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
+            java.util.List<ActivityManager.AppTask> tasks = manager.getAppTasks();
+            boolean calculator = intent.getComponent() != null && MainActivity.class.getName().equals(intent.getComponent().getClassName());
+            if (!tasks.isEmpty()) {
+                tasks.get(0).moveToFront();
+                app.startActivity(intent);
+            } else if (calculator) {
+                app.startActivity(intent);
+            } else {
+                Intent root = new Intent(app, MainActivity.class).setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(MainActivity.UNDER, true);
+                app.startActivities(new Intent[]{root, intent});
+            }
         } catch (RuntimeException blocked) {
             Toast.makeText(app, "Open Halgakos from your home screen", Toast.LENGTH_SHORT).show();
         }
