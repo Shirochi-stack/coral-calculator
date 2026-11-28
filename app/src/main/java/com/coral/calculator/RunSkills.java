@@ -92,7 +92,8 @@ final class RunSkills {
             E_SHIELD_BREAK = 38, E_KILL_HEAL = 39, E_KILL_ENERGY = 40, E_SPEED = 41, E_SWIM = 42, E_CLIMB = 43, E_FORMS = 44, E_METER = 45,
             E_SECOND_WIND = 46, E_BLOOD = 47, E_IRON = 48, E_PET = 49, E_STOMP = 50, E_RICOCHET = 51, E_CHARGE = 52, E_LAST_STAND = 53, E_FRENZY = 54,
             E_POUND_AREA = 55, E_POUND_HIT = 56, E_GLIDE = 57, E_AERIAL_TIME = 58, E_AERIAL_HIT = 59, E_SKYBORNE = 60,
-            E_EFFECTS = 61;
+            E_RED = 61, E_BLUE = 62, E_BROWN = 63, E_GREEN = 64, E_YELLOW = 65, E_PURPLE = 66, E_WHITE = 67, E_MONO = 68,
+            E_EFFECTS = 69;
 
     /**
      * Whether an effect is felt only with the weapons of the class that gives it (a class's own way of fighting), or always, whatever is in
@@ -102,6 +103,7 @@ final class RunSkills {
         switch (effect) {
             case E_HP_PCT: case E_SHIELD: case E_REGEN: case E_SECOND_WIND: case E_BLOOD: case E_IRON: case E_AIR: case E_SWIM: case E_CLIMB: case E_FORMS:
             case E_MAGNET: case E_PLUSES: case E_SHRUG: case E_DP: case E_ENERGY: case E_WARD_HIT: case E_GLIDE: case E_AERIAL_TIME: case E_SKYBORNE:
+            case E_RED: case E_BLUE: case E_BROWN: case E_GREEN: case E_YELLOW: case E_PURPLE: case E_WHITE: case E_MONO:
                 return false;
             default:
                 return true;
@@ -174,6 +176,14 @@ final class RunSkills {
             case E_AERIAL_TIME: return "her aerial strike holds her up " + n + "% longer";
             case E_AERIAL_HIT: return "her aerial strike hits " + n + "% harder";
             case E_SKYBORNE: return "she cannot attack on the ground";
+            case E_RED: return n >= 100 ? "in red, every blow burns" : "in red, " + n + "% chance a blow burns";
+            case E_BLUE: return n >= 100 ? "in blue, every blow chills" : "in blue, " + n + "% chance a blow chills (three freeze solid)";
+            case E_BROWN: return "in brown, +" + n + "% defence";
+            case E_GREEN: return "in green, she rises " + n + "% faster";
+            case E_YELLOW: return "in yellow, " + n + "% faster attacks";
+            case E_PURPLE: return "in purple, " + n + "% chance to shrug off a hurt";
+            case E_WHITE: return "in white, +" + n + "% attack";
+            case E_MONO: return "only one ribbon at a time";
             default: return "";
         }
     }
@@ -262,6 +272,8 @@ final class RunSkills {
     /** The moves of the air, added after: the ring round her seed (four passives and Skyborne), and the classes' own, with their classes. */
     static final int SKY = CORE_KEYSTONES + CORE_KEYSTONE_COUNT, SKY_COUNT = 5, SKY_CLASSES = SKY + SKY_COUNT;
     static final int[] SKY_CLASS = {8, 12, 9, 2, 1};
+    /** The ribbons' notables, added after those: seven felt in a colour, four of their mixes, six actives and Monochrome. */
+    static final int RIBBONS = SKY_CLASSES + 5, RIBBON_COUNT = 18;
     /** A class's seven, by their places: the one by the start, the two clusters' outward, the two actives' clusters, the deep one and the keystone. */
     static final int EARLY = 0, OUTER_LEFT = 1, OUTER_RIGHT = 2, ACTIVE_LEFT = 3, ACTIVE_RIGHT = 4, DEEP = 5, CLASS_KEYSTONE = 6;
 
@@ -434,7 +446,26 @@ final class RunSkills {
             n("Meteor Fist", PASSIVE, 1 << 12, E_POUND_HIT, 50, E_STUN, 10),
             n("Sky Sigil", PASSIVE, 1 << 9, E_AERIAL_HIT, 40, E_AERIAL_TIME, 10),
             n("Falling Star", PASSIVE, 1 << 2, E_POUND_HIT, 35, E_POUND_AREA, 15),
-            n("Swallow Dive", PASSIVE, 1 << 1, E_AERIAL_HIT, 30, E_AERIAL_TIME, 20)
+            n("Swallow Dive", PASSIVE, 1 << 1, E_AERIAL_HIT, 30, E_AERIAL_TIME, 20),
+            // (Added after: the ribbons, each felt only in its colour; their mixes; actives that call on a colour; and Monochrome.)
+            n("Kindled Ink", PASSIVE, 0, E_RED, 35),
+            n("Undertow", PASSIVE, 0, E_BLUE, 30, E_SWIM, 30),
+            n("Bedrock", PASSIVE, 0, E_BROWN, 25),
+            n("Tailwind", PASSIVE, 0, E_GREEN, 35),
+            n("Quicksilver", PASSIVE, 0, E_YELLOW, 20),
+            n("Mirrorglass", PASSIVE, 0, E_PURPLE, 20),
+            n("Prism Heart", PASSIVE, 0, E_WHITE, 15, E_FORMS, 25),
+            n("Steamcraft", PASSIVE, 0, E_RED, 20, E_BLUE, 20),
+            n("Comet Trail", PASSIVE, 0, E_RED, 20, E_YELLOW, 12),
+            n("Tidecaller", PASSIVE, 0, E_BLUE, 20, E_GREEN, 20),
+            n("Gale Rider", PASSIVE, 0, E_GREEN, 20, E_YELLOW, 12),
+            n("Crimson Burst", ACTIVE, 0, E_RED, 100, E_AREA, 40),
+            n("Tidal Wave", ACTIVE, 0, E_BLUE, 100, E_AREA, 30),
+            n("Stoneskin", ACTIVE, 0, E_BROWN, 50, E_THORNS, 3),
+            n("Gale Force", ACTIVE, 0, E_GREEN, 80, E_SPEED, 20),
+            n("Lightning Step", ACTIVE, 0, E_YELLOW, 45, E_SPEED, 30),
+            n("Looking Glass", ACTIVE, 0, E_PURPLE, 50, E_REFLECT, 100),
+            n("Monochrome", KEYSTONE, 0, E_FORMS, 100, E_ATK_PCT, 30, E_MONO, -1)
         // (end of the table)
         };
         NOTABLES = Collections.unmodifiableList(new ArrayList<>(MAKING));
@@ -502,6 +533,7 @@ final class RunSkills {
             for (int clazz = 0; clazz < CLASS_COUNT; clazz++) crossings(clazz);
             core();
             skyward();
+            ribbons();
             return nodes;
         }
 
@@ -905,6 +937,46 @@ final class RunSkills {
                     previous = small;
                 }
                 link(previous, notable(clazz, SKY_CLASSES + which, spot));
+            }
+        }
+
+        /**
+         * The ribbons' notables, laid after everything so that nothing before them changes its number: each on a spur of two steps from a
+         * small node of the core's outer ring or of a region next to it, wherever there is room, going round from the top.
+         */
+        void ribbons() {
+            for (int which = 0; which < RIBBON_COUNT; which++) {
+                double best = Double.MAX_VALUE;
+                double[] spot = null;
+                int near = -1;
+                double turn = which * Math.PI * 2 / RIBBON_COUNT + .17;
+                for (double out = 44; out <= 70 && spot == null; out += 2) {
+                    for (double sway = 0; sway <= .6 && spot == null; sway += .03) {
+                        for (int side = -1; side <= 1; side += 2) {
+                            double[] p = polar(out, turn + side * sway);
+                            if (!room(p, which == RIBBON_COUNT - 1 ? 1.05 : .8)) continue;
+                            for (Node node : nodes) {
+                                if (node.type != SMALL || node.next.size() != 2 || nextToEnd(node.id)) continue;
+                                double length = far(node, p[0], p[1]);
+                                if (length < 6 || length > 9 || length >= best) continue;
+                                double[] one = {node.x + (p[0] - node.x) / 3, node.y + (p[1] - node.y) / 3}, two = {node.x + (p[0] - node.x) * 2 / 3, node.y + (p[1] - node.y) * 2 / 3};
+                                if (!room(one, .38) || !room(two, .38) || !clear(node.x, node.y, p[0], p[1], node.id, -1)) continue;
+                                best = length;
+                                spot = p;
+                                near = node.id;
+                            }
+                            if (spot != null) break;
+                        }
+                    }
+                }
+                Node from = nodes.get(near);
+                int previous = near;
+                for (int step = 1; step <= 2; step++) {
+                    int small = statSmall(from.path, new double[]{from.x + (spot[0] - from.x) * step / 3, from.y + (spot[1] - from.y) * step / 3});
+                    link(previous, small);
+                    previous = small;
+                }
+                link(previous, notable(from.path, RIBBONS + which, spot));
             }
         }
 

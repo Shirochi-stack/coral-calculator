@@ -225,7 +225,7 @@ final class RunGame {
      */
     private static final String[] UP_NAMES = {"Chikuwa's lunch box", "Wings: a second jump", "Glossary magnet", "Longer treats", "Bigger ink tank",
             "Flag picnic", "Thicker ink", "Spare bookmarks", "Prism", "Quick ribbons", "A place by her side", "Room for a stray", "Kennel: brisker pets",
-            "Kennel: stronger pets", "Triple jump", "Air dash", "Thorns", "Ground pound", "Dodge roll", "Wall jump", "Glide", "Second wind", "Aerial strike"};
+            "Kennel: stronger pets", "Triple jump", "Air dash", "Thorns", "Ground pound", "Dodge roll", "Wall jump", "Glide", "Second wind", "Aerial strike", "Lasting ribbons"};
     private static final String[][] UP_GIVES = {
             {"A fourth heart in every land", "A fifth heart in every land"},
             {"A second jump in the air: press jump again"},
@@ -251,19 +251,20 @@ final class RunGame {
             {"Hold jump as she falls: she glides down slowly", "She glides slower, and so further", "Slower still, and every second and a half a gust lifts her"},
             {"Once a land, what would end her leaves half a heart"},
             {"Hold strike in the air: she hangs there, wings out, and strikes all round her", "It holds her up longer, reaches wider and hits harder",
-                    "Longest and hardest, with quicker strikes, and twice before she lands"}};
+                    "Longest and hardest, with quicker strikes, and twice before she lands"},
+            {"Her ribbons last a fifth longer (never black)", "Her ribbons last two fifths longer", "Her ribbons last seven tenths longer"}};
     private static final int[][] UP_COSTS = {{120, 320}, {200}, {90, 240}, {80, 220}, {70, 180}, {260}, {160}, {150, 300, 480}, {200, 350, 500, 900},
             {120, 240, 400}, {400, 900}, {250, 600}, {200, 450}, {300, 650}, {350}, {300, 650}, {250, 500, 900}, {280, 520, 900}, {260}, {320}, {300, 560, 950}, {600},
-            {350, 650, 1000}};
+            {350, 650, 1000}, {180, 360, 650}};
     /** The moves bought at the counter, by their places in those lists. */
-    private static final int TRIPLE = 14, AIR_DASH = 15, THORNS = 16, POUND = 17, ROLL = 18, WALL_JUMP = 19, GLIDE = 20, SECOND_WIND = 21, AERIAL = 22;
+    private static final int TRIPLE = 14, AIR_DASH = 15, THORNS = 16, POUND = 17, ROLL = 18, WALL_JUMP = 19, GLIDE = 20, SECOND_WIND = 21, AERIAL = 22, LASTING = 23;
     /** For her pets: more of her own beside her, more strays, brisker, stronger. */
     private static final int PET_PLACES = 10, STRAY_ROOM = 11, PET_BRISK = 12, PET_STRONG = 13;
     /** What a pet costs to have for good: the five animals, and the five small stuffed copies of people she knows. */
     private static final int[] PET_COSTS = {300, 300, 350, 350, 400, 600, 600, 700, 700, 800, 950, 900, 1200, 1500};
     /** The counter's tabs, and what stands under each. */
     private static final String[] TAB_NAMES = {"Hearts", "Moves", "Colours", "Comforts", "Pets", "Arms", "Vanity"};
-    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1, 14, 15, 18, 19, 17, 20, 22, 16, 21}, {8, 9}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
+    private static final int[][] TAB_WARES = {{0, 7, 5, 6}, {1, 14, 15, 18, 19, 17, 20, 22, 16, 21}, {8, 9, 23}, {2, 3, 4}, {PET_PLACES, STRAY_ROOM, PET_BRISK, PET_STRONG}, {}, {}};
     private static final int PETS_TAB = 4, ARMS_TAB = 5, COLOURS_TAB = 2, VANITY_TAB = 6;
     private final RectF[] counterTabs = new RectF[TAB_NAMES.length], petCells = new RectF[PlusRun.PETS];
     private final RectF petAct = new RectF(), armsAct = new RectF();
@@ -271,6 +272,8 @@ final class RunGame {
     /** How many colours must be hers before each step of the prism is for sale: the last, all seven. */
     private static final int[] PRISM_NEEDS = {3, 4, 5, 7};
     private static final int PRISM = 8, QUICK = 9;
+    /** How much longer her ribbons last, by the steps of Lasting ribbons bought. */
+    static final float[] RIBBON_LONGER = {1, 1.2f, 1.4f, 1.7f};
     /** The mixes that have names, as {@link PlusRun} numbers them: what each is called, what it is made of, and what it does. */
     private static final String[] MIX_NAMES = {"Steam", "Comet", "Tide", "Mirror", "Gale", "Ember", "Prism", "White, unmastered"};
     private static final String[] MIX_OF = {"Red + Blue", "Red + Yellow", "Blue + Green", "Brown + Purple", "Green + Yellow", "Red + Brown", "Any three", "All six"};
@@ -278,14 +281,14 @@ final class RunGame {
             "she comes down slowly, and water goes both ways", "what is sent back goes on through a row", "she rises much faster",
             "what she knocks over flies off burning", "whatever lands on her lands by half", "every colour's power for a while: a glow, not yet a light"};
     /** The order they stand in at the counter: lives under hearts. And the picture that stands for her own face. */
-    private static final int[] UP_ORDER = {0, 7, 8, 9, 1, 14, 15, 18, 19, 17, 20, 22, 16, 21, 2, 3, 4, 5, 6, 10, 11, 12, 13};
+    private static final int[] UP_ORDER = {0, 7, 8, 9, 23, 1, 14, 15, 18, 19, 17, 20, 22, 16, 21, 2, 3, 4, 5, 6, 10, 11, 12, 13};
     private static final int HER_FACE = -2;
     /** A ware whose picture is her in one of her moves: below nothing, so that it is never taken for one of the other pictures. */
     private static final int MOVE_ART = -100;
     private static final int[] UP_ART = {BUFF_ART + PlusRun.BREAD, -1, BUFF_ART + PlusRun.MAGNET, BUFF_ART + PlusRun.ICE, WEAPON_ART + PlusRun.GUN,
             FLAG_ART, BUFF_ART + PlusRun.SHIELD, HER_FACE, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART, STAR_ART,
             MOVE_ART + PlusRun.MOVE_FLIP + 1, MOVE_ART + PlusRun.MOVE_DASH, STAR_ART, MOVE_ART + PlusRun.MOVE_POUND, MOVE_ART + PlusRun.MOVE_ROLL, MOVE_ART + PlusRun.MOVE_WALL,
-            MOVE_ART + PlusRun.MOVE_GLIDE, HER_FACE, MOVE_ART + PlusRun.MOVE_GLIDE};
+            MOVE_ART + PlusRun.MOVE_GLIDE, HER_FACE, MOVE_ART + PlusRun.MOVE_GLIDE, STAR_ART};
     /** How long the ice cream, the magnet and the notes last before anything is bought, as {@link PlusRun} has them. */
     private static final float[] BUFF_LASTS = {0, 8, 0, 10, 6};
 
@@ -834,6 +837,7 @@ final class RunGame {
         kept.poundLevel = bought(POUND);
         kept.glideLevel = bought(GLIDE);
         kept.aerial = bought(AERIAL);
+        kept.ribbonLonger = RIBBON_LONGER[bought(LASTING)];
         kept.secondWind = bought(SECOND_WIND) > 0;
         kept.reach = bought(2) == 0 ? 0 : bought(2) == 1 ? 1.6f : 2.6f;
         kept.lasting = 1 + .5f * bought(3);
@@ -3538,7 +3542,10 @@ final class RunGame {
     private void drawHits(Canvas canvas, int first, int last) {
         text.setTextAlign(Paint.Align.CENTER);
         text.setTypeface(Typeface.DEFAULT_BOLD);
-        for (float[] hit : run.hits()) {
+        int numbers = 0;
+        java.util.List<float[]> all = run.hits();
+        for (int index = all.size() - 1; index >= 0; index--) {
+            float[] hit = all.get(index);
             if (hit[0] < first - 2 || hit[0] > last + 2) continue;
             boolean great = hit[3] > 0, beaten = hit[8] > 0, broke = hit[9] > 0;
             if (hit[6] == 0) {
@@ -3640,12 +3647,15 @@ final class RunGame {
                 }
                 paint.setAlpha(255);
             }
-            if (hit[2] <= 0) continue;
+            // (A blow counted into another's number has none of its own; and never more than eight numbers at once, the newest.)
+            if (hit[2] <= 0 || hit[11] > 0 || ++numbers > NUMBERS_MOST) continue;
             // The number.
             float rise = age / .9f, size = dp(great ? 19 : 14) * (age < .1f ? 1 + (1 - age / .1f) * .4f : 1);
             text.setTextSize(size);
-            String said = String.valueOf((int) hit[2]) + (great ? "!" : "");
-            float tx = x + (float) Math.sin(hit[0] * 7) * tile * .15f, ty = y - tile * .5f - rise * tile * .9f;
+            String said = shortNumber((int) hit[2]) + (great ? "!" : "");
+            // (Each a little to one side of the last and rising at its own pace, so that numbers close together stay apart.)
+            float lean = ((index * 37) % 7 - 3) / 3f, pace = .75f + ((index * 53) % 5) * .12f;
+            float tx = x + lean * tile * .35f, ty = y - tile * .5f - rise * pace * tile * 1.1f - (numbers - 1) % 3 * tile * .28f;
             int alpha = Math.round(255 * Math.min(1, (1 - rise) * 2.5f));
             stroke.setColor(0xFF1F2328);
             stroke.setStrokeWidth(dp(3));
@@ -3666,6 +3676,16 @@ final class RunGame {
         text.setAlpha(255);
         text.setTypeface(Typeface.DEFAULT);
         paint.setColor(Color.BLACK);
+    }
+
+    /** How many damage numbers show at once. */
+    static final int NUMBERS_MOST = 8;
+
+    /** A number as it is shown over a blow: as it is to 999, then in thousands to one place (1.1k), then millions. */
+    static String shortNumber(int value) {
+        if (value < 1000) return String.valueOf(value);
+        if (value < 1000000) return (value < 10000 ? String.format(java.util.Locale.ROOT, "%.1f", value / 1000f).replace(".0", "") : String.valueOf(value / 1000)) + "k";
+        return String.format(java.util.Locale.ROOT, "%.1f", value / 1000000f).replace(".0", "") + "M";
     }
 
     /** The stroke paint, in a colour and width. */

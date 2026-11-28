@@ -28,7 +28,7 @@ public class RunSkillsTest {
 
     @Test public void aWebOfThirteenRegionsWithManyMoreNotablesThanBefore() {
         assertTrue("nodes " + TREE.size(), TREE.size() >= 1000);
-        assertEquals(RunSkills.SKY_CLASSES + RunSkills.SKY_CLASS.length, RunSkills.NOTABLES.size());
+        assertEquals(RunSkills.RIBBONS + RunSkills.RIBBON_COUNT, RunSkills.NOTABLES.size());
         assertTrue(RunSkills.NOTABLES.size() >= 140);
         // Every notable is in the tree exactly once, and every one has its own name and its own picture.
         int[] placed = new int[RunSkills.NOTABLES.size()];
@@ -45,8 +45,8 @@ public class RunSkillsTest {
             if (notable.keystone) keystones++;
         }
         assertTrue(actives >= 30);
-        // (And Skyborne, of the moves of the air.)
-        assertEquals(RunSkills.CLASS_COUNT + RunSkills.CORE_KEYSTONE_COUNT + 1, keystones);
+        // (And Skyborne, of the moves of the air, and Monochrome, of the ribbons.)
+        assertEquals(RunSkills.CLASS_COUNT + RunSkills.CORE_KEYSTONE_COUNT + 2, keystones);
         // Thirteen starts, one for each class; each class region with its seven.
         for (int clazz = 0; clazz < RunSkills.CLASS_COUNT; clazz++) {
             assertTrue(start(clazz) > 0);
