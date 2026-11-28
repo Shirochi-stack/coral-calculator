@@ -17,8 +17,8 @@ import java.util.List;
 
 /**
  * Her skill tree's own screen, over everything: the tree on a night sky, dragged to look round and pinched (or the + and − buttons, or the
- * mouse wheel) to come closer or go further off; each path's emblem past its keystone; each node drawn as its own picture, bright when
- * taken, lit round when it can be taken. A node touched shows its card: what it is and does, and a button to take it, or for an active
+ * mouse wheel) to come closer or go further off; each class's region tinted in its colour, with its emblem and name past its edge; each
+ * node drawn as its own picture, bright when taken, lit round when it can be taken. A node touched shows its card: what it is and does, and a button to take it, or for an active
  * taken, the slot to put it in. At the top, the points she has, her stats, and taking every point back at a cost.
  * The game keeps what is taken; this only shows it and says what was asked for.
  */
@@ -32,12 +32,14 @@ final class RunTree {
         int[] slots = new int[RunSkills.SLOTS];
         int points, level = 1, bank, respecCost, hearts = 3;
         boolean freeRespec;
+        /** Whether to say that the tree was redrawn and every point is hers again (until the tree is next closed). */
+        boolean redrawn;
         RunSkills.Built built = new RunSkills.Built();
     }
 
-    private static final int ICON = 96, COLUMNS = 8, NODE_ICONS = RunSkills.PATHS;
-    /** How far out the tree reaches, in its own units: the keystones, and the emblems past them. */
-    static final float REACH = 4 + RunSkills.PATH_LENGTH * 1.15f, EMBLEMS = REACH + 5.5f;
+    private static final int ICON = 96, COLUMNS = 8, NODE_ICONS = RunSkills.NODE_ICONS;
+    /** How far out the tree reaches, in its own units: its furthest nodes, and the regions' emblems past them. */
+    static final float REACH = RunSkills.REACH - 4, EMBLEMS = RunSkills.REACH;
 
     private final Resources resources;
     private final float density;
@@ -75,12 +77,29 @@ final class RunTree {
 
     private float dp(float value) { return value * density; }
 
-    /** Opened afresh: at the centre, close enough to read the first steps of every path. */
-    void open(float width, float height) {
+    /** Opened afresh: with nothing taken, the whole tree, every start in sight; else close by what is taken. */
+    void open(float width, float height) { open(width, height, new BitSet()); }
+
+    void open(float width, float height, BitSet taken) {
         this.width = width;
         this.height = height;
         lookX = lookY = 0;
-        zoom = Math.max(least(), dp(16));
+        zoom = least();
+        if (!taken.isEmpty()) {
+            List<RunSkills.Node> nodes = RunSkills.tree();
+            float sumX = 0, sumY = 0;
+            int count = 0;
+            for (int id = taken.nextSetBit(1); id >= 0 && id < nodes.size(); id = taken.nextSetBit(id + 1)) {
+                sumX += nodes.get(id).x;
+                sumY += nodes.get(id).y;
+                count++;
+            }
+            if (count > 0) {
+                lookX = sumX / count;
+                lookY = sumY / count;
+            }
+            zoom = Math.max(least(), dp(12));
+        }
         on = -1;
         statsOpen = asking = false;
         pinching = false;
@@ -92,17 +111,26 @@ final class RunTree {
     int on() { return on; }
 
     /** The furthest off it can be seen from: the whole tree in the screen. */
-    private float least() { return Math.min(width, height) / (2 * (EMBLEMS + 7)); }
+    private float least() {
+        float tall = (safeBottom > 0 ? safeBottom : height) - Math.max(0, safeTop) - dp(110);
+        // (Across, room for the regions' names past their emblems; up and down, the names fit in what is left over.)
+        return Math.min(width / (2 * (EMBLEMS + 16)), tall / (2 * (EMBLEMS + 4)));
+    }
 
     private float most() { return dp(64); }
 
     private void zoomBy(float times, float aboutX, float aboutY) {
         float before = zoom;
         zoom = Math.max(least(), Math.min(most(), zoom * times));
+        // (As far off as it goes, the whole tree is in the middle.)
+        if (zoom <= least() * 1.001f) {
+            lookX = lookY = 0;
+            return;
+        }
         // (What is under the fingers stays under them.)
-        float wx = lookX + (aboutX - width / 2) / before, wy = lookY + (aboutY - height / 2) / before;
+        float wx = lookX + (aboutX - width / 2) / before, wy = lookY + (aboutY - midY()) / before;
         lookX = wx - (aboutX - width / 2) / zoom;
-        lookY = wy - (aboutY - height / 2) / zoom;
+        lookY = wy - (aboutY - midY()) / zoom;
         hold();
     }
 
@@ -113,22 +141,38 @@ final class RunTree {
     }
 
     private float sx(float x) { return width / 2 + (x - lookX) * zoom; }
-    private float sy(float y) { return height / 2 + (y - lookY) * zoom; }
+    private float sy(float y) { return midY() + (y - lookY) * zoom; }
+
+    /** Where the middle of the tree is drawn: a little below the middle of the screen, clear of the bar at the top. */
+    private float midY() { return (Math.max(0, safeTop) + dp(68) + (safeBottom > 0 ? safeBottom : height)) / 2; }
+
+    /** The part of the screen that is clear to draw on, top and bottom, as last drawn (all of it, before then). */
+    private float safeTop, safeBottom;
 
     /** A node's size, in the tree's units. */
     static float size(RunSkills.Node node) {
-        if (node.type == RunSkills.CENTRE) return 1.6f;
+        if (node.type == RunSkills.CENTRE) return 0;
+        if (node.type == RunSkills.START) return 1.25f;
         if (node.type == RunSkills.NOTABLE) return RunSkills.keystone(node) ? 1.05f : .8f;
         return node.type == RunSkills.ROOT ? .58f : .38f;
     }
 
     /** Which picture in the sheet a node is. */
     static int iconOf(RunSkills.Node node) {
-        if (node.type == RunSkills.CENTRE) return NODE_ICONS + 11;
-        if (node.type == RunSkills.SMALL) return NODE_ICONS + node.stat;
+        if (node.type == RunSkills.CENTRE) return RunSkills.SEED_ICON;
+        if (node.type == RunSkills.START) return RunSkills.emblemOf(node.path);
+        if (node.type == RunSkills.NOTABLE) return RunSkills.NOTABLES.get(node.notable).icon;
         if (node.type == RunSkills.ROOT) return NODE_ICONS + 4 + node.stat;
-        if (RunSkills.keystone(node)) return NODE_ICONS + 10;
-        return NODE_ICONS + (RunSkills.notables(node.path).get(node.notable).kind == RunSkills.ACTIVE ? 9 : 8);
+        // (A small node of a class's own: its gem is attack's, or intelligence's for that.)
+        if (node.effect >= 0) return NODE_ICONS + (node.effect == RunSkills.E_INT_PCT ? RunSkills.INT : RunSkills.ATK);
+        return NODE_ICONS + node.stat;
+    }
+
+    /** The emblem a node's region shows on its card: its class's, the first of a hybrid's two; or none for the core. */
+    static int emblemOfRegion(int region) {
+        if (region >= 0 && region < RunSkills.CLASS_COUNT) return RunSkills.emblemOf(region);
+        if (region >= RunSkills.HYBRID) return RunSkills.emblemOf(region - RunSkills.HYBRID);
+        return -1;
     }
 
     /** One of the sheet's pictures, at a middle and a size. */
@@ -186,11 +230,11 @@ final class RunTree {
                 return NOTHING;
             }
             if (zoomIn.contains(x, y)) {
-                zoomBy(1.5f, width / 2, height / 2);
+                zoomBy(1.5f, width / 2, midY());
                 return NOTHING;
             }
             if (zoomOut.contains(x, y)) {
-                zoomBy(1 / 1.5f, width / 2, height / 2);
+                zoomBy(1 / 1.5f, width / 2, midY());
                 return NOTHING;
             }
             if (on >= 0 && card.contains(x, y)) {
@@ -268,6 +312,8 @@ final class RunTree {
         int best = -1;
         float bestFar = Float.MAX_VALUE;
         for (RunSkills.Node node : nodes) {
+            // (The hidden root is not there to be touched.)
+            if (node.id == 0) continue;
             float far = (float) Math.hypot(sx(node.x) - x, sy(node.y) - y), reach = Math.max(dp(20), size(node) * zoom);
             if (far < reach && far < bestFar) {
                 best = node.id;
@@ -285,17 +331,32 @@ final class RunTree {
     // Drawing
 
     void draw(Canvas canvas, RectF safe, Facts facts) {
+        safeTop = safe.top;
+        safeBottom = safe.bottom;
+        // Turned, or otherwise made another size: opened afresh at the new size.
+        if (zoom > 0 && (canvas.getWidth() != width || canvas.getHeight() != height)) open(canvas.getWidth(), canvas.getHeight(), facts.taken);
         width = canvas.getWidth();
         height = canvas.getHeight();
         if (zoom <= 0) open(width, height);
         clock = (System.nanoTime() / 1_000_000L % 1_000_000L) / 1000f;
         canvas.drawColor(0xFF110E20);
-        // A soft light at the heart of it.
+        // A soft light at the heart of it, and her seed there, faint.
         float cx = sx(0), cy = sy(0);
         paint.setStyle(Paint.Style.FILL);
         for (int glow = 5; glow >= 1; glow--) {
             paint.setColor(Color.argb(10, 150, 120, 255));
             canvas.drawCircle(cx, cy, glow * 7 * zoom, paint);
+        }
+        icon(canvas, RunSkills.SEED_ICON, cx, cy, 14 * zoom, 60);
+        // Each class's region, tinted in its colour round its start.
+        for (int clazz = 0; clazz < RunSkills.CLASS_COUNT; clazz++) {
+            double angle = clazz * Math.PI * 2 / RunSkills.CLASS_COUNT - Math.PI / 2;
+            float rx = sx((float) Math.cos(angle) * 68), ry = sy((float) Math.sin(angle) * 68);
+            int tint = RunSkills.PATH_COLOURS[clazz];
+            for (int glow = 4; glow >= 1; glow--) {
+                paint.setColor(Color.argb(9, Color.red(tint), Color.green(tint), Color.blue(tint)));
+                canvas.drawCircle(rx, ry, glow * 5.5f * zoom, paint);
+            }
         }
         // A few fixed stars, the same each time.
         paint.setColor(0x55FFFFFF);
@@ -311,16 +372,19 @@ final class RunTree {
         float margin = dp(40);
         // The links: bright in the path's colour where both ends are taken, lit where one is, faint elsewhere.
         for (RunSkills.Node node : nodes) {
+            // (The hidden root, and its links to the starts, are not drawn.)
+            if (node.id == 0) continue;
             float ax = sx(node.x), ay = sy(node.y);
             for (int other : node.next) {
                 if (other < node.id) continue;
                 RunSkills.Node far = nodes.get(other);
                 float bx = sx(far.x), by = sy(far.y);
                 if (Math.max(ax, bx) < -margin || Math.min(ax, bx) > width + margin || Math.max(ay, by) < -margin || Math.min(ay, by) > height + margin) continue;
-                boolean one = node.id == 0 || taken.get(node.id), two = taken.get(other);
-                int path = far.path >= 0 ? far.path : node.path;
-                boolean across = node.path >= 0 && far.path >= 0 && node.path != far.path;
-                int colour = across ? 0xFFFFD27A : lit(RunSkills.PATH_COLOURS[Math.max(0, path)], .25f);
+                boolean one = taken.get(node.id), two = taken.get(other);
+                // (A link between two regions is drawn in the hybrid's or the core's colour, whichever it goes into.)
+                int path = node.path == far.path ? node.path : Math.max(node.path, far.path);
+                boolean across = node.path != far.path;
+                int colour = lit(RunSkills.PATH_COLOURS[path], .25f);
                 if (one && two) {
                     line.setColor(colour);
                     line.setStrokeWidth(Math.max(dp(2), Math.min(dp(5), zoom * .18f)));
@@ -329,7 +393,7 @@ final class RunTree {
                     line.setAlpha(110);
                     line.setStrokeWidth(Math.max(dp(1.5f), Math.min(dp(3.5f), zoom * .12f)));
                 } else {
-                    line.setColor(across ? 0x55FFD27A : 0x33FFFFFF);
+                    line.setColor(across ? 0x44FFD27A : 0x33FFFFFF);
                     line.setStrokeWidth(Math.max(dp(1), Math.min(dp(2.5f), zoom * .08f)));
                 }
                 canvas.drawLine(ax, ay, bx, by, line);
@@ -338,10 +402,11 @@ final class RunTree {
         // The nodes.
         float pulse = .5f + .5f * (float) Math.sin(clock * 4);
         for (RunSkills.Node node : nodes) {
+            if (node.id == 0) continue;
             float x = sx(node.x), y = sy(node.y), r = size(node) * zoom;
             if (x < -r - margin || x > width + r + margin || y < -r - margin || y > height + r + margin) continue;
-            boolean has = node.id == 0 || taken.get(node.id), can = !has && RunSkills.canTake(taken, node.id);
-            int colour = node.path >= 0 ? lit(RunSkills.PATH_COLOURS[node.path], .3f) : 0xFFFFE9A8;
+            boolean has = taken.get(node.id), can = !has && RunSkills.canTake(taken, node.id);
+            int colour = lit(RunSkills.PATH_COLOURS[node.path], .3f);
             if (r < dp(5)) {
                 // Far off: a dot.
                 paint.setStyle(Paint.Style.FILL);
@@ -360,7 +425,7 @@ final class RunTree {
                 ring.setAlpha(Math.round(120 + 135 * pulse * (left > 0 ? 1 : .3f)));
                 ring.setStrokeWidth(Math.max(dp(1.5f), r * .12f));
                 canvas.drawCircle(x, y, r * 1.12f, ring);
-            } else if (has && node.id != 0) {
+            } else if (has) {
                 ring.setColor(colour);
                 ring.setStrokeWidth(Math.max(dp(1.5f), r * .1f));
                 canvas.drawCircle(x, y, r * 1.1f, ring);
@@ -383,22 +448,44 @@ final class RunTree {
                 canvas.drawText(String.valueOf(slot + 1), bx, by + br * .45f, text);
             }
         }
-        // Each path's emblem past its keystone, with its name under it.
-        for (int path = 0; path < RunSkills.PATHS; path++) {
-            double angle = path * Math.PI * 2 / RunSkills.PATHS;
-            float x = sx((float) Math.cos(angle) * EMBLEMS), y = sy((float) Math.sin(angle) * EMBLEMS), size = Math.max(dp(30), Math.min(dp(120), zoom * 5));
-            if (x < -size || x > width + size || y < -size || y > height + size) continue;
-            icon(canvas, path, x, y, size, 255);
-            float words = Math.max(dp(9), Math.min(dp(15), zoom * .9f));
+        // Each class's emblem past the edge of its region, with its name under it; and the core's name at its heart.
+        for (int clazz = 0; clazz < RunSkills.CLASS_COUNT; clazz++) {
+            double angle = clazz * Math.PI * 2 / RunSkills.CLASS_COUNT - Math.PI / 2;
+            float x = sx((float) Math.cos(angle) * EMBLEMS), y = sy((float) Math.sin(angle) * EMBLEMS), size = Math.max(dp(18), Math.min(dp(110), zoom * 5));
+            if (x < -size * 2 || x > width + size * 2 || y < -size || y > height + size * 2) continue;
+            icon(canvas, RunSkills.emblemOf(clazz), x, y, size, 255);
+            float words = Math.max(dp(8), Math.min(dp(15), zoom * .9f));
             text.setTextSize(words);
             text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(lit(RunSkills.PATH_COLOURS[path], .45f));
-            canvas.drawText(RunSkills.PATH_NAMES[path], x, y + size * .5f + words * 1.1f, text);
+            text.setColor(lit(RunSkills.PATH_COLOURS[clazz], .45f));
+            // (Kept on the screen, however far to one side its region is.)
+            float half = text.measureText(RunSkills.CLASSES[clazz]) / 2 + dp(4);
+            canvas.drawText(RunSkills.CLASSES[clazz], Math.max(half, Math.min(width - half, x)), y + size * .5f + words * 1.1f, text);
+        }
+        if (zoom * 14 > dp(60)) {
+            text.setTextSize(Math.max(dp(10), Math.min(dp(16), zoom * .9f)));
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(0x99FFE9A8);
+            canvas.drawText(RunSkills.PATH_NAMES[RunSkills.CORE], cx, cy + 9 * zoom, text);
         }
         drawTop(canvas, safe, facts, left);
+        if (facts.redrawn) drawRedrawn(canvas, safe);
         drawCard(canvas, safe, facts, left);
         if (statsOpen) drawStats(canvas, safe, facts);
         if (asking) drawAsk(canvas, safe, facts);
+    }
+
+    /** Under the bar at the top, once: the tree was redrawn, and every point is hers again. */
+    private void drawRedrawn(Canvas canvas, RectF safe) {
+        float wide = Math.min(safe.width() - dp(20), dp(480)), tall = dp(40);
+        RectF note = new RectF(safe.centerX() - wide / 2, top.bottom + dp(8), safe.centerX() + wide / 2, top.bottom + dp(8) + tall);
+        plate(canvas, note, dp(14), 0xEE3A2A10);
+        ring.setColor(0xFFFFD24A);
+        ring.setStrokeWidth(dp(1.5f));
+        canvas.drawRoundRect(note, dp(14), dp(14), ring);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(0xFFFFE08A);
+        fitted(canvas, RunSkills.REDRAWN_NOTE, note.centerX(), note.centerY() + dp(5), dp(13.5f), wide - dp(24));
     }
 
     private void plate(Canvas canvas, RectF where, float round, int colour) {
@@ -474,14 +561,21 @@ final class RunTree {
         float bottom = (on >= 0 && !card.isEmpty() ? card.top : safe.bottom) - dp(12);
         zoomIn.set(safe.right - pad - side, bottom - side * 2 - dp(8), safe.right - pad, bottom - side - dp(8));
         zoomOut.set(safe.right - pad - side, bottom - side, safe.right - pad, bottom);
+        // (No room for them over a card on a short screen, under the bar: then pinching it is.)
+        if (zoomIn.top < top.bottom + dp(8)) {
+            zoomIn.setEmpty();
+            zoomOut.setEmpty();
+        }
         for (RectF zoomButton : new RectF[]{zoomIn, zoomOut}) {
+            if (zoomButton.isEmpty()) continue;
             plate(canvas, zoomButton, side / 2, 0xEE2B2448);
             line.setColor(Color.WHITE);
             line.setStrokeWidth(dp(2.5f));
             canvas.drawLine(zoomButton.centerX() - dp(8), zoomButton.centerY(), zoomButton.centerX() + dp(8), zoomButton.centerY(), line);
             if (zoomButton == zoomIn) canvas.drawLine(zoomButton.centerX(), zoomButton.centerY() - dp(8), zoomButton.centerX(), zoomButton.centerY() + dp(8), line);
         }
-        if (on < 0) {
+        // (The hint at the foot, where there is room for it: not on a short screen, where it would lie over the tree.)
+        if (on < 0 && height > dp(560)) {
             text.setTextAlign(Paint.Align.CENTER);
             text.setColor(0xAAFFFFFF);
             fitted(canvas, "Touch a node to see it  ·  drag to look round  ·  pinch to come closer", safe.centerX() - side / 2, safe.bottom - dp(18), dp(12), safe.width() - side * 2 - dp(40));
@@ -500,16 +594,17 @@ final class RunTree {
         float textRoom = wide - pad * 3 - iconSide;
         List<String> lines = wrap(RunSkills.does(node), textRoom, dp(13));
         RunSkills.Notable notable = RunSkills.notableAt(on);
-        boolean has = on == 0 || facts.taken.get(on), can = RunSkills.canTake(facts.taken, on), active = notable != null && notable.kind == RunSkills.ACTIVE;
+        boolean has = facts.taken.get(on), can = RunSkills.canTake(facts.taken, on), active = notable != null && notable.kind == RunSkills.ACTIVE;
         float tall = pad + dp(20) + dp(18) + lines.size() * dp(17) + dp(10) + dp(40) + pad;
         card.set(safe.centerX() - wide / 2, safe.bottom - dp(10) - tall, safe.centerX() + wide / 2, safe.bottom - dp(10));
         plate(canvas, card, dp(20), 0xF2221C3A);
-        int colour = node.path >= 0 ? lit(RunSkills.PATH_COLOURS[node.path], .35f) : 0xFFFFE9A8;
+        int colour = lit(RunSkills.PATH_COLOURS[node.path], .35f);
         ring.setColor(colour);
         ring.setStrokeWidth(dp(2));
         canvas.drawRoundRect(card, dp(20), dp(20), ring);
         icon(canvas, iconOf(node), card.left + pad + iconSide / 2, card.top + pad + iconSide / 2, iconSide, 255);
-        if (node.path >= 0) icon(canvas, node.path, card.left + pad + iconSide * .85f, card.top + pad + iconSide * .85f, iconSide * .5f, 255);
+        int emblem = node.type == RunSkills.START ? -1 : emblemOfRegion(node.path);
+        if (emblem >= 0) icon(canvas, emblem, card.left + pad + iconSide * .85f, card.top + pad + iconSide * .85f, iconSide * .5f, 255);
         float x = card.left + pad * 2 + iconSide, y = card.top + pad;
         text.setTextAlign(Paint.Align.LEFT);
         text.setColor(Color.WHITE);
@@ -562,10 +657,19 @@ final class RunTree {
                 : "Divine power comes from some notables, and from their actives while called on"});
         StringBuilder more = new StringBuilder();
         for (int effect = 0; effect < RunSkills.E_EFFECTS; effect++) {
-            if (effect == RunSkills.E_ATK_PCT || effect == RunSkills.E_DEF_PCT || effect == RunSkills.E_HP_PCT || effect == RunSkills.E_DP || built.effects[effect] == 0) continue;
-            more.append(more.length() == 0 ? "" : ",  ").append(signed(built.effects[effect])).append(RunSkills.EFFECT_WORDS[effect]);
+            if (effect == RunSkills.E_DEF_PCT || effect == RunSkills.E_HP_PCT || effect == RunSkills.E_DP || built.effects[effect] == 0) continue;
+            more.append(more.length() == 0 ? "" : ";  ").append(RunSkills.phrase(effect, built.effects[effect]));
         }
         rows.add(new String[]{"Passives", more.length() == 0 ? "None taken yet" : more.toString()});
+        // And what is felt only with a class's weapons in her hands, class by class.
+        for (int clazz = 0; clazz < RunSkills.CLASS_COUNT; clazz++) {
+            StringBuilder with = new StringBuilder();
+            for (int effect = 0; effect < RunSkills.E_EFFECTS; effect++) {
+                if (built.byClass[clazz][effect] == 0) continue;
+                with.append(with.length() == 0 ? "" : ";  ").append(RunSkills.phrase(effect, built.byClass[clazz][effect]));
+            }
+            if (with.length() > 0) rows.add(new String[]{RunSkills.CLASSES[clazz], with.toString()});
+        }
         int actives = built.actives.size(), slotted = 0;
         for (RunSkills.Notable one : RunSkills.slotted(facts.taken, facts.slots)) if (one != null) slotted++;
         rows.add(new String[]{"Actives", actives + " taken, " + slotted + " in her slots"});
@@ -590,7 +694,7 @@ final class RunTree {
         text.setTypeface(Typeface.DEFAULT_BOLD);
         fitted(canvas, "Her stats  ·  level " + facts.level, statsCard.left + pad, y, dp(16), wide - pad * 2);
         y += dp(18);
-        int[] colours = {0xFFFF6F7A, 0xFF6FB8FF, 0xFFB98CFF, 0xFFFFB04A, 0xFF5F9BFF, 0xFFFFE08A, 0xFFE8E4FF, 0xFFE8E4FF, 0xFFE8E4FF};
+        int[] colours = {0xFFFF6F7A, 0xFF6FB8FF, 0xFFB98CFF, 0xFFFFB04A, 0xFF5F9BFF, 0xFFFFE08A, 0xFFE8E4FF, 0xFFFFD27A, 0xFFE8E4FF, 0xFFE8E4FF};
         for (int index = 0; index < rows.size(); index++) {
             y += dp(6);
             text.setTypeface(Typeface.DEFAULT_BOLD);

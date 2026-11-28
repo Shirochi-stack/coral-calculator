@@ -6604,6 +6604,12 @@ final class RunGame {
             session.keep("run_title_said", 1);
             speak(RunStory.TITLE_LINE[0], false);
         }
+        // The tree redrawn and every point back: she says so, once, the next time the map is open.
+        if (screen == MAP && video == null && !treeOpen && captionLeft <= 0 && personLeft <= 0 && session.tally("run_tree_notice") == 1 && session.tally("run_tree_said") == 0
+                && clock > 4 && !audio.speaking()) {
+            session.keep("run_tree_said", 1);
+            speak(RunStory.SKILLS[3], false);
+        }
         // The first time the map is open with points waiting in her skill tree: she says so.
         if (screen == MAP && video == null && !treeOpen && captionLeft <= 0 && personLeft <= 0 && session.tally("run_title_said") != 0 && session.tally("run_skills_said") == 0
                 && clock > 4 && !audio.speaking() && skillsLeft() > 0) {
@@ -9048,7 +9054,7 @@ final class RunGame {
                     paint.setStyle(Paint.Style.FILL);
                     paint.setColor(dark ? 0xFF33373B : 0xFFF1F3F4);
                     canvas.drawRoundRect(skillPause, dp(21), dp(21), paint);
-                    tree().icon(canvas, RunSkills.PATHS + 11, skillPause.left + dp(22), skillPause.centerY(), dp(32), 255);
+                    tree().icon(canvas, RunSkills.SEED_ICON, skillPause.left + dp(22), skillPause.centerY(), dp(32), 255);
                     text.setColor(ink);
                     text.setTextAlign(Paint.Align.LEFT);
                     fitted(canvas, "Skills  \u203A", skillPause.left + dp(40), skillPause.centerY() + dp(5.5f), dp(15.5f), skillPause.width() - dp(46));
@@ -9305,8 +9311,26 @@ final class RunGame {
         return tree;
     }
 
-    /** What is taken, as it is kept: anything no longer joined to the centre let go. */
-    private java.util.BitSet skillsTaken() { return RunSkills.whole(RunSkills.taken(session.note("run_skills"))); }
+    /** What is taken, as it is kept: anything no longer joined to the hidden root let go. */
+    private java.util.BitSet skillsTaken() {
+        redrawTree();
+        return RunSkills.whole(RunSkills.taken(session.note("run_skills")));
+    }
+
+    /**
+     * The tree was redrawn: the first time a save is read since, what was taken in the old tree is let go, and every point her level has
+     * earned is hers to spend again; the tree says so the next time it is open, and she says so on the map. Whether the first
+     * respec is free is as it was.
+     */
+    private void redrawTree() {
+        int seen = session.tally(RunSkills.TREE_VERSION_KEY);
+        if (seen != 0) return;
+        session.keep(RunSkills.TREE_VERSION_KEY, 1);
+        if (!RunSkills.fromBefore(seen, session.note("run_skills"))) return;
+        session.keepNote("run_skills", "");
+        session.keepNote("run_skill_slots", "");
+        session.keep("run_tree_notice", 1);
+    }
 
     private int[] skillSlots() { return RunSkills.slots(session.note("run_skill_slots")); }
 
@@ -9320,10 +9344,10 @@ final class RunGame {
     private void openTree(int from) {
         treeOpen = true;
         treeFrom = from;
-        tree().open(width, height);
+        readTree();
+        tree().open(width, height, treeFacts.taken);
         goLeft = goRight = goJump = goStrike = false;
         jumpPressed = strikePressed = false;
-        readTree();
         audio.play("page", .6f);
     }
 
@@ -9339,6 +9363,7 @@ final class RunGame {
         facts.freeRespec = freeRespec();
         facts.built = RunSkills.built(facts.taken);
         facts.hearts = kept().hearts;
+        facts.redrawn = session.tally("run_tree_notice") == 1;
     }
 
     /** What is taken has changed: felt at once in a land. */
@@ -9352,6 +9377,8 @@ final class RunGame {
         int asked = tree().touch(event), id = tree.picked();
         if (asked == RunTree.CLOSE) {
             treeOpen = false;
+            // (Said once: closed, the note that the tree was redrawn is done with.)
+            if (session.tally("run_tree_notice") == 1) session.keep("run_tree_notice", 2);
             audio.play("tap", .3f);
         } else if (asked == RunTree.TAKE) {
             java.util.BitSet taken = skillsTaken();
@@ -9412,7 +9439,7 @@ final class RunGame {
         }
     }
 
-    /** Her active slots on the HUD: each the emblem of its path; dark while it rests, ringed in gold while it is called on. */
+    /** Her active slots on the HUD: each its own picture; dark while it rests, ringed in gold while it is called on. */
     private void drawSlots(Canvas canvas) {
         placeSlots();
         for (int slot = 0; slot < PlusRun.SLOTS; slot++) {
@@ -9420,10 +9447,10 @@ final class RunGame {
             if (skill == null) continue;
             RectF where = slotButtons[slot];
             float rest = run.activeRest(slot), on = run.activeLeft(slot);
-            boolean ready = rest <= 0 && run.energy() >= PlusRun.ACTIVE_COST;
+            boolean ready = rest <= 0 && run.canSpend(PlusRun.ACTIVE_COST);
             if (on > 0) glowAt(canvas, where.centerX(), where.centerY(), where.width() * .85f, 0xFFFFD24A, 200);
             plate(canvas, where, where.height() / 2, 235);
-            tree().icon(canvas, skill.path, where.centerX(), where.centerY(), where.width() * .94f, ready || on > 0 ? 255 : 110);
+            tree().icon(canvas, skill.icon, where.centerX(), where.centerY(), where.width() * .94f, ready || on > 0 ? 255 : 110);
             if (rest > 0) {
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0x88000000);
@@ -15528,7 +15555,7 @@ final class RunGame {
         text.setTextAlign(Paint.Align.LEFT);
         // Her skill tree, beside her backpack: its seed, and a dot while there are points to spend.
         plate(canvas, skillButton, skillButton.height() / 2, 235);
-        tree().icon(canvas, RunSkills.PATHS + 11, skillButton.centerX(), skillButton.centerY(), skillButton.height() * 1.02f, 255);
+        tree().icon(canvas, RunSkills.SEED_ICON, skillButton.centerX(), skillButton.centerY(), skillButton.height() * 1.02f, 255);
         if (skillsLeft() > 0) {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(CalculatorLayout.CORAL);

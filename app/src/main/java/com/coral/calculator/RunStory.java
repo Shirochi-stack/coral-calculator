@@ -572,6 +572,7 @@ final class RunStory {
             {"skill1", "My skill tree woke up. Points to spend, so spend them Sloppy~♡", "H", PLAYER + "She has just found that her skill tree has points waiting and urges the player to open it and spend them. Excited, a little bossy, eager to grow stronger."},
             {"skill2", "Divine power! Every blow lands three times Sloppy~♡", "H", PLAYER + "In the middle of a fight her divine power fills and bursts out; for a few seconds she hits three times as hard. Triumphant, radiant, a battle cry."},
             {"skill3", "All of it back? Fine. Choose better this time Sloppy~♡", "H", PLAYER + "The player has just taken back every point of her skill tree to spend them again. Mock exasperated, teasing, but secretly glad of the fresh start."},
+            {"skill4", "My tree got redrawn! Every point came back, so spend them Sloppy~♡", "H", PLAYER + "Her skill tree has just been redrawn into a great new web of regions and routes, and every point she had spent has come back to her to spend again. Delighted, a little bossy, eager to explore it."},
     };
 
     /** Her moves from the counter: the second wind, which leaves her half a heart once a land. */

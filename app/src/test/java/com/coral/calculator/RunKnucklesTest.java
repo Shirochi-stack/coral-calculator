@@ -131,39 +131,26 @@ public class RunKnucklesTest {
         assertEquals(twelve - 1, RunCraft.roses(twelve - 1));
     }
 
-    @Test public void twoNewPathsAndWhatWasTakenBeforeStaysJoined() {
-        assertEquals(26, RunSkills.PATHS);
-        assertEquals(RunSkills.PATHS, RunSkills.PATH_NAMES.length);
-        assertEquals(RunSkills.PATHS, RunSkills.PATH_COLOURS.length);
-        assertEquals("Knuckles", RunSkills.CLASSES[RunSkills.classOf(24)]);
-        assertEquals(RunArms.KNUCKLES, RunSkills.weaponOf(RunSkills.classOf(25)));
-        assertEquals(12, RunSkills.notables(24).size());
-        assertEquals(12, RunSkills.notables(25).size());
-        // The first twenty-four paths' nodes come first, as they always did; the new ones after them.
-        java.util.List<RunSkills.Node> tree = RunSkills.tree();
-        int lastOld = 0;
-        for (RunSkills.Node node : tree) if (node.path >= 0 && node.path < RunSkills.FIRST_PATHS) lastOld = Math.max(lastOld, node.id);
-        for (RunSkills.Node node : tree) if (node.path >= RunSkills.FIRST_PATHS) assertTrue(node.id > lastOld);
-        // A path taken out to its end and over to the first path's end, as could be done before: still all joined to the centre.
-        BitSet taken = new BitSet();
-        int end23 = -1, end0 = -1;
-        for (RunSkills.Node node : tree) {
-            if (node.path == 23 && node.type != RunSkills.NOTABLE || node.path == 23 && node.notable < 11) taken.set(node.id);
-            if (node.path == 23) end23 = node.id;
+    @Test public void theKnucklesHaveARegionOfTheirOwnInTheTree() {
+        assertEquals(13, RunSkills.CLASS_COUNT);
+        assertEquals("Knuckles", RunSkills.CLASSES[12]);
+        assertEquals(RunArms.KNUCKLES, RunSkills.weaponOf(12));
+        assertEquals(12, RunSkills.classOfWeapon(RunArms.KNUCKLES));
+        // Its start, and its seven notables: finishers and launchers, two actives, a deep one and a keystone with a cost.
+        int start = -1, notables = 0;
+        for (RunSkills.Node node : RunSkills.tree()) {
+            if (node.type == RunSkills.START && node.path == 12) start = node.id;
+            if (node.type == RunSkills.NOTABLE && node.path == 12) notables++;
         }
-        for (RunSkills.Node node : tree) if (node.path == 0 && node.next.size() > 0 && tree.get(node.id).next.contains(lastEnd(tree, 23))) end0 = node.id;
-        if (end0 > 0) taken.set(end0);
-        assertEquals(taken, RunSkills.whole(taken));
-        assertTrue(end23 > 0);
+        assertTrue(start > 0);
+        assertEquals(RunSkills.PER_CLASS, notables);
+        RunSkills.Notable keystone = RunSkills.NOTABLES.get(12 * RunSkills.PER_CLASS + RunSkills.CLASS_KEYSTONE);
+        assertTrue(keystone.keystone);
+        assertTrue(keystone.costly());
+        assertTrue(keystone.of(RunSkills.E_EXECUTE) > 0);
+        assertTrue(RunSkills.NOTABLES.get(12 * RunSkills.PER_CLASS + RunSkills.OUTER_LEFT).of(RunSkills.E_STUN) > 0
+                || RunSkills.NOTABLES.get(12 * RunSkills.PER_CLASS + RunSkills.OUTER_RIGHT).of(RunSkills.E_STUN) > 0);
     }
-
-    /** The last node along a path before its keystone: where it crosses over. */
-    private static int lastEnd(java.util.List<RunSkills.Node> tree, int path) {
-        int end = -1;
-        for (RunSkills.Node node : tree) if (node.path == path && !(node.type == RunSkills.NOTABLE && node.notable == 11)) end = node.id;
-        return end;
-    }
-
     @Test public void huntsKnowItAndTheTreesKeepTheirNumber() {
         assertEquals(19, RunHunts.TREES);
         assertEquals(RunHunts.KNUCKLE_WAY, RunHunts.wayOf(RunArms.KNUCKLES));
