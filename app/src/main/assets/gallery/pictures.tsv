@@ -100,3 +100,18 @@ true_05_heroine_everyone	Heroine: everyone	Reach an ending	ending:2
 true_06_friends_picnic	A picnic of friends	Reach an ending	ending:2
 true_07_bat_mended	A mended bat	Reach an ending	ending:2
 true_08_read_to_the_end	Read to the end	Reach an ending	ending:2
+summon_c1	The Summoned Queen: concept 1	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_c2	The Summoned Queen: concept 2	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_c3	The Summoned Queen: concept 3	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_c4	The Summoned Queen: concept 4	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_k1a	Concept 1: key poses	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_k1b	Concept 1: more key poses	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_k2a	Concept 2: key poses	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_k2b	Concept 2: more key poses	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_k4a	Concept 4: key poses	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_k4b	Concept 4: more key poses	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_c5a	Concept 5 (gothic)	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_c5b	Concept 5 (gothic): another take	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_k5	Concept 5 (gothic): key poses	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_notes_faces	Design notes: faces	Unlock the True Grimoire	key:run_true_grimoire:1
+summon_notes_board	Design notes	Unlock the True Grimoire	key:run_true_grimoire:1
