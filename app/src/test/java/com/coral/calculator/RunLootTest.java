@@ -110,9 +110,9 @@ public class RunLootTest {
         }
         assertEquals("Archive Katana", RunLoot.name(RunLoot.code(RunLoot.WEAPON, 1, 1, RunLoot.BLUE)));
         assertEquals("Halgakos Rose Scythe", RunLoot.name(RunLoot.code(RunLoot.WEAPON, 11, 11, RunLoot.ROSE)));
-        assertEquals(30, RunLoot.ARMOURS.length);
-        assertEquals(30, RunLoot.ACCESSORIES.length);
-        assertEquals(12, RunLoot.WEAPONS.length);
+        assertEquals(31, RunLoot.ARMOURS.length);
+        assertEquals(31, RunLoot.ACCESSORIES.length);
+        assertEquals(13, RunLoot.WEAPONS.length);
         List<Integer> bag = RunLoot.bag("");
         for (int index = 0; index < RunLoot.BAG + 10; index++) RunLoot.add(bag, RunLoot.code(0, 0, 0, index < 10 ? RunLoot.WHITE : RunLoot.GOLD));
         assertEquals(RunLoot.BAG, bag.size());

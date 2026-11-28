@@ -22,16 +22,17 @@ final class RunSkills {
 
     /** The twelve classes of weapon, each with two paths. */
     static final String[] CLASSES = {"Swords", "Katana", "Greatswords", "Books", "Summoning staffs", "Knives", "Pens and pencils", "Maces", "Hammers", "Wands",
-            "Ink guns", "Scythes"};
-    static final int PATHS = 24;
+            "Ink guns", "Scythes", "Knuckles"};
+    /** (The knuckles' two came last: their nodes are after everyone else's, so that what was taken before is still what it was.) */
+    static final int PATHS = 26, FIRST_PATHS = 24;
     static final String[] PATH_NAMES = {
             "Bladesong", "Duelist", "Iaido", "Ronin's Ink", "Colossus", "Earthsplitter", "Archivist", "Lorekeeper", "Conjurer", "Spiritbinder",
             "Shadowstep", "Venomfang", "Calligrapher", "Inkstorm", "Bonebreaker", "Warden", "Thunderforge", "Quakebringer", "Elementalist", "Divine Script",
-            "Gunslinger", "Inkwell Artillery", "Reaper", "Harvest Moon"};
+            "Gunslinger", "Inkwell Artillery", "Reaper", "Harvest Moon", "Iron Fist", "Pressure Point"};
     /** Each path's colour, for its branch and its icon. */
     static final int[] PATH_COLOURS = {0xFF6FA8FF, 0xFF3F7FE0, 0xFFE0475A, 0xFF8A2A3A, 0xFFB08A50, 0xFF7A5A30, 0xFF2FB5A8, 0xFF1F7F78, 0xFF9A6AE8, 0xFF6A3FC0,
             0xFF4A4F60, 0xFF5FBF6A, 0xFFE89A3F, 0xFF3A50C8, 0xFFC0603A, 0xFF8A8F98, 0xFFFFC433, 0xFF9A6A3A, 0xFF4FC0E8, 0xFFFFE08A, 0xFF2A3FC8, 0xFF1B2152,
-            0xFF7A3A9A, 0xFFE0D0FF};
+            0xFF7A3A9A, 0xFFE0D0FF, 0xFFE0A030, 0xFF3FB0E0};
 
     /** The class a path is for. */
     static int classOf(int path) { return path / 2; }
@@ -93,7 +94,7 @@ final class RunSkills {
         int[][] themes = side == 0 ? new int[][]{{E_ATK_PCT, 12}, {E_HASTE, 10}, {E_CRIT, 8}, {E_AREA, 20}, {E_COMBO, 1}, {E_REACH, 15}}
                 : new int[][]{{E_LEECH, 4}, {E_SHIELD, 1}, {E_DEF_PCT, 12}, {E_PROJECTILES, 1}, {E_DP, 20}, {E_REGEN, 1}};
         // A class's own twist on the second of its themes.
-        int[] twist = {E_CRITX, E_COMBO, E_STUN, E_INT_PCT, E_PROJECTILES, E_POISON, E_PIERCE, E_STUN, E_AREA, E_FREEZE, E_HASTE, E_LEECH};
+        int[] twist = {E_CRITX, E_COMBO, E_STUN, E_INT_PCT, E_PROJECTILES, E_POISON, E_PIERCE, E_STUN, E_AREA, E_FREEZE, E_HASTE, E_LEECH, E_COMBO};
         List<Notable> list = new ArrayList<>();
         for (int index = 0; index < 12; index++) {
             int[] theme = themes[index % 6];
@@ -204,8 +205,10 @@ final class RunSkills {
             link(nodes, previous, keystone.id);
             ends[path] = previous;
         }
-        // Near their ends, paths cross over to the next one round: builds can mix.
+        // Near their ends, paths cross over to the next one round: builds can mix. (And the first twenty-four's last still crosses to the first, as it
+        // always did, so that nothing taken before is cut off.)
         for (int path = 0; path < PATHS; path++) link(nodes, ends[path], ends[(path + 1) % PATHS]);
+        link(nodes, ends[FIRST_PATHS - 1], ends[0]);
         tree = nodes;
         return tree;
     }

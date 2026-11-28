@@ -2287,6 +2287,16 @@ final class PlusRun {
     static final int GREATSWORD = RunArms.GREATSWORD, STAFF = RunArms.STAFF, MACE = RunArms.MACE, HAMMER = RunArms.HAMMER, WAND = RunArms.WAND, SCYTHE = RunArms.SCYTHE;
     /** What a blow of each of the six is made with. */
     static final int GREAT = -13, MACED = -14, HAMMERED = -15, BOLTED = -16, SUMMONED = -17, REAPED = -18;
+    /** Knuckles: the thing, and what its blows are made with (a punch, an uppercut, the haymaker); and counts of them. */
+    static final int KNUCKLES = RunArms.KNUCKLES, PUNCHED = -19, UPPERCUT = -23, HAYMAKER = -24;
+    private int punches, punchChain, uppercuts, dashPunches, haymakers;
+    private float sincePunch = 9;
+
+    int punches() { return punches; }
+    int punchChain() { return punchChain; }
+    int uppercuts() { return uppercuts; }
+    int dashPunches() { return dashPunches; }
+    int haymakers() { return haymakers; }
     private int greats, summons, smashes, slams, bolts, reaps, whirls, quakesMade;
     private float whirlLeft, reapLeft;
     /** Where ink splashed as blows landed: the place of each, and how long since. */
@@ -5546,13 +5556,13 @@ final class PlusRun {
         return by == PLAIN ? BRUSH : by == SWORDED ? SWORD : by == BLASTED || by == BOOK ? BOOK : by == PEN || by == KNIFE || by == GUN ? by
                 : by == PAGE || by == PANELLED ? TABLET : by == THROWN_KEY ? KEYS : by == CUT ? KATANA : by == LANCED ? LANCE : by == SHELLED ? CANNON
                 : by == WHIPPED ? WHIP : by == GREAT ? GREATSWORD : by == SUMMONED ? STAFF : by == MACED ? MACE : by == HAMMERED ? HAMMER : by == BOLTED ? WAND
-                : by == REAPED ? SCYTHE : UNARMED;
+                : by == REAPED ? SCYTHE : by == PUNCHED || by == UPPERCUT || by == HAYMAKER ? KNUCKLES : UNARMED;
     }
 
     private boolean dashCut;
 
     private void fell(Foe foe, int by) {
-        int thing = thingOf(by), way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : thing == UNARMED ? -1 : thing + 1;
+        int thing = thingOf(by), way = by == LANDED || by == PLUNGED ? RunHunts.LANDING : thing == UNARMED ? -1 : RunHunts.wayOf(thing);
         fells.add(new int[]{foe.kind, way});
     }
 
@@ -5874,6 +5884,29 @@ final class PlusRun {
                 bolt.chain = element == RunArms.LIGHTNING ? 2 : 0;
                 bolt.pierce = level >= 3 ? 99 : 0;
             }
+        } else if (weapon == KNUCKLES) {
+            // Punches: jab, jab, and an uppercut that leaves what it hits reeling; at a run, a dash punch that carries her into it.
+            punches++;
+            punchChain = sincePunch < RunArms.PUNCH_RHYTHM ? punchChain % 3 + 1 : 1;
+            sincePunch = 0;
+            float reach = reachOf(KNUCKLES), from = facingLeft ? x - reach : x + WIDE;
+            if (onGround && Math.abs(speedAcross) > RUN * .8f) {
+                dashPunches++;
+                speedAcross = (facingLeft ? -1 : 1) * RUN * 2.4f;
+                float far = RunArms.DASH_PUNCH;
+                sweep(PUNCHED, facingLeft ? x - far : x + WIDE, facingLeft ? x : x + WIDE + far, y + TALL - areaGear(KNUCKLES, level), y + TALL);
+            } else if (punchChain == 3) {
+                uppercuts++;
+                for (Foe foe : foes) {
+                    if (foe.flat || absent(foe) || RunLevels.boss(foe.kind) || foe.x >= from + reach || foe.x + foe.wide() <= from || foe.y >= y + TALL || foe.y + foe.tall() <= y - 1.4f) continue;
+                    beat(foe, UPPERCUT);
+                    if (!foe.flat) foe.dazed = Math.max(foe.dazed, level >= 2 ? 1.2f : .8f);
+                }
+            } else {
+                sweep(PUNCHED, from, from + reach, y + TALL - areaGear(KNUCKLES, level), y + TALL);
+            }
+            swing = SWING * .6f;
+            swungWith = KNUCKLES;
         } else if (weapon == SCYTHE) {
             // A wide arc in front of her, and behind her too.
             reaps++;
@@ -5945,6 +5978,19 @@ final class PlusRun {
                 bolt.element = element;
                 bolt.chain = element == RunArms.LIGHTNING ? 1 : 0;
             }
+            return true;
+        }
+        if (weapon == KNUCKLES) {
+            // The haymaker: every shield in front of her broken outright, and a blow that carries well past her fist.
+            haymakers++;
+            float far = RunArms.HAYMAKER_REACH * (level >= 3 ? 2 : 1), from = facingLeft ? x - far : x + WIDE, to = from + far;
+            for (Foe foe : foes) {
+                if (foe.flat || absent(foe) || foe.guard <= 0 || foe.x >= to || foe.x + foe.wide() <= from || Math.abs(foe.y + foe.tall() - y - TALL) > 1.6f) continue;
+                foe.guard = 0;
+                foe.guardMet = 0;
+                shieldsBroken++;
+            }
+            sweep(HAYMAKER, from, to, y + TALL - 1.8f, y + TALL);
             return true;
         }
         if (weapon == SCYTHE) {
@@ -6165,6 +6211,7 @@ final class PlusRun {
         }
         // A beat after a dash, everything on its line is cut; and a spin that goes round twice goes round again.
         sinceCut += seconds;
+        sincePunch += seconds;
         if (dashLeft > 0 && (dashLeft -= seconds) <= 0) {
             dashCut = true;
             sweep(CUT, dashFrom, dashTo, dashY, dashY + TALL);

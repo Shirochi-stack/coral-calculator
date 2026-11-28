@@ -111,7 +111,7 @@ final class RunGame {
             R.drawable.halgakos_arm3, R.drawable.halgakos_arm4, R.drawable.halgakos_arm5, R.drawable.halgakos_arm6, R.drawable.halgakos_arm7,
             R.drawable.halgakos_arm8, R.drawable.halgakos_arm9, R.drawable.halgakos_arm10, R.drawable.halgakos_arm11,
             R.drawable.halgakos_arm12, R.drawable.halgakos_arm13, R.drawable.halgakos_arm14, R.drawable.halgakos_arm15, R.drawable.halgakos_arm16,
-            R.drawable.halgakos_arm17};
+            R.drawable.halgakos_arm17, R.drawable.halgakos_arm18};
     /**
      * The katana has fourteen pictures of her: after the seven of standing, running, rising
      * and falling come drawing, the cut, sheathing, the dash gathered, the dash's cut, the
@@ -571,7 +571,7 @@ final class RunGame {
     private int seenTrees;
     private PlusRun paperRun;
     private int craftBase;
-    private final RectF[] craftKinds = new RectF[12], craftActs = {new RectF(), new RectF(), new RectF(), new RectF()};
+    private final RectF[] craftKinds = new RectF[RunCraft.KINDS], craftActs = {new RectF(), new RectF(), new RectF(), new RectF()};
     private static final int CRAFT = 3, QUESTS = 4;
     private int seenHeals, seenWinds, seenHidden;
     /** Foreground pieces, drawn in front of her for depth. */
@@ -1522,6 +1522,13 @@ final class RunGame {
 
     /** One of the three is walked up to: her work is looked at, and the land waits. The first time, she says who she is. From the map: only what she wears, to put on. */
     private void openSmith(int who, int from) {
+        int roses = session.tally("run_roses");
+        if (RunCraft.roses(roses) != roses) {
+            session.keep("run_roses", RunCraft.roses(roses));
+            int rose = RunCraft.rose(RunLoot.KNUCKLES);
+            intoBag(rose);
+            toast(RunLoot.name(rose), "Every Rose made before there were knuckles: this one is yours", LOOT_PICTURE + rose);
+        }
         smithOpen = true;
         smithFrom = from;
         smithTab = from == MAP ? RunGear.PULMU : who;
@@ -6655,6 +6662,24 @@ final class RunGame {
             }
             seenHidden = run.hiddenBeaten();
         }
+        // Knuckles: the first time she holds them, and her first uppercut, haymaker and dash punch.
+        if (run != null && screen == PLAY && captionLeft <= 0 && !audio.speaking()) {
+            String[] said = null;
+            if (run.weapon() == RunArms.KNUCKLES && session.tally("run_knk1") == 0) {
+                session.keep("run_knk1", 1);
+                said = RunStory.KNUCKLES[0];
+            } else if (run.uppercuts() > 0 && session.tally("run_knk2") == 0) {
+                session.keep("run_knk2", 1);
+                said = RunStory.KNUCKLES[1];
+            } else if (run.haymakers() > 0 && session.tally("run_knk3") == 0) {
+                session.keep("run_knk3", 1);
+                said = RunStory.KNUCKLES[2];
+            } else if (run.dashPunches() > 0 && session.tally("run_knk4") == 0) {
+                session.keep("run_knk4", 1);
+                said = RunStory.KNUCKLES[3];
+            }
+            if (said != null) speak(said, true);
+        }
         // The first time she comes near a stairway down; in a dive, its keeper seen, and her own double in ink.
         if (run != null && screen == PLAY && captionLeft <= 0 && !audio.speaking()) {
             if (delve < 0 && session.tally("run_dng1") == 0) {
@@ -10406,7 +10431,7 @@ final class RunGame {
     private void thing(Canvas canvas, int kind, float x, float y, float tall, float degrees, boolean mirrored, boolean byTheHandle) {
         if (kind >= RunArms.GREATSWORD) {
             int held = perks != null ? perks.item : 0;
-            int index = held != 0 && RunArms.kindOf(held) == kind ? iconOf(held) : RunArms.baseOf(kind) * 12;
+            int index = held != 0 && RunArms.kindOf(held) == kind ? iconOf(held) : kind == RunArms.KNUCKLES ? RunLoot.KNUCKLE_ICONS : RunArms.baseOf(kind) * 12;
             canvas.save();
             canvas.translate(x, y);
             if (mirrored) canvas.scale(-1, 1);
@@ -13149,12 +13174,12 @@ final class RunGame {
             fitted(canvas, paper(grade) + " " + RunCraft.PAPER_NAMES[grade].toLowerCase(java.util.Locale.ROOT), x + icon + dp(4), y + icon / 2 + dp(5), dp(12), (wide - pad * 2) / 3 - icon - dp(8));
         }
         y += icon + dp(8);
-        // The twelve kinds.
-        float cell = (wide - pad * 2) / 6;
-        for (int base = 0; base < 12; base++) {
+        // The thirteen kinds, seven to a row.
+        float cell = (wide - pad * 2) / 7;
+        for (int base = 0; base < RunCraft.KINDS; base++) {
             if (craftKinds[base] == null) craftKinds[base] = new RectF();
             RectF at = craftKinds[base];
-            at.set(left + pad + base % 6 * cell + dp(2), y + base / 6 * cell + dp(2), left + pad + (base % 6 + 1) * cell - dp(2), y + (base / 6 + 1) * cell - dp(2));
+            at.set(left + pad + base % 7 * cell + dp(2), y + base / 7 * cell + dp(2), left + pad + (base % 7 + 1) * cell - dp(2), y + (base / 7 + 1) * cell - dp(2));
             boolean made = (rosesMade() >> base & 1) != 0;
             lootFrame(canvas, made ? RunCraft.rose(base) : RunCraft.folded(base, false), at, base == craftBase);
         }
@@ -13172,7 +13197,7 @@ final class RunGame {
                                 : "Take a found weapon (white to gold) in hand first"},
                 {"Halgakos Rose " + kind, roseMade ? "Made" : RunCraft.ROSE_GOLDEN + " golden, " + RunCraft.ROSE_LEAF + " leaf, " + RunCraft.ROSE_CRYSTAL + " crystal, + " + RunCraft.ROSE_PLUSES
                         + (level < RunCraft.ROSE_LEVEL ? "  ·  from level " + RunCraft.ROSE_LEVEL : "")},
-                {"The Mother Tongue's Quill", quillMade ? "Made: the one above all others" : Integer.bitCount(rosesMade()) + " of 12 Roses made  ·  " + RunCraft.QUILL_GOLDEN + " golden, "
+                {"The Mother Tongue's Quill", quillMade ? "Made: the one above all others" : Integer.bitCount(rosesMade()) + " of " + RunCraft.KINDS + " Roses made  ·  " + RunCraft.QUILL_GOLDEN + " golden, "
                         + RunCraft.QUILL_LEAF + " leaf, + " + RunCraft.QUILL_PLUSES + (level < RunCraft.QUILL_LEVEL ? ", level " + RunCraft.QUILL_LEVEL : "")}};
         boolean[] can = {
                 affordsPaper(RunCraft.FOLD_PLAIN, blue ? RunCraft.FOLD_FINE : 0, 0) && bank >= RunCraft.FOLD_PLUSES,
@@ -13207,7 +13232,7 @@ final class RunGame {
     }
 
     private void craftTouch(float x, float y, int bank, int[] has) {
-        for (int base = 0; base < 12; base++) {
+        for (int base = 0; base < RunCraft.KINDS; base++) {
             if (craftKinds[base] != null && craftKinds[base].contains(x, y)) {
                 craftBase = base;
                 smithSaid = "";
@@ -13472,7 +13497,7 @@ final class RunGame {
         float hx = axis[1], hy = axis[2], tx = axis[3], ty = axis[4];
         float iconLength = (float) Math.hypot(tx - hx, ty - hy), lineLength = (float) Math.hypot(line[2] - line[0], line[3] - line[1]);
         // (Never smaller than reads at the game's size: a knife or a pen is shown as long as a third of her.)
-        float length = Math.max(lineLength, weapon == PlusRun.KNIFE || weapon == PlusRun.PEN ? 75 : 0) * 1.05f;
+        float length = Math.max(lineLength, weapon == PlusRun.KNIFE || weapon == PlusRun.PEN ? 75 : weapon == PlusRun.KNUCKLES ? 40 : 0) * 1.05f;
         float scale = length / Math.max(1, iconLength);
         double angle = Math.atan2(line[3] - line[1], line[2] - line[0]) - Math.atan2(ty - hy, tx - hx);
         canvas.save();

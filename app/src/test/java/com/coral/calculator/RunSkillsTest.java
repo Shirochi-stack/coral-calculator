@@ -39,9 +39,9 @@ public class RunSkillsTest {
         Set<Integer> figures = new HashSet<>();
         for (RunSkills.Node node : tree) if (node.type == RunSkills.ROOT) figures.add(node.figure);
         assertTrue(figures.containsAll(java.util.Arrays.asList(3, 5, 10, 20)));
-        // Two paths for each of the twelve classes.
-        assertEquals(24, RunSkills.PATH_NAMES.length);
-        assertEquals(12, RunSkills.CLASSES.length);
+        // Two paths for each of the thirteen classes.
+        assertEquals(26, RunSkills.PATH_NAMES.length);
+        assertEquals(13, RunSkills.CLASSES.length);
     }
 
     @Test public void everyNodeIsReachableFromTheCentreAndPathsCrossNearTheirEnds() {
@@ -57,7 +57,8 @@ public class RunSkillsTest {
         assertEquals(tree.size(), seen.cardinality());
         int crossings = 0;
         for (RunSkills.Node node : tree) for (int next : node.next) if (node.path >= 0 && tree.get(next).path >= 0 && tree.get(next).path != node.path) crossings++;
-        assertEquals(RunSkills.PATHS * 2, crossings);
+        // (Each path to the next round, and the first twenty-four's last still to the first, as before the knuckles' two.)
+        assertEquals(RunSkills.PATHS * 2 + 2, crossings);
     }
 
     @Test public void nodesAreTakenNextToOnesTakenAndAddUp() {

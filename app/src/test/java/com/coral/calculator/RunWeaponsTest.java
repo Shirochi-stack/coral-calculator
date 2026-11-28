@@ -59,7 +59,7 @@ public class RunWeaponsTest {
     }
 
     @Test public void everyKindIsAThingSheFightsWithAndTheSixNewOnesAreNew() {
-        assertEquals(18, RunArms.COUNT);
+        assertEquals(19, RunArms.COUNT);
         Set<Integer> kinds = new HashSet<>();
         for (int base = 0; base < 12; base++) kinds.add(RunArms.kindOf(weapon(base, RunLoot.WHITE)));
         assertEquals(12, kinds.size());

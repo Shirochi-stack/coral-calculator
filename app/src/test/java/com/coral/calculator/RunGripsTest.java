@@ -73,7 +73,7 @@ public class RunGripsTest {
         assertEquals(13, blades.size());
         for (int blade : blades) assertNotNull(RunGrips.axis(blade));
         // Every found kind has a grip now.
-        for (int base = 0; base < 12; base++) assertTrue(RunGrips.of(RunArms.kindOf(RunLoot.code(RunLoot.WEAPON, 0, base, RunLoot.WHITE))) >= 0);
+        for (int base = 0; base < RunLoot.WEAPONS.length; base++) assertTrue(RunGrips.of(RunArms.kindOf(RunLoot.code(RunLoot.WEAPON, 0, base, RunLoot.WHITE))) >= 0);
     }
 
     @Test public void everyGripHasALineInEveryFrame() {

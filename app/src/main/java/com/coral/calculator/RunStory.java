@@ -613,6 +613,14 @@ final class RunStory {
             {"sq3e", "Three anvils. One seal. Yours. ...Proud of you. Don't make it weird.", "W", "A blunt, short-spoken dwarf smith girl, gives the hero the seal the three sisters forged together. Gruff, proud, embarrassed."},
     };
 
+    /** Knuckles: the first time she holds them, her first uppercut, her first haymaker, and her first dash punch. */
+    static final String[][] KNUCKLES = {
+            {"knk1", "Knuckles! No more swinging things. I'll just punch it Sloppy~♡", "H", PLAYER + "She puts on golden gauntlets for the first time and grins, cracking her knuckles. Cheeky, fired up."},
+            {"knk2", "Jab, jab, and up you go Sloppy~♡", "H", PLAYER + "She lands a quick combo ending in an uppercut. Snappy, rhythmic, pleased."},
+            {"knk3", "Shields? Not against this fist Sloppy~♡", "H", PLAYER + "Her charged haymaker has just smashed through a shield. Smug, powerful."},
+            {"knk4", "Coming through, fists first Sloppy~♡", "H", PLAYER + "She dashes forward into a punch at full speed. Breathless, gleeful."},
+    };
+
     /** The dungeons: the stairway found, going down, between floors, the keeper, cleared, lost, three kinds of floor, and her own double in ink. */
     static final String[][] DUNGEONS = {
             {"dng1", "Stairs going down... a whole dungeon under here! Want to see how deep it goes Sloppy~♡", "H", PLAYER + "She has found a stone stairway leading down into a dungeon. Curious, excited, a little daring."},
@@ -1271,6 +1279,7 @@ final class RunStory {
         groups.add(WATER);
         groups.add(DUNGEONS);
         groups.add(SMITH_QUESTS);
+        groups.add(KNUCKLES);
         for (String[][] stage : TALK) groups.add(stage);
         for (String[][] stage : ANSWERS) groups.add(stage);
         for (int land = 1; land <= RunLevels.TOTAL; land++) {
