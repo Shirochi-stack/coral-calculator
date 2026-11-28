@@ -7473,6 +7473,16 @@ final class RunGame {
                 speak(RunStory.STATUS_UNIQUES[which], true);
                 break;
             }
+            // And each of the six later hidden bosses, the first time she finds it.
+            for (PlusRun.Foe foe : run.foes()) {
+                if (captionLeft > 0) break;
+                if (foe.flat || !RunUniques.hidden2(foe.kind) || Math.abs(foe.x - run.x()) > 9 || Math.abs(foe.y - run.y()) > 5) continue;
+                int which = foe.kind - RunUniques.HIDDEN2_FIRST;
+                if (session.tally("run_hb2_" + which) != 0) continue;
+                session.keep("run_hb2_" + which, 1);
+                speak(RunStory.HIDDEN2[which], true);
+                break;
+            }
         }
         // Deep water, the first time: in blue she can swim in it; without it she cannot breathe.
         if (run != null && screen == PLAY && run.inWater() && captionLeft <= 0 && !audio.speaking()) {
@@ -10084,7 +10094,17 @@ final class RunGame {
         paint.setAlpha(foe.flat ? Math.round(255 * Math.max(0, Math.min(1, (1.1f - foe.act) / .4f))) : way == RunUniques.GHOST && foe.unseen ? 60
                 : foe.dazed > 0 && (int) (clock * 16) % 2 == 0 ? 150 : 255);
         // (Those of the dungeons are in a sheet of their own; and those of the later chapters in the run's asset pack.)
-        boolean status = RunUniques.status(foe.kind), later = RunUniques.later(foe.kind), delving = !later && !status && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        // (And the six later hidden bosses in a sheet of their own there too.)
+        boolean hidden2 = RunUniques.hidden2(foe.kind);
+        boolean status = RunUniques.status(foe.kind), later = RunUniques.later(foe.kind), delving = !hidden2 && !later && !status && RunUniques.index(foe.kind) >= RunUniques.SHEET_ROWS;
+        if (hidden2 && hidden2Sheet == null && !hidden2Tried) {
+            hidden2Tried = true;
+            try (java.io.InputStream in = context.getAssets().open(RunUniques.HIDDEN2_SHEET)) {
+                hidden2Sheet = BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                hidden2Sheet = null;
+            }
+        }
         if (status && statusSheet == null && !statusTried) {
             statusTried = true;
             try (java.io.InputStream in = context.getAssets().open(RunUniques.STATUS_SHEET)) {
@@ -10102,13 +10122,13 @@ final class RunGame {
                 laterSheet = null;
             }
         }
-        Bitmap sheet = status ? statusSheet : later ? laterSheet : delving ? delverSheet : uniqueSheet;
+        Bitmap sheet = hidden2 ? hidden2Sheet : status ? statusSheet : later ? laterSheet : delving ? delverSheet : uniqueSheet;
         if (sheet == null) {
             paint.setAlpha(255);
             return;
         }
-        int rows = status ? RunUniques.STATUS_COUNT : later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
-        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (status ? RunUniques.index(RunUniques.STATUS_FIRST) : later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
+        int rows = hidden2 ? RunUniques.HIDDEN2_COUNT : status ? RunUniques.STATUS_COUNT : later ? RunUniques.LATER_COUNT : delving ? RunUniques.LATER_FIRST - RunUniques.DELVER_FIRST : RunUniques.SHEET_ROWS;
+        int cell = sheet.getHeight() / rows, row = RunUniques.index(foe.kind) - (hidden2 ? RunUniques.index(RunUniques.HIDDEN2_FIRST) : status ? RunUniques.index(RunUniques.STATUS_FIRST) : later ? RunUniques.index(RunUniques.LATER_FIRST) : delving ? RunUniques.SHEET_ROWS : 0);
         if (!foe.flat) laterStrikes(canvas, foe, way, middle, feet);
         if (way == RunUniques.DROPPER && foe.turn == 0 && !foe.flat) {
             // The spider's thread, up out of sight.
@@ -10239,8 +10259,8 @@ final class RunGame {
             new android.graphics.ColorMatrixColorFilter(new float[]{.25f, .2f, .2f, 0, 10, .2f, .2f, .25f, 0, 8, .3f, .25f, .35f, 0, 30, 0, 0, 0, 1, 0}),
             null, new android.graphics.LightingColorFilter(0xFFFFE8F0, 0x00140810)};
 
-    private Bitmap laterSheet, statusSheet;
-    private boolean laterTried, statusTried;
+    private Bitmap laterSheet, statusSheet, hidden2Sheet;
+    private boolean laterTried, statusTried, hidden2Tried;
 
     /**
      * What the later chapters' creatures do, drawn about them: the strikethrough's line, red as it is raised and bold as it strikes; the
