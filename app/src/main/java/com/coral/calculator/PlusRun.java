@@ -664,6 +664,7 @@ final class PlusRun {
                 if (Math.hypot(plus[0] + .5f - it.x, plus[1] + .5f - it.y + .4f) > 1.8f) continue;
                 pluses.remove(index);
                 collected++;
+                if (gem > 0) bonus += GEM_FACTOR - 1;
                 plusX = plus[0] + .5f;
                 plusY = plus[1] + .5f;
             }
@@ -3167,6 +3168,9 @@ final class PlusRun {
         float x, y, across, down, age;
         final int code;
         boolean resting;
+        /** For a plus (code 0): how many pluses it is worth (1, 5, 25 or 100: bronze, silver, gold, prismatic); or a glossary gem, which multiplies what pluses gain for a time. */
+        int worth = 1;
+        boolean gem;
 
         Drop(float x, float y, float across, float down, int code) {
             this.x = x;
@@ -3180,15 +3184,45 @@ final class PlusRun {
             this(other.x, other.y, other.across, other.down, other.code);
             age = other.age;
             resting = other.resting;
+            worth = other.worth;
+            gem = other.gem;
         }
 
         /** How long a plus lies about before it is gone, and a thing to keep; and for how much of the end of that it blinks. */
-        float life() { return code == 0 ? 11 : 40; }
+        float life() { return code != 0 ? 40 : gem ? 24 : worth >= 25 ? 18 : 11; }
 
-        float blink() { return code == 0 ? 3 : 6; }
+        float blink() { return code != 0 ? 6 : gem || worth >= 25 ? 4 : 3; }
     }
 
     private final List<Drop> scattered = new ArrayList<>();
+
+    /**
+     * Glossary gems: a gem makes what pluses gain count for {@link #GEM_FACTOR} times as much for {@link #GEM_SECONDS} more seconds (the time stacks, up to
+     * {@link #GEM_MOST}; the factor does not). The pluses the lands lay out count by the extra going to what she has to spend, not to how many she picked up (which
+     * the stars are for); a bigger coin counts for its worth.
+     */
+    static final int GEM_FACTOR = 2;
+    static final float GEM_SECONDS = 15, GEM_MOST = 90;
+    private float gem, gemSeen;
+    private int gems, lastWorth = 1;
+
+    /** How much longer gems make pluses count for more; how many gems she has picked up; the factor now; and the worth of the last coin she took. */
+    float gem() { return gem; }
+    int gems() { return gems; }
+    int multiplier() { return gem > 0 ? GEM_FACTOR : 1; }
+    int lastWorth() { return lastWorth; }
+
+    /** The pluses a coin gives: its worth, more while a gem is on. */
+    static int pays(int worth, boolean gemOn) { return worth * (gemOn ? GEM_FACTOR : 1); }
+
+    /** What a creature's pluses are made of, as coins: as many of the big ones as will go, and the rest bronze, so that the same worth falls in fewer, bigger coins. */
+    static int coinWorth(int left) { return left >= 60 ? 25 : left >= 12 ? 5 : 1; }
+
+    /** How much dearer than her own, in tenths, what falls is made: a little more of it, for more pluses all round. */
+    static final int MORE_TENTHS = 1;
+    /** How likely a gem is from a creature (in a thousand), by how hard the land is; bosses always give one. */
+    static int gemChance(int landLevel) { return 10 + landLevel / 4; }
+
     /** How much room a drop takes: half its width, and its height (its place is the middle of its bottom). */
     static final float DROP_HALF = .3f, DROP_TALL = .6f;
     /** The furthest a drop moves before it is looked at again: well under its height, so nothing is ever passed through. */
@@ -3254,7 +3288,14 @@ final class PlusRun {
         for (int rarity = RunLoot.WHITE; rarity <= RunLoot.ROSE; rarity++) {
             loose(new Drop(atX + 1.4f * rarity + 1, atY, 0, -5, RunLoot.code(rarity % 3, Math.min(11, level.chapter), rarity * 3, rarity)));
         }
-        for (int coin = 0; coin < 8; coin++) loose(new Drop(atX + 3 + coin * .3f, atY - 1, (coin - 4) * .8f, -7, 0));
+        for (int coin = 0; coin < 8; coin++) {
+            Drop drop = new Drop(atX + 3 + coin * .3f, atY - 1, (coin - 4) * .8f, -7, 0);
+            drop.worth = coin < 3 ? 1 : coin < 5 ? 5 : coin < 7 ? 25 : 100;
+            loose(drop);
+        }
+        Drop glossary = new Drop(atX + 3.4f, atY - 1, 0, -8, 0);
+        glossary.gem = true;
+        loose(glossary);
     }
 
     /** What she keeps that has to do with this land: her level among it, which grows while she plays. */
@@ -3294,9 +3335,21 @@ final class PlusRun {
         if (more > 0) coins += (coins * more + lootRoll(100)) / 100;
         // (Under black, half of them, rounded up.)
         if (inked()) coins = (coins + 1) / 2;
-        for (int coin = 0; coin < coins; coin++) {
+        // (A tenth more, rounded down, for pluses all round; and in coins as big as will go.)
+        coins += coins * MORE_TENTHS / 10;
+        for (int left = coins; left > 0; ) {
+            int worth = coinWorth(left);
+            left -= worth;
             float way = (lootRoll(1000) / 1000f - .5f) * 1.4f;
-            loose(new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0));
+            Drop drop = new Drop(middle, top, way * (boss ? 7 : 4), -6 - lootRoll(1000) / 250f, 0);
+            drop.worth = worth;
+            loose(drop);
+        }
+        // A glossary gem: from every boss, and now and then from one of the rest (not from a swarm).
+        if (!foe.swarm && (boss || lootRoll(1000) < gemChance(landLevel) * (hard ? 2 : 1))) {
+            Drop glossary = new Drop(middle, top, (lootRoll(1000) / 1000f - .5f) * 2, -8, 0);
+            glossary.gem = true;
+            loose(glossary);
         }
         if (RunUniques.great(foe.kind)) {
             if (RunUniques.hidden(foe.kind)) {
@@ -3305,6 +3358,10 @@ final class PlusRun {
             } else {
                 keepersBeaten++;
             }
+            // (A coin of a gold's worth from each of the great, and a prismatic one from the hidden.)
+            Drop great = new Drop(middle, top, 1.2f, -9, 0);
+            great.worth = RunUniques.hidden(foe.kind) ? 100 : 25;
+            loose(great);
             int theme = Math.min(RunLoot.THEMES.length - 1, RunUniques.chapter(foe.kind) + 1);
             for (int type = 0; type < 3; type++) {
                 int roll = lootRoll(100), rarity = roll < 10 ? RunLoot.ROSE : roll < 40 ? RunLoot.RED : RunLoot.GOLD;
@@ -3342,8 +3399,14 @@ final class PlusRun {
                 drop.resting = false;
                 if (far < .55f) {
                     scattered.remove(index);
-                    dropPluses++;
-                    bonus++;
+                    if (drop.gem) {
+                        gem = Math.min(GEM_MOST, gem + GEM_SECONDS);
+                        gems++;
+                    } else {
+                        dropPluses += drop.worth;
+                        bonus += pays(drop.worth, gem > 0);
+                        lastWorth = drop.worth;
+                    }
                 }
                 continue;
             }
@@ -3606,6 +3669,8 @@ final class PlusRun {
         shield = other.shield;
         combo = other.combo;
         bonus = other.bonus;
+        gem = other.gem;
+        gems = other.gems;
         airJumps = other.airJumps;
         flaps = other.flaps;
         taken = other.taken;
@@ -5323,6 +5388,7 @@ final class PlusRun {
         sinceJump = pressed ? 0 : sinceJump + seconds;
         if (rush > 0) rush -= seconds;
         if (magnet > 0) magnet -= seconds;
+        if (gem > 0) gem = Math.max(0, gem - seconds);
         if (notes > 0) notes -= seconds;
         if (onGround) {
             combo = 0;
@@ -5491,6 +5557,7 @@ final class PlusRun {
             if (drawn || x < plus[0] + .8f && x + WIDE > plus[0] + .2f && y < plus[1] + .8f && y + TALL > plus[1] + .2f) {
                 pluses.remove(index);
                 collected++;
+                if (gem > 0) bonus += GEM_FACTOR - 1;
                 plusX = plus[0] + .5f;
                 plusY = plus[1] + .5f;
             }
