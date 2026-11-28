@@ -175,7 +175,7 @@ final class RunGame {
     private float hammered = 9;
     private String smithSaid = "";
     private final RectF smithCard = new RectF(), smithAct = new RectF(), packWear = new RectF();
-    private final RectF[] smithTabs = {new RectF(), new RectF(), new RectF(), new RectF()}, tradeBuys = {new RectF(), new RectF(), new RectF()},
+    private final RectF[] smithTabs = {new RectF(), new RectF(), new RectF(), new RectF(), new RectF()}, tradeBuys = {new RectF(), new RectF(), new RectF()},
             tradeSells = {new RectF(), new RectF(), new RectF()}, forgeRows = new RectF[RunArms.COUNT], reforges = new RectF[RunArms.COUNT],
             gearCells = new RectF[RunGear.SLOTS * RunGear.TIERS];
     private static final int[] SMITH_ART = {R.drawable.run_smith_moru, R.drawable.run_smith_pulmu, R.drawable.run_smith_sutdol};
@@ -568,7 +568,7 @@ final class RunGame {
     private PlusRun paperRun;
     private int craftBase;
     private final RectF[] craftKinds = new RectF[12], craftActs = {new RectF(), new RectF(), new RectF(), new RectF()};
-    private static final int CRAFT = 3;
+    private static final int CRAFT = 3, QUESTS = 4;
     private int seenHeals, seenWinds, seenHidden;
     /** Foreground pieces, drawn in front of her for depth. */
     private Bitmap foreground;
@@ -1557,6 +1557,13 @@ final class RunGame {
                 return;
             }
         }
+        if (smithTab == QUESTS) {
+            if (!questTouch(x, y) && !smithCard.contains(x, y)) {
+                smithOpen = false;
+                audio.play("tap", .3f);
+            }
+            return;
+        }
         if (smithTab == CRAFT) {
             craftTouch(x, y, bank, has);
             if (!smithCard.contains(x, y)) {
@@ -1731,6 +1738,111 @@ final class RunGame {
         fitted(canvas, word, where.centerX(), where.centerY() + dp(5), dp(13.5f), where.width() - dp(14));
     }
 
+
+    // The smith sisters' quests
+
+    /** Each quest's button on the Quests tab. */
+    private final RectF[] questButtons = {new RectF(), new RectF(), new RectF(), new RectF()};
+
+    private RunVanity.Keep keep() { return RunVanity.on(session); }
+
+    /** A line as it is shown under the quests: who says it, and what. */
+    private static String said(String[] line) {
+        int who = RunStory.SPEAKERS.indexOf(line[2]);
+        return (who >= 0 ? RunStory.NAMES[who] + ": " : "") + line[1];
+    }
+
+    /**
+     * The Quests tab: the sisters' four quests, each with whose it is, the step she is on and how far it has come (or what it asks
+     * first, or that it waits for the other three), what it gives, and a button: take it up, hand the step in, or done.
+     */
+    private void drawQuests(Canvas canvas, float left, float y, float wide, float pad, float bottom) {
+        RunVanity.Keep save = keep();
+        float each = (bottom - y - (smithSaid.isEmpty() ? 0 : dp(36))) / SmithQuests.COUNT;
+        for (int quest = 0; quest < SmithQuests.COUNT; quest++) {
+            float top = y + quest * each, button = dp(96);
+            int state = SmithQuests.state(save, quest);
+            boolean open = SmithQuests.open(save, quest), ready = SmithQuests.ready(save, quest), done = SmithQuests.done(save, quest);
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setColor(done ? soft : ink);
+            fitted(canvas, SmithQuests.NAMES[quest], left + pad, top + dp(18), dp(14.5f), wide - pad * 2 - button - dp(8));
+            text.setTypeface(Typeface.DEFAULT);
+            text.setColor(0xFF8A5A33);
+            fitted(canvas, SmithQuests.GIVERS[quest], left + pad, top + dp(35), dp(12), wide - pad * 2 - button - dp(8));
+            String step;
+            if (done) step = "Done: every step handed in";
+            else if (state == 0) step = open ? "First: " + SmithQuests.STEPS[quest][0].ask.toLowerCase(java.util.Locale.ROOT) + ", then two more" : "Once the other three are done";
+            else {
+                int[] now = SmithQuests.progress(save, quest);
+                step = "Step " + state + " of 3: " + SmithQuests.STEPS[quest][state - 1].ask + "  ·  " + now[0] + " of " + now[1];
+            }
+            text.setColor(ink);
+            fitted(canvas, step, left + pad, top + dp(54), dp(12.5f), wide - pad * 2);
+            text.setColor(soft);
+            fitted(canvas, "Gives: " + RunLoot.name(SmithQuests.REWARDS[quest]) + "  ·  + " + SmithQuests.PLUSES[quest], left + pad, top + dp(71), dp(12), wide - pad * 2);
+            questButtons[quest].set(left + wide - pad - button, top + dp(6), left + wide - pad, top + dp(38));
+            smithButton(canvas, questButtons[quest], done ? "Done" : state == 0 ? (open ? "Take it up" : "Later") : ready ? "Hand in" : "Not yet",
+                    !done && (state == 0 ? open : ready), CalculatorLayout.CORAL);
+            if (quest < SmithQuests.COUNT - 1) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(dark ? 0xFF33373B : 0xFFECEDEE);
+                canvas.drawRect(left + pad, top + each - dp(1), left + wide - pad, top + each, paint);
+                paint.setColor(Color.BLACK);
+            }
+        }
+        if (!smithSaid.isEmpty()) {
+            // What was last said about them, under them.
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(0xFF8A5A33);
+            text.setTextSize(dp(12.5f));
+            List<String> lines = wrap(smithSaid, wide - pad * 2);
+            for (int index = 0; index < Math.min(2, lines.size()); index++) canvas.drawText(lines.get(index), left + pad, y + SmithQuests.COUNT * each + dp(14) + index * dp(16), text);
+        }
+    }
+
+    /** A touch on the Quests tab: a quest taken up, or a step handed in, with whoever's quest it is saying so. Returns whether it was on a button. */
+    private boolean questTouch(float x, float y) {
+        RunVanity.Keep save = keep();
+        for (int quest = 0; quest < SmithQuests.COUNT; quest++) {
+            if (!questButtons[quest].contains(x, y)) continue;
+            int state = SmithQuests.state(save, quest);
+            if (state == 0 && SmithQuests.take(save, quest)) {
+                audio.play("unlock", .6f);
+                person(SmithQuests.line(quest, 0));
+                talk.add(SmithQuests.line(quest, 1));
+                smithSaid = said(SmithQuests.line(quest, 0));
+                return true;
+            }
+            int handed = SmithQuests.hand(save, quest);
+            if (handed == SmithQuests.STEP) {
+                audio.play("buy", .6f);
+                buzz(true);
+                person(SmithQuests.line(quest, state == 1 ? 2 : 3));
+                smithSaid = said(SmithQuests.line(quest, state == 1 ? 2 : 3));
+                regrant();
+                return true;
+            }
+            if (handed == SmithQuests.FINISHED) {
+                int reward = SmithQuests.REWARDS[quest];
+                intoBag(reward);
+                hammerer = quest == SmithQuests.TOGETHER ? RunGear.MORU : quest;
+                hammered = 0;
+                audio.play("win", .8f);
+                buzz(true);
+                person(SmithQuests.line(quest, 4));
+                smithSaid = said(SmithQuests.line(quest, 4));
+                toast(RunLoot.RARITIES[RunLoot.rarity(reward)] + ": " + RunLoot.name(reward), "From " + (quest == SmithQuests.TOGETHER ? "all three sisters" : SmithQuests.GIVERS[quest]) + ", in her bag",
+                        LOOT_PICTURE + reward);
+                regrant();
+                return true;
+            }
+            audio.play("no", .5f);
+            return true;
+        }
+        return false;
+    }
+
     /**
      * The smithy, over the land. At its head what she has to pay with: her pluses, and the
      * three a smith works with. Then the three sisters' work, a tab each. Moru's: every
@@ -1765,10 +1877,13 @@ final class RunGame {
                 wide - pad * 2);
         float y = top + pad + dp(50);
         if (here) {
-            // The three sisters' work: a tab each, with whose it is where all three are in.
-            float each = (wide - pad * 2 - dp(18)) / 4;
-            String[] words = sisters() ? new String[]{"Moru: forge", "Pulmu: armour", "Sutdol: trade", "Paper: craft"} : new String[]{"Forge", "Armour", "Trade", "Craft"};
-            for (int tab = 0; tab < 4; tab++) {
+            // The three sisters' work: a tab each, with whose it is where all three are in; and there, their quests.
+            int tabs = sisters() ? 5 : 4;
+            if (!sisters() && smithTab == QUESTS) smithTab = RunGear.MORU;
+            smithTabs[4].setEmpty();
+            float each = (wide - pad * 2 - dp(6) * (tabs - 1)) / tabs;
+            String[] words = sisters() ? new String[]{"Moru", "Pulmu", "Sutdol", "Craft", "Quests"} : new String[]{"Forge", "Armour", "Trade", "Craft"};
+            for (int tab = 0; tab < tabs; tab++) {
                 smithTabs[tab].set(left + pad + tab * (each + dp(6)), y, left + pad + tab * (each + dp(6)) + each, y + dp(32));
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(tab == smithTab ? CalculatorLayout.CORAL : dark ? 0xFF2C3033 : 0xFFF0F1F2);
@@ -1782,7 +1897,9 @@ final class RunGame {
         }
         float bottom = top + tall - pad;
         smithAct.setEmpty();
-        if (smithTab == CRAFT) {
+        if (smithTab == QUESTS) {
+            drawQuests(canvas, left, y, wide, pad, bottom);
+        } else if (smithTab == CRAFT) {
             drawCraft(canvas, left, y, wide, pad, bottom, bank, has);
         } else if (smithTab == RunGear.MORU) {
             int owned = kept().pack, count = Integer.bitCount(owned);
@@ -6255,6 +6372,7 @@ final class RunGame {
             }
             if (run.treesCut() > seenTrees) {
                 for (int felled = seenTrees; felled < run.treesCut(); felled++) {
+                    session.keep("run_trees_cut", session.tally("run_trees_cut") + 1);
                     for (int slot = 0; slot < RunHunts.SLOTS; slot++) if (RunHunts.countsTree(hunt(slot))) hunted(slot);
                 }
                 audio.play("crumble", .7f);
