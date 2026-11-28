@@ -2028,7 +2028,7 @@ final class RunGame {
      * floor and brick, a dungeon's stone of its band. Returns whether it drew it.
      */
     private boolean underSquare(Canvas canvas, int column, int row, float left, float y) {
-        boolean capped = run.shown(column, row - 1) != RunLevels.BLOCK;
+        boolean capped = !groundish(run.shown(column, row - 1));
         int kind = roomKind();
         if (kind == RunLevels.LAGOON || kind == RunLevels.HIDEOUT || kind == RunLevels.ARENA) {
             if (roomSquares == null) roomSquares = BitmapFactory.decodeResource(context.getResources(), R.drawable.run_ground_rooms);
@@ -3520,12 +3520,18 @@ final class RunGame {
             poundFxReach = run.poundReach();
             poundFxLevel = Math.max(1, perks.poundLevel);
             poundFxFlavour = PlusRun.flavourOf(PlusRun.blowOf(run.weapon()));
-            shake = Math.max(shake, .1f + .04f * poundFxLevel);
+            shake = Math.max(shake, .14f + .06f * poundFxLevel);
             audio.play("quake", .5f + .15f * poundFxLevel);
-            // The shockwave and the dust, as wide as it reaches; at the third step a burst on top.
+            // The shockwave and the dust, as wide as it reaches; a star of impact at her feet, bigger at each step; at the second step a wider,
+            // warmer ring after the first; at the third a burst on top, and a flash.
             poundPictured = vfx(Vfx.SHOCKWAVE, poundFxX, poundFxY - .2f, poundFxReach * 2.2f, 0, Vfx.WHITE, poundFxLevel >= 2 ? Vfx.BLOOM : 0) >= 0;
+            vfx(Vfx.IMPACT_STAR, poundFxX, poundFxY - .3f, 1.3f + .55f * poundFxLevel, 0, Vfx.WHITE, poundFxLevel >= 2 ? Vfx.BLOOM : 0);
             vfx(Vfx.DUST, poundFxX, poundFxY - .4f, poundFxReach * 1.6f, 0, Vfx.WHITE, 0);
-            if (poundFxLevel >= 3) vfx(Vfx.EXPLOSION, poundFxX, poundFxY - .6f, 2.2f, 0, Vfx.WHITE, 0);
+            if (poundFxLevel >= 2) vfx(Vfx.SHOCKWAVE, poundFxX, poundFxY - .15f, poundFxReach * 3.1f, 0, 0xFFFFE08A, Vfx.BLOOM);
+            if (poundFxLevel >= 3) {
+                vfx(Vfx.EXPLOSION, poundFxX, poundFxY - .6f, 2.2f, 0, Vfx.WHITE, 0);
+                flash = Math.max(flash, .08f);
+            }
             int bits = 8 + 5 * poundFxLevel;
             for (int bit = 0; bit < bits && moveBits.size() < FX_MOST; bit++) {
                 float side = bit % 2 == 0 ? -1 : 1, speed = 2.5f + random.nextFloat() * 3 * poundFxLevel;
@@ -3599,25 +3605,259 @@ final class RunGame {
         }
     }
 
+    // Cracked ground, which only a ground pound breaks
+
+    /**
+     * What cracked ground is made of, by the land: cracked paper, slate, old floorboards or ice. For each: the wash laid over the ground's face, the
+     * dark of its cracks, and the two colours of the chunks that fly off it when it breaks.
+     */
+    private static final int[][] CRACK_LOOKS = {
+            {0xFFEAD9A8, 0xFF4F3B26, 0xFFD6C08A, 0xFFF6EBC9},
+            {0xFF9AA3B4, 0xFF1B202B, 0xFF6B7487, 0xFFB4BDCC},
+            {0xFFB07B44, 0xFF35200E, 0xFF8A5A2E, 0xFFC99555},
+            {0xFFC4F0FF, 0xFF3B6788, 0xFF98D4F0, 0xFFEFFCFF}};
+    /** The chunks flying off broken ground (x, y, across, down, age, life, colour, size, turn, how fast it turns) and the squares of cracked ground in view this frame. */
+    private final List<float[]> debris = new ArrayList<>();
+    private final List<int[]> crackSpots = new ArrayList<>();
+    private int seenCrackBursts, seenCrackHolds, seenCrackStood, seenCrackLog, seenCaches, seenVaults;
+    private float crackAge = 9;
+    static final int DEBRIS_MOST = 160;
+    /** How long the game holds still when a slam breaks the ground: a good deal more than a blow's. */
+    static final float CRACK_STOP = .1f;
+    /** What she says, the first time she stands on cracked ground: with the pound not yet hers, and with it. No recording: it is read, not heard. */
+    private static final String[] CRACK_HINT = {"crack1", "Cracked floor. Something heavy might break it Sloppy~♡", "H"},
+            CRACK_HINT_POUND = {"crack2", "Cracked floor. Slam down on it from above Sloppy~♡", "H"};
+
+    /** Which of the four it is drawn as in this land: paper, slate, boards, ice. */
+    private int crackLook() {
+        if (delve >= 0) {
+            int back = RunDungeons.backdrop(delve);
+            return back == 2 ? 0 : back == 3 ? 2 : 1;
+        }
+        return Math.max(0, run.level().chapter) % 4;
+    }
+
+    /** A few numbers from 0 to 1 that stay the same for a square, to draw the cracks in it by. */
+    private static float chance(int column, int row, int which) {
+        int hash = column * 73856093 ^ row * 19349663 ^ which * 83492791;
+        hash ^= hash >>> 13;
+        hash *= 0x5bd1e995;
+        hash ^= hash >>> 15;
+        return (hash & 0xFFFF) / 65535f;
+    }
+
+    /** Whether a square is the hatch at the top of the vine up out of a place under cracked ground. */
+    private static boolean vaultHatch(RunLevels.Level level, int column, int row) {
+        for (int[] vault : level.vaults) if (vault[10] == column && vault[11] == row) return true;
+        return false;
+    }
+
+    /** Whether a square is ground: rock, or cracked ground, which is rock that a pound breaks. */
+    private static boolean groundish(char square) { return square == RunLevels.BLOCK || RunLevels.crackNeed(square) > 0; }
+
+    /**
+     * Her slam on cracked ground, as time goes: the squares it broke fly apart in chunks of what they were made of that fall with the weight of
+     * them, in dust and a burst, with the land jumping and the game held still a moment, and the crunch; a pound that was too weak for what is
+     * under it rings off it; and the first time she stands on cracked ground, a word about it. (The places found are kept, land by land.)
+     */
+    private void cracksAfter(float seconds) {
+        crackAge += seconds;
+        List<int[]> log = run.crackLog();
+        if (seenCrackLog > log.size()) seenCrackLog = seenCrackBursts = seenCrackHolds = seenCrackStood = seenCaches = seenVaults = 0;
+        int[] colours = CRACK_LOOKS[crackLook()];
+        if (run.crackBursts() != seenCrackBursts) {
+            seenCrackBursts = run.crackBursts();
+            int level = Math.max(1, run.crackLevel());
+            float cx = run.crackX(), cy = run.crackY();
+            crackAge = 0;
+            int tiles = 0;
+            for (int index = seenCrackLog; index < log.size(); index++) {
+                int[] one = log.get(index);
+                tiles++;
+                // The chunks: a few big, a few small, thrown up and out from the square, in the two colours of what it was made of.
+                int chunks = 5 + 2 * level;
+                for (int chunk = 0; chunk < chunks && debris.size() < DEBRIS_MOST; chunk++) {
+                    float x = one[0] + random.nextFloat(), y = one[1] + random.nextFloat() * .5f, away = (x - cx) * (1.2f + level * .4f) + (random.nextFloat() - .5f) * 3;
+                    boolean big = chunk % 3 == 0;
+                    debris.add(new float[]{x, y, away, -4 - random.nextFloat() * (4 + level), 0, .9f + random.nextFloat() * .6f, chunk % 2 == 0 ? colours[2] : colours[3],
+                            (big ? .2f : .1f) + random.nextFloat() * .06f, random.nextFloat() * 6.28f, (random.nextFloat() - .5f) * 14});
+                }
+                // A puff of dust where each of the first few stood (the effects' pictures are never many at once).
+                if (tiles <= 3) vfx(Vfx.DUST, one[0] + .5f, one[1] + .4f, 1.7f, 0, Vfx.WHITE, 0);
+            }
+            seenCrackLog = log.size();
+            // The burst: where she landed; ice shatters, the rest throws sparks.
+            vfx(crackLook() == 3 ? Vfx.ICE_BURST : Vfx.IMPACT_STAR, cx, cy - .2f, 2.2f + .7f * level, 0, Vfx.WHITE, level >= 2 ? Vfx.BLOOM : 0);
+            vfx(Vfx.POOF, cx, cy - .3f, 1.8f + .5f * level, 0, Vfx.WHITE, 0);
+            shake = Math.max(shake, .34f + .09f * level);
+            hitStop = Math.max(hitStop, CRACK_STOP + .02f * level);
+            audio.play("crumble", 1f);
+            audio.play("quake", .55f + .1f * level);
+            buzz(true);
+            if (level >= 3) flash = Math.max(flash, .1f);
+            pop(cx, cy - 1.6f, "Crack!");
+        }
+        if (run.crackHolds() != seenCrackHolds) {
+            // A pound that was not strong enough: it rings off, in sparks, and she is told.
+            seenCrackHolds = run.crackHolds();
+            audio.play("clang", .8f);
+            vfx(Vfx.SPARKLE, run.holdX(), run.holdY() - .3f, 1.4f, 0, Vfx.WHITE, 0);
+            shake = Math.max(shake, .12f);
+            pop(run.holdX(), run.holdY() - 1.6f, "Needs a stronger pound");
+        }
+        if (run.vaultsOpened() != seenVaults) {
+            // A place found under the ground: counted among the places she has found in this land, and kept.
+            seenVaults = run.vaultsOpened();
+            if (delve < 0) session.keep("run_rooms_" + number, session.tally("run_rooms_" + number) | run.roomsFound());
+            toast("A hidden place", "Found under cracked ground", 0);
+            audio.play("unlock", .8f);
+        }
+        if (run.caches() != seenCaches) {
+            seenCaches = run.caches();
+            if (delve >= 0) cacheGift();
+        }
+        if (run.crackStood() != seenCrackStood) {
+            if (session.tally("run_crack_hint") != 0) {
+                seenCrackStood = run.crackStood();
+            } else if (captionLeft <= 0 && personLeft <= 0 && !talking && !audio.speaking()) {
+                seenCrackStood = run.crackStood();
+                session.keep("run_crack_hint", 1);
+                speak(perks.pound ? CRACK_HINT_POUND : CRACK_HINT, true);
+            }
+        }
+        for (int index = debris.size() - 1; index >= 0; index--) {
+            float[] chunk = debris.get(index);
+            chunk[4] += seconds;
+            if (chunk[4] > chunk[5]) {
+                debris.remove(index);
+                continue;
+            }
+            chunk[0] += chunk[2] * seconds;
+            chunk[1] += chunk[3] * seconds;
+            chunk[2] *= 1 - seconds * .6f;
+            chunk[3] += 24 * seconds;
+            chunk[8] += chunk[9] * seconds;
+        }
+    }
+
+    /**
+     * What is in a cache (a chest in a chamber under cracked ground, in a dungeon): by chance a blessing, kept for the rest of the dive (from the
+     * next floor on; a gold one at once), a relic of the dungeon's chapter, or only pluses.
+     */
+    private void cacheGift() {
+        int roll = random.nextInt(100);
+        if (roll < 45) {
+            int[] blessings = {RunDungeons.HEART, RunDungeons.MIGHT, RunDungeons.GOLD, RunDungeons.WARD};
+            int which = blessings[random.nextInt(blessings.length)];
+            if (which == RunDungeons.HEART) delveHearts++;
+            else if (which == RunDungeons.MIGHT) delveMight++;
+            else if (which == RunDungeons.GOLD) delveGold++;
+            else delveWard++;
+            toast("A blessing: " + RunDungeons.BLESSING_NAMES[which], RunDungeons.BLESSING_WORDS[which] + (which == RunDungeons.GOLD ? "" : ", from the next floor"), 0);
+        } else if (roll < 70) {
+            int[] types = {RunLoot.ACCESSORY, RunLoot.ARMOUR, RunLoot.WEAPON};
+            int code = RunLoot.code(types[(delve + delveFloor) % 3], Math.min(11, delve / 2), (delve * 5 + 7 + delveFloor * 3) % 12, delveFloor >= 3 ? RunLoot.GOLD : RunLoot.PURPLE);
+            intoBag(code);
+            toast(RunLoot.RARITIES[RunLoot.rarity(code)] + ": " + RunLoot.name(code), "Found in a secret cache", LOOT_PICTURE + code);
+        } else {
+            toast("A secret cache", "Pluses, and nothing more this time", 0);
+        }
+        audio.play("unlock", .9f);
+    }
+
+    /** The cracks in the squares of cracked ground in view, drawn over the ground's own picture: a wash of what it is made of, fissures (more of them, the stronger the pound it asks for) and, every few seconds, a glint. */
+    private void drawCracks(Canvas canvas) {
+        if (crackSpots.isEmpty()) return;
+        int[] colours = CRACK_LOOKS[crackLook()];
+        float line = Math.max(2f, tile * .06f);
+        for (int[] spot : crackSpots) {
+            int column = spot[0], row = spot[1], need = spot[2];
+            float left = (column - cameraX) * tile, top = (row - cameraY) * tile;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(colours[0]);
+            paint.setAlpha(60 + 18 * need);
+            canvas.drawRect(left, top, left + tile + 1, top + tile + 1, paint);
+            // The fissures: one right across from the top, bending as it goes; a branch off it for each step the pound has to be; and a hairline.
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            float x = left + tile * (.25f + .5f * chance(column, row, 0)), y = top;
+            for (int branch = 0; branch <= need; branch++) {
+                float px = branch == 0 ? x : left + tile * (.2f + .6f * chance(column, row, 10 + branch)), py = branch == 0 ? top : top + tile * (.2f + .3f * chance(column, row, 20 + branch));
+                int segments = branch == 0 ? 4 : 2 + branch % 2;
+                for (int step = 1; step <= segments; step++) {
+                    float nx = px + tile * (chance(column, row, 30 + branch * 5 + step) - .5f) * .42f, ny = Math.min(top + tile, py + tile * (branch == 0 ? .25f : .18f));
+                    nx = Math.max(left + tile * .04f, Math.min(left + tile * .96f, nx));
+                    stroke.setColor(colours[1]);
+                    stroke.setAlpha(branch == 0 ? 230 : 190);
+                    stroke.setStrokeWidth(branch == 0 ? line * (1 + .25f * need) : line * .7f);
+                    canvas.drawLine(px, py, nx, ny, stroke);
+                    // (A pale edge beside it, where the light gets in.)
+                    stroke.setColor(colours[3]);
+                    stroke.setAlpha(branch == 0 ? 140 : 90);
+                    stroke.setStrokeWidth(Math.max(1f, line * .4f));
+                    canvas.drawLine(px + line * .7f, py, nx + line * .7f, ny, stroke);
+                    px = nx;
+                    py = ny;
+                }
+            }
+            // The strongest cracks glow a little in their depths.
+            if (need >= 3) glowAt(canvas, left + tile * .5f, top + tile * .5f, tile * .55f, colours[3], Math.round(36 + 22 * (float) Math.sin(clock * 2.4f + column)));
+            // And every few seconds a glint along the crack, so that whoever looks sees it.
+            float phase = (clock * .3f + chance(column, row, 99) * 3.7f) % 1;
+            if (phase < .15f) {
+                float through = phase / .15f, shine = (float) Math.sin(through * Math.PI), sx = x, sy = top + tile * .32f;
+                glowAt(canvas, sx, sy, tile * (.22f + .12f * shine), 0xFFFFF4C2, Math.round(120 * shine));
+                stroke.setColor(0xFFFFFFFF);
+                stroke.setAlpha(Math.round(190 * shine));
+                stroke.setStrokeWidth(Math.max(1f, tile * .03f));
+                float reach = tile * .17f * shine;
+                canvas.drawLine(sx - reach, sy, sx + reach, sy, stroke);
+                canvas.drawLine(sx, sy - reach, sx, sy + reach, stroke);
+            }
+        }
+        stroke.setAlpha(255);
+        stroke.setStrokeCap(Paint.Cap.BUTT);
+        paint.setAlpha(255);
+    }
+
+    /** The chunks of broken ground in the air, turning as they fall, and fading as they go. */
+    private void drawDebris(Canvas canvas) {
+        paint.setStyle(Paint.Style.FILL);
+        for (float[] chunk : debris) {
+            float x = (chunk[0] - cameraX) * tile, y = (chunk[1] - cameraY) * tile, left = 1 - chunk[4] / chunk[5], half = tile * chunk[7];
+            paint.setColor((int) chunk[6]);
+            paint.setAlpha(Math.round(255 * Math.min(1, left * 2.5f)));
+            canvas.save();
+            canvas.rotate((float) Math.toDegrees(chunk[8]), x, y);
+            canvas.drawRect(x - half, y - half * .75f, x + half, y + half * .75f, paint);
+            canvas.restore();
+        }
+        paint.setAlpha(255);
+    }
+
     /** Bits that are feathers (white, then dark): above the four ways a blow is seen. */
     static final int FEATHER_BIT = 10;
 
     private void drawMoveFx(Canvas canvas) {
         if (run == null) return;
+        drawDebris(canvas);
         // The pound's ring, along the ground and as wide as it reaches; its cracks; and its dust.
         if (poundFxAge < .6f) {
             float x = (poundFxX - cameraX) * tile, y = (poundFxY - cameraY) * tile, through = Math.min(1, poundFxAge / .35f), reach = poundFxReach * tile;
             int colour = poundFxFlavour == PlusRun.SPLASHES ? 0xFF2A3266 : poundFxFlavour == PlusRun.CUTS ? 0xFFFFE08A : poundFxFlavour == PlusRun.SPARKLES ? 0xFFB9F3FF : 0xFFF2E6CF;
-            if (poundFxAge < .35f && !poundPictured) {
+            // The ring along the ground: one for each step of the pound, a little after the last, so that the third is three. (Fainter where the
+            // effects' pictures play it as well.)
+            for (int ring = 0; ring < poundFxLevel && poundFxAge < .35f + ring * .07f; ring++) {
+                float turn = Math.min(1, Math.max(0, (poundFxAge - ring * .07f) / .35f)), faint = poundPictured ? .55f : 1;
                 stroke.setColor(colour);
-                stroke.setAlpha(Math.round(230 * (1 - through)));
-                stroke.setStrokeWidth(tile * (.16f - .1f * through));
-                box.set(x - reach * through, y - tile * .28f * through, x + reach * through, y + tile * .16f * through);
+                stroke.setAlpha(Math.round(230 * faint * (1 - turn)));
+                stroke.setStrokeWidth(tile * (.16f - .1f * turn));
+                box.set(x - reach * turn, y - tile * .28f * turn, x + reach * turn, y + tile * .16f * turn);
                 canvas.drawOval(box, stroke);
                 stroke.setColor(Color.WHITE);
-                stroke.setAlpha(Math.round(200 * (1 - through)));
+                stroke.setAlpha(Math.round(200 * faint * (1 - turn)));
                 stroke.setStrokeWidth(tile * .04f);
-                box.set(x - reach * through * .7f, y - tile * .2f * through, x + reach * through * .7f, y + tile * .1f * through);
+                box.set(x - reach * turn * .7f, y - tile * .2f * turn, x + reach * turn * .7f, y + tile * .1f * turn);
                 canvas.drawOval(box, stroke);
             }
             // Cracks running out along the ground, longer the further it reaches.
@@ -3739,7 +3979,7 @@ final class RunGame {
         return Vfx.play(id, x * tile, y * tile, squares * tile, angle, tint, flags | blend, 1, 0);
     }
 
-    static final int VFX_A_FRAME = 5;
+    static final int VFX_A_FRAME = 9;
 
     private void drawVfx(Canvas canvas) {
         if (!vfxStarted) return;
@@ -5152,6 +5392,13 @@ final class RunGame {
             session.keep("run_clip", 0);
             showClip(clip, stage, null);
         }
+        // (And a land, or a dungeon (a number over a thousand is its number less a thousand and one), gone straight into from the map, for looking at it.)
+        if (BuildConfig.DEBUG && screen == MAP && video == null && session.tally("run_play_land") > 0) {
+            int asked = session.tally("run_play_land");
+            session.keep("run_play_land", 0);
+            if (asked > 1000) startDive(asked - 1001);
+            else playLand(asked);
+        }
         // (And the guild counter, at a tab, for looking at it.)
         if (BuildConfig.DEBUG && screen == MAP && video == null && session.tally("run_counter") > 0) {
             counterTab = Math.min(TAB_NAMES.length - 1, session.tally("run_counter") - 1);
@@ -5827,6 +6074,8 @@ final class RunGame {
             if (session.tally("run_from_row") > 0) stand = session.tally("run_from_row");
             run.place(column + (1 - PlusRun.WIDE) / 2, stand - PlusRun.TALL - .05f);
         }
+        // (And with no one else in the land, to look at the land.)
+        if (BuildConfig.DEBUG && session.tally("run_calm") > 0) run.foes().clear();
         // And, for the same, she may start in a colour, as from a ribbon, and with something in her hands.
         if (BuildConfig.DEBUG && session.tally("run_wear") > 0) run.lend(session.tally("run_wear"));
         // (And straight into a place off the land of a kind, kind and one, for looking at it.)
@@ -5870,6 +6119,8 @@ final class RunGame {
         saidRumour = false;
         seenLives = seenCasts = seenBraces = seenPaid = seenReminders = seenChests = 0;
         seenDiaries = seenLifted = 0;
+        seenCrackBursts = seenCrackHolds = seenCrackStood = seenCrackLog = seenCaches = seenVaults = 0;
+        debris.clear();
         seenXp = seenFound = 0;
         seenMerchantBlows = seenGifts = seenDrinks = seenStops = seenFoundPotions = 0;
         pickerOpen = false;
@@ -8132,6 +8383,7 @@ final class RunGame {
         run.step(seconds, goLeft, goRight, goJump || jumpPressed, goStrike || strikePressed);
         Vfx.update(seconds);
         movesAfter(seconds);
+        cracksAfter(seconds);
         statusLoops();
         jumpPressed = false;
         strikePressed = false;
@@ -12253,10 +12505,11 @@ final class RunGame {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0xFF1C1626);
         for (int[] way : level.ways) {
-            if (way[2] > 1) continue;
+            // (The shaft under cracked ground and the vine up out of its chamber are dark in the same way; a hidden wall and the high ledges' way up are not.)
+            if (way[2] > 1 && way[2] < RunLevels.WAY_SHAFT) continue;
             float x = (way[0] - cameraX) * tile;
             if (x < -tile || x > width) continue;
-            canvas.drawRect(x - 1, (way[1] + .3f - cameraY) * tile, x + tile + 1, (RunLevels.ROWS - cameraY) * tile + 1, paint);
+            canvas.drawRect(x - 1, (way[1] + (way[2] == RunLevels.WAY_SHAFT ? 0 : .3f) - cameraY) * tile, x + tile + 1, (RunLevels.ROWS - cameraY) * tile + 1, paint);
         }
         paint.setColor(Color.BLACK);
         if (top >= height) return;
@@ -12665,12 +12918,21 @@ final class RunGame {
                 cell(canvas, homesOut(), ownerAt(level, decor[1]), RunLevels.OWNERS, (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * 3.9f, false);
             } else pieceTall(canvas, three, decor[0], (decor[1] + .5f - cameraX) * tile, (decor[2] + 1 - cameraY) * tile, tile * DECOR_TALL[decor[0]], false);
         }
+        crackSpots.clear();
         for (int column = first; column <= last; column++) {
             float left = (column - cameraX) * tile;
             for (int row = top; row <= bottom; row++) {
                 char here = run.shown(column, row);
                 float y = (row - cameraY) * tile;
                 paint.setAlpha(255);
+                // Cracked ground is drawn as the ground it is, and cracked over it afterwards.
+                if (RunLevels.crackNeed(here) > 0) {
+                    crackSpots.add(new int[]{column, row, RunLevels.crackNeed(here)});
+                    here = RunLevels.BLOCK;
+                } else if (here == RunLevels.THIN && !level.vaults.isEmpty() && vaultHatch(level, column, row)) {
+                    // (The hatch of a vault's vine opens only from below: from above it is ground, with nothing to say that it is anything else.)
+                    here = RunLevels.BLOCK;
+                }
                 // A secret space not yet found is drawn as the rock round it: the same squares, nothing of what is inside. Found, the rock
                 // over it fades away, and its false wall is left faint, to be seen through.
                 float ago = run.foundAgo(column, row);
@@ -12746,7 +13008,7 @@ final class RunGame {
                     // The top of a pile has the turf on it; the rest is what lies under. Every other one is
                     // turned about, so the same picture side by side does not show as a pattern.
                     // (Rock fading off a secret space just found has no turf on it anywhere.)
-                    boolean capped = !fading && run.shown(column, row - 1) != RunLevels.BLOCK;
+                    boolean capped = !fading && !groundish(run.shown(column, row - 1));
                     if (chapter >= RunLevels.CHAPTERS * 2) {
                         // (The third volume's ground is in a row of squares of its own.)
                         if (ground3 == null) ground3 = BitmapFactory.decodeResource(context.getResources(), R.drawable.plus_run_art5);
@@ -12848,6 +13110,7 @@ final class RunGame {
             }
         }
         if (run.room() >= 0) houseFloor(canvas, level.rooms.get(run.room()), first, last);
+        drawCracks(canvas);
         // Under the land it is darker: the caves and the rock round them.
         if (run.room() < 0 && level.under != null && (RunLevels.ROWS - cameraY) * tile < height) {
             paint.setStyle(Paint.Style.FILL);
