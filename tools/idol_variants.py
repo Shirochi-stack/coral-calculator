@@ -45,7 +45,7 @@ V = {
     40: {"en": ("Jump, heart, bow.", "Jump!"), "ja": ("ジャンプ、ハート、お辞儀。", "ジャンプ！"), "ko": ("점프, 하트, 인사.", "점프!"), "zh": ("跳、爱心、鞠躬。", "跳！")},
     41: {"en": ("Sloppy~♡ — don't stop!", "Don't stop!"), "ja": ("Sloppy~♡ ——止めないで！", "止めないで！"), "ko": ("Sloppy~♡ ——멈추지 마!", "멈추지 마!"), "zh": ("Sloppy~♡ ——别停！", "别停！")},
     42: {"en": ("You're welcome.", "Welcome."), "ja": ("どういたしまして。", "どうぞ。"), "ko": ("천만에.", "별말씀."), "zh": ("不客气。", "不客气。")},
-    43: {"en": ("Mint ice cream.", "Ice cream."), "ja": ("ミントアイス。", "アイス。"), "ko": ("민트 아이스.", "아이스."), "zh": ("薄荷冰淇淋。", "冰淇淋。")},
+    43: {"en": ("Mint ice cream, Sloppy~♡", "Ice cream, Sloppy~♡"), "ja": ("ミントアイス、Sloppy~♡", "アイス、Sloppy~♡"), "ko": ("민트 아이스크림, Sloppy~♡", "아이스, Sloppy~♡"), "zh": ("薄荷冰淇淋，Sloppy~♡", "冰淇淋，Sloppy~♡")},
 }
 FIRST = 100.0   # where the first of the forms is said in the spec, and how far apart they are
 EVERY = 5.0

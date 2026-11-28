@@ -337,3 +337,13 @@ def nearest_spans(spans, nominal):
 
 
 
+
+
+def edged(x, ms=6):
+    x = x.copy()
+    n = min(len(x) // 2, int(ms * RATE / 1000))
+    if n:
+        x[:n] *= numpy.linspace(0, 1, n)
+        x[-n:] *= numpy.linspace(1, 0, n)
+    return x
+

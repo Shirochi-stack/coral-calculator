@@ -366,7 +366,7 @@ final class RunShelf extends FrameLayout {
         LinearLayout beside = new LinearLayout(context);
         beside.setOrientation(LinearLayout.VERTICAL);
         beside.setPadding(px(12), 0, px(6), 0);
-        beside.addView(words(open ? item.title : "Locked", 16, open ? ink : soft, true));
+        beside.addView(words(open ? item.title : RunGallery.lockedName(item), 16, open ? ink : soft, true));
         beside.addView(words(open ? item.film >= RunClips.BASE ? "A scene from the story" : item.film == RunFilms.CLIP ? "The scene from the last land" : "Ninety seconds" : item.hint, 12.5f, soft, false));
         top.addView(beside, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
         if (open) {
@@ -436,7 +436,7 @@ final class RunShelf extends FrameLayout {
             small.addView(lock(), new LayoutParams(px(24), px(24), Gravity.CENTER));
         }
         box.addView(small, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, px(tall)));
-        TextView under = words(open ? item.title : item.hint, 12, open ? ink : soft, false);
+        TextView under = words(open ? item.title : RunGallery.lockedLabel(item), 12, open ? ink : soft, false);
         under.setMaxLines(2);
         under.setPadding(px(2), px(4), px(2), 0);
         box.addView(under);
