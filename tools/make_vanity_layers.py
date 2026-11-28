@@ -45,11 +45,24 @@ if (RES / "halgakos_moves.webp").exists():
 # Her swimming (two strokes, a dive, an ink shot).
 if (RES / "halgakos_swim.webp").exists():
     SHEETS["swim"] = (4, 1, 256, 208)
+# Her climbing, and knuckles (the thirteenth weapon class: its frames, and the same with nothing in her hands). Drawn after all the rest, as grids of their own.
+EXTRA = []
+if (RES / "halgakos_climb.webp").exists():
+    SHEETS["climb"] = (4, 1, 256, 208)
+    EXTRA.append("climb")
+if (RES / "halgakos_arm18.webp").exists():
+    SHEETS["arm18"] = (12, 1, 500, 248)
+    EXTRA.append("arm18")
+if (RES / "run_grip_knuckles.webp").exists():
+    SHEETS["grip18"] = (12, 1, 500, 248)
+    EXTRA.append("grip18")
 
 
 def sheet_file(name):
     """Where a sheet of her is: her own sheets by their name, the weapon-free grips under their weapon's."""
     if name.startswith("grip"):
+        if name == "grip18":
+            return RES / "run_grip_knuckles.webp"
         return RES / ("run_grip_%s.webp" % GRIP[int(name[4:])][0])
     return RES / ("halgakos_%s.webp" % name)
 

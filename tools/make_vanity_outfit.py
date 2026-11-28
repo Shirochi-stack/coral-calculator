@@ -87,13 +87,16 @@ def groups():
     # And her swimming, after those.
     swims = [(s, i) for s in ("swim",) if s in SHEETS for i, _ in cells(s)]
     out += [("g3x2", swims[i:i + 6]) for i in range(0, len(swims), 6)]
+    # And climbing and knuckles, last of all (as before: the grids before them stay the same grids).
+    extra = [(s, i) for s in layers.EXTRA for i, _ in cells(s)]
+    out += [("g2x3", extra[i:i + 6]) for i in range(0, len(extra), 6)]
     return out
 
 
 LAYOUT = {"g4x2": (4, 2), "g3x2": (3, 2), "g2x3": (2, 3)}
 
 
-def make_jobs(outfit, redo):
+def make_jobs(outfit, redo, new=False):
     title, text = DESIGNS[outfit]
     work = WORK / outfit
     (work / "grids").mkdir(parents=True, exist_ok=True)
@@ -109,7 +112,9 @@ def make_jobs(outfit, redo):
         while any((work / "raw" / ("%s_r%d.png" % (j, n))).exists() for j in bad):
             n += 1
         suffix = "_r%d" % n
-    for gi, (kind, frames) in enumerate(groups()):
+    allg = groups()
+    first_new = len(allg) - sum(1 for _, fr in allg if any(s in layers.EXTRA for s, _ in fr)) if new else 0
+    for gi, (kind, frames) in enumerate(allg):
         name = "%s_%02d" % (outfit, gi)
         cols, rows = LAYOUT[kind]
         cw, ch = CANVAS[0] // cols, CANVAS[1] // rows
@@ -132,6 +137,8 @@ def make_jobs(outfit, redo):
         manifest[name] = {"kind": kind, "frames": place}
         if redo and name not in bad:
             continue
+        if gi < first_new:
+            continue
         prompt = (
             f"Reference image 1 is a sprite sheet of {len(frames)} animation frames of Halgakos, a chibi catgirl with pink hair, dark curled horns, pink cat ears, one white feathered angel wing, one dark bat wing and a pink tail, "
             f"wearing a white school blouse, red ribbon, navy pleated skirt and white socks, laid out in {cols} columns and {rows} rows (left to right, top to bottom), one frame in each cell, each in a different pose (some hold a weapon or a tool). "
@@ -144,7 +151,7 @@ def make_jobs(outfit, redo):
                      "refs": [str(work / "grids" / (name + ".png")), str(CARDS / (outfit + ".png"))]})
     (work / "manifest.json").write_text(json.dumps(manifest))
     for s in range(3):
-        (work / ("jobs%s_%d.json" % (suffix, s))).write_text(json.dumps(jobs[s::3]))
+        (work / ("jobs%s_%d.json" % ("_new" if new else suffix, s))).write_text(json.dumps(jobs[s::3]))
     print(outfit, "grids", len(manifest), "jobs", len(jobs), suffix)
 
 
@@ -319,6 +326,7 @@ if __name__ == "__main__":
     ap.add_argument("what", choices=["jobs", "pack", "contact"])
     ap.add_argument("outfit")
     ap.add_argument("--redo", action="store_true")
+    ap.add_argument("--new", action="store_true", help="jobs: only the grids of the sheets that came last (climb and knuckles)")
     ap.add_argument("--only", nargs="*", default=None, help="pack only these sheets (the others' files are left as they are)")
     a = ap.parse_args()
-    {"jobs": lambda: make_jobs(a.outfit, a.redo), "pack": lambda: pack(a.outfit, only=set(a.only) if a.only else None), "contact": lambda: contact(a.outfit)}[a.what]()
+    {"jobs": lambda: make_jobs(a.outfit, a.redo, a.new), "pack": lambda: pack(a.outfit, only=set(a.only) if a.only else None), "contact": lambda: contact(a.outfit)}[a.what]()

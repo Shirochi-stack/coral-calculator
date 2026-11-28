@@ -99,6 +99,8 @@ public class RunVanityTest {
         for (Object[] sheet : VanityLayers.SHEETS) {
             String name = (String) sheet[0];
             int frames = VanityLayers.frames(name);
+            // Her climbing and her knuckles came after every outfit was drawn whole: they have no mask (no outfit is a dyed one now), only drawn frames.
+            if (name.equals("climb") || name.equals("arm18") || name.equals("grip18")) continue;
             assertTrue(name, new File("src/main/res/drawable-nodpi/vanity_mask_" + name + ".webp").exists());
             total += frames;
             covered += anchors.count(name);
