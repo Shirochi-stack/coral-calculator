@@ -785,6 +785,8 @@ final class PlusRun {
          */
         int colours;
         float recharge = 10, formLonger = 1;
+        /** How much longer her ribbons last, from the counter's Lasting ribbons (never black). */
+        float ribbonLonger = 1;
         /**
          * Whether she is whole: every colour hers to keep, and every friend met on the way to the last land pledged to her. It is
          * what the black ribbon thrown there is turned by.
@@ -2680,7 +2682,7 @@ final class PlusRun {
         int thing = thingOf(with);
         boolean minded = thing == BOOK || thing == TABLET || thing == RunArms.STAFF || thing == RunArms.WAND;
         float more = 1 + (perks.skills.stats[RunSkills.ATK] + skillOf(RunSkills.E_ATK_PCT) + (minded ? intelligence() : 0) + perks.mightPct + metered()
-                + (hp * 3 <= maxHp() ? skillOf(RunSkills.E_LAST_STAND) : 0) - (inked() ? curseWeak() : 0)) / 100f;
+                + (hp * 3 <= maxHp() ? skillOf(RunSkills.E_LAST_STAND) : 0) - (inked() ? curseWeak() : 0) + (white() ? Math.max(0, skillOf(RunSkills.E_WHITE)) : 0)) / 100f;
         return Math.max(1, Math.round(BLOW * power() * RunLoot.power(perks.level) * Math.max(.1f, more) * (divineLeft > 0 ? 3 : 1)));
     }
 
@@ -2688,13 +2690,16 @@ final class PlusRun {
     int intelligence() { return RunSkills.intelligence(perks.skills, skillOf(RunSkills.E_INT_PCT) - perks.skills.effects[RunSkills.E_INT_PCT]); }
 
     /** How much less a hurt costs, in percent: the tree's (a strong passive may make it more), and an active's. */
-    int defencePercent() { return RunSkills.defencePercent(skillOf(RunSkills.E_DEF_PCT) + (skillOf(RunSkills.E_IRON) > 0 ? dodgeRaw() : 0)); }
+    int defencePercent() { return RunSkills.defencePercent(skillOf(RunSkills.E_DEF_PCT) + (skillOf(RunSkills.E_IRON) > 0 ? dodgeRaw() : 0) + (has(BROWN) ? Math.max(0, skillOf(RunSkills.E_BROWN)) : 0)); }
 
     /** How much of energy spent becomes divine power, in percent, now. */
     int dpMaking() { return Math.max(0, skillOf(RunSkills.E_DP)); }
 
     /** Blows that landed, for showing: where, how much, whether a great one, and how long ago. */
     private final List<float[]> hits = new ArrayList<>();
+    /** The number a creature's blows are being counted up in, and for how long after one a next is counted into it. */
+    private final java.util.Map<Foe, float[]> counted = new java.util.IdentityHashMap<>();
+    static final float NUMBER_MERGES = .45f;
 
     List<float[]> hits() { return hits; }
 
@@ -3206,6 +3211,9 @@ final class PlusRun {
         if (chance(gear(RunLoot.POISON))) poison(foe);
         if (chance(gear(RunLoot.BURN))) ignite(foe, BURN_LASTS);
         if (!waits && chance(gear(RunLoot.FREEZE))) chillFoe(foe);
+        // The tree's ribbons: in red her blows burn, in blue they chill.
+        if (has(RED) && chance(skillOf(RunSkills.E_RED))) ignite(foe, BURN_LASTS);
+        if (has(BLUE) && !waits && chance(skillOf(RunSkills.E_BLUE))) chillFoe(foe);
         return dealt;
     }
 
@@ -3230,7 +3238,7 @@ final class PlusRun {
             dodgeAge = 0;
             return true;
         }
-        if (chance(gear(RunLoot.SHRUG))) {
+        if (chance(gear(RunLoot.SHRUG) + (has(PURPLE) ? Math.max(0, skillOf(RunSkills.E_PURPLE)) : 0))) {
             shrugs++;
             shrugAge = 0;
             return true;
@@ -5133,6 +5141,7 @@ final class PlusRun {
         perks.colours |= now.colours;
         perks.recharge = now.recharge;
         perks.formLonger = now.formLonger;
+        perks.ribbonLonger = now.ribbonLonger;
         perks.together = now.together;
         perks.resists |= now.resists;
         // Her pets: those that are hers for good are those now chosen; and there is as much room for strays as there now is.
@@ -5903,7 +5912,7 @@ final class PlusRun {
         char about = at((int) Math.floor(x + WIDE / 2), (int) Math.floor(y + TALL * .6f));
         // A draught lifts her; and with the wind in her hair she flies for as long as the jump is held.
         if (about == RunLevels.DRAUGHT) speedDown = Math.max(-5, speedDown - (GRAVITY + 24) * seconds);
-        else if (has(GREEN) && jump && !down && !onGround && y > 1) speedDown = Math.max(mastered ? -10 : named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * seconds);
+        else if (has(GREEN) && jump && !down && !onGround && y > 1) speedDown = Math.max(mastered ? -10 : named(GALE) ? -8 : -4.5f, speedDown - (GRAVITY + 24) * (1 + Math.max(0, skillOf(RunSkills.E_GREEN)) / 100f) * seconds);
         // On the tide she does not drop out of the air: let go of, the jump lets her down slowly.
         else if (named(TIDE) && !onGround && !down) speedDown = Math.min(speedDown, 2.6f);
         // On a vine (or a ladder) she climbs: up while the jump is held, down with the down button, and holds on otherwise; off the top of it,
@@ -6180,7 +6189,7 @@ final class PlusRun {
         // Held in the air, with the move, the strike is the aerial strike: it takes the hold over from anything else a hold would do there.
         aerialStrike(seconds, strike);
         {
-            int haste = Math.min(80, gear(RunLoot.HASTE) + (frenzyLeft > 0 ? Math.max(0, skillOf(RunSkills.E_FRENZY)) : 0));
+            int haste = Math.min(80, gear(RunLoot.HASTE) + (frenzyLeft > 0 ? Math.max(0, skillOf(RunSkills.E_FRENZY)) : 0) + (has(YELLOW) ? Math.max(0, skillOf(RunSkills.E_YELLOW)) : 0));
             boolean used = weapon != UNARMED && strike && (!strikeHeld || weapon == GUN) && sinceStrike >= restOf(weapon) * (1 - haste / 100f)
                     && aerialLeft <= 0 && !(onGround && skyborne());
             if (used) {
@@ -6380,7 +6389,7 @@ final class PlusRun {
      */
     boolean call(int colour) {
         if (!callable(colour)) return false;
-        put(colour, (colour == BLACK ? 5 : 9) * perks.lasting * perks.formLonger * forms(), false);
+        put(colour, (colour == BLACK ? 5 : 9 * perks.ribbonLonger) * perks.lasting * perks.formLonger * forms(), false);
         called++;
         return true;
     }
@@ -6388,7 +6397,7 @@ final class PlusRun {
     /** Whether a colour could be called on now. */
     boolean callable(int colour) {
         return state == PLAYING && !mastered && cursed <= 0 && colour >= RED && colour < BLACK && (perks.colours & 1 << colour - 1) != 0 && worn[colour] <= 0
-                && waits[colour] <= 0 && Integer.bitCount(mix() & ~lent) < perks.together;
+                && waits[colour] <= 0 && Integer.bitCount(mix() & ~lent) < together();
     }
 
     /** She calls on several at once, those given as bits, in their order, for as far as she can hold them. Returns those she could, as bits. */
@@ -6406,7 +6415,8 @@ final class PlusRun {
     }
 
     /** How many of her own colours she may wear at once. */
-    int together() { return perks.together; }
+    /** How many colours she may wear at once: the prism's; with Monochrome in her tree, one. */
+    int together() { return skillOf(RunSkills.E_MONO) < 0 ? 1 : perks.together; }
 
     /** The colours that are hers and could be called on now, were there room for them: neither on nor waiting. */
     int ready() {
@@ -6470,7 +6480,7 @@ final class PlusRun {
             return;
         }
         perks.colours |= 1 << colour - 1;
-        wear(colour, 9 * perks.lasting * perks.formLonger * forms());
+        wear(colour, 9 * (colour == BLACK ? 1 : perks.ribbonLonger) * perks.lasting * perks.formLonger * forms());
     }
 
     /** Whether she wears a colour: black that was put on her, which is no use to her, does not count. */
@@ -6774,7 +6784,7 @@ final class PlusRun {
             cleared++;
         } else if (kind > FORM) {
             int colour = kind - FORM;
-            wear(colour, (colour == WHITE ? 12 : RIBBON) * perks.lasting * perks.formLonger * forms());
+            wear(colour, (colour == WHITE ? 12 : RIBBON) * (colour == BLACK ? 1 : perks.ribbonLonger) * perks.lasting * perks.formLonger * forms());
         } else if (kind == ICE) {
             rush = LASTS[ICE] * perks.lasting;
         } else if (kind == MAGNET) {
@@ -6955,7 +6965,19 @@ final class PlusRun {
         if (hers) landed(foe, waits);
         boolean stun = hers && !waits && chance(skillOf(RunSkills.E_STUN));
         // (What it was dealt with, for how the blow is seen: a cut, a splash of ink, a thud, a sparkle; and, below, whether it was the last.)
-        float[] hit = new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0, flavourOf(with), 0, 0};
+        float[] hit = new float[]{foe.x + foe.wide() / 2, foe.y, dealt, critAge == 0 ? 1 : 0, 0, foe.most > BLOW ? 1 : 0, 0, flavourOf(with), 0, 0, 0, 0};
+        // Blows on one coming fast (hers, a pet's, a burn's) are one number counting up, not a pile of them: the last one young enough takes this
+        // one's count, and this one is seen only as its burst.
+        if (counted.size() > 64) counted.clear();
+        float[] counting = counted.get(foe);
+        if (counting != null && counting[4] < NUMBER_MERGES && hits.contains(counting)) {
+            counting[2] += dealt;
+            counting[4] = Math.min(counting[4], NUMBER_MERGES * .3f);
+            counting[3] = Math.max(counting[3], hit[3]);
+            hit[11] = 1;
+        } else {
+            counted.put(foe, hit);
+        }
         if (hits.size() < 24) hits.add(hit);
         // A creature is knocked back a little, away from her, where there is room.
         foe.knocked = foe.x + foe.wide() / 2 < x + WIDE / 2 ? -1 : 1;

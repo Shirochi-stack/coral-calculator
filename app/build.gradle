@@ -18,8 +18,8 @@ android {
         applicationId 'com.halgakos.calculator'
         minSdk 26
         targetSdk 36
-        versionCode 134
-        versionName '3.54.0'
+        versionCode 135
+        versionName '3.54.1'
     }
 
     // The outfits, and Plus run's other art kept out of the base module, are install-time asset packs; the debug APK carries them in the app itself.
