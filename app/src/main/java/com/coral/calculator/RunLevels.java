@@ -695,10 +695,13 @@ final class RunLevels {
     }
 
     /**
-     * How many times as many creatures as it was laid with a land has at last: twenty in the first three lands, and from there up to
-     * fifty in the last. (The packs that make up its numbers, {@link #crowd}, give two to ten times; the swarms give the rest.)
+     * How many times as many creatures as it was laid with a land has at last: thirty in the first three lands, and from there up to
+     * fifty-five in the last. (The packs that make up its numbers, {@link #crowd}, give two to ten times; the swarms give the rest.)
      */
-    static int swarmOf(int number) { return number <= 3 ? 20 : Math.min(50, 20 + 30 * (number - 3) / (TOTAL - 3)); }
+    static int swarmOf(int number) { return number <= 3 ? 30 : Math.min(60, 30 + 25 * (number - 3) / (TOTAL - 3)); }
+
+    /** How many a land counts as having been laid with, at the least, when its swarms are made: the first lands lay hardly any, and are not left bare for it. */
+    static int swarmBase(int number, int laid) { return Math.max(laid, number <= 3 ? 2 : number <= 10 ? 3 : 1); }
 
     /** How many a swarm has: small in the first lands, a crowd in the last. */
     static int swarmSize(int number, Random random) { return number <= 3 ? 4 + random.nextInt(3) : Math.min(22, 4 + number / 5 + random.nextInt(4)); }
@@ -724,14 +727,16 @@ final class RunLevels {
             else if (foe[0] != WORD && foe[0] != DRAGON && foe[0] != ZERO && foe[0] != TIMES) walkers.add(foe[0]);
         }
         if (walkers.isEmpty()) walkers.add(MINUS);
-        int want = Math.max(1, base) * swarmOf(number) - now;
+        int want = swarmBase(number, base) * swarmOf(number) - now;
         if (want <= 0) return;
         // Where one could stand, as crowd() has it: the ground and the ledges, with room over them, clear of every place of its own.
         List<int[]> spots = new ArrayList<>();
         for (int column = 24; column < until; column++) {
             boolean near = false;
             for (int flag : level.flags) near |= Math.abs(flag - column) < 6;
-            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 8;
+            // (A lamp or a tree is no reason to leave a stretch bare: only a village is, whole.)
+            for (int[] thing : level.decor) near |= Math.abs(thing[1] - column) < 3;
+            if (level.town >= 0) near |= column >= level.town - 6 && column <= level.town + townWide(townOf(number).length) + 6;
             for (int[] room : level.rooms) near |= Math.abs(room[1] - column) < 4 || Math.abs(room[5] - column) < 4;
             for (int[] item : level.items) if (item[1] < level.main) near |= Math.abs(item[1] - column) < (item[3] != 0 || item[0] >= PlusRun.CHEST ? 6 : 3);
             for (int[] weapon : level.weapons) near |= Math.abs(weapon[1] - column) < 2;
@@ -1831,16 +1836,16 @@ final class RunLevels {
     private static void delve(Level level, int dungeon, int floor, int sort, int hall, int hallFloor, Random random) {
         int until = hall >= 0 ? hall - 4 : level.gate - 6;
         List<int[]> spots = standings(level, until);
-        int want = 5 + floor * 2 + level.number / 12;
+        int want = 10 + floor * 3 + level.number / 6;
         if (sort == RunDungeons.TEEMING) want *= 2;
         if (sort == RunDungeons.QUIET) want = Math.max(2, want / 3);
         int[] kinds = RunDungeons.delvers(dungeon);
         int chapterFirst = RunUniques.first(Math.min(11, level.chapter));
         List<Integer> taken = new ArrayList<>();
-        for (int tries = 0; tries < 300 && want > 0 && !spots.isEmpty(); tries++) {
+        for (int tries = 0; tries < 600 && want > 0 && !spots.isEmpty(); tries++) {
             int[] spot = spots.get(random.nextInt(spots.size()));
             boolean clear = true;
-            for (int column : taken) clear &= Math.abs(column - spot[0]) >= (sort == RunDungeons.TEEMING ? 5 : 7);
+            for (int column : taken) clear &= Math.abs(column - spot[0]) >= (sort == RunDungeons.TEEMING ? 4 : 5);
             if (!clear) continue;
             int kind = kinds[random.nextInt(kinds.length)];
             // (One in five is one of its chapter's own; never its mini-boss, nor its hornets.)

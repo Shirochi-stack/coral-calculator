@@ -6470,6 +6470,19 @@ final class RunGame {
     private final java.util.Map<Integer, Bitmap> glows = new java.util.HashMap<>();
     private Bitmap vignette;
 
+    /** The mark over a creature that has just seen her: a red bar and a dot with a pale edge, bouncing a little. */
+    void drawAlarm(Canvas canvas, float x, float y, float left) {
+        float lift = Math.abs((float) Math.sin(left * 14)) * tile * .08f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFFFFF4E6);
+        canvas.drawRoundRect(x - tile * .1f, y - tile * .52f - lift, x + tile * .1f, y - tile * .1f - lift, tile * .08f, tile * .08f, paint);
+        canvas.drawCircle(x, y + tile * .04f - lift, tile * .1f, paint);
+        paint.setColor(0xFFE0362F);
+        canvas.drawRoundRect(x - tile * .065f, y - tile * .48f - lift, x + tile * .065f, y - tile * .16f - lift, tile * .05f, tile * .05f, paint);
+        canvas.drawCircle(x, y + tile * .04f - lift, tile * .066f, paint);
+        paint.setColor(Color.BLACK);
+    }
+
     void glowAt(Canvas canvas, float x, float y, float radius, int colour, int alpha) {
         if (BuildConfig.DEBUG && (session.tally("run_fxoff") & 4) != 0) return;
         Bitmap glow = glows.get(colour);
@@ -12155,6 +12168,17 @@ final class RunGame {
                 float pulse = .5f + .5f * (float) Math.sin(clock * 24);
                 glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * (.8f + .2f * pulse), 0xFFFF6A3A, Math.round(150 + 90 * pulse));
             }
+            // Crouched to lunge at her: squashed low and glowing, a moment before it springs.
+            if (foe.wind > 0 && !foe.flat) {
+                float pulse = .5f + .5f * (float) Math.sin(clock * 30);
+                glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * (.7f + .2f * pulse), 0xFFFF4A3A, Math.round(120 + 100 * pulse));
+                if (squashed < 0) {
+                    squashed = canvas.save();
+                    canvas.scale(1.14f, .82f, middle, feet);
+                }
+            }
+            // It has just seen her: a red alarm over its head.
+            if (foe.alert > 0 && !foe.flat) drawAlarm(canvas, middle, (foe.y - cameraY) * tile - tile * .1f, foe.alert);
             if (!RunLevels.boss(foe.kind)) {
                 // Gold glows faintly; black ink has a dark aura that breathes.
                 if (!foe.flat && (foe.tier == PlusRun.RED_TIER || foe.tier == PlusRun.PURPLE_TIER)) glowAt(canvas, middle, feet - foe.tall() * tile * .5f, foe.tall() * tile * .95f, TIER_BARS[foe.tier], 70);

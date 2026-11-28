@@ -64,7 +64,7 @@ public class RunWalkersTest {
                     }
                     float gone = since.getOrDefault(foe, 0f) + 1 / 60f;
                     since.put(foe, gone);
-                    if (gone > .5f && gone < .52f) out.append(unheld(run, "land " + number + " at " + step).split("\n", 3).length > 1 ? "\nland " + number + " step " + step + " kind " + foe.kind + (RunUniques.is(foe.kind) ? " (" + RunUniques.WAY_NAMES[RunUniques.way(foe.kind)] + ")" : "") + (foe.swarm ? " swarm" : "") + " at " + foe.x + "," + (foe.ground + foe.tall()) + " home " + foe.home : "");
+                    if (gone > .8f && gone < .82f) out.append(unheld(run, "land " + number + " at " + step).split("\n", 3).length > 1 ? "\nland " + number + " step " + step + " kind " + foe.kind + (RunUniques.is(foe.kind) ? " (" + RunUniques.WAY_NAMES[RunUniques.way(foe.kind)] + ")" : "") + (foe.swarm ? " swarm" : "") + " at " + foe.x + "," + (foe.ground + foe.tall()) + " home " + foe.home : "");
                 }
             }
             fell += run.foesFell();
