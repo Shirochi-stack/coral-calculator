@@ -339,6 +339,31 @@ public class RunSkillsTest {
         assertTrue(new java.io.File("src/main/res/drawable-nodpi/run_skill_icons.webp").length() < 300_000);
     }
 
+    @Test public void eachClassRegionHasItsOwnNodePictures() {
+        Set<Integer> smalls = new HashSet<>(), roots = new HashSet<>();
+        for (int clazz = 0; clazz < RunSkills.CLASS_COUNT; clazz++) {
+            Set<Integer> mine = new HashSet<>();
+            for (RunSkills.Node node : TREE) {
+                if (node.path != clazz || node.type != RunSkills.SMALL && node.type != RunSkills.ROOT) continue;
+                int icon = RunTree.iconOf(node);
+                assertTrue(icon >= RunTree.PACK_NODES && icon < RunTree.PACK_NODES + RunTree.PACK_NODE_COUNT);
+                mine.add(icon);
+                (node.type == RunSkills.SMALL ? smalls : roots).add(icon);
+            }
+            assertEquals(RunSkills.CLASSES[clazz], 2, mine.size());
+        }
+        assertEquals(RunSkills.CLASS_COUNT, smalls.size());
+        assertEquals(RunSkills.CLASS_COUNT, roots.size());
+        // The core's small nodes by stat, and the hybrid routes' their own; each card still names what it gives.
+        for (RunSkills.Node node : TREE) {
+            if (node.type != RunSkills.SMALL || node.path < RunSkills.CLASS_COUNT) continue;
+            int icon = RunTree.iconOf(node);
+            assertEquals(node.path >= RunSkills.HYBRID ? RunTree.PACK_NODES + RunTree.HYBRID_SMALL : RunTree.PACK_NODES + RunTree.CORE_SMALLS + node.stat, icon);
+            assertTrue(RunSkills.title(node).length() > 3);
+        }
+        assertTrue(new java.io.File("../runart/src/main/assets/" + RunTree.NODE_SHEET).isFile());
+    }
+
     @Test public void heartsAreTwentyHpAndPastTwentyTheyTurnColour() {
         assertEquals(20, RunSkills.HEART);
         float[] third = RunSkills.heart(2, 50, 60);
