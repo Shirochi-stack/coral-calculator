@@ -66,6 +66,7 @@ SCENE_H = ("She is the vocalist of an epic anime fight theme, chanting the lyric
 SCENE_G = "She is singing a battle anthem together with four other girls in unison, loud, bright and in time, "
 SCENE_W = "Halgakos whispers this line very softly, breathy and hushed, like a secret said close to the microphone, a clear whisper with no voice in it. "
 MEMBERS = ("C", "R", "I", "T")
+UNISON = False  # off: the friends' separate takes and her whisper under the chorus smeared into an echo; the voice is hers alone, dry
 
 
 def key_of(*parts):
@@ -207,7 +208,7 @@ def vocals():
         q = nat / final
         piece = cf.stretch(x, q, RATE) if abs(q - 1) > .02 else x
         piece = cf.edged(piece)
-        if group:
+        if group and UNISON:
             mixed = piece.copy()
             for who, (gain, off) in zip(MEMBERS, ((.5, .012), (.4, .02), (.5, .006), (.45, .016))):
                 g = load(VOICE / f"{who}-{tag}.wav")
@@ -226,7 +227,7 @@ def vocals():
         start = bar * BAR + (.05 if bar != 2 else .1)
         s = int(start * RATE)
         track[s:s + len(piece)] += piece[: total - s]
-        notes.append(f"bar {bar:2d} {start:6.2f}-{start + len(piece) / RATE:6.2f} s  x{q:.2f}  {'[unison + whisper] ' if group else ''}{text}")
+        notes.append(f"bar {bar:2d} {start:6.2f}-{start + len(piece) / RATE:6.2f} s  x{q:.2f}  {'' if group else ''}{text}")
     return track, notes
 
 
@@ -300,7 +301,7 @@ def lyrics():
             "[Intro, 4 bars]", INTRO[0][1], "", "[Verse 1]"] + VERSE1 + ["", "[Chorus]"] + CHORUS + ["", "[Verse 2]"] + VERSE2 + ["", "[Chorus]"] + CHORUS2 + ["", "[Final chorus]"] + FINAL
     rows = [r + ("   [STRONG: the f-word]" if re.search(r"fuck", r, re.I) else "   [language: mild]") if re.search(r"\b(damn|hell|crap|screw|fuck)\b", r, re.I) and not r.startswith("[") else r for r in rows]
     rows.append("")
-    rows.append("Language (marked above): damn, hell, crap, screw, and the f-word twice (second chorus and final chorus, aimed at sloppiness). The chorus is sung by the five in unison with her whisper under it; the verses are hers alone.")
+    rows.append("Language (marked above): damn, hell, crap, screw, and the f-word twice (second chorus and final chorus, aimed at sloppiness). Her voice alone and dry throughout (no unison, no whisper double, no echo).")
     return "\n".join(rows)
 
 
