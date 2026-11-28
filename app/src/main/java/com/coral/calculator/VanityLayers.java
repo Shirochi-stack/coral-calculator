@@ -21,7 +21,9 @@ final class VanityLayers {
             {"arm12", 12, 1, 500, 248}, {"arm13", 12, 1, 500, 248}, {"arm14", 12, 1, 500, 248}, {"arm15", 12, 1, 500, 248}, {"arm16", 12, 1, 500, 248}, {"arm17", 12, 1, 500, 248},
             // Her frames with nothing in her hands, for the weapons found: by the number of the kind of weapon (book 2, greatsword 12, gun 5, hammer 15, katana 8, knife 1, mace 14, pen 0, scythe 17, staff 13, sword 4, wand 16).
             {"grip2", 8, 1, 304, 248}, {"grip12", 12, 1, 500, 248}, {"grip5", 8, 1, 304, 248}, {"grip15", 12, 1, 500, 248}, {"grip8", 14, 1, 400, 248}, {"grip1", 8, 1, 304, 248},
-            {"grip14", 12, 1, 500, 248}, {"grip0", 8, 1, 304, 248}, {"grip17", 12, 1, 500, 248}, {"grip13", 12, 1, 500, 248}, {"grip4", 8, 1, 304, 248}, {"grip16", 12, 1, 500, 248}};
+            {"grip14", 12, 1, 500, 248}, {"grip0", 8, 1, 304, 248}, {"grip17", 12, 1, 500, 248}, {"grip13", 12, 1, 500, 248}, {"grip4", 8, 1, 304, 248}, {"grip16", 12, 1, 500, 248},
+            // Her moves: flips, air dash, ground pound, roll, cling, glide.
+            {"moves", 8, 1, 256, 208}};
 
     static int[] geometry(String sheet) {
         for (Object[] one : SHEETS) {
