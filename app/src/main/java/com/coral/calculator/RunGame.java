@@ -4962,7 +4962,7 @@ final class RunGame {
         int kind = delveKind();
         String words = kind != RunDungeons.PLAIN ? RunDungeons.KIND_NAMES[kind] + ": " + RunDungeons.KIND_WORDS[kind]
                 : delveFloor == RunDungeons.floors(delve) - 1 ? "Its keeper waits at the end" : "Laid anew for this dive";
-        toast(RunDungeons.name(delve) + "  ·  floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve), words, 0);
+        toast(RunDungeons.name(delve) + "  ·  floor " + (delveFloor + 1), words, 0);
     }
 
     /** What she takes down to a floor: harder the deeper, harder again on a fierce floor; and what the blessings chosen give. */
@@ -5220,13 +5220,17 @@ final class RunGame {
         }
     }
 
-    /** Over the buttons along the foot of the screen, in the middle, in a dive: which floor of how many, and what it is like. */
-    private void drawDelveLabel(Canvas canvas, float middle, float top) {
+    /**
+     * At the top, under the pause button and against the right, in a dive: which floor (never of how many: how deep it goes is left to find
+     * out) and what it is like. Where it would run into what is shown along the top left, a row lower.
+     */
+    private void drawDelveLabel(Canvas canvas, float right, float top, float clearOf, float lower) {
         if (delve < 0) return;
         int kind = delveKind();
-        String words = "Floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve) + (kind == RunDungeons.PLAIN ? "" : "  ·  " + RunDungeons.KIND_NAMES[kind]);
+        String words = "Floor " + (delveFloor + 1) + (kind == RunDungeons.PLAIN ? "" : "  ·  " + RunDungeons.KIND_NAMES[kind]);
         text.setTextSize(dp(12));
-        float wide = text.measureText(words) + dp(24), left = middle - wide / 2;
+        float wide = text.measureText(words) + dp(24), left = right - wide;
+        if (left < clearOf) top = lower;
         box.set(left, top, left + wide, top + dp(22));
         plate(canvas, box, dp(11), 235);
         text.setTextAlign(Paint.Align.LEFT);
@@ -5253,7 +5257,7 @@ final class RunGame {
         }
         int floors = RunDungeons.floors(delve), next = RunDungeons.kindOf(delve, delveFloor + 1, delveDive);
         boolean keeperNext = delveFloor + 1 == floors - 1;
-        float top = card(canvas, "Floor " + (delveFloor + 1) + " of " + floors + " cleared", "Kept + " + delveKept + "  ·  choose a blessing for the rest of the dive", dp(92));
+        float top = card(canvas, "Floor " + (delveFloor + 1) + " cleared", "Kept + " + delveKept + "  ·  choose a blessing for the rest of the dive", dp(92));
         text.setTextAlign(Paint.Align.LEFT);
         for (int one = 0; one < 3; one++) {
             text.setColor(ink);
@@ -9912,7 +9916,7 @@ final class RunGame {
                 canvas.drawColor(0x8C000000);
                 if (screen == PAUSED) {
                     // (With her backpack to look into.)
-                    float inside = card(canvas, "Paused", (delve >= 0 ? RunDungeons.name(delve) + ", floor " + (delveFloor + 1) + " of " + RunDungeons.floors(delve)
+                    float inside = card(canvas, "Paused", (delve >= 0 ? RunDungeons.name(delve) + ", floor " + (delveFloor + 1)
                             : blackRung > 0 ? "The black arena, rung " + blackRung : RunStory.CHAPTERS[RunLevels.chapterOf(number)] + ", land " + number + "  ·  level " + RunLevels.levelOf(number))
                             + (hard() > 0 ? "  ·  harder by " + hard() : "") + (run != null && run.inked() ? "  ·  under black " + (int) Math.ceil(run.cursed()) + " s" : ""), dp(run != null && run.inked() ? 112 : 52));
                     // Black, and what it does to her, named.
@@ -14924,7 +14928,7 @@ final class RunGame {
         drawStatusChips(canvas, x + dp(divine ? 336 : 232) + (run.inked() ? dp(76) : 0), under);
         if (anySlot) drawSlots(canvas);
         drawBreath(canvas, x, under + dp(26));
-        drawDelveLabel(canvas, safe.centerX(), leftButton.top - dp(30));
+        drawDelveLabel(canvas, pauseButton.right, pauseButton.bottom + dp(8), x + dp(divine ? 440 : 232), under + dp(30));
         under += dp(30);
         if (run.pet() >= 0) {
             float face = dp(run.herd().size() > 2 ? 30 : 42), left = pauseButton.right - face, top = pauseButton.bottom + dp(8);
