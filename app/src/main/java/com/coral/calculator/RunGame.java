@@ -482,7 +482,7 @@ final class RunGame {
     private final Rect source = new Rect();
     final RectF target = new RectF(), safe = new RectF(), box = new RectF();
     private final RectF leftButton = new RectF(), rightButton = new RectF(), jumpButton = new RectF(), strikeButton = new RectF();
-    private final RectF pauseButton = new RectF(), closeButton = new RectF(), soundButton = new RectF(), shopButton = new RectF(), goButton = new RectF();
+    private final RectF pauseButton = new RectF(), closeButton = new RectF(), soundButton = new RectF(), shopButton = new RectF(), goButton = new RectF(), labButton = new RectF();
     private final RectF[] pills = {new RectF(), new RectF(), new RectF()};
     private final String[] pillLabels = new String[3];
     private final int[] pillActions = new int[3];
@@ -3849,6 +3849,8 @@ final class RunGame {
         pauseButton.set(safe.right - margin - small, safe.top + margin, safe.right - margin, safe.top + margin + small);
         closeButton.set(pauseButton);
         soundButton.set(closeButton.left - dp(8) - small, closeButton.top, closeButton.left - dp(8), closeButton.bottom);
+        // (The small button that opens the experimental 2.5D sandbox, under the close button.)
+        labButton.set(closeButton.right - dp(116), closeButton.bottom + dp(3), closeButton.right, closeButton.bottom + dp(25));
         // The map: a page for each volume, with a row of lands for each of its chapters under the chapter's name, and the button that goes on under them all.
         // (On a screen wider than it is tall, the width is used: its chapters side by side, each in rows of its own, the lands as large as fit.)
         float room = safe.height() - dp(92) - dp(150) - dp(44);
@@ -8549,6 +8551,12 @@ final class RunGame {
             if (closeButton.contains(x, y)) {
                 audio.play("tap", .5f);
                 stage.done();
+            } else if (labButton.contains(x, y)) {
+                // The experimental 2.5D sandbox, a screen of its own (SandboxActivity).
+                audio.play("tap", .5f);
+                android.content.Intent lab = new android.content.Intent(context, SandboxActivity.class);
+                if (!(context instanceof android.app.Activity)) lab.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(lab);
             } else if (soundButton.contains(x, y)) {
                 audio.set(!audio.on());
                 names.set(CompanionPrefs.GAME_SOUND, audio.on());
@@ -15286,6 +15294,12 @@ final class RunGame {
             canvas.drawLine(x + dp(4), y - dp(4.5f), x + dp(10), y + dp(4.5f), stroke);
             canvas.drawLine(x + dp(10), y - dp(4.5f), x + dp(4), y + dp(4.5f), stroke);
         }
+        // A small "Sandbox (test)" pill: the experimental 2.5D mode.
+        plate(canvas, labButton, labButton.height() / 2, 215);
+        text.setTextAlign(Paint.Align.CENTER);
+        text.setColor(0xFF5B4BC4);
+        fitted(canvas, "Sandbox (test)", labButton.centerX(), labButton.centerY() + dp(4), dp(11), labButton.width() - dp(12));
+        text.setTextAlign(Paint.Align.LEFT);
         int firstShown = firstOf(page), lastShown = lastOf(page);
         int each = eachOf(page);
         for (int index = firstShown; index < lastShown; index++) {

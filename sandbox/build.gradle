@@ -1,0 +1,13 @@
+plugins {
+    id 'com.android.asset-pack'
+}
+
+// The sandbox test (a 2.5D map with house building and combat, Sandbox*.java): its art, kept out of the base module, which is near Play's 200 MB.
+// Delivered with the install; the debug build carries the same files, see app/build.gradle.
+assetPack {
+    packName = 'sandbox'
+    dynamicDelivery {
+        deliveryType = 'install-time'
+    }
+}
+

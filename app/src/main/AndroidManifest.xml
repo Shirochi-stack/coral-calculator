@@ -44,6 +44,12 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:label="@string/play_with_halgakos" />
+        <!-- The 2.5D sandbox test: opened from the small "Sandbox (test)" button on Plus run's map (or: adb shell am start -n com.halgakos.calculator/com.coral.calculator.SandboxActivity). -->
+        <activity
+            android:name=".SandboxActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
+            android:label="Sandbox (test)" />
         <activity
             android:name=".CompanionSettingsActivity"
             android:exported="false"
