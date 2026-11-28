@@ -37,10 +37,12 @@ Root causes found:
 - JA/KO/ZH: first sound on the phrase onset, whole phrase stretched into the span, ≤×1.25 target.
 - Targets: onset error 0–90 ms (worst accepted 170 ms), offset within ~300 ms.
 
-## Effects (v5 direction)
+## Effects (v5)
 
-- The game's `res/raw/fight_s_*.ogg` set is too generic. Choose per visible action; generated or library effects
-  are fine (log source and licence).
+- The game's `res/raw/fight_s_*.ogg` set is too generic. v5 uses `tools/clips_sfx.py`: ~33 effects synthesised with
+  numpy (whooshes, ink launch/splash/splat/wave/drips, squelch, wood crack, paper rustle/burst, page flap, book
+  thud, shimmer, heart sparkle, beam, metal shing, glass crack, zero rise, wing flap, wind...). They are original
+  (no licence to carry). Real recorded libraries would sound better; swap them in by name if the owner wants.
 - Detect beats from the picture (motion peaks, flashes, cuts), then confirm each against the frames.
 - Ink is a liquid: wet launch + splash/splat. Bats crack, pages rustle and flap, blades shing, slimes squelch,
   beams hum then roar, landings thud. Keep effects under voices (ducking) and away from the bed's own effects.
@@ -53,3 +55,13 @@ Root causes found:
   whispered double under the crowd calls, her calls pinned on her mouths (0:23–0:30), and "Sloppy" always inside
   a line. Measure sync before/after with `idol_sync.py` (share of mouth-time hit).
 - Nothing ships to the app until the owner approves the review copies.
+
+## Idol song v4 (what was actually built)
+
+- `tools/idol_transcribe.py` writes `dist/cutscenes/idol/transcripts/idol-SHAPE.json/.txt` (words, mouth phrases, syllable nuclei).
+- `tools/idol_v4.py record SHAPE` then `build SHAPE LANG`: SLOTS hold the lines (4 languages); each shape's phrase
+  takes the slots that start in it; Halgakos is recorded at the mouth's pace; group phrases add Chikuwa, Rune,
+  Illya, Tsubakieh and her whispered double; the mix is the instrumental plus the Demucs bed as before.
+- Honest result: lines now match phrases, "Sloppy" is always inside a line, but the share of mouth-time covered by
+  voice (`idol_sync.py`) fell 0-10 points against 3.43.0, which had padded mouths with filler calls. Check
+  `transcripts/sync-before-after.md` before calling it better.

@@ -47,25 +47,30 @@ build our lines on that map. Everything else follows from this.
 
 ## Pipeline (one clip, every language)
 
-1. **Separate**: `clips_bed.py` (Demucs htdemucs) → `ID-bed.wav` (effects bed) and `ID-vocals.wav` (mouth map).
+1. **Separate**: `clips_bed.py PICTURE.mp4 OUT-bed.wav` in a venv with demucs+torch (Demucs htdemucs) → `ID-bed.wav` (effects bed) and `ID-vocals.wav` (mouth map).
 2. **Transcribe**: `clips_transcribe.py` (faster-whisper, word timestamps) → `transcripts\ID.json/.txt`.
 3. **Verify mouths**: mouth spans from the vocals-stem energy, not Whisper's word ends; frame montages at each
    phrase; mark speaker (whose mouth) and expression.
 4. **Decide lines** (rules 1–4, 6): one line per real mouth phrase, original words when they make sense
    (garbles mended: "Helgocco" → Halgakos), else rewritten to the same phrase breaks and syllable count.
-5. **Record** each line fresh in the speaker's Inworld voice (Halgakos `community-5fwhmdpiq45g`; cast voices in
-   the voice tables), at a rate scaled to the mouth span; up to 4 takes, keep the best. Saving designed voices
-   to the owner's Inworld account is pre-approved.
+5. **Record** each line fresh in the speaker's Inworld voice (`tools/make_run_voice.py` VOICES: H Halgakos
+   `community-5fwhmdpiq45g`, C Chikuwa `community-iyfnceehtmbk`, R Rune the designed voice
+   `upbeat-bee-0979__design-voice-02fb12a5`, I Illya `community-blcuaurhzmvi`, T Tsubakieh `community-pwotyqkmtlsi`,
+   M the Mawang = H's voice at pitch .84, f the Mother Tongue). `python tools/clips_v4.py record` then `refit`:
+   `refit` re-says each line with speakingRate scaled by (take length / mouth span) until the take is within
+   0.9-1.1 of the mouth (up to 4 takes, nearest kept; TTS varies by +-30% between takes, so keep the best, never
+   the last). Saving designed voices to the owner's Inworld account is pre-approved. Key by name only.
 6. **Place**: EN word by word onto the original's words by syllable share (each segment ×0.8–1.25); JA/KO/ZH
    phrase by phrase from the original onset (≤×1.25, ×1.35 hard cap, flag anything over 1.25).
 7. **Lengthen only as a last resort**: slow the picture inside one shot by ≤1.5× with motion-compensated
    in-between frames (DIS optical flow, both frames warped and blended), never interpolate across a cut (a
    frame-to-frame jump over 35 = cut; hold the frame before it), music extended by repeating bars, never
    stretched; effects re-timed onto their action. Check every lengthened stretch frame by frame.
-8. **Effects** (rule 9) on detected action beats, checked against the frames.
+8. **Effects** (rule 9): `tools/clips_sfx.py` synthesises the library (original, no licence) and holds `CUES`, a
+   hand-made cue list per clip, timed from frame montages at each second; `FX5=1 python tools/clips_v3.py NN --langs en,ja,ko,zh` builds with them (v5 files).
 9. **Mix**: bed + effects + faint room tone + game instrumental ducked under voices; loudness and peak as rule 10.
 10. **Encode** once from the master with that language's captions burned in.
-11. **Verify and table** (`clips_v4_report.py`): per clip/language/line: status, speaker, face, original words and
+11. **Verify and table** (`python tools/clips_v4_report.py`, needs the voice dumps `review\v4-voice\`): per clip/language/line: status, speaker, face, original words and
     times, our line, placed time, onset and offset error, voice-with-no-mouth and mouth-with-no-voice seconds.
     Fix anything over target before reporting.
 
