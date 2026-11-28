@@ -24,7 +24,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHOTS = ROOT / "dist" / "cutscenes"
-RAW = ROOT / "app" / "src" / "main" / "res" / "raw"
+RAW = ROOT / "films" / "src" / "main" / "assets" / "films"
 ASSETS = ROOT / "app" / "src" / "main" / "assets"
 # A picture: its name in the game, the film it is the picture of, its size, and its bits a second.
 PICTURES = [

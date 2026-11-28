@@ -33,6 +33,13 @@ public class RunClipsTest {
     }
 
     private static final File MAIN = new File("src/main");
+    // The films and the gallery's pictures are in the "films" asset pack (films/src/main/assets), the gallery's table and the captions in the base module.
+    private static final File FILMS = new File("../films/src/main/assets/films");
+
+    private static File gallery(String name) {
+        File base = new File(MAIN, "assets/gallery/" + name);
+        return base.isFile() ? base : new File("../films/src/main/assets/gallery/" + name);
+    }
 
     @Test public void theClipsAreRowsOfTheirTable() {
         List<RunClips.Clip> clips = RunClips.parse("# number\ttitle\thint\tland\twhen\n1\tThe first\tLand 1\t1\tbefore\nbad row\n2\tThe second\tLand 3\t3\tafter\n3\tNo moment\tLand 4\t4\tsometime\n\n04\tAnother\tLand 3\t3\tafter\textra\n");
@@ -92,12 +99,12 @@ public class RunClipsTest {
             assertTrue("clip " + clip.number + " has a number of its own", numbers.add(clip.number));
             assertFalse(clip.title.isEmpty() || clip.hint.isEmpty());
             assertTrue(clip.land >= 1 && clip.land <= RunLevels.TOTAL + 100);
-            assertTrue(clip.number + " picture", new File(MAIN, "res/raw/" + RunClips.picture(clip.number) + ".mp4").isFile());
-            assertTrue(clip.number + " tile", new File(MAIN, "assets/gallery/video_clip" + RunClips.two(clip.number) + ".webp").isFile());
-            assertTrue(clip.number + " storyboard", new File(MAIN, "assets/gallery/board_clip" + RunClips.two(clip.number) + ".webp").isFile());
+            assertTrue(clip.number + " picture", new File(FILMS, RunClips.picture(clip.number) + ".mp4").isFile());
+            assertTrue(clip.number + " tile", gallery("video_clip" + RunClips.two(clip.number) + ".webp").isFile());
+            assertTrue(clip.number + " storyboard", gallery("board_clip" + RunClips.two(clip.number) + ".webp").isFile());
             for (int tongue = 0; tongue < RunFilms.TONGUES.length; tongue++) {
                 String sound = RunClips.sounds(clip.number, tongue)[0];
-                assertTrue(clip.number + " voice " + RunFilms.TONGUES[tongue], new File(MAIN, "res/raw/run_" + sound + ".m4a").isFile());
+                assertTrue(clip.number + " voice " + RunFilms.TONGUES[tongue], new File(FILMS, "run_" + sound + ".m4a").isFile());
                 for (int script = 0; script < RunFilms.TONGUES.length; script++) {
                     assertTrue(sound + " written in " + RunFilms.TONGUES[script], new File(MAIN, "assets/" + RunFilms.captions(sound, script)).isFile());
                 }

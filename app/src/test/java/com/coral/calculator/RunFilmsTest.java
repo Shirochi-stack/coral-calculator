@@ -41,6 +41,13 @@ public class RunFilmsTest {
     }
 
     private static final File MAIN = new File("src/main");
+    // The films and the gallery's pictures are in the "films" asset pack (films/src/main/assets), the gallery's table and the captions in the base module.
+    private static final File FILMS = new File("../films/src/main/assets/films");
+
+    private static File gallery(String name) {
+        File base = new File(MAIN, "assets/gallery/" + name);
+        return base.isFile() ? base : new File("../films/src/main/assets/gallery/" + name);
+    }
 
     private static String read(File file) throws IOException {
         return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
@@ -105,10 +112,10 @@ public class RunFilmsTest {
         File raw = new File(MAIN, "res/raw");
         for (int film : new int[]{RunFilms.PROLOGUE, RunFilms.IDOL}) {
             for (boolean upright : new boolean[]{true, false}) {
-                assertTrue(new File(raw, "run_film_" + RunFilms.picture(film, upright) + ".mp4").isFile());
+                assertTrue(new File(FILMS, "run_film_" + RunFilms.picture(film, upright) + ".mp4").isFile());
                 for (int choice = RunFilms.HALGAKOS; choice <= RunFilms.LEGACY; choice++) {
                     String[] names = RunFilms.sounds(film, choice, RunFilms.ENGLISH, upright);
-                    assertTrue(names[0], new File(raw, "run_film_" + names[0] + ".m4a").isFile());
+                    assertTrue(names[0], new File(FILMS, "run_film_" + names[0] + ".m4a").isFile());
                     assertTrue("what is heard in " + names[0] + " is written out in English", new File(MAIN, "assets/" + RunFilms.captions(names[0], RunFilms.ENGLISH)).isFile());
                 }
             }
@@ -117,7 +124,8 @@ public class RunFilmsTest {
     }
 
     @Test public void theFilmsAreKeptThoughNothingNamesThem() throws IOException {
-        assertTrue(read(new File(MAIN, "res/raw/keep.xml")).contains("@raw/run_film_*"));
+        assertTrue("the films are an install-time asset pack of their own", read(new File("../films/build.gradle")).contains("packName = 'films'"));
+        assertEquals("the app delivers it, and the debug build carries it", 2, read(new File("build.gradle")).split("':films'|films/src/main/assets", -1).length - 1);
     }
 
     // What is written under a film
@@ -301,7 +309,7 @@ public class RunFilmsTest {
         int unmade = 0, truly = 0;
         for (RunGallery.Item item : pictures) {
             assertTrue(item.name + " has a name of its own", names.add(item.name));
-            assertTrue(item.name + " is there", new File(MAIN, "assets/gallery/" + item.name + ".webp").isFile());
+            assertTrue(item.name + " is there", gallery(item.name + ".webp").isFile());
             assertFalse(item.name, item.title.isEmpty() || item.hint.isEmpty());
             if (item.rule.equals("ending:1")) unmade++;
             if (item.rule.equals("ending:2")) truly++;
@@ -316,7 +324,7 @@ public class RunFilmsTest {
         // (When the pictures of the endings are in, each ending has five of its own at the least.)
         assertTrue(unmade == 0 || unmade >= 5);
         assertTrue(truly == 0 || truly >= 5);
-        for (RunGallery.Item item : RunGallery.FIXED) assertTrue(item.name, new File(MAIN, "assets/gallery/" + item.name + ".webp").isFile());
+        for (RunGallery.Item item : RunGallery.FIXED) assertTrue(item.name, gallery(item.name + ".webp").isFile());
     }
 
     @Test public void sheSaysThatSomethingNewIsInTheGallery() {

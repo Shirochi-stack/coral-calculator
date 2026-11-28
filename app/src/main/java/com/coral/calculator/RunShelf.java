@@ -161,7 +161,7 @@ final class RunShelf extends FrameLayout {
     /** A raw resource by its name, or 0: the films' files are looked for by name, so one that is not there is simply not offered. */
     @SuppressWarnings("DiscouragedApi")
     static int raw(Context context, String name) {
-        return context.getResources().getIdentifier(name, "raw", context.getPackageName());
+        return FilmFiles.id(context, name);
     }
 
     /** What a file among the app's own says, or null if there is no such file. */
