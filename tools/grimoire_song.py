@@ -66,7 +66,7 @@ SCENE_H = ("She is the vocalist of an epic anime fight theme, chanting the lyric
 SCENE_G = "She is singing a battle anthem together with four other girls in unison, loud, bright and in time, "
 SCENE_W = "Halgakos whispers this line very softly, breathy and hushed, like a secret said close to the microphone, a clear whisper with no voice in it. "
 MEMBERS = ("C", "R", "I", "T")
-UNISON = False  # off: the friends' separate takes and her whisper under the chorus smeared into an echo; the voice is hers alone, dry
+UNISON = False  # (old whisper/unison smear) off: the friends' separate takes and her whisper under the chorus smeared into an echo; the voice is hers alone, dry
 
 
 def key_of(*parts):
@@ -195,9 +195,122 @@ def load(path):
     return x
 
 
+def shift(x, semis):
+    """Her own take a number of semitones up or down, the same length to the sample (resampled, then stretched back: the formants move with it; no reverb, no delay)."""
+    r = 2 ** (semis / 12)
+    y = scipy.signal.resample_poly(x, 1000, int(round(1000 * r))).astype("float32")
+    y = cf.stretch(y, len(y) / len(x), RATE)
+    return numpy.pad(y, (0, max(0, len(x) - len(y))))[: len(x)].astype("float32")
+
+
+def bands(x, hop=RATE // 100, win=RATE // 40, n=32):
+    """Log band energies (10 ms hop, 25 ms window) for aligning one take on another."""
+    f, t, S = scipy.signal.stft(x, RATE, nperseg=win * 2 if False else 1200, noverlap=1200 - hop)
+    S = numpy.abs(S)
+    edges = numpy.geomspace(100, 7000, n + 1)
+    out = numpy.stack([S[(f >= edges[k]) & (f < edges[k + 1])].sum(axis=0) for k in range(n)])
+    out = numpy.log(out + 1e-6)
+    return (out - out.mean(axis=1, keepdims=True)) / (out.std(axis=1, keepdims=True) + 1e-6)
+
+
+def dtw_path(a, b, band=60):
+    """Monotone path matching frames of a (lead) to frames of b (friend): [(i, j)], frames of 10 ms."""
+    na, nb = a.shape[1], b.shape[1]
+    cost = numpy.full((na + 1, nb + 1), numpy.inf)
+    cost[0, 0] = 0
+    d = numpy.sqrt(((a[:, :, None] - b[:, None, :]) ** 2).sum(axis=0))
+    back = numpy.zeros((na + 1, nb + 1), dtype="int8")
+    for i in range(1, na + 1):
+        lo, hi = max(1, int(i * nb / na) - band), min(nb, int(i * nb / na) + band)
+        for jj in range(lo, hi + 1):
+            c = (cost[i - 1, jj - 1], cost[i - 1, jj], cost[i, jj - 1])
+            k = int(numpy.argmin(c))
+            cost[i, jj] = d[i - 1, jj - 1] + c[k]
+            back[i, jj] = k
+    i, jj, path = na, nb, []
+    while i > 0 and jj > 0:
+        path.append((i - 1, jj - 1))
+        k = back[i, jj]
+        if k == 0:
+            i, jj = i - 1, jj - 1
+        elif k == 1:
+            i -= 1
+        else:
+            jj -= 1
+    return path[::-1]
+
+
+def warp_onto(lead, friend):
+    """The friend's take moved word by word onto the lead's timing by a monotone warp of the envelopes (10 ms frames), the same length as the lead; None if the warp is wild."""
+    path = dtw_path(bands(lead), bands(friend))
+    li = numpy.array([p[0] for p in path], dtype=float)
+    fj = numpy.array([p[1] for p in path], dtype=float)
+    # one friend time for each lead frame, smoothed
+    uniq, idx = numpy.unique(li, return_index=True)
+    ft = numpy.interp(numpy.arange(int(li.max()) + 1), uniq, fj[idx])
+    ft = scipy.ndimage.uniform_filter1d(ft, 7)
+    rate = (ft[20:] - ft[:-20]) / 20.0 if len(ft) > 40 else numpy.diff(ft)  # the pace over 200 ms
+    if rate.size and (rate.max() > 2.4 or rate.min() < .35):
+        return None, 0
+    t_s = numpy.interp(numpy.arange(len(lead)) / (RATE / 100), numpy.arange(len(ft)), ft) * (RATE / 100)
+    out = numpy.interp(t_s, numpy.arange(len(friend)), friend).astype("float32")
+    return out, float(numpy.median(numpy.abs(rate - 1)))
+
+
+def residual_lag_ms(lead, other, window=.25):
+    """Largest local lag (ms) between the two envelopes (5 ms hop), over 250 ms windows where the lead is voiced."""
+    hop = RATE // 200
+    def env(x):
+        y = scipy.signal.sosfilt(scipy.signal.butter(4, [200, 4000], "bandpass", fs=RATE, output="sos"), x)
+        return numpy.sqrt((y[: len(y) // hop * hop].reshape(-1, hop) ** 2).mean(axis=1))
+    a, b = env(lead), env(other[: len(lead)])
+    n = int(window * 200)
+    worst, corr_all = 0.0, numpy.corrcoef(a, b[: len(a)])[0, 1]
+    for s0 in range(0, len(a) - n, n // 2):
+        wa, wb = a[s0:s0 + n], b[s0:s0 + n]
+        if wa.max() < a.max() * .2:
+            continue
+        lags = range(-6, 7)
+        best = max(lags, key=lambda L: numpy.corrcoef(wa[max(0, L):n + min(0, L)], wb[max(0, -L):n - max(0, L)])[0, 1])
+        worst = max(worst, abs(best) * 5.0)
+    return worst, float(corr_all)
+
+
+import scipy.ndimage  # noqa: E402
+
+HARMONIES = ((4, -7.0, -.55), (-7, -8.0, .55), (-12, -9.0, 0.0))  # semitones, dB, pan: a third above, a fifth below, the octave below
+
+
+def layers_for(lead, tag, notes, label):
+    """Stereo layers for a chorus line, locked to the lead's timing: her own take in harmony (no offset), and each friend's take warped word by word onto hers where the fit is tight."""
+    out = numpy.zeros((len(lead), 2), dtype="float32")
+    for semis, db, pan in HARMONIES:
+        h = shift(lead, semis) * 10 ** (db / 20)
+        out[:, 0] += h * math.cos((pan + 1) * math.pi / 4)
+        out[:, 1] += h * math.sin((pan + 1) * math.pi / 4)
+    kept = []
+    for who in MEMBERS:
+        g = load(VOICE / f"{who}-{tag}.wav")
+        warped, wild = warp_onto(lead, g)
+        if warped is None:
+            notes.append(f"    friend {who}: left out ({label}): the warp was wild")
+            continue
+        lag, corr = residual_lag_ms(lead, warped)
+        if lag <= 10 and corr >= .7:
+            gain = 10 ** (-9.0 / 20) / math.sqrt(2)
+            out[:, 0] += warped * gain
+            out[:, 1] += warped * gain
+            kept.append(who)
+            notes.append(f"    friend {who}: kept, residual lag {lag:.0f} ms, envelope correlation {corr:.2f}")
+        else:
+            notes.append(f"    friend {who}: left out ({label}): residual lag {lag:.0f} ms, correlation {corr:.2f}")
+    return out
+
+
 def vocals():
     total = int(TOTAL_BARS * BAR * RATE)
     track = numpy.zeros(total, dtype="float32")
+    layers = numpy.zeros((total, 2), dtype="float32")
     notes = []
     for bar, text, group in lines_with_bars():
         span = 2 * BAR - .25 if bar != 2 else 1.4
@@ -208,27 +321,14 @@ def vocals():
         q = nat / final
         piece = cf.stretch(x, q, RATE) if abs(q - 1) > .02 else x
         piece = cf.edged(piece)
-        if group and UNISON:
-            mixed = piece.copy()
-            for who, (gain, off) in zip(MEMBERS, ((.5, .012), (.4, .02), (.5, .006), (.45, .016))):
-                g = load(VOICE / f"{who}-{tag}.wav")
-                g = cf.stretch(g, min(1.9, max(.6, len(g) / len(piece))), RATE)
-                g = cf.edged(g[: len(piece)])
-                o = int(off * RATE)
-                mixed[o:o + len(g)] += gain * g[: max(0, len(mixed) - o)]
-            peak = numpy.abs(mixed).max()
-            mixed *= max(numpy.abs(piece).max(), .3) / peak if peak > 0 else 1
-            w = load(VOICE / f"W-{tag}.wav")
-            w = cf.stretch(w, min(1.9, max(.6, len(w) / len(piece))), RATE)
-            w = cf.edged(w[: len(piece)])
-            o = int(.035 * RATE)
-            mixed[o:o + len(w)] += .5 * w[: max(0, len(mixed) - o)]
-            piece = mixed
         start = bar * BAR + (.05 if bar != 2 else .1)
         s = int(start * RATE)
         track[s:s + len(piece)] += piece[: total - s]
-        notes.append(f"bar {bar:2d} {start:6.2f}-{start + len(piece) / RATE:6.2f} s  x{q:.2f}  {'' if group else ''}{text}")
-    return track, notes
+        notes.append(f"bar {bar:2d} {start:6.2f}-{start + len(piece) / RATE:6.2f} s  x{q:.2f}  {'[chorus: harmonies + friends] ' if group and bar != 2 else ''}{text}")
+        if group and bar != 2:
+            lay = layers_for(piece, tag, notes, text[:20])
+            layers[s:s + len(lay)] += lay[: total - s]
+    return track, layers, notes
 
 
 def lufs(x):
@@ -254,7 +354,7 @@ def mouth_track(voice_stem, loop_end):
 def build():
     song = instrumental()
     loop_start, loop_end = int(LOOP_START_BAR * BAR * RATE), int(TOTAL_BARS * BAR * RATE)
-    voc, notes = vocals()
+    voc, layers, notes = vocals()
     inst = song.mean(axis=1) if False else song
     # the voice at one level, the instrumental held down under it
     act = numpy.abs(voc) > .02
@@ -263,14 +363,22 @@ def build():
     voc_level = float(numpy.sqrt((voc[act] ** 2).mean()))
     voc_g = 10 ** (-14.0 / 20) / voc_level
     voc = voc * voc_g
+    layers = layers * voc_g
+    # the choruses lifted a little in the instrumental (the choir pads and brass are in it, and cannot be lifted alone): +2.5 dB with half-second ramps
+    lift = numpy.zeros(len(song), dtype='float32')
+    for name, first, n in PLAN:
+        if name.startswith(('chorus', 'final')):
+            lift[int(first * BAR * RATE):int((first + n) * BAR * RATE)] = 1
+    lift = scipy.ndimage.uniform_filter1d(lift, int(.5 * RATE))
+    song = song * (1 + (10 ** (2.5 / 20) - 1) * lift)[:, None]
     inst_g = 10 ** (-16.0 / 20) / float(numpy.sqrt((song ** 2).mean()))
     inst_ducked = song * inst_g * (1 - .3 * env)[:, None]
-    mix = inst_ducked + numpy.stack([voc, voc], axis=1)
+    mix = inst_ducked + numpy.stack([voc, voc], axis=1) + layers
     # loudness -15 LUFS, true peak under -1 dB
     gain = 10 ** ((-15.0 - lufs(mix)) / 20)
     for stem in (mix, ):
         pass
-    mix, inst_stem, voc_stem = mix * gain, (song * inst_g) * gain, numpy.stack([voc, voc], axis=1) * gain
+    mix, inst_stem, voc_stem, lead_stem = mix * gain, (song * inst_g) * gain, (numpy.stack([voc, voc], axis=1) + layers) * gain, numpy.stack([voc, voc], axis=1) * gain
     for _ in range(4):
         up = scipy.signal.resample_poly(mix, 4, 1, axis=0)
         peak = 20 * numpy.log10(numpy.abs(up).max() + 1e-9)
@@ -279,16 +387,17 @@ def build():
         import scipy.ndimage as nd
         level = nd.maximum_filter1d(numpy.abs(mix).max(axis=1), size=int(.006 * RATE))
         g = nd.uniform_filter1d(numpy.minimum(1.0, 10 ** (-1.4 / 20) / (level + 1e-9)), size=int(.004 * RATE))[:, None]
-        mix, inst_stem, voc_stem = mix * g, inst_stem * g, voc_stem * g
+        mix, inst_stem, voc_stem, lead_stem = mix * g, inst_stem * g, voc_stem * g, lead_stem * g
     loud = lufs(mix)
     up = scipy.signal.resample_poly(mix, 4, 1, axis=0)
     peak = 20 * numpy.log10(numpy.abs(up).max() + 1e-9)
     # the loop: close it in each of the three
-    mix_l, inst_l, voc_l = (close_loop(a, loop_start, loop_end) for a in (mix, inst_stem, voc_stem))
+    mix_l, inst_l, voc_l, lead_l = (close_loop(a, loop_start, loop_end) for a in (mix, inst_stem, voc_stem, lead_stem))
+    soundfile.write(OUT / "grimoire_theme_lead.wav", lead_l, RATE)
     soundfile.write(OUT / "grimoire_theme_mix.wav", mix_l, RATE)
     soundfile.write(OUT / "grimoire_theme_instrumental.wav", inst_l, RATE)
     soundfile.write(OUT / "grimoire_theme_vocals.wav", voc_l, RATE)
-    mouth = mouth_track(voc_stem[:, 0], loop_end)
+    mouth = mouth_track(lead_stem[:, 0], loop_end)
     (OUT / "grimoire_theme.mouth").write_bytes(mouth.tobytes())
     (OUT / "grimoire_theme_lyrics.txt").write_text(lyrics(), encoding="utf-8")
     (OUT / "grimoire_theme_notes.txt").write_text("\n".join(notes) + f"\n\nloop_start={loop_start} loop_end={loop_end} samples at {RATE} Hz ({loop_start / RATE:.3f} s - {loop_end / RATE:.3f} s)\nfull mix {loud:.1f} LUFS, true peak {peak:.1f} dB\nmouth: {len(mouth)} frames at 30 fps, classes {numpy.bincount(mouth, minlength=4).tolist()}\n", encoding="utf-8")
@@ -301,7 +410,7 @@ def lyrics():
             "[Intro, 4 bars]", INTRO[0][1], "", "[Verse 1]"] + VERSE1 + ["", "[Chorus]"] + CHORUS + ["", "[Verse 2]"] + VERSE2 + ["", "[Chorus]"] + CHORUS2 + ["", "[Final chorus]"] + FINAL
     rows = [r + ("   [STRONG: the f-word]" if re.search(r"fuck", r, re.I) else "   [language: mild]") if re.search(r"\b(damn|hell|crap|screw|fuck)\b", r, re.I) and not r.startswith("[") else r for r in rows]
     rows.append("")
-    rows.append("Language (marked above): damn, hell, crap, screw, and the f-word twice (second chorus and final chorus, aimed at sloppiness). Her voice alone and dry throughout (no unison, no whisper double, no echo).")
+    rows.append("Language (marked above): damn, hell, crap, screw, and the f-word twice (second chorus and final chorus, aimed at sloppiness). Verses: her voice alone and dry. Choruses: her lead, her own take in harmony (a third above, a fifth and an octave below, sample-aligned) and any friends' takes that were warped onto her words within 10 ms; no reverb, delay or echo anywhere.")
     return "\n".join(rows)
 
 
